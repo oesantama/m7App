@@ -541,41 +541,7 @@ export const saveConciliation = async (req: Request, res: Response) => {
         try {
             await client.query('BEGIN');
 
-            // 1. Manejo de Reasignación en REPICE (Otro Conductor)
-            let finalPlate = vehiclePlate;
-            let finalConductorId = conductorId;
-            let finalConductorName = conductorName;
-
-            if (estadoEntrega === 'repice' && targetRouteId) {
-                // Obtener datos de la ruta destino
-                const targetRes = await client.query(`
-                    SELECT r.id, v.plate, d.id as driver_id, d.name as driver_name
-                    FROM routes r
-                    LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
-                    LEFT JOIN drivers d ON d.id::text = r.driver_id::text
-                    WHERE r.id::text = $1
-                `, [targetRouteId]);
-
-                if (targetRes.rowCount > 0) {
-                    const tr = targetRes.rows[0];
-                    finalPlate = tr.plate;
-                    finalConductorId = tr.driver_id;
-                    finalConductorName = tr.driver_name;
-
-                    // Reasignar en route_invoices
-                    // Primero desvincular de cualquier ruta previa (mismo invoice_id)
-                    const invKey = invoiceNumber.includes('_') ? invoiceNumber : `${documentId}_${invoiceNumber}`;
-                    await client.query(`DELETE FROM route_invoices WHERE invoice_id = $1 OR invoice_id = $2`, [invoiceNumber, invKey]);
-                    
-                    // Vincular a la nueva ruta
-                    await client.query(`
-                        INSERT INTO route_invoices (route_id, invoice_id, created_at)
-                        VALUES ($1, $2, NOW())
-                    `, [targetRouteId, invKey]);
-                }
-            }
-
-            // 2. Estado anterior de la factura
+            // 1. Estado anterior de la factura
             const prevRes = await client.query(
                 `SELECT ic.forma_pago, di.item_status
                  FROM document_items di
@@ -585,6 +551,100 @@ export const saveConciliation = async (req: Request, res: Response) => {
             );
             const prevFormaPago  = prevRes.rows[0]?.forma_pago  || null;
             const prevItemStatus = prevRes.rows[0]?.item_status || null;
+
+            // ── REPICE: flujo especial ──────────────────────────────────────────
+            // El REPICE NO es un pago. Devuelve la factura al estado pendiente para
+            // que el conductor la reentregue. NO debe quedar en invoice_conciliations.
+            if (estadoEntrega === 'repice') {
+                const invKey = invoiceNumber.includes('_') ? invoiceNumber : `${documentId}_${invoiceNumber}`;
+
+                let repicePlate = vehiclePlate;
+                let repiceConductorId = conductorId;
+                let repiceConductorName = conductorName;
+
+                // Determinar placa destino
+                let targetPlate: string | null = null;
+                if (targetRouteId) {
+                    // OTRO_CONDUCTOR: obtener placa de la ruta seleccionada
+                    const trRes = await client.query(`
+                        SELECT v.plate FROM routes r
+                        LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
+                        WHERE r.id::text = $1 LIMIT 1
+                    `, [targetRouteId]);
+                    targetPlate = trRes.rows[0]?.plate || null;
+                } else {
+                    // MISMO_CONDUCTOR: usar la placa actual del vehículo
+                    targetPlate = vehiclePlate || null;
+                }
+
+                // Buscar la ruta MÁS RECIENTE para la placa destino
+                if (targetPlate) {
+                    const latestRes = await client.query(`
+                        SELECT r.id, v.plate, d.id AS driver_id, d.name AS driver_name
+                        FROM routes r
+                        LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
+                        LEFT JOIN drivers d ON d.id::text = r.driver_id::text
+                        WHERE LOWER(TRIM(v.plate)) = LOWER(TRIM($1))
+                        ORDER BY r.created_at DESC LIMIT 1
+                    `, [targetPlate]);
+
+                    if ((latestRes.rowCount ?? 0) > 0) {
+                        const lr = latestRes.rows[0];
+                        repicePlate = lr.plate;
+                        repiceConductorId = lr.driver_id;
+                        repiceConductorName = lr.driver_name;
+
+                        // Reasignar en route_invoices a la ruta más reciente
+                        await client.query(
+                            `DELETE FROM route_invoices WHERE invoice_id = $1 OR invoice_id = $2`,
+                            [invoiceNumber, invKey]
+                        );
+                        await client.query(
+                            `INSERT INTO route_invoices (route_id, invoice_id, created_at) VALUES ($1, $2, NOW())`,
+                            [lr.id, invKey]
+                        );
+                    }
+                }
+
+                // Eliminar de invoice_conciliations (REPICE = pendiente, no conciliado)
+                await client.query(
+                    `DELETE FROM invoice_conciliations WHERE document_id = $1 AND invoice_number = $2`,
+                    [documentId, invoiceNumber]
+                );
+
+                // Actualizar estado del ítem a EST-15 (REPICE)
+                await client.query(
+                    `UPDATE document_items SET item_status = 'EST-15' WHERE document_id = $1 AND invoice = $2`,
+                    [documentId, invoiceNumber]
+                );
+
+                await client.query('COMMIT');
+                res.json({ success: true, data: { repice: true, plate: repicePlate, conductorName: repiceConductorName } });
+
+                // Historial (best-effort fuera de transacción)
+                pool.query(`
+                    INSERT INTO invoice_status_history
+                        (document_id, invoice_number, evento, estado_anterior, estado_nuevo,
+                         valor_factura, valor_entregado, valor_devuelto,
+                         banco, comprobante, usuario_id, usuario_nombre, created_at)
+                    VALUES ($1, $2, 'REPICE', $3, 'EST-15', $4, NULL, NULL, NULL, $5, $6, $7, NOW())
+                `, [
+                    documentId, invoiceNumber,
+                    prevItemStatus,
+                    Number(valorFactura) || null,
+                    targetRouteId ? 'OTRO_CONDUCTOR' : 'MISMO_CONDUCTOR',
+                    conciliadoPor || null,
+                    usuarioNombre || null,
+                ]).catch(e => console.warn('[CONCILIATION] repice history insert skipped:', e.message));
+
+                return; // salir aquí para REPICE
+            }
+            // ── Fin REPICE ─────────────────────────────────────────────────────
+
+            // 2. Reasignación para otros casos (solo si viene targetRouteId sin ser repice)
+            let finalPlate = vehiclePlate;
+            let finalConductorId = conductorId;
+            let finalConductorName = conductorName;
 
             // 3. UPSERT en invoice_conciliations
             // Para Plan Normal (sin formaPago) usar estadoEntrega como forma_pago
@@ -621,8 +681,6 @@ export const saveConciliation = async (req: Request, res: Response) => {
                 itemsReturned ? JSON.stringify(itemsReturned) : '[]',
             ]);
 
-
-
             // 4. Determinar nuevo item_status según estado de entrega
             let nuevoItemStatus: string | null = null;
             let eventoHistorial = 'LEGALIZADO';
@@ -633,9 +691,6 @@ export const saveConciliation = async (req: Request, res: Response) => {
             } else if (estadoEntrega === 'parcial') {
                 nuevoItemStatus = 'EST-14';
                 eventoHistorial = 'PARCIAL';
-            } else if (estadoEntrega === 'repice') {
-                nuevoItemStatus = 'EST-15';
-                eventoHistorial = 'REPICE';
             } else if (estadoEntrega === 'entregado' || formaPago) {
                 nuevoItemStatus = 'EST-12';
                 eventoHistorial = 'LEGALIZADO';
@@ -650,7 +705,7 @@ export const saveConciliation = async (req: Request, res: Response) => {
                 );
             }
 
-        // 5. COMMIT — la conciliación queda guardada independiente del historial
+        // COMMIT
         await client.query('COMMIT');
         res.json({ success: true, data: result.rows[0] });
 
@@ -1706,5 +1761,109 @@ export const updateInvoiceValue = async (req: Request, res: Response) => {
     }
 };
 
+// ─── POST /conciliation/adjust-payment ────────────────────────────────────────
+// Edita valor y/o comprobante de una factura ya ENTREGADA mientras la conciliación está abierta.
+// Guarda los valores previos en invoice_conciliation_reversal_logs con observations = 'EDICION'.
+export const adjustPayment = async (req: Request, res: Response) => {
+    const { documentId, invoiceNumber, newValor, newComprobante, userId } = req.body;
 
+    if (!documentId || !invoiceNumber || !userId) {
+        return res.status(400).json({ success: false, error: 'Faltan parámetros requeridos.' });
+    }
+    if (newValor === undefined && newComprobante === undefined) {
+        return res.status(400).json({ success: false, error: 'Debe indicar al menos un campo a actualizar (valor o comprobante).' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Obtener registro actual
+        const origRes = await client.query(
+            `SELECT * FROM invoice_conciliations WHERE document_id = $1 AND invoice_number = $2`,
+            [documentId, invoiceNumber]
+        );
+        if (origRes.rowCount === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ success: false, error: 'No se encontró conciliación activa para esta factura.' });
+        }
+        const orig = origRes.rows[0];
+
+        // Verificar que es entregado (no devolución)
+        if (orig.es_devolucion) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ success: false, error: 'No se puede editar el pago de una factura en devolución.' });
+        }
+
+        // Si el comprobante cambia, validar duplicados contra OTROS registros
+        const cleanComprobante = newComprobante !== undefined ? String(newComprobante).trim() : null;
+        if (cleanComprobante && cleanComprobante.toUpperCase() !== (orig.comprobante || '').trim().toUpperCase()) {
+            const dupRes = await client.query(
+                `SELECT ic.document_id, ic.invoice_number FROM invoice_conciliations ic
+                 WHERE TRIM(UPPER(ic.comprobante)) = TRIM(UPPER($1))
+                   AND NOT (ic.document_id = $2 AND ic.invoice_number = $3)
+                 UNION ALL
+                 SELECT rgp.document_id, NULL FROM route_group_payments rgp
+                 WHERE TRIM(UPPER(rgp.referencia)) = TRIM(UPPER($1))
+                 LIMIT 1`,
+                [cleanComprobante, documentId, invoiceNumber]
+            );
+            if ((dupRes.rowCount ?? 0) > 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({
+                    success: false,
+                    error: `El comprobante "${cleanComprobante}" ya está registrado en otro movimiento.`,
+                    code: 'DUPLICATE_REF'
+                });
+            }
+        }
+
+        // Guardar valores previos en log
+        await client.query(`
+            INSERT INTO invoice_conciliation_reversal_logs (
+                document_id, invoice_number, banco, valor, comprobante, fecha_pago,
+                forma_pago, numero_cheque, es_devolucion, conciliado_por,
+                vehicle_plate, conductor_id, conductor_name,
+                original_created_at, original_updated_at,
+                reversed_by, reversed_at, observations
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, NOW(), $17)
+        `, [
+            orig.document_id, orig.invoice_number, orig.banco, orig.valor, orig.comprobante, orig.fecha_pago,
+            orig.forma_pago, orig.numero_cheque, orig.es_devolucion, orig.conciliado_por,
+            orig.vehicle_plate, orig.conductor_id, orig.conductor_name,
+            orig.created_at, orig.updated_at,
+            userId, 'EDICION'
+        ]);
+
+        // Actualizar valor y/o comprobante
+        const updates: string[] = [];
+        const params: any[] = [];
+        let paramIdx = 1;
+
+        if (newValor !== undefined) {
+            updates.push(`valor = $${paramIdx++}`);
+            params.push(Number(newValor));
+        }
+        if (cleanComprobante !== null) {
+            updates.push(`comprobante = $${paramIdx++}`);
+            params.push(cleanComprobante);
+        }
+        updates.push(`updated_at = NOW()`);
+        params.push(documentId, invoiceNumber);
+
+        await client.query(
+            `UPDATE invoice_conciliations SET ${updates.join(', ')} WHERE document_id = $${paramIdx++} AND invoice_number = $${paramIdx}`,
+            params
+        );
+
+        await client.query('COMMIT');
+        res.json({ success: true, message: 'Pago ajustado correctamente.' });
+    } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error('[CONCILIATION] adjustPayment error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        client.release();
+    }
+};
 

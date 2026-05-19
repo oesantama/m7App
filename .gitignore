@@ -1,5 +1,5 @@
-# Logs
-logs
+# ── Logs ──────────────────────────────────────────────────────────────────────
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,37 +7,84 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Frameworks y Entorno
-node_modules
-dist
-dist-ssr
+# ── Dependencias y Builds ─────────────────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+dist_backend/
 *.local
-.env
-.wwebjs_auth
-.wwebjs_cache
 
-# Scripts de Diagnóstico y Temporales (Ignorados en Producción)
+# ── Fuentes Legadas (carpeta histórica, no va al repositorio) ─────────────────
+legacy_sources/
+
+# ── Variables de Entorno y Autenticación ─────────────────────────────────────
+.env
+.env.*
+.env.bak
+!.env.example
+.wwebjs_auth/
+.wwebjs_cache/
+
+# ── Configuración local del editor / herramientas ─────────────────────────────
+.claude/settings.local.json
+
+# ── Scripts de Diagnóstico y Temporales ──────────────────────────────────────
 *.cjs
 *.js
 *.txt
-*.pdf
 !package.json
 !run_migration.js
 
-# Base de Datos (Ocultar scripts de desarrollo, mantener el MASTER)
+# ── Archivos Pesados / Binarios ───────────────────────────────────────────────
+# Documentos Office y archivos comprimidos
+*.xlsx
+*.xlsm
+*.xls
+*.docx
+*.doc
+*.pptx
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# PDFs generados / reportes temporales
+*.pdf
+
+# Imágenes de debug / capturas locales
+*debug*.png
+*debug*.jpg
+local_*.png
+local_*.jpg
+
+# ── Informes HTML generados automáticamente ───────────────────────────────────
+informe-*.html
+INFORME_*.html
+playwright-report/
+
+# ── Base de Datos ─────────────────────────────────────────────────────────────
 *.sql
 !M7_PRODUCTION_SETUP.sql
 !backend/init_production_coolify.sql
 !backend/full_restore.sql
 !backend/scripts/MIGRACION_CAPACITACIONES.sql
+!backend/scripts/MIGRACION_DOTACIONES_PROD.sql
 
-# Editor directories and files
+# ── Editor ────────────────────────────────────────────────────────────────────
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# ── Temporales del SO ─────────────────────────────────────────────────────────
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+/tmp/

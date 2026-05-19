@@ -1,6 +1,12 @@
 
 import pool from '../config/database.js';
 import bcrypt from 'bcryptjs';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'roles': ['name', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
@@ -617,6 +623,46 @@ const healSchema = async (client: any) => {
     console.error('Error running assignments and returns migrations:', e);
   }
 
+  // AdminCenter (Logística & Transportes: Formatos)
+  try {
+    const client = await pool.connect();
+    try {
+      // Limpieza de tablas de Inventario Ajover (eliminado a petición del usuario)
+      await client.query(`
+        DROP TABLE IF EXISTS ia_inventario_detalle CASCADE;
+        DROP TABLE IF EXISTS ia_inventario_encabezado CASCADE;
+        DROP TABLE IF EXISTS ia_eles_detalle CASCADE;
+        DROP TABLE IF EXISTS ia_eles_encabezado CASCADE;
+        DROP TABLE IF EXISTS ia_destinatarios CASCADE;
+        DROP TABLE IF EXISTS ia_smtp_config CASCADE;
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS opt_formatos (
+            id VARCHAR(255) PRIMARY KEY,
+            nombre VARCHAR(255) NOT NULL,
+            orden INTEGER DEFAULT 0
+        );
+      `);
+
+      // Seed default formats if table is empty
+      await client.query(`
+        INSERT INTO opt_formatos (id, nombre, orden)
+        VALUES 
+          ('1aF-K05Jp-9u27D0P5N3v1r6wG4x8y9z0', 'F-OPT-007 Inspección Preoperacional de Vehículos', 1),
+          ('1bF-K05Jp-9u27D0P5N3v1r6wG4x8y9z1', 'F-OPT-005 Pagaré y Carta de Instrucciones', 2),
+          ('1cF-K05Jp-9u27D0P5N3v1r6wG4x8y9z2', 'F-OPT-008 Control de Fatiga y Descanso', 3)
+        ON CONFLICT (id) DO NOTHING;
+      `);
+      
+      console.log('[M7-DB-ADMINCENTER] Tabla y semillas de opt_formatos creadas.');
+    } finally {
+      client.release();
+    }
+  } catch (e) {
+    console.error('Error running AdminCenter migrations:', e);
+  }
+
   // ─────────────────────────────────────────────────────────────────────────────
 
   try {
@@ -745,6 +791,11 @@ const healSchema = async (client: any) => {
     await client.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS unq_inv_cli_batch 
       ON inventario_clientes (client_id, article_id, batch)
+    `);
+
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_gh_cargos_nombre 
+      ON gh_cargos (nombre)
     `);
 
     console.log('[M7-DB-HEAL] Limpiando duplicados de Patrones IA para estabilidad ON CONFLICT...');
@@ -1014,6 +1065,27 @@ export const restoreSystem = async () => {
     const healEnd = Date.now();
     console.log(`[M7-DB-HEAL] Curación de esquema completada en ${healEnd - start}ms`);
 
+    // Ejecutar migración de dotaciones histórica una sola vez
+    try {
+      const checkMig = await client.query("SELECT COUNT(*) FROM gh_asignaciones_personal WHERE usuario_control = 'Migración'");
+      const count = Number(checkMig.rows[0].count);
+      if (count === 0) {
+        console.log('[M7-DB-MIGRATION] Detectada base de datos limpia de datos históricos. Ejecutando MIGRACION_DOTACIONES_PROD.sql...');
+        const sqlPath = path.join(__dirname, '../scripts/MIGRACION_DOTACIONES_PROD.sql');
+        if (fs.existsSync(sqlPath)) {
+          const sql = fs.readFileSync(sqlPath, 'utf8');
+          await client.query(sql);
+          console.log('[M7-DB-MIGRATION] Datos históricos de dotaciones migrados con éxito.');
+        } else {
+          console.warn('[M7-DB-MIGRATION] Archivo de migración no encontrado en:', sqlPath);
+        }
+      } else {
+        console.log(`[M7-DB-MIGRATION] Datos históricos ya migrados previamente (${count} asignaciones).`);
+      }
+    } catch (e: any) {
+      console.error('[M7-DB-MIGRATION-ERROR] Error al aplicar migración histórica:', e.message);
+    }
+
     await client.query('BEGIN');
 
     // SEMILLAS DE DATOS BOOTSTRAP — solo se ejecutan en entornos NO-producción
@@ -1130,6 +1202,7 @@ export const restoreSystem = async () => {
       ('PAG-13', 'DESPACHO LOGÍSTICO', 'despacho', 'MOD-03', 'MOD-03', 'EST-01'),
       ('PAG-14', 'GESTIÓN DE FLOTAS', 'flotas', 'MOD-02', 'MOD-02', 'EST-01'),
       ('PAG-15', 'PLANIFICADOR DE RUTAS', 'rutas', 'MOD-03', 'MOD-03', 'EST-01'),
+      ('PAG-60', 'FORMATOS TRANSPORTES', 'formatos-transportes', 'MOD-02', 'MOD-02', 'EST-01'),
 
       -- Inventarios (MOD-03)
       ('PAG-16', 'GESTIÓN DE DOCUMENTOS', 'documentos', 'MOD-03', 'MOD-03', 'EST-01'),

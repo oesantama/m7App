@@ -381,28 +381,37 @@ const LegalizationDialog: React.FC<{
                                 <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
                                     <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-2">Información de Repice</p>
                                     <div className="flex gap-2">
-                                        <button 
+                                        <button
                                             disabled={!canEdit}
-                                            onClick={() => onUpdate({ numConsignacion: 'MISMO_CONDUCTOR' })}
-                                            className={`flex-1 py-2 rounded-xl text-[8px] font-black uppercase transition-all border-2 
+                                            onClick={() => onUpdate({ numConsignacion: 'MISMO_CONDUCTOR', targetRouteId: undefined })}
+                                            className={`flex-1 py-2.5 rounded-xl text-[8px] font-black uppercase transition-all border-2
                                                 ${form.numConsignacion === 'MISMO_CONDUCTOR' ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50'}`}>
-                                            Mismo Conductor
+                                            🔄 Mismo Conductor
                                         </button>
-                                        <button 
+                                        <button
                                             disabled={!canEdit}
-                                            onClick={() => onUpdate({ numConsignacion: 'OTRO_CONDUCTOR' })}
-                                            className={`flex-1 py-2 rounded-xl text-[8px] font-black uppercase transition-all border-2 
+                                            onClick={() => onUpdate({ numConsignacion: 'OTRO_CONDUCTOR', targetRouteId: undefined })}
+                                            className={`flex-1 py-2.5 rounded-xl text-[8px] font-black uppercase transition-all border-2
                                                 ${form.numConsignacion === 'OTRO_CONDUCTOR' ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'bg-white border-blue-200 text-blue-500 hover:bg-blue-50'}`}>
-                                            Otro Conductor
+                                            🔀 Otro Conductor
                                         </button>
                                     </div>
-                                    <p className="text-[7px] text-blue-400 font-bold mt-2 uppercase text-center italic">
-                                        {form.numConsignacion === 'MISMO_CONDUCTOR' 
-                                            ? 'ℹ️ Quedará pendiente hasta entrega por el mismo conductor.' 
-                                            : form.numConsignacion === 'OTRO_CONDUCTOR' 
-                                                ? 'ℹ️ Seleccione la nueva placa de destino para la reasignación.'
-                                                : 'ℹ️ Seleccione el tipo de disposición para el Repice.'}
-                                    </p>
+
+                                    {form.numConsignacion === 'MISMO_CONDUCTOR' && (
+                                        <div className="mt-2 bg-blue-50/80 border border-blue-100 rounded-xl p-3 space-y-1">
+                                            <p className="text-[8px] font-black text-blue-700 uppercase tracking-widest">🚗 Placa actual: {inv.vehicle_plate || '—'}</p>
+                                            <p className="text-[7px] text-blue-500 font-bold">
+                                                El sistema asignará la factura a la ruta más reciente de <span className="font-black">{inv.vehicle_plate || 'este vehículo'}</span>.
+                                                Quedará pendiente para ser legalizada como entregada, parcial o devolución.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {!form.numConsignacion && (
+                                        <p className="text-[7px] text-blue-400 font-bold mt-1 uppercase text-center italic">
+                                            ℹ️ Seleccione el tipo de disposición para el Repice.
+                                        </p>
+                                    )}
 
                                     {form.numConsignacion === 'OTRO_CONDUCTOR' && (() => {
                                         const [isOpen, setIsOpen] = useState(false);
@@ -430,16 +439,19 @@ const LegalizationDialog: React.FC<{
                                         }, []);
 
                                         return (
-                                            <div className="mt-4 animate-in slide-in-from-top-1 duration-200" ref={dropdownRef}>
-                                                <label className="block text-[8px] font-black text-blue-600 uppercase tracking-widest mb-1.5 ml-1">Placa de Destino (Reasignación)</label>
-                                                
+                                            <div className="mt-3 animate-in slide-in-from-top-1 duration-200" ref={dropdownRef}>
+                                                <label className="block text-[8px] font-black text-blue-600 uppercase tracking-widest mb-1.5 ml-1">
+                                                    Conductor / Placa de Destino
+                                                </label>
+                                                <p className="text-[7px] text-blue-400 font-bold mb-2 ml-1">
+                                                    El sistema usará la ruta más reciente del conductor seleccionado.
+                                                </p>
                                                 <div className="relative">
-                                                    {/* Botón / Input de visualización */}
-                                                    <div 
-                                                        onClick={() => !isLegalized && setIsOpen(!isOpen)}
+                                                    <div
+                                                        onClick={() => canEdit && setIsOpen(!isOpen)}
                                                         className={`w-full px-4 py-3 bg-blue-50 border-2 rounded-xl text-[10px] font-black flex items-center justify-between transition-all cursor-pointer
                                                             ${isOpen ? 'border-blue-400 ring-2 ring-blue-100' : 'border-blue-100'}
-                                                            ${isLegalized ? 'opacity-70 cursor-not-allowed' : 'hover:border-blue-300'}`}
+                                                            ${!canEdit ? 'opacity-70 cursor-not-allowed' : 'hover:border-blue-300'}`}
                                                     >
                                                         <div className="flex items-center gap-2">
                                                             {selectedRoute ? (
@@ -448,21 +460,20 @@ const LegalizationDialog: React.FC<{
                                                                     <span className="text-blue-400 text-[8px]">| {selectedRoute.driver_name}</span>
                                                                 </>
                                                             ) : (
-                                                                <span className="text-blue-300 uppercase tracking-tighter">Seleccione placa de destino...</span>
+                                                                <span className="text-blue-300 uppercase tracking-tighter">Buscar por placa o conductor...</span>
                                                             )}
                                                         </div>
                                                         <Icons.ChevronDown className={`w-3 h-3 text-blue-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                                                     </div>
 
-                                                    {/* Dropdown con buscador */}
                                                     {isOpen && (
                                                         <div className="absolute z-[1000] top-full left-0 right-0 mt-2 bg-white border border-blue-100 shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                                                             <div className="p-2 bg-blue-50/50 border-b border-blue-50">
                                                                 <div className="relative">
                                                                     <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-blue-400" />
-                                                                    <input 
+                                                                    <input
                                                                         autoFocus
-                                                                        type="text" 
+                                                                        type="text"
                                                                         value={search}
                                                                         onChange={(e) => setSearch(e.target.value)}
                                                                         placeholder="Filtrar por placa o conductor..."
@@ -472,8 +483,8 @@ const LegalizationDialog: React.FC<{
                                                             </div>
                                                             <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
                                                                 {filteredRoutes.length > 0 ? (
-                                                                    filteredRoutes.map(r => (
-                                                                        <div 
+                                                                    filteredRoutes.map((r, ridx) => (
+                                                                        <div
                                                                             key={r.route_id}
                                                                             onClick={() => {
                                                                                 onUpdate({ targetRouteId: r.route_id });
@@ -482,8 +493,11 @@ const LegalizationDialog: React.FC<{
                                                                             }}
                                                                             className="px-4 py-3 hover:bg-blue-50 cursor-pointer flex items-center justify-between border-b border-blue-50 last:border-0 transition-colors"
                                                                         >
-                                                                            <div className="flex flex-col">
-                                                                                <span className="text-[10px] font-black text-blue-900">🚗 {r.plate}</span>
+                                                                            <div className="flex flex-col gap-0.5">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-[10px] font-black text-blue-900">🚗 {r.plate}</span>
+                                                                                    {ridx === 0 && <span className="text-[7px] font-black px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">Más reciente</span>}
+                                                                                </div>
                                                                                 <span className="text-[8px] font-bold text-slate-400 uppercase">{r.driver_name || 'Sin conductor'}</span>
                                                                             </div>
                                                                             {form.targetRouteId === r.route_id && (
@@ -714,6 +728,20 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     const [reverseObservations, setReverseObservations] = useState('');
     const [reversingState, setReversingState] = useState(false);
 
+    // Refs de comprobantes ya confirmados como duplicados (para no bloquear el guardado tras confirmar)
+    const confirmedRefsRef = useRef<Set<string>>(new Set());
+
+    // Estado para modal de edición de valor/comprobante en facturas ENTREGADAS
+    const [adjustModal, setAdjustModal] = useState<{
+        isOpen: boolean;
+        invoice: any | null;
+        newValor: string;
+        newComprobante: string;
+        saving: boolean;
+        checkingRef: boolean;
+        refDuplicate: boolean;
+    }>({ isOpen: false, invoice: null, newValor: '', newComprobante: '', saving: false, checkingRef: false, refDuplicate: false });
+
     // Estado para alerta de referencia duplicada
     const [duplicateAlert, setDuplicateAlert] = useState<{
         reference: string;
@@ -942,6 +970,30 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         if (nonZeroWithMissingRef.length > 0) {
             toast.error('La Referencia es obligatoria para cada pago registrado.');
             return;
+        }
+
+        // Verificar referencias duplicadas en nuevos pagos
+        for (let idx = 0; idx < allToSave.length; idx++) {
+            const c = allToSave[idx];
+            const ref = c.nroAprobacion?.trim();
+            if (!ref) continue;
+            const confirmedKey = ref.toUpperCase();
+            if (confirmedRefsRef.current.has(confirmedKey)) continue;
+            try {
+                const checkRes = await api.checkReferenceExists(ref);
+                if (checkRes.success && checkRes.exists) {
+                    const originalIdx = consignaciones.findIndex(x => x.id === c.id);
+                    setDuplicateAlert({
+                        reference: ref,
+                        sourceType: 'grupal',
+                        groupIndex: originalIdx >= 0 ? originalIdx : idx,
+                        details: checkRes.data
+                    });
+                    return;
+                }
+            } catch {
+                // Si la verificación falla, permitir continuar
+            }
         }
 
         setSavingGrupal(true);
@@ -1187,10 +1239,16 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         const valorNum = Number(form.valor);
         const invoiceVal = Number(inv.invoice_value) || 0;
 
-        // Validación de reasignación REPICE
-        if (form.estadoEntrega === 'repice' && form.numConsignacion === 'OTRO_CONDUCTOR' && !form.targetRouteId) {
-            toast.error('Debe seleccionar la placa de destino para la reasignación.');
-            return;
+        // Validaciones REPICE
+        if (form.estadoEntrega === 'repice') {
+            if (!form.numConsignacion || (form.numConsignacion !== 'MISMO_CONDUCTOR' && form.numConsignacion !== 'OTRO_CONDUCTOR')) {
+                toast.error('Debe seleccionar "Mismo Conductor" o "Otro Conductor" para el Repice.');
+                return;
+            }
+            if (form.numConsignacion === 'OTRO_CONDUCTOR' && !form.targetRouteId) {
+                toast.error('Debe seleccionar la placa de destino para la reasignación.');
+                return;
+            }
         }
 
         // Validación de comprobante y valor obligatorio para Entregado/Parcial
@@ -1203,6 +1261,28 @@ const ConciliacionRouteModal: React.FC<Props> = ({
             if (valorNum < 0 || (form.estadoEntrega === 'entregado' && valorNum <= 0)) {
                 toast.error(form.estadoEntrega === 'parcial' ? 'El valor no puede ser negativo.' : 'El total a consignar debe ser mayor a $0 para facturas entregadas.');
                 return;
+            }
+        }
+
+        // Verificar referencia duplicada antes de guardar (si no fue ya confirmada por el usuario)
+        const refToCheck = form.numConsignacion?.trim();
+        if (refToCheck && !esDevolucion && form.estadoEntrega !== 'repice') {
+            const confirmedKey = refToCheck.toUpperCase();
+            if (!confirmedRefsRef.current.has(confirmedKey)) {
+                try {
+                    const checkRes = await api.checkReferenceExists(refToCheck);
+                    if (checkRes.success && checkRes.exists) {
+                        setDuplicateAlert({
+                            reference: refToCheck,
+                            sourceType: 'individual',
+                            invoiceNumber: inv.invoice_number,
+                            details: checkRes.data
+                        });
+                        return;
+                    }
+                } catch {
+                    // Si la verificación falla, permitir continuar
+                }
             }
         }
 
@@ -1473,7 +1553,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                             <button onClick={() => setActiveDialog(inv.invoice_number)} className={`shrink-0 px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-wide transition-all ${isLegalized ? 'bg-slate-100 text-slate-500 hover:bg-slate-200' : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-900/20'}`}>
                                                 {isLegalized ? 'Ver Detalle' : 'Legalizar'}
                                             </button>
-                                            <button 
+                                            <button
                                                 onClick={() => {
                                                     setSelectedNewMethod('');
                                                     setPaymentObs('');
@@ -1483,6 +1563,28 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                             >
                                                 💳 Ajustar Pago
                                             </button>
+                                            {(() => {
+                                                const status = (inv.item_status || '').toUpperCase();
+                                                const isDev = inv.es_devolucion || DEVUELTO_STATUS.includes(status);
+                                                const isPar = PARCIAL_STATUS.includes(status);
+                                                if (!isLegalized || isDev || isPar) return null;
+                                                return (
+                                                    <button
+                                                        onClick={() => setAdjustModal({
+                                                            isOpen: true,
+                                                            invoice: inv,
+                                                            newValor: String(inv.valor || ''),
+                                                            newComprobante: inv.comprobante || '',
+                                                            saving: false,
+                                                            checkingRef: false,
+                                                            refDuplicate: false,
+                                                        })}
+                                                        className="shrink-0 px-4 py-2 rounded-xl text-[8px] font-black uppercase tracking-wide transition-all bg-amber-500 text-white hover:bg-amber-600"
+                                                    >
+                                                        ✏️ Editar Recaudo
+                                                    </button>
+                                                );
+                                            })()}
                                         </div>
                                     </div>
                                 );
@@ -2054,15 +2156,152 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                             >
                                 ❌ No, Cancelar
                             </button>
-                            <button 
+                            <button
                                 onClick={() => {
-                                    // SI/CONTINUAR: Mantener el valor
+                                    // Registrar referencia como confirmada para no bloquear el guardado
+                                    confirmedRefsRef.current.add(duplicateAlert.reference.trim().toUpperCase());
                                     setDuplicateAlert(null);
                                     toast.success('Se ha permitido el uso de la referencia duplicada.');
                                 }}
                                 className="flex-[1.2] py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-900/20 transition-all"
                             >
                                 Sí, Continuar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ── Modal: Editar Recaudo (valor + comprobante) de factura ENTREGADA ── */}
+            {adjustModal.isOpen && adjustModal.invoice && (
+                <div className="fixed inset-0 z-[1060] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden border border-amber-100 animate-in zoom-in-95 duration-200">
+                        <div className="bg-gradient-to-r from-amber-500 to-orange-400 px-6 py-5 text-white flex items-center gap-3">
+                            <span className="text-2xl">✏️</span>
+                            <div>
+                                <p className="text-[10px] font-black text-amber-100 uppercase tracking-[0.2em] mb-0.5">Editar Recaudo</p>
+                                <h4 className="text-base font-black">{adjustModal.invoice.invoice_number}</h4>
+                                <p className="text-[9px] text-amber-100 font-bold mt-0.5 uppercase">{adjustModal.invoice.customer_name}</p>
+                            </div>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Valor Recaudado</label>
+                                <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">$</span>
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        autoFocus
+                                        value={adjustModal.newValor}
+                                        onChange={e => setAdjustModal(prev => ({ ...prev, newValor: e.target.value }))}
+                                        disabled={adjustModal.saving}
+                                        className="w-full pl-8 pr-4 py-3 bg-white border-2 border-slate-200 focus:border-amber-500 rounded-2xl text-sm font-black outline-none transition-all disabled:opacity-50"
+                                    />
+                                </div>
+                                <p className="text-[9px] text-slate-400 font-bold ml-1">Actual: {fmtCOP(Number(adjustModal.invoice.valor))}</p>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">No. Comprobante / Ref.</label>
+                                <input
+                                    type="text"
+                                    value={adjustModal.newComprobante}
+                                    onChange={e => setAdjustModal(prev => ({ ...prev, newComprobante: e.target.value, refDuplicate: false }))}
+                                    onBlur={async e => {
+                                        const ref = e.target.value.trim();
+                                        const origRef = (adjustModal.invoice?.comprobante || '').trim();
+                                        if (!ref || ref.toUpperCase() === origRef.toUpperCase()) return;
+                                        const confirmedKey = ref.toUpperCase();
+                                        if (confirmedRefsRef.current.has(confirmedKey)) return;
+                                        setAdjustModal(prev => ({ ...prev, checkingRef: true, refDuplicate: false }));
+                                        try {
+                                            const res = await api.checkReferenceExists(ref);
+                                            setAdjustModal(prev => ({ ...prev, checkingRef: false, refDuplicate: !!(res.success && res.exists) }));
+                                            if (res.success && res.exists) {
+                                                setDuplicateAlert({
+                                                    reference: ref,
+                                                    sourceType: 'individual',
+                                                    invoiceNumber: adjustModal.invoice?.invoice_number,
+                                                    details: res.data
+                                                });
+                                            }
+                                        } catch {
+                                            setAdjustModal(prev => ({ ...prev, checkingRef: false }));
+                                        }
+                                    }}
+                                    disabled={adjustModal.saving}
+                                    placeholder="Ref. del pago"
+                                    className={`w-full px-4 py-3 bg-white border-2 rounded-2xl text-sm font-black outline-none transition-all placeholder:text-slate-300 disabled:opacity-50 ${adjustModal.refDuplicate ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200 focus:border-amber-500'}`}
+                                />
+                                {adjustModal.checkingRef && <p className="text-[9px] text-slate-400 font-bold ml-1">Verificando referencia...</p>}
+                                {adjustModal.refDuplicate && <p className="text-[9px] text-rose-500 font-bold ml-1">⚠️ Esta referencia ya existe. Confirme para continuar.</p>}
+                                <p className="text-[9px] text-slate-400 font-bold ml-1">Actual: {adjustModal.invoice.comprobante || '—'}</p>
+                            </div>
+                        </div>
+                        <div className="px-6 pb-6 flex gap-3">
+                            <button
+                                onClick={() => setAdjustModal({ isOpen: false, invoice: null, newValor: '', newComprobante: '', saving: false, checkingRef: false, refDuplicate: false })}
+                                disabled={adjustModal.saving}
+                                className="flex-1 py-3 bg-white border border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                disabled={adjustModal.saving || adjustModal.checkingRef}
+                                onClick={async () => {
+                                    const inv = adjustModal.invoice;
+                                    const newValorNum = Number(adjustModal.newValor);
+                                    const newRef = adjustModal.newComprobante.trim();
+                                    const origRef = (inv.comprobante || '').trim();
+
+                                    if (isNaN(newValorNum) || newValorNum < 0) {
+                                        toast.error('El valor debe ser un número mayor o igual a 0.');
+                                        return;
+                                    }
+
+                                    // Verificar duplicado si el comprobante cambió y no fue confirmado
+                                    if (newRef && newRef.toUpperCase() !== origRef.toUpperCase()) {
+                                        const confirmedKey = newRef.toUpperCase();
+                                        if (!confirmedRefsRef.current.has(confirmedKey)) {
+                                            try {
+                                                const res = await api.checkReferenceExists(newRef);
+                                                if (res.success && res.exists) {
+                                                    setAdjustModal(prev => ({ ...prev, refDuplicate: true }));
+                                                    setDuplicateAlert({
+                                                        reference: newRef,
+                                                        sourceType: 'individual',
+                                                        invoiceNumber: inv.invoice_number,
+                                                        details: res.data
+                                                    });
+                                                    return;
+                                                }
+                                            } catch { /* continuar */ }
+                                        }
+                                    }
+
+                                    setAdjustModal(prev => ({ ...prev, saving: true }));
+                                    try {
+                                        await api.adjustPayment({
+                                            documentId,
+                                            invoiceNumber: inv.invoice_number,
+                                            newValor: newValorNum,
+                                            newComprobante: newRef || undefined,
+                                            userId: currentUserId,
+                                        });
+                                        toast.success(`✅ Recaudo de ${inv.invoice_number} actualizado`);
+                                        setAdjustModal({ isOpen: false, invoice: null, newValor: '', newComprobante: '', saving: false, checkingRef: false, refDuplicate: false });
+                                        onSaved();
+                                    } catch (err: any) {
+                                        toast.error(err.message || 'Error al ajustar el recaudo.');
+                                        setAdjustModal(prev => ({ ...prev, saving: false }));
+                                    }
+                                }}
+                                className="flex-[1.5] py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-amber-500/30 transition-all disabled:opacity-50 disabled:shadow-none flex items-center justify-center gap-2"
+                            >
+                                {adjustModal.saving
+                                    ? <><svg className="animate-spin w-3 h-3" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"/><path d="M4 12a8 8 0 018-8" stroke="currentColor" strokeWidth="4" className="opacity-75"/></svg> Guardando</>
+                                    : '💾 Guardar Cambios'
+                                }
                             </button>
                         </div>
                     </div>

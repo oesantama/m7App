@@ -153,7 +153,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [reassignData, setReassignData] = useState({ newVehicleId: '', observations: '' });
     const [vehicleSearch, setVehicleSearch] = useState('');
     const [vehicleDropOpen, setVehicleDropOpen] = useState(false);
-    const [reassignTab, setReassignTab] = useState<'placa' | 'factura' | 'repice'>('placa');
+    const [reassignTab, setReassignTab] = useState<'placa' | 'factura' | 'repice' | 'asignar'>('placa');
     const [modalRouteInvoices, setModalRouteInvoices] = useState<any[]>([]);
     const [loadingModalInvoices, setLoadingModalInvoices] = useState(false);
     const [selectedInvoicesToRemove, setSelectedInvoicesToRemove] = useState<Set<string>>(new Set());
@@ -167,6 +167,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [repiceVehicleSearch, setRepiceVehicleSearch] = useState('');
     const [repiceVehicleDropOpen, setRepiceVehicleDropOpen] = useState(false);
     const [isRepicing, setIsRepicing] = useState(false);
+
+    // Asignar Factura tab states
+    const [pendingInvoices, setPendingInvoices] = useState<any[]>([]);
+    const [loadingPendingInvoices, setLoadingPendingInvoices] = useState(false);
+    const [assignInvoiceSearch, setAssignInvoiceSearch] = useState('');
+    const [isAssigningInvoice, setIsAssigningInvoice] = useState(false);
     const mapRef = useRef<L.Map | null>(null);
     const markersRef = useRef<{ [key: string]: L.Marker }>({});
     const routeLinesRef = useRef<{ [key: string]: L.Polyline }>({});
@@ -838,6 +844,42 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             toast.error("Error el servidor: " + err.message);
         } finally {
             setIsReassigningPlate(false);
+        }
+    };
+
+    const loadPendingInvoices = async () => {
+        if (!showReassignModal.route) return;
+        setLoadingPendingInvoices(true);
+        setPendingInvoices([]);
+        try {
+            const clientId = showReassignModal.route.client_id || showReassignModal.route.clientId;
+            const res = await api.getInvoices(clientId === 'GLOBAL' ? undefined : clientId);
+            setPendingInvoices(res || []);
+        } catch (err) {
+            console.error('[LOAD-PENDING-INVOICES-ERR]', err);
+            toast.error('Error cargando facturas disponibles');
+        } finally {
+            setLoadingPendingInvoices(false);
+        }
+    };
+
+    const handleAssignInvoice = async (invoiceId: string) => {
+        if (!showReassignModal.route) return;
+        setIsAssigningInvoice(true);
+        try {
+            await api.assignRouteInvoice({
+                routeId: showReassignModal.route.id,
+                invoiceId,
+                userId: user.id
+            });
+            toast.success(`Factura ${invoiceId} asignada correctamente a la ruta`);
+            loadPendingInvoices();
+            onRefresh();
+        } catch (err: any) {
+            console.error('[ASSIGN-INVOICE-ERR]', err);
+            toast.error(err.message || 'Error al asignar factura');
+        } finally {
+            setIsAssigningInvoice(false);
         }
     };
 
@@ -2814,21 +2856,26 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     className="w-9 h-9 bg-slate-100 hover:bg-rose-50 hover:text-rose-500 rounded-full flex items-center justify-center text-slate-400 transition-all text-lg font-black">×</button>
                             </div>
                             {/* Tabs */}
-                            <div className="flex gap-2">
+                            <div className="flex gap-1.5 flex-wrap">
                                 <button onClick={() => setReassignTab('placa')}
-                                    className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 transition-all
+                                    className={`flex-1 min-w-[90px] py-2 rounded-xl text-[8px] font-black uppercase tracking-wider border-2 transition-all
                                         ${reassignTab === 'placa' ? 'bg-indigo-600 border-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300'}`}>
-                                    🔄 Cambio de Placa
+                                    🔄 Placa
                                 </button>
                                 <button onClick={() => { setReassignTab('factura'); loadModalInvoices(showReassignModal.route.id); }}
-                                    className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 transition-all
+                                    className={`flex-1 min-w-[90px] py-2 rounded-xl text-[8px] font-black uppercase tracking-wider border-2 transition-all
                                         ${reassignTab === 'factura' ? 'bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-200' : 'bg-white border-slate-200 text-slate-500 hover:border-rose-300'}`}>
-                                    📦 Liberar Factura
+                                    📦 Liberar
                                 </button>
                                 <button onClick={() => { setReassignTab('repice'); loadModalInvoices(showReassignModal.route.id); }}
-                                    className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 transition-all
+                                    className={`flex-1 min-w-[90px] py-2 rounded-xl text-[8px] font-black uppercase tracking-wider border-2 transition-all
                                         ${reassignTab === 'repice' ? 'bg-amber-500 border-amber-500 text-white shadow-md shadow-amber-200' : 'bg-white border-slate-200 text-slate-500 hover:border-amber-300'}`}>
                                     🔁 Repice
+                                </button>
+                                <button onClick={() => { setReassignTab('asignar'); loadPendingInvoices(); }}
+                                    className={`flex-1 min-w-[90px] py-2 rounded-xl text-[8px] font-black uppercase tracking-wider border-2 transition-all
+                                        ${reassignTab === 'asignar' ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-200' : 'bg-white border-slate-200 text-slate-500 hover:border-emerald-300'}`}>
+                                    ➕ Asignar
                                 </button>
                             </div>
                         </div>
@@ -3118,6 +3165,96 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                         onClick={handleUnassignInvoices}
                                         disabled={isUnassigning || selectedInvoicesToRemove.size === 0 || !unassignObs.trim()}>
                                         {isUnassigning ? 'Liberando...' : `Liberar (${selectedInvoicesToRemove.size}) Factura${selectedInvoicesToRemove.size !== 1 ? 's' : ''}`}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+
+                        {reassignTab === 'asignar' && (
+                            <>
+                                <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
+                                    {/* Buscador de facturas pendientes */}
+                                    <div className="px-7 pt-5 pb-3 shrink-0">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">
+                                            Buscar Factura Disponible
+                                        </label>
+                                        <div className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl focus-within:ring-2 focus-within:ring-emerald-400/30 flex items-center gap-2">
+                                            <input
+                                                className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-900 placeholder:text-slate-400"
+                                                placeholder="Número de factura o cliente..."
+                                                value={assignInvoiceSearch}
+                                                onChange={e => setAssignInvoiceSearch(e.target.value)}
+                                            />
+                                            {assignInvoiceSearch && (
+                                                <button onClick={() => setAssignInvoiceSearch('')}
+                                                    className="text-slate-400 hover:text-rose-500 text-lg leading-none">×</button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Lista de facturas pendientes */}
+                                    <div className="flex-1 overflow-y-auto px-7 pb-5 min-h-[250px] max-h-[40vh]">
+                                        {loadingPendingInvoices ? (
+                                            <div className="flex items-center justify-center py-10">
+                                                <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                                            </div>
+                                        ) : pendingInvoices.length === 0 ? (
+                                            <div className="text-center py-10 text-slate-400">
+                                                <p className="text-3xl mb-2">📥</p>
+                                                <p className="text-sm font-bold">No hay facturas pendientes</p>
+                                                <p className="text-[10px] text-slate-400 mt-1">Todas las facturas ya están asignadas o no corresponden al cliente</p>
+                                            </div>
+                                        ) : (() => {
+                                            const filtered = pendingInvoices.filter((inv: any) => {
+                                                const q = assignInvoiceSearch.toLowerCase().trim();
+                                                if (!q) return true;
+                                                return (inv.invoiceNumber || '').toLowerCase().includes(q) ||
+                                                       (inv.orderNumber || '').toLowerCase().includes(q) ||
+                                                       (inv.customerName || '').toLowerCase().includes(q) ||
+                                                       (inv.city || '').toLowerCase().includes(q);
+                                            });
+
+                                            if (filtered.length === 0) {
+                                                return (
+                                                    <p className="text-center py-10 text-xs text-slate-400 font-bold">
+                                                        Sin resultados para la búsqueda
+                                                    </p>
+                                                );
+                                            }
+
+                                            return (
+                                                <div className="space-y-2">
+                                                    {filtered.map((inv: any) => (
+                                                        <div key={inv.id} className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl hover:border-slate-200 transition-all">
+                                                            <div className="min-w-0 pr-4">
+                                                                <p className="text-xs font-black text-slate-900 truncate">
+                                                                    {inv.invoiceNumber || inv.id}
+                                                                </p>
+                                                                <p className="text-[10px] text-slate-500 font-bold truncate mt-0.5">
+                                                                    {inv.customerName}
+                                                                </p>
+                                                                <p className="text-[9px] text-slate-400 font-semibold mt-0.5">
+                                                                    📍 {inv.city} • Vol: {inv.volumeM3 ? Number(inv.volumeM3).toFixed(3) : '0.000'} m³
+                                                                </p>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleAssignInvoice(inv.invoiceNumber || inv.id)}
+                                                                disabled={isAssigningInvoice}
+                                                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md shadow-emerald-100 disabled:opacity-50 shrink-0"
+                                                            >
+                                                                Asignar
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                                <div className="px-7 py-5 bg-slate-50 border-t border-slate-100 shrink-0 flex">
+                                    <button className="w-full py-3 bg-slate-100 text-slate-500 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
+                                        onClick={() => { setShowReassignModal({ isOpen: false, route: null }); setReassignTab('placa'); setAssignInvoiceSearch(''); }}>
+                                        Cerrar
                                     </button>
                                 </div>
                             </>

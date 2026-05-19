@@ -82,7 +82,7 @@ const FletesConciliacion = lazyWithRetry(() => import('./components/OperacionExi
 const InformeDashboardDrive = lazyWithRetry(() => import('./components/documents/InformeDashboardDrive'));
 const AuditoriaFactura = lazyWithRetry(() => import('./components/Logistics/AuditoriaFactura'));
 const InformesGerenciales = lazyWithRetry(() => import('./components/Logistics/InformesGerenciales'));
-
+const FormatosTransportes = lazyWithRetry(() => import('./components/AdminCenter/FormatosTransportes'));
 
 // Import Admin Module
 const AdminDBManager = lazyWithRetry(() => import('./pages/AdminDBManager'));
@@ -1005,6 +1005,8 @@ const App: React.FC = () => {
         return <ValidacionConciliaciones user={user!} />;
       case 'fletes-conciliacion':
         return <FletesConciliacion user={user!} />;
+      case 'formatos-transportes':
+        return <FormatosTransportes />;
       default:
         return (
           <div className="p-10 border-2 border-dashed border-slate-200 rounded-[3rem] text-center">

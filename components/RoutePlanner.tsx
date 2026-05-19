@@ -2336,8 +2336,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const utilization = (newVol / realCapacity) * 100;
 
     if (utilization > OPTIMIZATION_CONSTANTS.CRITICAL_THRESHOLD * 100) {
-      toast.error(`BLOQUEO: Agregar esta factura superaría el umbral crítico de capacidad (${utilization.toFixed(1)}% de ${realCapacity}m³).`);
-      return;
+      toast.warning(`Advertencia: Agregar esta factura supera el umbral crítico de capacidad (${utilization.toFixed(1)}% de ${realCapacity}m³).`);
     }
 
     // Marcar como repice si viene del tab repice
@@ -2366,30 +2365,22 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     const loadVolume = route.assignedInvoices.reduce((acc, inv) => acc + Number(inv.volumeM3 || (inv as any).volume_m3 || 0), 0);
     const utilization = (loadVolume / newCapacity) * 100;
 
-    // REGLA DE CAPACIDAD M7
+    // REGLA DE CAPACIDAD M7 - SOLO ADVERTENCIA PERMITIENDO CONTINUAR
     if (utilization > OPTIMIZATION_CONSTANTS.CRITICAL_THRESHOLD * 100) {
       setCapacityAlert({
         isOpen: true,
-        type: 'error',
-        message: `BLOQUEO: La carga actual (${(Number(loadVolume) || 0).toFixed(2)}m³) excede el límite crítico del ${OPTIMIZATION_CONSTANTS.CRITICAL_THRESHOLD * 100}% para este vehículo (${newCapacity}m³). ¿Deseas ajustar automáticamente la carga al ${OPTIMIZATION_CONSTANTS.TARGET_UTILIZATION * 100}%?`,
-        confirmLabel: `Ajustar al ${OPTIMIZATION_CONSTANTS.TARGET_UTILIZATION * 100}% y Asignar`,
+        type: 'warning',
+        message: `Advertencia: La carga actual (${(Number(loadVolume) || 0).toFixed(2)}m³) excede el límite crítico del ${OPTIMIZATION_CONSTANTS.CRITICAL_THRESHOLD * 100}% para este vehículo (${newCapacity}m³, utilización: ${utilization.toFixed(1)}%). ¿Deseas proceder con el cambio de todas formas?`,
+        confirmLabel: 'Proceder con Cambio',
         onConfirm: () => {
-          const targetVolume = newCapacity * OPTIMIZATION_CONSTANTS.TARGET_UTILIZATION;
-          let currentVol = loadVolume;
-          const removedInvoices: Invoice[] = [];
-          while (currentVol > targetVolume && route.assignedInvoices.length > 0) {
-            const removed = route.assignedInvoices.pop()!;
-            currentVol -= Number(removed.volumeM3 || (removed as any).volume_m3 || 0);
-            removedInvoices.push(removed);
-          }
           route.vehicle = newVehicle;
-          route.totalVolume = Number(Number(currentVol).toFixed(2));
-          route.utilization = Math.round((Number(currentVol) / newCapacity) * 100);
+          route.totalVolume = Number(Number(loadVolume).toFixed(2));
+          route.utilization = Math.round((Number(loadVolume) / newCapacity) * 100);
           route.id = `route-${Date.now()}-${newVehicle.plate}`;
           setSuggestedRoutes(newSuggestions);
           setSwapVehicleModal({ isOpen: false, routeIndex: null });
           setCapacityAlert(prev => ({ ...prev, isOpen: false }));
-          toast.success(`Vehículo asignado. Se retiraron ${removedInvoices.length} facturas.`);
+          toast.success(`Vehículo cambiado a ${newVehicle.plate}`);
         }
       });
       return;

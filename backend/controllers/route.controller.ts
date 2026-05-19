@@ -1195,3 +1195,92 @@ export const resolveCustomerCoords = async (req: Request, res: Response) => {
     res.json({ coords: {} }); // fallo silencioso — frontend usa fallback
   }
 };
+
+export const assignRouteInvoice = async (req: Request, res: Response) => {
+    const { routeId, invoiceId, userId } = req.body;
+    if (!routeId || !invoiceId) {
+        return res.status(400).json({ success: false, error: 'routeId e invoiceId son requeridos' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Verificar si la factura ya está asignada a alguna otra ruta activa
+        const checkActive = await client.query(
+            `SELECT r.id, v.plate 
+             FROM route_invoices ri
+             JOIN routes r ON r.id = ri.route_id
+             LEFT JOIN vehicles v ON v.id = r.vehicle_id
+             WHERE ri.invoice_id = $1 AND r.status_id NOT IN ('EST-16', 'anulada')`,
+            [invoiceId]
+        );
+        if (checkActive.rowCount && checkActive.rowCount > 0) {
+            throw new Error(`La factura ya está asignada a la ruta activa del vehículo ${checkActive.rows[0].plate}`);
+        }
+
+        // 2. Obtener el volumen de la factura
+        const volRes = await client.query(
+            `SELECT SUM(COALESCE(volume, 0))::float as vol
+             FROM document_items
+             WHERE CONCAT(document_id::text, '_', TRIM(COALESCE(NULLIF(invoice,''), order_number))) = $1
+                OR TRIM(COALESCE(NULLIF(invoice,''), order_number)) = $1`,
+            [invoiceId]
+        );
+        const invVol = volRes.rows[0]?.vol || 0;
+
+        // 3. Insertar en route_invoices
+        await client.query(
+            `INSERT INTO route_invoices (route_id, invoice_id, created_at, assigned_at)
+             VALUES ($1, $2, NOW(), NOW())
+             ON CONFLICT (route_id, invoice_id) DO NOTHING`,
+            [routeId, invoiceId]
+        );
+
+        // 4. Actualizar item_status a EST-10 (En Ruta)
+        await client.query(
+            `UPDATE document_items SET item_status = 'EST-10'
+             WHERE CONCAT(document_id::text, '_', TRIM(COALESCE(NULLIF(invoice,''), order_number))) = $1
+                OR TRIM(COALESCE(NULLIF(invoice,''), order_number)) = $1`,
+            [invoiceId]
+        );
+
+        // 5. Actualizar volumen de la ruta
+        await client.query(
+            `UPDATE routes SET total_volume_m3 = COALESCE(total_volume_m3, 0) + $2
+             WHERE id::text = $1`,
+            [routeId, invVol]
+        );
+
+        // 6. Recalcular utilization_pct si la capacidad es válida
+        await client.query(
+            `UPDATE routes 
+             SET utilization_pct = CASE WHEN COALESCE(vehicle_capacity_m3, 0) > 0 
+                                        THEN (total_volume_m3 / vehicle_capacity_m3) * 100 
+                                        ELSE 0 END
+             WHERE id::text = $1`,
+            [routeId]
+        );
+
+        // 7. Registrar en log
+        const plateRes = await client.query(
+            `SELECT v.plate FROM routes r LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text WHERE r.id::text = $1::text LIMIT 1`,
+            [routeId]
+        );
+        const plate = plateRes.rows[0]?.plate || null;
+        await client.query(
+            `INSERT INTO route_modifications_log (route_id, invoice_id, action, user_id, new_plate, details)
+             VALUES ($1, $2, 'ASSIGN_INVOICE', $3, $4, $5)`,
+            [routeId, invoiceId, userId || null, plate, JSON.stringify({ observations: 'Asignado directamente desde gestión de ruta', timestamp: new Date().toISOString() })]
+        );
+
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error('[M7-ASSIGN-INVOICE-ERR]', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        client.release();
+    }
+};

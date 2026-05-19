@@ -1,6 +1,9 @@
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
 import bcrypt from 'bcryptjs';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { LOGO_MILLA_SIETE } from './gh-personal.controller.js';
 
 // Get elements list (for dropdowns, including es_serializado)
 export const getElementosDropdown = async (req: Request, res: Response) => {
@@ -39,8 +42,6 @@ export const getOrdenesCompra = async (req: Request, res: Response) => {
             if (fecha_inicio && fecha_fin) {
                 whereClause.push(`fecha BETWEEN $${params.length + 1} AND $${params.length + 2}`);
                 params.push(fecha_inicio, fecha_fin);
-            } else {
-                whereClause.push(`fecha >= CURRENT_DATE - INTERVAL '30 days'`);
             }
         }
 
@@ -146,8 +147,6 @@ export const getEntradasBodega = async (req: Request, res: Response) => {
             if (fecha_inicio && fecha_fin) {
                 whereClause.push(`e.fecha BETWEEN $${params.length + 1} AND $${params.length + 2}`);
                 params.push(fecha_inicio, fecha_fin);
-            } else {
-                whereClause.push(`e.fecha >= CURRENT_DATE - INTERVAL '30 days'`);
             }
         }
 
@@ -295,8 +294,6 @@ export const getSalidasProveedor = async (req: Request, res: Response) => {
             if (fecha_inicio && fecha_fin) {
                 whereClause.push(`s.fecha BETWEEN $${params.length + 1} AND $${params.length + 2}`);
                 params.push(fecha_inicio, fecha_fin);
-            } else {
-                whereClause.push(`s.fecha >= CURRENT_DATE - INTERVAL '30 days'`);
             }
         }
 
@@ -449,8 +446,6 @@ export const getAsignaciones = async (req: Request, res: Response) => {
             if (fecha_inicio && fecha_fin) {
                 whereClause.push(`a.fecha BETWEEN $${params.length + 1} AND $${params.length + 2}`);
                 params.push(fecha_inicio, fecha_fin);
-            } else {
-                whereClause.push(`a.fecha >= CURRENT_DATE - INTERVAL '30 days'`);
             }
         }
 
@@ -606,8 +601,6 @@ export const getDevoluciones = async (req: Request, res: Response) => {
             if (fecha_inicio && fecha_fin) {
                 whereClause.push(`d.fecha BETWEEN $${params.length + 1} AND $${params.length + 2}`);
                 params.push(fecha_inicio, fecha_fin);
-            } else {
-                whereClause.push(`d.fecha >= CURRENT_DATE - INTERVAL '30 days'`);
             }
         }
 
@@ -1006,3 +999,475 @@ export const getInventarioPersonal = async (req: Request, res: Response) => {
     }
 };
 
+// Generate printed receipt PDF for personal assignment
+export const generateAsignacionActaPDF = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        const query = `
+            SELECT a.id, a.numero_asignacion, a.personal_id, a.autorizado_por, a.fecha, a.observaciones,
+                   COALESCE(a.firma_estado, 'PENDIENTE') as firma_estado, a.fecha_firma, a.firmado_por,
+                   p.nombre as personal_nombre, p.cedula as personal_documento, p.cargo as personal_cargo,
+                   p.placa as personal_placa, p.operacion as personal_operacion
+            FROM gh_asignaciones_personal a
+            LEFT JOIN gh_personal p ON a.personal_id = p.id
+            WHERE a.id = $1
+        `;
+        const result = await pool.query(query, [Number(id)]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Asignación no encontrada' });
+        }
+        const asig = result.rows[0];
+
+        const detQuery = `
+            SELECT d.id, d.elemento_id, d.cantidad, e.nombre as elemento_nombre, e.es_serializado,
+                   (SELECT ARRAY_AGG(serial) FROM gh_inventario_serial_elemento WHERE elemento_id = d.elemento_id AND personal_id = $2 AND estado_serial = 'ASIGNADO') as serials
+            FROM gh_asignaciones_personal_detalle d
+            LEFT JOIN gh_elementos e ON d.elemento_id = e.id
+            WHERE d.asignacion_id = $1
+        `;
+        const details = await pool.query(detQuery, [asig.id, asig.personal_id]);
+
+        const doc = new jsPDF() as any;
+        const pageWidth = doc.internal.pageSize.width;
+
+        // --- STEP 1: DRAW THE OFFICIAL HEADER BOX (F-GA-007) ---
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.3);
+        doc.rect(14, 10, 182, 24); // Outline box
+
+        // Vertical lines to split columns
+        doc.line(54, 10, 54, 34);
+        doc.line(156, 10, 156, 34);
+
+        // Horizontal line in the middle column
+        doc.line(54, 22, 156, 22);
+
+        // Horizontal lines in the right column (splits into 3 parts)
+        doc.line(156, 18, 196, 18);
+        doc.line(156, 26, 196, 26);
+
+        // Draw logo on the left
+        try {
+            if (LOGO_MILLA_SIETE) {
+                doc.addImage(LOGO_MILLA_SIETE, 'PNG', 16, 11, 35, 22);
+            }
+        } catch (e) {
+            console.warn("Could not add logo to assignment PDF:", e);
+        }
+
+        // Center Text
+        doc.setTextColor(0, 0, 0);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.5);
+        doc.text("SISTEMA INTEGRADO DE GESTIÓN BASC - PESV - SGA - SG-SST", 105, 17, { align: 'center' });
+        doc.setFontSize(9.5);
+        doc.text("ENTREGA DE DOTACIÓN PERSONAL", 105, 29, { align: 'center' });
+
+        // Right Text
+        doc.setFontSize(7);
+        doc.text("CÓDIGO: F-GA-007", 158, 15);
+        doc.text("VERSIÓN: 3", 158, 23);
+        doc.text("FECHA: 21/11/2020", 158, 31);
+
+        // --- STEP 2: USER DETAILS TABLE ---
+        const fechaFormatted = asig.fecha ? new Date(asig.fecha).toLocaleDateString('es-CO') : '';
+        const personalDataRows = [
+            ['FECHA', fechaFormatted],
+            ['NOMBRE COMPLETO', (asig.personal_nombre || '').toUpperCase()],
+            ['CEDULA', asig.personal_documento || ''],
+            ['CARGO', (asig.personal_cargo || '').toUpperCase()],
+            ['OPERACIÓN', (asig.personal_operacion || '').toUpperCase()],
+            ['PLACA', (asig.personal_placa || '').toUpperCase()]
+        ];
+
+        autoTable(doc, {
+            startY: 38,
+            showHead: 'never',
+            body: personalDataRows,
+            theme: 'grid',
+            styles: {
+                fontSize: 8.5,
+                cellPadding: 2,
+                lineColor: [0, 0, 0],
+                lineWidth: 0.3,
+                textColor: [0, 0, 0],
+                font: 'helvetica'
+            },
+            columnStyles: {
+                0: { cellWidth: 50, fillColor: [217, 225, 242], fontStyle: 'bold' },
+                1: { cellWidth: 132 }
+            }
+        });
+
+        let currentY = (doc as any).lastAutoTable.finalY + 8;
+
+        // Intermediary text
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text("Con la presente acta se hace entrega de la siguiente dotación", 14, currentY);
+
+        // --- STEP 3: ITEMS TABLE (CANTIDAD | DESCRIPCIÓN | TALLA) ---
+        // Helper to parse talla from item name (e.g. "BOTAS KONDOR 36" -> description: "BOTAS KONDOR", talla: "36")
+        const parseTalla = (nombre: string) => {
+            const parts = nombre.trim().split(' ');
+            const lastPart = parts[parts.length - 1];
+            if (/^\d+$/.test(lastPart) || ['S', 'M', 'L', 'XL', 'XXL', 'XXLR', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45'].includes(lastPart.toUpperCase())) {
+                return {
+                    description: parts.slice(0, -1).join(' '),
+                    talla: lastPart
+                };
+            }
+            return {
+                description: nombre,
+                talla: 'N/A'
+            };
+        };
+
+        const itemsBody = details.rows.map((d: any) => {
+            const parsed = parseTalla(d.elemento_nombre || '');
+            const serialsList = d.serials && Array.isArray(d.serials) ? ` (Seriales: ${d.serials.join(', ')})` : '';
+            return [
+                d.cantidad ? d.cantidad.toString() : '0',
+                parsed.description + serialsList,
+                parsed.talla
+            ];
+        });
+
+        autoTable(doc, {
+            startY: currentY + 4,
+            head: [['CANTIDAD', 'DESCRIPCIÓN', 'TALLA']],
+            body: itemsBody,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [217, 225, 242],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [0, 0, 0],
+                lineWidth: 0.3,
+                halign: 'center'
+            },
+            styles: {
+                fontSize: 8.5,
+                cellPadding: 2.5,
+                lineColor: [0, 0, 0],
+                lineWidth: 0.3,
+                textColor: [0, 0, 0],
+                font: 'helvetica'
+            },
+            columnStyles: {
+                0: { cellWidth: 35, halign: 'center' },
+                1: { cellWidth: 112 },
+                2: { cellWidth: 35, halign: 'center' }
+            }
+        });
+
+        // --- STEP 4: COMPROMISO Y MANIFIESTO ---
+        let manifestTitleY = (doc as any).lastAutoTable.finalY + 8;
+        if (manifestTitleY + 35 > doc.internal.pageSize.height) {
+            doc.addPage();
+            manifestTitleY = 20;
+        }
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text("El empleado manifiesta que:", 14, manifestTitleY);
+
+        const manifestText = [
+            "Me comprometo a cuidar los elementos recibidos y utilizarlos exclusivamente para el desempeño de las funciones como empleado, a no cambiar sus características tales como: color, forma, distintivo, marcas, etc.; y proporcionarles el mantenimiento adecuado de acuerdo a el lavado y mantenimiento.",
+            "Reconozco que la dotación que aquí se me entrega es de uso para el desempeño de las labores contratadas y pertenece a la empresa en todo momento, me comprometo hacer buen uso de esta y realizar la devolución en el momento de la terminación de contrato.",
+            "Autorizo expresamente a MILLA SIE7E S.A.S., mediante este documento descontar del valor de la nómina en caso de pérdida, daño alguno de los elementos entregados."
+        ];
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        let textY = manifestTitleY + 5;
+
+        for (const text of manifestText) {
+            const lines = doc.splitTextToSize(text, 182);
+            if (textY + (lines.length * 4.5) > doc.internal.pageSize.height - 20) {
+                doc.addPage();
+                textY = 20;
+            }
+            doc.text(lines, 14, textY);
+            textY += (lines.length * 4.5) + 3;
+        }
+
+        // --- STEP 5: SIGNATURE BLOCK ---
+        let signatureY = textY + 8;
+        if (signatureY + 30 > doc.internal.pageSize.height) {
+            doc.addPage();
+            signatureY = 20;
+        }
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text("Recibió,", 14, signatureY);
+
+        doc.line(14, signatureY + 16, 100, signatureY + 16);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.text("Nombre completo y número de cédula.", 14, signatureY + 20);
+
+        // If digitally signed, print signature info inside the block
+        if (asig.firma_estado === 'FIRMADO') {
+            doc.setTextColor(22, 163, 74); // Green 600
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(8.5);
+            doc.text("✓ FIRMADO DIGITALMENTE", 14, signatureY + 6);
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Fecha Firma: ${new Date(asig.fecha_firma).toLocaleString('es-CO')}`, 14, signatureY + 10);
+            doc.text(`Colaborador: ${asig.personal_nombre}`, 14, signatureY + 14);
+            doc.setTextColor(0, 0, 0);
+        }
+
+        const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+        const cleanName = (asig.personal_nombre || 'SIN_NOMBRE')
+            .toUpperCase()
+            .normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .replace(/[^A-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+        const fechaPdf = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=acta_entrega_${cleanName}_${asig.numero_asignacion}_${fechaPdf}.pdf`);
+        res.send(pdfBuffer);
+    } catch (err: any) {
+        console.error('[PDF-ASIGNACION-ERROR]', err);
+        res.status(500).json({ success: false, error: err.message || 'Error al generar el PDF de la asignación' });
+    }
+};
+
+// Generate printed receipt PDF for personal return
+export const generateDevolucionActaPDF = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    try {
+        const query = `
+            SELECT d.id, d.numero_devolucion, d.personal_id, d.motivo, d.fecha, d.usuario_control,
+                   COALESCE(d.firma_estado, 'PENDIENTE') as firma_estado, d.fecha_firma, d.firmado_por,
+                   p.nombre as personal_nombre, p.cedula as personal_documento, p.cargo as personal_cargo,
+                   p.placa as personal_placa, p.operacion as personal_operacion
+            FROM gh_devoluciones_personal d
+            LEFT JOIN gh_personal p ON d.personal_id = p.id
+            WHERE d.id = $1
+        `;
+        const result = await pool.query(query, [Number(id)]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Devolución no encontrada' });
+        }
+        const dev = result.rows[0];
+
+        const detQuery = `
+            SELECT d.id, d.elemento_id, d.cantidad, e.nombre as elemento_nombre, e.es_serializado,
+                   (SELECT ARRAY_AGG(serial) FROM gh_inventario_serial_elemento WHERE elemento_id = d.elemento_id AND personal_id = $2 AND estado_serial = 'DISPONIBLE') as serials
+            FROM gh_devoluciones_personal_detalle d
+            LEFT JOIN gh_elementos e ON d.elemento_id = e.id
+            WHERE d.devolucion_id = $1
+        `;
+        const details = await pool.query(detQuery, [dev.id, dev.personal_id]);
+
+        const doc = new jsPDF() as any;
+        const pageWidth = doc.internal.pageSize.width;
+
+        // --- STEP 1: DRAW THE OFFICIAL HEADER BOX (F-GA-007) ---
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.3);
+        doc.rect(14, 10, 182, 24); // Outline box
+
+        // Vertical lines to split columns
+        doc.line(54, 10, 54, 34);
+        doc.line(156, 10, 156, 34);
+
+        // Horizontal line in the middle column
+        doc.line(54, 22, 156, 22);
+
+        // Horizontal lines in the right column (splits into 3 parts)
+        doc.line(156, 18, 196, 18);
+        doc.line(156, 26, 196, 26);
+
+        // Draw logo on the left
+        try {
+            if (LOGO_MILLA_SIETE) {
+                doc.addImage(LOGO_MILLA_SIETE, 'PNG', 16, 11, 35, 22);
+            }
+        } catch (e) {
+            console.warn("Could not add logo to return PDF:", e);
+        }
+
+        // Center Text
+        doc.setTextColor(0, 0, 0);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(7.5);
+        doc.text("SISTEMA INTEGRADO DE GESTIÓN BASC - PESV - SGA - SG-SST", 105, 17, { align: 'center' });
+        doc.setFontSize(9.5);
+        doc.text("RETORNO Y DEVOLUCIÓN DE ELEMENTOS", 105, 29, { align: 'center' });
+
+        // Right Text
+        doc.setFontSize(7);
+        doc.text("CÓDIGO: F-GA-007", 158, 15);
+        doc.text("VERSIÓN: 3", 158, 23);
+        doc.text("FECHA: 21/11/2020", 158, 31);
+
+        // --- STEP 2: USER DETAILS TABLE ---
+        const fechaFormatted = dev.fecha ? new Date(dev.fecha).toLocaleDateString('es-CO') : '';
+        const personalDataRows = [
+            ['FECHA', fechaFormatted],
+            ['NOMBRE COMPLETO', (dev.personal_nombre || '').toUpperCase()],
+            ['CEDULA', dev.personal_documento || ''],
+            ['CARGO', (dev.personal_cargo || '').toUpperCase()],
+            ['OPERACIÓN', (dev.personal_operacion || '').toUpperCase()],
+            ['PLACA', (dev.personal_placa || '').toUpperCase()]
+        ];
+
+        autoTable(doc, {
+            startY: 38,
+            showHead: 'never',
+            body: personalDataRows,
+            theme: 'grid',
+            styles: {
+                fontSize: 8.5,
+                cellPadding: 2,
+                lineColor: [0, 0, 0],
+                lineWidth: 0.3,
+                textColor: [0, 0, 0],
+                font: 'helvetica'
+            },
+            columnStyles: {
+                0: { cellWidth: 50, fillColor: [217, 225, 242], fontStyle: 'bold' },
+                1: { cellWidth: 132 }
+            }
+        });
+
+        let currentY = (doc as any).lastAutoTable.finalY + 8;
+
+        // Intermediary text
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text("Se hace constar la devolución de los siguientes elementos:", 14, currentY);
+
+        // --- STEP 3: ITEMS TABLE (CANTIDAD | DESCRIPCIÓN | TALLA) ---
+        const parseTalla = (nombre: string) => {
+            const parts = nombre.trim().split(' ');
+            const lastPart = parts[parts.length - 1];
+            if (/^\d+$/.test(lastPart) || ['S', 'M', 'L', 'XL', 'XXL', 'XXLR', '36', '37', '38', '39', '40', '41', '42', '43', '44', '45'].includes(lastPart.toUpperCase())) {
+                return {
+                    description: parts.slice(0, -1).join(' '),
+                    talla: lastPart
+                };
+            }
+            return {
+                description: nombre,
+                talla: 'N/A'
+            };
+        };
+
+        const itemsBody = details.rows.map((d: any) => {
+            const parsed = parseTalla(d.elemento_nombre || '');
+            const serialsList = d.serials && Array.isArray(d.serials) ? ` (Seriales: ${d.serials.join(', ')})` : '';
+            return [
+                d.cantidad ? d.cantidad.toString() : '0',
+                parsed.description + serialsList,
+                parsed.talla
+            ];
+        });
+
+        autoTable(doc, {
+            startY: currentY + 4,
+            head: [['CANTIDAD', 'DESCRIPCIÓN', 'TALLA']],
+            body: itemsBody,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [217, 225, 242],
+                textColor: [0, 0, 0],
+                fontStyle: 'bold',
+                lineColor: [0, 0, 0],
+                lineWidth: 0.3,
+                halign: 'center'
+            },
+            styles: {
+                fontSize: 8.5,
+                cellPadding: 2.5,
+                lineColor: [0, 0, 0],
+                lineWidth: 0.3,
+                textColor: [0, 0, 0],
+                font: 'helvetica'
+            },
+            columnStyles: {
+                0: { cellWidth: 35, halign: 'center' },
+                1: { cellWidth: 112 },
+                2: { cellWidth: 35, halign: 'center' }
+            }
+        });
+
+        // --- STEP 4: RECEIPT DECLARATION ---
+        let manifestTitleY = (doc as any).lastAutoTable.finalY + 8;
+        if (manifestTitleY + 30 > doc.internal.pageSize.height) {
+            doc.addPage();
+            manifestTitleY = 20;
+        }
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.text("El empleado manifiesta que:", 14, manifestTitleY);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.text("Hago entrega de los elementos aquí descritos en el estado en que se reporta, liberando la responsabilidad sobre la custodia de los mismos.", 14, manifestTitleY + 5);
+
+        // --- STEP 5: SIGNATURE BLOCK ---
+        let signatureY = manifestTitleY + 18;
+        if (signatureY + 30 > doc.internal.pageSize.height) {
+            doc.addPage();
+            signatureY = 20;
+        }
+
+        // Two signature columns: Left (Colaborador / Entregó) and Right (Bodega / Recibió)
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.3);
+
+        // Left Line
+        doc.line(14, signatureY + 16, 90, signatureY + 16);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.text("Entregó Colaborador", 14, signatureY + 20);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.text(dev.personal_nombre || '', 14, signatureY + 24);
+        doc.text(`C.C. ${dev.personal_documento || ''}`, 14, signatureY + 28);
+
+        // Right Line
+        doc.line(110, signatureY + 16, 186, signatureY + 16);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.text("Recibió Bodega", 110, signatureY + 20);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.text(dev.usuario_control || 'BODEGA', 110, signatureY + 24);
+
+        // If digitally signed, print signature info inside the block
+        if (dev.firma_estado === 'FIRMADO') {
+            doc.setTextColor(22, 163, 74); // Green 600
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(8);
+            doc.text("✓ FIRMADO DIGITALMENTE", 14, signatureY + 6);
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "normal");
+            doc.text(`Fecha: ${new Date(dev.fecha_firma).toLocaleString('es-CO')}`, 14, signatureY + 10);
+            doc.text(`Por: ${dev.firmado_por || dev.personal_documento}`, 14, signatureY + 14);
+            doc.setTextColor(0, 0, 0);
+        }
+
+        const pdfBuffer = Buffer.from(doc.output('arraybuffer'));
+        const cleanName = (dev.personal_nombre || 'SIN_NOMBRE')
+            .toUpperCase()
+            .normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .replace(/[^A-Z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+        const fechaPdf = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=acta_devolucion_${cleanName}_${dev.numero_devolucion}_${fechaPdf}.pdf`);
+        res.send(pdfBuffer);
+    } catch (err: any) {
+        console.error('[PDF-DEVOLUCION-ERROR]', err);
+        res.status(500).json({ success: false, error: err.message || 'Error al generar el PDF de la devolución' });
+    }
+};

@@ -24,6 +24,8 @@ interface PersonalRecord {
   estado: string;
   jefe_nombre?: string;
   area_nombre?: string;
+  placa?: string;
+  operacion?: string;
 }
 
 interface EncuestaRecord {
@@ -204,9 +206,11 @@ const Personal: React.FC<Props> = ({ user }) => {
       ESTADO:              p.estado === 'EST-01' ? 'ACTIVO' : 'INACTIVO',
       'ES JEFE':           p.es_jefe ? 'SÍ' : 'NO',
       'JEFE INMEDIATO':    p.jefe_nombre || '',
+      PLACA:               p.placa || '',
+      OPERACIÓN:           p.operacion || '',
     }));
     const ws = XLSX.utils.json_to_sheet(data);
-    ws['!cols'] = [20,14,22,18,16,16,14,28,14,10,8,20].map(w => ({ wch: w }));
+    ws['!cols'] = [20, 14, 22, 18, 16, 16, 14, 28, 14, 10, 8, 20, 12, 20].map(w => ({ wch: w }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Personal');
     XLSX.writeFile(wb, `personal_gh_${new Date().toISOString().slice(0,10)}.xlsx`);
@@ -289,7 +293,7 @@ const Personal: React.FC<Props> = ({ user }) => {
 
   const openEdit = (p: PersonalRecord) => {
     setEditing(p);
-    setForm({ ...p, fecha_ingreso: p.fecha_ingreso ? p.fecha_ingreso.slice(0, 10) : '' });
+    setForm({ ...p, fecha_ingreso: p.fecha_ingreso ? p.fecha_ingreso.slice(0, 10) : '', placa: p.placa || '', operacion: p.operacion || '' });
     setIsModalOpen(true);
   };
 
@@ -300,7 +304,7 @@ const Personal: React.FC<Props> = ({ user }) => {
       celular_personal: '', correo_personal: '', celular_corporativo: '',
       correo_corporativo: '', jefe_inmediato_id: null, area_trabajo_id: null,
       es_jefe: false, fecha_ingreso: new Date().toISOString().slice(0, 10),
-      estado: 'EST-01'
+      estado: 'EST-01', placa: '', operacion: ''
     });
     setIsModalOpen(true);
   };
@@ -682,6 +686,14 @@ const Personal: React.FC<Props> = ({ user }) => {
                     <select value={form.estado} onChange={e => setForm({...form, estado: e.target.value})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase outline-none focus:border-indigo-500">
                       {estados.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                     </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Placa Vehículo (Opcional)</label>
+                    <input value={form.placa || ''} onChange={e => setForm({...form, placa: e.target.value.toUpperCase()})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase outline-none focus:border-indigo-500" placeholder="PLACA DEL VEHÍCULO" />
+                  </div>
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 ml-1">Operación / Proyecto (Opcional)</label>
+                    <input value={form.operacion || ''} onChange={e => setForm({...form, operacion: e.target.value.toUpperCase()})} className="w-full h-12 px-4 rounded-2xl bg-slate-50 border border-slate-200 text-[11px] font-bold uppercase outline-none focus:border-indigo-500" placeholder="OPERACIÓN O PROYECTO" />
                   </div>
                 </>
               ) : (

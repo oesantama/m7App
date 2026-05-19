@@ -2,37 +2,54 @@ import cron from 'node-cron';
 import pool from '../config/database.js';
 
 /**
+ * Retrocede N días hábiles (lunes-viernes) desde una fecha dada.
+ * Ejemplo: si hoy es lunes y N=5, retorna el lunes de la semana anterior.
+ */
+function subtractBusinessDays(fromDate: Date, businessDays: number): Date {
+    const result = new Date(fromDate);
+    let remaining = businessDays;
+    while (remaining > 0) {
+        result.setDate(result.getDate() - 1);
+        const dow = result.getDay(); // 0=Domingo, 6=Sábado
+        if (dow !== 0 && dow !== 6) {
+            remaining--;
+        }
+    }
+    // Retroceder al inicio del día (00:00:00) para incluir todo el día de corte
+    result.setHours(0, 0, 0, 0);
+    return result;
+}
+
+/**
  * Servicio de Tareas Programadas (M7 Scheduler)
- * Gestiona la limpieza automática de datos temporales para optimizar el servidor.
  */
 export const initScheduler = () => {
     console.log('[M7-SCHEDULER] Inicializando Motor de Tareas Programadas...');
 
-    // Tarea 1: Limpieza de Novedades e Imágenes (Cada día a la 1:00 AM)
-    // Símbolo Cron: minuto hora día mes día-semana
+    // Limpieza de Novedades: se eliminan registros con más de 5 días hábiles (L-V).
+    // Corre diariamente a la 1:00 AM hora Colombia.
     cron.schedule('0 1 * * *', async () => {
         const startTime = Date.now();
-        console.log('[M7-SCHEDULER] Iniciando limpieza de novedades de más de 30 horas...');
+
+        // Calcular la fecha límite: 5 días hábiles atrás desde hoy
+        const cutoff = subtractBusinessDays(new Date(), 5);
+        const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+        console.log(`[M7-SCHEDULER] Limpiando novedades anteriores a ${cutoffStr} (5 días hábiles)...`);
 
         try {
-            // Borramos los registros de inventory_news que tengan más de 30 horas
-            // Esto también borra las fotos (Base64) al estar en la misma tabla.
-            const result = await pool.query(`
-                DELETE FROM inventory_news 
-                WHERE created_at < NOW() - INTERVAL '30 hours'
-            `);
-
+            const result = await pool.query(
+                `DELETE FROM inventory_news WHERE created_at < $1`,
+                [cutoff]
+            );
             const duration = Date.now() - startTime;
-            console.log(`[M7-SCHEDULER] Limpieza completada con éxito.`);
-            console.log(`- Registros eliminados: ${result.rowCount}`);
-            console.log(`- Duración: ${duration}ms`);
-
+            console.log(`[M7-SCHEDULER] Limpieza completada. Eliminados: ${result.rowCount} registros | Duración: ${duration}ms`);
         } catch (error: any) {
-            console.error('[M7-SCHEDULER] ERROR CRÍTICO en tarea de limpieza:', error.message);
+            console.error('[M7-SCHEDULER] ERROR en limpieza de novedades:', error.message);
         }
     }, {
-        timezone: "America/Bogota" // Aseguramos que corra en hora de Colombia
+        timezone: 'America/Bogota'
     });
 
-    console.log('[M7-SCHEDULER] Tarea "Limpieza Novedades" programada: Diariamente 01:00 AM');
+    console.log('[M7-SCHEDULER] Tarea "Limpieza Novedades" programada: Diariamente 01:00 AM | Retención: 5 días hábiles (L-V)');
 };

@@ -226,6 +226,8 @@ export const api = {
   }) => fetchJson(`${API_URL}/conciliation/reverse`, { method: 'POST', body: JSON.stringify(data) }),
   updateInvoiceValue: (data: { documentId: string; invoiceNumber: string; value: number }) =>
     fetchJson(`${API_URL}/conciliation/invoice-value`, { method: 'PATCH', body: JSON.stringify(data) }),
+  adjustPayment: (data: { documentId: string; invoiceNumber: string; newValor?: number; newComprobante?: string; userId: string }) =>
+    fetchJson(`${API_URL}/conciliation/adjust-payment`, { method: 'POST', body: JSON.stringify(data) }),
 
   // ── Devoluciones Bodega ────────────────────────────────────────────────────
   getPendingRouteReturns: (clientId?: string) =>
@@ -632,6 +634,44 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
+  downloadAsignacionPDF: async (id: number | string) => {
+    const token = localStorage.getItem('token') || 
+                 localStorage.getItem('m7_token') || 
+                 localStorage.getItem('m7_auth_token') || 
+                 localStorage.getItem('m7_client_token');
+    
+    const response = await fetch(`${API_URL}/gh-entradas-salidas/asignaciones/${id}/acta`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Error al descargar acta de asignación');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Acta_Asignacion_${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  },
+  downloadDevolucionPDF: async (id: number | string) => {
+    const token = localStorage.getItem('token') || 
+                 localStorage.getItem('m7_token') || 
+                 localStorage.getItem('m7_auth_token') || 
+                 localStorage.getItem('m7_client_token');
+    
+    const response = await fetch(`${API_URL}/gh-entradas-salidas/devoluciones/${id}/acta`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Error al descargar acta de devolución');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Acta_Devolucion_${id}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  },
 
   // Marcas
   getMarcas: () => fetchJson(`${API_URL}/marcas?_t=${Date.now()}`),
@@ -825,6 +865,12 @@ export const api = {
     fetchJson(`${API_URL}/routes/${encodeURIComponent(routeId)}/invoices`),
   unassignRouteInvoice: (data: { routeId: string; invoiceId: string; observations?: string; userId?: string }) =>
     fetchJson(`${API_URL}/routes/unassign-invoice`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  assignRouteInvoice: (data: { routeId: string; invoiceId: string; userId?: string }) =>
+    fetchJson(`${API_URL}/routes/assign-invoice`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -1410,4 +1456,5 @@ export const api = {
       }
     }
   },
+  getFormatosTransportes: () => fetchJson(`${API_URL}/admin-center/formatos`),
 };

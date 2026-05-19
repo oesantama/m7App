@@ -1,0 +1,18937 @@
+-- =========================================================
+-- SCRIPT DE MIGRACIÓN DE DATOS HISTÓRICOS DE DOTACIONES (PRODUCCIÓN)
+-- Generado automáticamente: 2026-05-19T19:34:03.933Z
+-- =========================================================
+
+BEGIN;
+
+-- --- CARGOS ---
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('-----', 'EST-01', 'Migración', '2026-05-19T19:33:53.178Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('AJOVER CALI', 'EST-01', 'Migración', '2026-05-19T19:33:53.180Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('ANALISTA CONTABLE', 'EST-01', 'Migración', '2026-05-19T19:33:53.182Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('ANALISTA DE CONTROL Y MONITOREO', 'EST-01', 'Migración', '2026-05-19T19:33:53.184Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('ANALISTA DE INVENTARIO', 'EST-01', 'Migración', '2026-05-19T19:33:53.186Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('ANALISTA SST', 'EST-01', 'Migración', '2026-05-19T19:33:53.188Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('APRENDIZ SENA', 'EST-01', 'Migración', '2026-05-19T19:33:53.189Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('ASESOR LOGISTICO', 'EST-01', 'Migración', '2026-05-19T19:33:53.190Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('ASESOR LOGÍSTICO', 'EST-01', 'Migración', '2026-05-19T19:33:53.192Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('ASISTENTE FINANCIERA', 'EST-01', 'Migración', '2026-05-19T19:33:53.193Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('AUXILIAR', 'EST-01', 'Migración', '2026-05-19T19:33:53.194Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('AUXILIAR CONDUCTOR', 'EST-01', 'Migración', '2026-05-19T19:33:53.195Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('AUXILIAR CONTUCTOR', 'EST-01', 'Migración', '2026-05-19T19:33:53.197Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('AUXILIAR DE BODEGA', 'EST-01', 'Migración', '2026-05-19T19:33:53.198Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('AUXILIAR DE CONDUCTOR', 'EST-01', 'Migración', '2026-05-19T19:33:53.199Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('AUXILIAR DE OPERACIONES', 'EST-01', 'Migración', '2026-05-19T19:33:53.201Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('AUXILIAR GESTIÓN DOCUMENTAL', 'EST-01', 'Migración', '2026-05-19T19:33:53.202Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('AUXILIAR LGÍSTICO', 'EST-01', 'Migración', '2026-05-19T19:33:53.203Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('AUXILIAR LOGISTICO', 'EST-01', 'Migración', '2026-05-19T19:33:53.204Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('AUXILIAR LOGÍSTICO', 'EST-01', 'Migración', '2026-05-19T19:33:53.205Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('AUXULIAR', 'EST-01', 'Migración', '2026-05-19T19:33:53.206Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('AXILIAR', 'EST-01', 'Migración', '2026-05-19T19:33:53.207Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('BODEGA', 'EST-01', 'Migración', '2026-05-19T19:33:53.208Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('CONDUCTOR', 'EST-01', 'Migración', '2026-05-19T19:33:53.209Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('COORDINADORA GESTION HUMANA', 'EST-01', 'Migración', '2026-05-19T19:33:53.210Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('COORDINADORA LOGÍSTICA', 'EST-01', 'Migración', '2026-05-19T19:33:53.211Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('DIRECTOR T.I', 'EST-01', 'Migración', '2026-05-19T19:33:53.213Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('DIRECTORA DE CARTERA', 'EST-01', 'Migración', '2026-05-19T19:33:53.214Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('DIRECTORA DE TESORERIA', 'EST-01', 'Migración', '2026-05-19T19:33:53.215Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('GERENTE', 'EST-01', 'Migración', '2026-05-19T19:33:53.217Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('GERENTE ADMINISTRATIVA', 'EST-01', 'Migración', '2026-05-19T19:33:53.218Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('GERENTE COMERCIAL', 'EST-01', 'Migración', '2026-05-19T19:33:53.219Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('INHOUSE', 'EST-01', 'Migración', '2026-05-19T19:33:53.220Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('MENSAJERO', 'EST-01', 'Migración', '2026-05-19T19:33:53.222Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('MONTA CARGUISTA', 'EST-01', 'Migración', '2026-05-19T19:33:53.223Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('MONTACARGUISTA', 'EST-01', 'Migración', '2026-05-19T19:33:53.225Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('OPERARIA MAQUILA', 'EST-01', 'Migración', '2026-05-19T19:33:53.226Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('PRACTICANTE GESTION HUMANA', 'EST-01', 'Migración', '2026-05-19T19:33:53.228Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('SERVICIO AL CLIENTE', 'EST-01', 'Migración', '2026-05-19T19:33:53.229Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('SERVICIOS GENERALES', 'EST-01', 'Migración', '2026-05-19T19:33:53.231Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('SUPERVISOR DE TRANSPORTE', 'EST-01', 'Migración', '2026-05-19T19:33:53.232Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('SUPERVISOR OPBT', 'EST-01', 'Migración', '2026-05-19T19:33:53.233Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_cargos (nombre, estado, usuario_control, fecha_control) 
+VALUES ('UAXILIAR LOGISTICO', 'EST-01', 'Migración', '2026-05-19T19:33:53.235Z') 
+ON CONFLICT (nombre) DO NOTHING;
+
+-- --- PERSONAL ---
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHO EDUAR GARCIA', '98558444', 'CONDUCTOR', 'WOX613', 'GASOSAS INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.442Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('EDURDO ALEJANDRO RODRIGUEZ LISTA', '28134017', 'AUXILIAR DE CONDUCTOR', 'LKN938', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.366Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SANTIAGO CARDONA SALAZAR', '1088346231', 'ASESOR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.657Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CARLOS MARIO MENDEZ ORTIZ', '1067907703', 'ASESOR LOGISTICO', NULL, 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.643Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUIS ANGEL DE LA CRUZ MACHADO', '1309388', 'CONDUCTOR', 'LKN938', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.322Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANA MARIA ALVAREZ CASTRILLON', '1038768241', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.603Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('NEIDER VILLAMISAR', '1036690996', 'AUXILIAR DE CONDUCTOR', 'NNN500', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.587Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YESICA NATALIA JANER ACEVEDO', '1017200099', 'ANALISTA DE INVENTARIO', 'N/A', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.511Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOSE CRISTOBAL CASAS', '70192995', 'CONDUCTOR', 'YAR044', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.396Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CRISTIAN ALEXIS CEBALLOS VILLADA', '1017163428', 'ANALISTA DE CONTROL Y MONITOREO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.507Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JORGE LEON GALEANO SERNA', '98528497', 'SUPERVISOR DE TRANSPORTE', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.440Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('BIBIANA MARIA RESTREPO RINCON', '43258579', 'PRACTICANTE GESTION HUMANA', NULL, 'ADMINISTRATIVA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.377Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('EDWIN ARLEY BETANCUR MONTOYA', '1040745482', 'AUXILIAR DE BODEGA', NULL, 'AJOVER MEDELLIN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.622Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JAVIER DAVID CASTILLO RODRIGUEZ', '5981155', 'CONDUCTOR', 'WFJ876', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.338Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ALEJANDRO HERRERA LOPEZ', '1010079018', 'AUXILIAR LOGISTICO', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.503Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN CARLOS CUERVO BURITICA', '1036601715', 'ANALISTA DE INVENTARIO', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.575Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DIEGO FERNANDO MARIN SALAZAR', '98659009', 'GERENTE COMERCIAL', NULL, 'ADMINISTRATIVA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.453Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN CARLOS MARTINEZ', '71266316', 'CONDUCTOR', 'UPB412', 'GASEOSAS INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.404Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CARLOS ESCOBAR', '1035855577', 'CONDUCTOR', 'WNQ032', 'GASEOSAS INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.562Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CARLOS GUSTAVO ESCOBAR', '94399513', 'CONDUCTOR', 'TKH408', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.437Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YEIFER SANCHEZ LOZANO', '1062430747', 'AUXILIAR LOGISTICO', NULL, 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.641Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DANIEL FERNANDO RAMIREZ', '8433512', 'CONDUCTOR', 'LKN291', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.346Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DIANA MARULANDA VELEZ', '43723793', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.380Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ALEXANDER CHIRINOS', '5964961', 'AUXILIAR', 'TOQ606', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.337Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CARLOS ARENAS CRUZ', '1028018100', 'CONDUCTOR', 'TRL629', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.551Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOSE MIGUL HOYOS FRABRA', '1003465260', 'AUXILIAR LOGÍSTICO', 'N/A', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.486Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('FREDDY ALONSO AGUDELO RUEDA', '71790541', 'CONDUCTOR', 'WGV585', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.426Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('RICHARD REYES CARREÑO', '4895949', 'AUXILIAR', 'SNT443', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.329Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SANDRA MILENA VELEZ CANO', '43400943', 'AUXILIAR LOGÍSTICO', 'n/a', 'linea directa', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.378Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUIS FERNANDO GRISALES', '71264883', 'AUXILIAR DE CONDUCTOR', 'NNN494', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.403Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SANTIAGO VELEZ SEGURO', '1036682418', 'AUXILIAR DE OPERACIONES', NULL, 'ADMINISTRATIVA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.586Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('OSCAR DAVID PIEDRAHITA', '1037625490', 'CONDUCTOR', 'SZW000', 'INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.596Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ALEJANDRO VELASQUEZ CUARTAS', '1023522397', 'AUXILIAR LOGÍSTICO', NULL, 'JHON URIBE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.527Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHON EDWIN ARISTIZABAL', '1112160663', 'CONDUCTOR', 'JYX117', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.668Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JAMES SALGADO', '94252356', 'CONDUCTOR', 'VEJ509', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.435Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANGEL DE LA CRUZ', '1336303', 'CONDUCTOR', 'EQS426', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.323Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN DAVID VALENCIA MONDRAGON', '1116376622', 'AUXILIAR LOGISTICO', 'NA', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.671Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHOAN ANDRES BENITEZ ARANGO', '1021802341', 'AUXILIAR LOGISTICO', NULL, 'JHON URIBE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.522Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN ANDRES SALAZAR', '1108334950', 'AUXILIAR LOGISTICO', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.661Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('BERNARDO JOSE CONTRERAS', '1017180467', 'AUXILIAR', 'WCQ379', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.508Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DUVAN ANDRES QUINTERO PERTUZ', '1082874105', 'AUXILIAR LOGISTICO', NULL, 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.651Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ALEXANDER TEJADA MARIN', '71393476', 'CONDUCTOR', 'JYX363', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.410Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ISABELA GONZALEZ SILGADO', '1025649975', 'APRENDIZ SENA', NULL, 'ADMINISTRATIVA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.533Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANDREI JIMENEZ ARANA', '1037545432', 'CONDUCTOR', 'WOS443', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.589Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANDRES FELIPE RESTREPO CAICEDO', '1007643194', 'AUXILIAR LOGISTICO', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.498Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOHAN SINITAVE', '1045416826', 'AUXILIAR', 'SZW000', 'INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.634Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CATALINA MARIA GONZALEZ MONTOYA', '43180713', 'DIRECTORA DE CARTERA', NULL, 'ADMINISTRATIVA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.374Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHON EDISON SANCHEZ GALLEGO', '1040737902', 'AUXILIAR LOGISTICO', NULL, 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.616Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUIS CONTRERAS', '1017227949', 'CONDUCTOR', 'TKD564', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.513Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUIS FERNANDO GONZALEZ', '14280317', 'CONDUCTOR', 'LPK798', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.349Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('GALLEGO SANCHEZ JEAN PAUL', '1144211121', 'AUXILIAR LOGISTICO', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.695Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOSE CHAVARRIA', '71741158', 'CONDUCTOR', 'TRG822', 'PAPYSER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.421Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CRISTIAN JOHAO GOMEZ RODRIGUEZ', '1144201858', 'AUXILIAR LOGISTICO', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.693Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CARLOS MARIN', '71731792', 'CONDUCTOR', 'GDX508', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.420Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUCELLY MARGARITA SOTO GONZALEZ', '43878355', 'AUXILIAR LOGISTICO', 'N/A', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.389Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MILENA ANDREA BETANCUR TORRES', '43792820', 'SERVICIO AL CLIENTE', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.383Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ELIZABETH ZUÑIGA PEREZ', '1118303397', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.677Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('RODRIGO MAZO', '1045077138', 'CONDUCTOR', 'LKO525', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.632Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MATEO RODRIGUEZ BERMUDEZ', '1023630801', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.531Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CAROLINA MALDONADO RESTREPO', '1001575864', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.481Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('RICHARD ANDERSON BERRIO VILLAREAL', '1037576609', 'CONDUCTOR', 'NLX578', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.590Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN DAVID GRISALES', '1025761930', 'CONDUCTOR', 'NNN494', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.536Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CAMILO ANDRES TIRADO RENDON', '1001145577', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.473Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SEBASTIAN MAURICIO PUERTA MONTOYA', '1193033290', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.705Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JULIO CESAR VELANDIA', '6102333', 'CONDUCTOR', 'TMO983', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.339Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('HECTOR MUÑOZ', '98631515', 'CONDUCTOR', 'EQS817', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.450Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DIANA MARCELA LOBATON MICOLTA', '1118290929', 'ASESOR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.673Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CARLOS MORALES', '94376749', 'CONDUCTOR', 'KUL668', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.436Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('PEDRO EMILIO RINCON', '4053344', 'CONDUCTOR', 'SOE380', 'PAPYSER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.326Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CRISTIAN GIL VELEZ', '831181', 'CONDUCTOR', 'ESQ398', 'GASEOSAS INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.319Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DANIEL AGUDELO', '1020103395', 'AUXILIAR DE CONDUCTOR', 'WCX326', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.518Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('GABRIEL DURAN', '18189021', 'AUXILIAR DE CONDUCTOR', 'YAR044', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.364Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('RAFAEL DAVID CORREA HERAZO', '1068420489', 'AUXILIAR LOGISTICO', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.644Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('HECTOR MAURICIO YEPEZ LOAIZA', '1037598604', 'INHOUSE', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.592Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUIS FERNANDO GONZALEZ VELEZ', '98715267', 'CONDUCTOR', 'JYX456', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.455Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ENRIQUE DE JESUS SERNA GIL', '4551916', 'CONDUCTOR', NULL, 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.328Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DIDIER ANDREY PINEDA CARDONA', '1037668748', 'AUXILIAR DE CONDUCTOR', 'STI894', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.597Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DAYANA ALEXANDRA CALVO ARANGO', '1017137772', 'ASESOR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.504Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CRISTIAN MERCADO RIOS', '1082897050', 'AUXILIAR LOGISTICO', NULL, 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.653Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('RICARIO HERNANDEZ', '8295011', 'CONDUCTOR', 'STI894', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.345Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('HOSMAN GARCIA ROCHA', '98763347', 'CONDUCTOR', 'WDI031', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.456Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YENNY YULIETH TORRES COLORADO', '1033338949', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.555Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DIEGO ALEJANDRO RUEDA  AGUDELO', '1001634186', 'CONDUCTOR', 'TDZ565', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.482Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHORMAN ARLEY MALDONADO', '8434351', 'CONDUCTOR', 'WCO995', 'ESNECTOR', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.347Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ARLEX HUMBERTO CALLEJAS SALDARRIAGA', '71767352', 'ANALISTA SST', NULL, 'ADMINISTRATIVA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.425Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CESAR GUERRA MONTES', '1003191664', 'AUXILIAR', 'STE355', 'RTD', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.485Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JEAN PAUL CORREA GOEZ', '1035974914', 'AUXILIAR DE CONDUCTOR', 'WCO995', 'SNECTOR', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.574Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOEL TIVORCIO GAVIRIA', '15048987', 'CONDUCTOR', 'TOQ606', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.352Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JORGE ROLDAN', '98550136', 'CONDUCTOR', 'TRG354', 'PAPYSER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.441Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('GLORIA STELLA FERNANDEZ TRUJILLO', '43799412', 'ASISTENTE FINANCIERA', NULL, 'ADMINISTRATIVA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.385Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN CAMILO VARGAS', '71240858', 'AUXILIAR DE CONDUCTOR', 'STR429', 'JHON URIBE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.402Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DANIEL TABARES USUGA', '71765975', 'CONDUCTOR', 'WPM227', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.424Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DANIELA LEDESMA RAMIREZ', '1035972220', 'AUXILIAR LOGÍSTICO', 'n/a', 'linea directa', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.573Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('OWEN URREGO BENITEZ', '1000307448', 'UAXILIAR LOGISTICO', NULL, 'LEONISA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.463Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CAMILO ANDRES PEREZ', '1040494197', 'AUXILIAR DE CONDUCTOR', 'WMQ019', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.614Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YELISON TEJADA', '1026149223', 'CONDUCTOR', 'WOS372', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.542Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHONATHAN VIERA PALACIOS', '1025761115', 'AUXILIAR DE CONDUCTOR', 'LKN291', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.535Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('EDGAR MARIN', '88271287', 'AUXILIAR LOGISTICO', NULL, 'JHON URIBE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.432Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('XIMENA DOMINGUEZ RAMOS', '29125299', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.367Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LILIANA MARCELA AGUDELO POSADA', '1039462228', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.608Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CARLOS MAURICIO BETACUR ORTIZ', '715252545', 'CONDUCTOR', 'NNM572', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.459Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUIS FERNANDO HIGUITA LOPEZ', '3486592', 'ASESOR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.325Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SEBASTIAN VELEZ', '1017217508', 'CONDUCTOR', 'JYX540', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.512Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHON ARBEY ZULUAGA ESTRADA', '1001418286', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.476Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('VALENTINA ARBELAEZ ALVAREZ', '1001017519', 'AUXILIAR DE OPERACIONES', NULL, 'ADMINISTRATIVA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.471Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LIZETH YURANY IBARRA URREGO', '1037610725', 'AUXILIAR LOGÍSTICO', 'N/A', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.594Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YESICA TORRES', '1111111111', 'AUXILIAR', 'STZ427', 'INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.666Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('GILDARDO BUITRAGO', '17315809', 'CONDUCTOR', 'SOP174', 'PLAN R', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.362Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('RUBEN ARIAS', '70003223', 'AUXILIAR CONDUCTOR', 'TLK087', 'JHON URIBE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.393Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHON ALEXANDERS GRANADOS BENITEZ', '1007386760', 'AUXILIAR', 'EQP170', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.495Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ALFREDO BUSTAMANTE MEJIA', '98572492', 'DIRECTOR T.I', NULL, 'ADMINISTRACION', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.443Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YEISON ALEJANDRO RUIZ MURILLO', '1035918305', 'ASESOR LOGÍSTICO', 'N/A', 'SOCODA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.568Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('Elkin Dario Uribe Villa', '1033342303', 'CONDUCTOR', 'GDX859', 'Agrosan', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.556Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('IMANOL ORDOÑEZ LABRADA', '1110040808', 'AUXILIAR LOGISTICO', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.663Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('KAROL XILENA URIBE VELEZ', '1040752488', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.627Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHONATHAN VALENCIA', '1036660698', 'CONDUCTOR', 'TDZ565', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.583Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANDRES FELIPE OSSA GARCIA', '1214729139', 'AUXILIAR CONDUCTOR', 'JYX456', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.707Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DIEGO POSSO', '1027955385', 'AUXILIAR CONDUCTOR', 'JYN021', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.549Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('HOSMAN DAVID LOPEZ RUIZ', '1000922482', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.470Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DIEGO ALEXANDER AGUIRRE', '98696759', 'CONDUCTOR', 'WCX326', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.454Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SANDRA ELENA ARROYAVE MONCADA', '32151233', 'AUXILIAR LOGÍSTICO', 'N/A', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.370Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('BRAYAN GRAJALES', '1000100560', 'CONDUCTOR', 'NUV493', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.460Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DIEGO VELASCO', '1140929333', 'CONDUCTOR', 'WFD722', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.690Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JORGE HUMBERTO PASTRANA ESTRADA', '71642450', 'GERENTE', NULL, 'ADMINISTRATIVA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.417Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN ESTEBAN MONCADA', '1000206476', 'CONDUCTOR', 'SVO488', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.461Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHON FREDY QUINTERO', '71748870', 'CONDUCTOR', 'SVO562', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.422Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('OSCAR ANIBAL BERMUDEZ MENDOZA', '1143980115', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.691Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANDRES FELIPE ZAPATA JARAMILLO', '1037776836', 'AUXILIAR LOGISTICO', NULL, 'JHON URIBE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.599Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DIEGO LUIS ZAPATA PULGARIN', '71697454', 'CONDUCTOR', 'GTY793', 'DICORD', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.418Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CARL MARLON BRAND MARULANDA', '1118303067', 'AUXILIAR LOGISTICO', 'NA', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.676Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('EDWIN DAVID LEONEL GIRALDO', '1007530363', 'AUXILIAR DE CONDUCTOR', 'NNN610', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.497Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANDRES MARIN', '1040751758', 'AUXILIAR', 'GDX508', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.626Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ADELAIDA DE LA CRUZ ORTIZ BEDOYA', '43840726', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.387Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('KEYNER MARQUEZ TAMAYO', '1037524189', 'AUXILIAR', 'JYX363', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.588Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('RAMON MARIN', '70567895', 'AUXILIAR', 'WDX372', 'VARIAS', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.398Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN MANUEL GOMEZ RAMIREZ', '1017922169', 'AUXILIAR LOGISTICO', NULL, 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.515Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SERGIO MARTINEZ', '1113702254', 'AUXILIAR', 'SOP174', 'PLAN R MILLA SIETE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.669Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('FABIO ALBEIRO GARCIA LEZCANO', '15429663', 'AUXILIAR LOGISTICO', NULL, 'ADMINISTRATIVA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.354Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CLAUDIO ANTONIO NISPERUZA BANDA', '1072251193', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.646Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CARLOS ALBERTO UPEGUI BOLAOS', '94061179', 'AUXILIAR LOGISTICO', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.433Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DANIEL TANGARIFE VALENCIA', '1107102700', 'AUXILIAR LOGÍSTICO', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.659Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('FRANCIS GOMEZ', '1048067793', 'AUXILIAR DE CONDUCTOR', 'SVD999', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.638Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ALEXANDRA MARIA MUÑOZ CASTRILLON', '43845511', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.388Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANDRES FELIPE ORDOÑEZ PULIDO', '1007161142', 'CONDUCTOR', 'SNU320', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.493Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN PABLO MORENO FAJARDO', '1118293032', 'AUXILIAR LOGÍSTICO', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.674Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MATHEW MUÑOZ DIEZ', '1035971851', 'AUXILIAR', 'JYN215', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.571Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CARLOS DAVID MERINO', '1036648093', 'AUXILIAR DE CONDUCTOR', 'GTY793', 'DICORD', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.581Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DEYNER MARTINEZ', '1045497657', 'AUXILIAR DE CONDUCTOR', 'TDZ425', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.637Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUIS ANGEL RODRIGUEZ', '1152469188', 'CONDUCTOR', 'SNW541', 'JHON URIBE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.701Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DIEGO MUÑOZ MORELO', '71985543', 'CONDUCTOR', 'ECQ159', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.430Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YAIR FRANCISCO VILLA ARANGO', '1022033708', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.524Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CIFUENTES BOLAÑOS JUAN DIEGO', '1005877611', 'AUXILIAR LOGISTICO', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.490Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('VICTOR HUGO FERNANDEZ CORREA', '1035423881', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.559Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANDRES QUICENO', '1007814097', 'CONDUCTOR', 'PXK108', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.501Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHORMAN ANDREY ALVAREZ MORALES', '1021924568', 'AUXILIAR LOGÍSTICO', NULL, 'AJOVER MEDELLIN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.523Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('TORO HURTADO JUSTIN', '1007370983', 'AUXILIAR LOGISTICO', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.494Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('VERONICA NATALY GUISAO ECHEVERRI', '1039452734', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.607Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('BRAYAN DAVID CASTILLOMEJIA', '1073988710', 'AUXILIAR LOGISTICO', NULL, 'ALMACENAMIENTO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.647Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CARLOS ALBERTO GOMEZ', '18400377', 'CONDUCTOR', 'UPT897', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.365Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANDRES MAURICIO MEJIA GAVIRIA', '1001505973', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.480Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUIS DANIEL RUEDA AGUDELO', '1000211019', 'CONDUCTOR', 'SNT443', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.462Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('EDGAR RONALDO RODRIGUEZ', '1005362857', 'AUXILIAR DE CONDUCTOR', 'JYO074', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.487Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANA MARIA PALACIO SALAZAR', '43747633', 'GERENTE ADMINISTRATIVA', NULL, 'ADMINISTRATIVA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.382Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SARA MEJIA', '1114001329', 'CONDUCTOR', 'TKD167', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.670Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DANIELA CAROLINA MONTOYA HIDALGO', '1214740345', 'ASESOR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.709Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DARWIN RICARDO', '1039706511', 'CONDUCTOR', 'ESQ159', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.612Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('HERNAN DARIO JARAMILLO JARAMILLO', '1045424390', 'AUXILIAR LOGISTICO', NULL, 'AJOVER MEDELLIN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.636Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOHAN SEBASTIAN HURTADO ACOSTA', '1130628467', 'AUXILIAR LOGISTICO', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.683Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('HERNAN ALVAREZ', '1020451381', 'CONDUCTOR', 'STE355', 'RTD', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.520Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MIGUEL ANGEL CARDONA MOLINA', '98595039', 'CONDUCTOR', 'LKN540', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.447Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('RANDY  XAVIER GARCIA  BOLIVAR', '6520587', 'AUXILIAR', 'NNM822', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.340Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUIS HERNANDO ALVAREZ BETANCUR', '98641739', 'CONDUCTOR', NULL, 'NOVASEO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.451Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN DANIEL USUGA', '1192732262', 'CONDUCTOR', 'WMQ019', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.703Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('RONALDO CARDONA', '1039422713', 'CONDUCTOR', 'TLK087', 'JHON URIBE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.605Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('OSCAR ESTIVEN GARCIA', '1007779091', 'AUXILIAR DE BODEGA', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.499Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ONEI FLOREZ', '71940777', 'CONDUCTOR', 'JYN215', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.428Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('EDWIN MARQUEZ PANTOJA', '1130661841', 'AUXILIAR LOGISTICO', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.685Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YECID MENDOZA ESTRADA', '1040751199', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.624Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LEONARDO FORONDA CORREA', '1017248672', 'SUPERVISOR OPBT', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.514Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JORGE ANDRES TORO CAMPILLO', '71290694', 'MONTACARGUISTA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.405Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MARIA ESTEFANIA LOAIZA VARGAS', '1000764450', 'COORDINADORA GESTION HUMANA', NULL, 'ADMINISTRACION', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.466Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MANUEL VARGAS', '11111111', 'CONDUCTOR', 'SUL046', 'INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.348Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('KEVIN ANDRES COLMENARES', '1140427247', 'AUXILIAR', 'TKM408', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.688Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOSE JOAQUIN VILLA HERRERA', '71240188', 'CONDUCTOR', 'TLK137', 'JHON URIBE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.401Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MAURICIO RUIZ', '1035871906', 'AUXILIAR', 'WNQ032', 'GASEOSAS INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.567Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('EDUAR FERNANDEZ', '14609998', 'CONDUCTOR', 'ZNN749', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.351Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOHAN CASTILLO', '1023868483', 'CONDUCTOR', 'NNN500', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.532Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DIEGO FERNANDO ECHEVERRY CASTAÑO', '97600354', 'CONDUCTOR', 'JYX456', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.439Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DANIEL SUAREZ', '1039023796', 'AUXILIAR', 'ESQ398', 'GASEOSAS INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.604Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN MAURICIO SERNA GARCIA', '1023526126', 'AUXILIAR DE CONDUCTOR', 'PXK108', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.528Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('FABIAN GALLEGO', '1022123846', 'AUXILIAR', 'JYX540', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.525Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('EDGAR GAVIRIA', '71750546', 'CONDUCTOR', 'SAW828', 'PAPYSER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.423Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('KEVIN VARELAS', '1002084834', 'CONDUCTOR', 'ESP387', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.483Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YEFERSON GAVIRIA', '1035861214', 'AUXILIAR CONDUCTOR', 'JYO275', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.564Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANDRES RUIZ', '1001367879', 'CONDUCTOR', 'TRD882', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.475Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DENILSON GARCIA', '1000895626', 'CONDUCTOR', 'TOQ781', 'ESNECTOR', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.469Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DAVID RUIZ', '1238938665', 'AUXILIAR DE CONDUCTOR', 'LKO525', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.710Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LINA MARIA ZAPATA ORTIZ', '1130661860', 'ASESOR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.686Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('EMANUEL VALENCIA CABEZAS', '1026137745', 'AUXILIAR LGÍSTICO', 'N/A', 'LIENA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.539Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('PAOLA ANDREA CORREA TRUJILLO', '43103160', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.371Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANDRES FELIPE MOSQUERA', '1110377990', 'AUXILIAR', 'TKD167', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.665Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('FABIAN ALONSO VELEZ QUIROZ', '1026148124', 'AUXILIAR', 'SNT443', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.541Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('Cristian Mauricio Benavides', '1110284774', 'AUXILIAR DE BODEGA', NULL, 'AJOVER MEDELLIN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.664Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YENNIFER VELASQUEZ MUÑOZ', '1036604969', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.577Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CRISTIAN RUEDA AGUDELO', '1039596223', 'AUXILIAR', 'TDZ565', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.610Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DIANA PATRICIA CANO VIVAS', '1036603227', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.576Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('OSCAR EDUARDO OSPINA RAVE', '98586340', 'AUXILIAR DE CONDUCTOR', 'KER044', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.446Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LISANDRO JAVIER CASTIBLNACO GOMEZ', '71381534', 'CONDUCTOR', 'NNM822', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.409Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('RONAL FERNANDO NARVAEZ MAMBUSCAY', '1121825317', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.678Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('BRAYAN DAVID GARCIA', '1000895464', 'AUXILIAR', 'WOX613', 'GASEOSAS INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.468Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOHAN ALEXIS BARRERA', '1035235723', 'AUXILIAR', 'SVO488', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.558Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DAVID MONSALVE OCHOA', '1001456161', 'ASESOR LOGÍSTICO', 'N/A', 'DICORD', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.479Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('IGUEL ANGEL OTALVARO', '1039681775', 'AUXILIAR', 'SMR448', 'INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.611Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN MANUEL MARTINEZ NISPERUZA', '1003059076', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.484Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUISA FERNANDA PUERTA BETANCUR', '1041610220', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.631Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('FRANCISCO ERASMO ORTIZ GIRALDO', '71293531', 'AUXILIAR LOGISTICO', NULL, 'AJOVER MEDELLIN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.408Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ROBERT GARAY', '7035899', 'AUXILIAR CONTUCTOR', 'TRN884', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.342Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ESAU VERA PARRA', '1128387195', 'INHOUSE', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.680Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ALBAN TEJADA MARIN', '71394056', 'CONDUCTOR', 'STR429', 'JHON URIBE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.412Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANGELA MARIA  MEDINA HERRERA', '43253011', 'OPERARIA MAQUILA', NULL, 'OBT', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.375Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MARCOS LASSO ROLDAN', '1006185517', 'CONDUCTOR', 'TCY392', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.492Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('EDIER DAVID BABILONIA', '1039088479', 'AUXILIAR DE CONDUCTOR', 'ESP387', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.604Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DANIEL ROJAS RESTREPO', '1026159488', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.546Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YEISON STIVEN ZAPATA', '1128476187', 'CONDUCTOR', 'TRN884', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.682Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('BRAYAN ALEXIS DIAZ ARENAS', '1039466574', 'AUXILIAR CONDUCTOR', 'TLK137', 'JHON URIBE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.609Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('OSCAR EDUARDO OSPINA LOPEZ', '1088000833', 'INHOUSE', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.655Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SARA CORDERO ARANGO', '1038263151', 'AUXILIAR GESTIÓN DOCUMENTAL', NULL, 'AJOVER MEDELLIN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.602Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOSE NORBEY LOPEZ', '1007413522', 'CONDUCTOR', 'TDZ425', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.496Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ALEXANDER LOPEZ TOLA', '1118286764', 'AUXILIAR LOGISTICO', 'NA', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.672Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHON BAYRON CHAVEZ', '1152717744', 'AUXILIAR DE CONDUCTOR', 'WGV585', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.702Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DANNY LENIS LAGUNA', '1005705743', 'BODEGA', NULL, 'AJOVER CALI   PLAN R', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.488Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANDRES FELIPE CETRE MOSQUERA', '71292518', 'ASESOR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.406Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('EDISON GOMEZ', '1148205622', 'AUXILIAR DE CONDUCTOR', 'TDZ565', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.696Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ANDRES FELIPE SORA MANJARREZ', '1056783325', 'AUXULIAR', 'EQS426', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.640Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('GUSTAVO ZAMIR ESCOBAR VALENCIA', '1140165970', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.687Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DANIEL ALEJANDRO OSORIO GRISALES', '1039446142', 'ASESOR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.606Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LAURA VALENTINA SUAREZ MENDEZ', '1006128721', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.491Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CARLOS NARVAEZ', '1017198051', 'CONDUCTOR', 'TRK715', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.510Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YOVANY ACEVEDO LUJAN', '71725965', 'MENSAJERO', NULL, 'ADMINISTRATIVA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.419Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOEL OREJUELA', '1104824687', 'AUXILIAR', 'KUN825', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.658Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHONATAN JOSE SILVA ROJAS', '5370025', 'AUXILIAR', 'JYO275', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.334Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('RUBEN DARIO GARCIA HENAO', '16051419', 'CONDUCTOR', 'WLZ300', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.357Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DIANA MARCELA CARDONA CARVAJAL', '1027882700', 'ASESOR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.548Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('OMAR FERNANDO YENDA', '1005832836', 'CONDUCTOR', 'KUN825', 'PLAN R MILLA SIETE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.489Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOSE DANIEL URREGO ZAPATA', '1035921665', 'AUXILIAR DE CONDUCTOR', 'TOQ606', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.570Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHON JAIRO SALAZAR', '71634613', 'CONDUCTOR', 'TMZ798', 'GASEOSAS INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.415Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LEIDY JOHANA ALZATE CARDONA', '1037946394', 'AUXILIAR', 'NNM572', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.600Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MARIA EUGENIA CANO VIVAS', '43162718', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.373Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOSE FERNANDO VERA', '1144204609', 'AXILIAR', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.694Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('GUSTAVO ADOLFO OSORIO RAMIREZ', '1040755956', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.628Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DANIEL ESTEBAN BEDOYA', '1040743591', 'AUXILIAR LOGISTICO', NULL, 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.617Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MATHEW MUÑOZ DIEZ', '1035471851', 'AUXILIAR', 'JYN215', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.561Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN DAVID ROMAN', '1000755246', 'CONDUCTOR', 'NNN610', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.465Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JADER AGUDELO', '71195097', 'AUXILIAR DE CONDUCTOR', 'TOQ781', 'POLIETILENO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.399Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ROSA ANGELICA RIVERA SEPULVEDA', '1214731310', 'DIRECTORA DE TESORERIA', NULL, 'ADMINISTRATIVA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.708Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LEIDY YHULIANA ROMAN CANO', '1017162359', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.505Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SANTIAGO POSSO', '1001030721', 'CONDUCTOR', 'JYN021', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.472Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JENIFFER ESTEFANS PEREZ GUZMAN', '1026137508', 'ANALISTA CONTABLE', NULL, 'ADMINISTRATIVA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.538Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MARIA JULIANA QUINTANA ARANGO', '1023622980', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.530Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOSE VANEGAS', '72204766', 'CONDUCTOR', 'SVD999', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.431Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LEIDY VIVIANA GALEANO MONTOYA', '1037595006', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.591Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MAYRA ALEJANDRA MUÑOZ TAFUR', '1144150988', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.692Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('RAMON ANTONIO MORENO MORENO', '98579515', 'AUXILIAR DE CONDUCTOR', 'LJS983', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.444Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN GOMEZ', '1036673031', 'AUXILIAR', 'LKK942', 'INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.584Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MARTIN CASTRILLON', '1001450323', 'AUXILIAR', 'SNM323', 'GASEOSAS INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.477Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('STIVEN LOPEZ', '1035871625', 'CONDUCTOR', 'JYO074', 'COMODISIMO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.565Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SEBASTIAN MORALES PEREZ', '1026162201', 'AUXILIAR', 'TLK137', 'JHON URIBE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.547Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOSE ROLANDO RAMIREZ MARIN', '8105737', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.344Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('FREDDY OSPINA', '15337874', 'CONDUCTOR', 'LKK942', 'INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.353Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ALEXANDER CHIRINOS', '5964901', 'AUXILIAR', 'TOQ606', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.335Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MARCIAL DE JESUS CASTILLO ZULUAGA', '1088252459', 'ASESOR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.656Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('NATALIA CRISTINA MAZO MAZO', '43927118', 'AUXILIAR', 'COMPRO', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.390Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MELBA PIEDRAHITA FERNANDEZ', '31483718', 'SERVICIOS GENERALES', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.368Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JENNY CATALINA ISAZA OSORIO', '1152457795', 'COORDINADORA LOGÍSTICA', NULL, 'CAF', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.699Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ARIEL INESTROZA', '16796131', 'CONDUCTOR', 'ZNL629', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.359Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SERGIO ANDRES RESTREPO GUTIERREZ', '1000746961', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.464Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('GILBERTO GUZMAN', '16772472', 'CONDUCTOR', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.358Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SIMON CARDONA ORTEGA', '1034991472', 'AUXILIAR LOGÍSTICO', 'N/A', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.557Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YEFERSON VERNAZA ANGULO', '1028184728', 'AUXILIAR LOGISTICO', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.554Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUISA FERNANDA HOLGUIN RAMIREZ', '1036639784', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.580Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DANIEL ATEHORTUA VASCO', '1001248991', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.474Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DUVAN CORTEZ', '1152216210', 'AUXILIAR', 'TLK297', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.698Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('EDWIN ANDRES GARCIA SILVA', '15444183', 'ASESOR LOGISTICO', NULL, 'RIONEGRO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.355Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHON SEBASTIAN BETANCUR MARULANDA', '1109115259', 'MONTA CARGUISTA', 'NA', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.662Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SEBASTIAN GALEANO', '1018233082', 'AUXILIAR DE CONDUCTOR', 'SVO562', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.516Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JESUS EMANUEL TEJADA MARIN', '71397558', 'CONDUCTOR', 'GDY095', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.413Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JULIAN FERLEY VERGARA ASPRILLA', '1028161169', 'AUXILIAR LOGISTICO', NULL, 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.552Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('EDWIN DUVAN FRANCO', '1037598750', 'CONDUCTOR', 'WCQ379', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.593Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('REYNALDO QUERALES', '7119440', 'AUXILIAR', 'LPK798', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.343Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('Juan Pablo Uribe Franco', '1026152381', 'AUXILIAR LOGISTICO', NULL, 'AJOVER MEDELLIN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.544Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MATEO LOAIZA FRANCO', '1007895746', 'CONDUCTOR', 'STY099', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.502Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ALEXANDER GARCIA CANO', '1020396692', 'AUXILIAR', 'WLZ300', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.519Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ESTEBAN BOLIVAR', '1036637209', 'AUXILIAR', 'JYY259', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.579Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MILAGROS PEREZ', '71795023', 'CONDUCTOR', 'SNM323', 'GASEOASA INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.427Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('MARIA ELENA VILA COLORADO', '43400981', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.379Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('ESTEBAN FUENTES', '1121960627', 'AUXILIAR DE CONDUCTOR', 'TKD564', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.679Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JADER MOISES REYES MERCADO', '1063283514', 'AUXILIAR LOGISTICO', NULL, 'JHON URIBE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.642Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('RIGOBERTO SALAZAR', '1214718600', 'AUXILIAR', 'JYX456', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.706Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUIS MANUEL FLOREZ MUÑOZ', '1079912281', 'AUXILIAR DE CONDUCTOR', 'CTI894', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.649Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LINA MARCELA OROZCO ARANGO', '1128406621', 'ASESOR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.681Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CRISTIAN HERNANDEZ', '103862250', 'AUXILIAR', 'UPB412', 'INN', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.458Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHONATHAN BOLIVAR', '1036628051', 'CONDUCTOR', 'JYY259', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.578Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('DIANA CAROLINA RAVE MONTOYA', '1026144020', 'OPERARIA MAQUILA', NULL, 'OPERACION BAJO TECHO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.540Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUIS FELIPE RUIZ MARIN', '1040756480', 'AUXILIAR DE CONDUCTOR', 'EDX508', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.629Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('EDILSA FUENTES OVIEDO', '43147520', 'ASESOR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.372Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUIS ALBERTO PINEDA OSSO', '1040374984', 'CONDUCTOR', 'LKK194', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.613Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUDITH SAMIRA ARIZA GONZALEZ', '52183491', 'ASESOR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.391Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOAN MAFRAY CORDOBA MARTINEZ', '1079094093', 'AUXILIAR LOGÍSTICO', NULL, 'linea directa', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.648Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YEISON VIVEROS CAICEDO', '1086047865', 'AUXILIAR LOGISTICO', 'NA', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.654Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('HERNADO CORTEZ', '70553645', 'CONDUCTOR', 'TLK297', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.397Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JOSEU DE JESUS HERNANDEZ MORENO', '71493872', 'CONDUCTOR', 'LJS983', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.414Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('CONRADO ANTONIO GUARIN GUARIN', '70162268', 'AUXILIAR', 'WDI031', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.394Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('YOJHAN MUJICA', '5051540', 'AUXILIAR DE CONDUCTOR', 'WFJ876', 'EXITO', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.331Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JUAN FERNANDO GARCIA MONTOYA', '1025880327', 'AUXILIAR LOGISTICO', NULL, 'TRANSPORTE', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.537Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUIS ALBEIRO LOPERA MAZO', '15508965', 'AUXILIAR', 'NUV493', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.356Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JEFERSON ORTIZ', '16883551', 'AJOVER CALI', 'VMU325', 'AUXILIAR', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.360Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('JHONATHAN TEJADA', '1026158274', 'AUXILIAR DE CONDUCTOR', 'JYX117', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.545Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('LUIS ALEXANDER OSORIO', '98627573', 'CONDUCTOR', 'TYX363', 'LINEA DIRECTA', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.448Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('SANTIAGO  GOMEZ', '1041440515', 'CONDUCTOR', 'WOS372', 'AJOVER', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.630Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+INSERT INTO gh_personal (nombre, cedula, cargo, placa, operacion, estado, usuario_control, fecha_control) 
+VALUES ('OSCAR HERNAN VALENCIA  AJOVER CALI', '16973164', 'CONDUCTOR', 'ZID283', 'AJOVER CALI', 'ACTIVO', 'Migración', '2026-05-20T00:33:53.361Z') 
+ON CONFLICT (cedula) DO UPDATE SET 
+  nombre = EXCLUDED.nombre,
+  cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+  placa = COALESCE(EXCLUDED.placa, gh_personal.placa),
+  operacion = COALESCE(EXCLUDED.operacion, gh_personal.operacion);
+
+-- --- ELEMENTOS ---
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO TURQUESA HOMBRE L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.834Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO GRIS  HOMBRE XXL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.823Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO BLANCA DAMA  M', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.809Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO TURQUESA HOMBRE XXXL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.839Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO GRIS  HOMBRE  XL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.821Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('BOTAS KONDOR 37', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.795Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('ANTIFLUIDO', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.866Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS HOMBRE  38', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.856Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS  FEMENINO 16', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.846Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA T-SHIRT CONTRATISTAS XXXL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.864Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO NEGRA HOMBRE  L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.825Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO BLANCA HOMBRE  L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.811Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('BOTAS KONDOR 44', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.802Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS HOMBRE  42', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.857Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS MASCULINO 40', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.867Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS HOMBRE  44', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.859Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS  FEMENINO 6', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.848Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS  FEMENINO 14', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.844Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS HOMBRE  34', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.853Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO TURQUESA HOMBRE M', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.835Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO BLANCA HOMBRE XXL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.814Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA T-SHIRT CONTRATISTAS  M', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.804Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS FEMENINO 10', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.842Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO BLANCA HOMBRE  XL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.813Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('BOTAS KONDOR 42', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.861Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS FEMENINO 12', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.843Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('BOTAS KONDOR 36', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.791Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS MASCULINO 42', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.868Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO BLANCA HOMBRE S', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.865Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO BLANCA DAMA  S', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.810Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS  FEMENINO 8', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.849Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA T-SHIRT CONTRATISTAS XL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.806Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO GRIS HOMBRE  S', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.820Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO GRIS  HOMBRE  M', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.819Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('BOTAS KONDOR 43', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.863Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO TURQUESA  DAMA L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.828Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO GRIS DAMA   S', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.817Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS HOMBRE  32', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.852Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS HOMBRE 30', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.851Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS HOMBRE  28', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.850Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA T-SHIRT CONTRATISTAS  XXL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.807Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO BLANCA DAMA  L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.808Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO GRIS  HOMBRE XXXL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.824Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO TURQUESA  DAMA M', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.829Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA T-SHIRT CONTRATISTAS  L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.803Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO TURQUESA  DAMA S', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.832Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO NEGRA HOMBRE  XL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.827Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO BLANCA HOMBRE  M', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.812Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO TURQUESA HOMBRE XL', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.838Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS  FEMENINO 18', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.847Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO GRIS DAMA  M', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.816Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO GRIS DAMA  L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.815Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('BOTAS KONDOR 35', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.869Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA POLO GRIS HOMBRE L', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.818Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('BOTAS KONDOR 41', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.801Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('JEANS HOMBRE  36', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.854Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('BOTAS KONDOR 40', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.860Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('CAMISETA T-SHIRT CONTRATISTAS  S', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.805Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('BOTAS KONDOR 39', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.799Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+INSERT INTO gh_elementos (nombre, tipo_id, estado_id, usuario_control, fecha_control, es_serializado) 
+VALUES ('BOTAS KONDOR 38', 3, 'EST-01', 'Migración', '2026-05-19T15:59:58.797Z', false) 
+ON CONFLICT (nombre) DO NOTHING;
+
+-- --- ASIGNACIONES ---
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75375',
+  (SELECT id FROM gh_personal WHERE cedula = '1037595006'),
+  'Estefania',
+  '2025-04-21T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 1)',
+  'Migración',
+  '2025-04-21T17:05:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75375'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75375')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75375'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75375')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75375'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75375')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75376',
+  (SELECT id FROM gh_personal WHERE cedula = '1088252459'),
+  'Bibiana',
+  '2025-04-21T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 2)',
+  'Migración',
+  '2025-04-21T20:02:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75376'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75376')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75376'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75376')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75377',
+  (SELECT id FROM gh_personal WHERE cedula = '43103160'),
+  'Bibiana',
+  '2025-04-21T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 3)',
+  'Migración',
+  '2025-04-21T20:05:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75377'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75377')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75377'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75377')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75378',
+  (SELECT id FROM gh_personal WHERE cedula = '71292518'),
+  'Bibiana',
+  '2025-04-21T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 4)',
+  'Migración',
+  '2025-04-21T20:06:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75378'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75378')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75378'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75378')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75379',
+  (SELECT id FROM gh_personal WHERE cedula = '43840726'),
+  'Estefania',
+  '2025-04-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 5)',
+  'Migración',
+  '2025-04-22T12:05:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75379'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75379')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75379'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75379')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75379'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75379')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75380',
+  (SELECT id FROM gh_personal WHERE cedula = '43845511'),
+  'Estefania',
+  '2025-04-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 6)',
+  'Migración',
+  '2025-04-22T12:09:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75380'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75380')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75380'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75380')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75380'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75380')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75381',
+  (SELECT id FROM gh_personal WHERE cedula = '1038768241'),
+  'Estefania',
+  '2025-04-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 7)',
+  'Migración',
+  '2025-04-22T12:11:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75381'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75381')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75381'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75381')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75381'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75381')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75382',
+  (SELECT id FROM gh_personal WHERE cedula = '1007643194'),
+  'Estefania',
+  '2025-04-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 8)',
+  'Migración',
+  '2025-04-22T12:14:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75382'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75382')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75382'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75382')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75382'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75382')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75383',
+  (SELECT id FROM gh_personal WHERE cedula = '1041610220'),
+  'Estefania',
+  '2025-04-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 9)',
+  'Migración',
+  '2025-04-22T19:40:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75383'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75383')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75383'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75383')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75383'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75383')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75384',
+  (SELECT id FROM gh_personal WHERE cedula = '1026144020'),
+  'Estefania',
+  '2025-04-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 10)',
+  'Migración',
+  '2025-04-22T19:47:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75384'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75384')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75384'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75384')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75384'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75384')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75385',
+  (SELECT id FROM gh_personal WHERE cedula = '1036603227'),
+  'Estefania',
+  '2025-04-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 11)',
+  'Migración',
+  '2025-04-23T16:42:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75385'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75385')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75385'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75385')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75385'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75385')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75386',
+  (SELECT id FROM gh_personal WHERE cedula = '1023622980'),
+  'Estefania',
+  '2025-04-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 12)',
+  'Migración',
+  '2025-04-23T16:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75386'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75386')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75386'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75386')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75386'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75386')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75387',
+  (SELECT id FROM gh_personal WHERE cedula = '71290694'),
+  'Estefania',
+  '2025-04-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 13)',
+  'Migración',
+  '2025-04-23T16:49:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75387'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75387')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75387'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE XL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75387')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75387'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  42'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75387')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  42')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75388',
+  (SELECT id FROM gh_personal WHERE cedula = '1036601715'),
+  'Estefania',
+  '2025-04-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 14)',
+  'Migración',
+  '2025-04-23T16:52:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75388'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75388')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75388'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75388')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75388'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75388')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75389',
+  (SELECT id FROM gh_personal WHERE cedula = '1040752488'),
+  'Estefania',
+  '2025-04-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 15)',
+  'Migración',
+  '2025-04-23T16:54:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75389'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75389')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75389'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75389')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75389'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75389')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75390',
+  (SELECT id FROM gh_personal WHERE cedula = '1017162359'),
+  'Estefania',
+  '2025-04-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 16)',
+  'Migración',
+  '2025-04-23T16:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75390'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75390')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75390'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75390')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75390'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75390')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75391',
+  (SELECT id FROM gh_personal WHERE cedula = '1037595006'),
+  'Estefania',
+  '2025-04-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 17)',
+  'Migración',
+  '2025-04-23T16:57:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75391'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75391')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75391'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75391')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75391'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75391')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75392',
+  (SELECT id FROM gh_personal WHERE cedula = '1039462228'),
+  'Bibiana',
+  '2025-04-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 18)',
+  'Migración',
+  '2025-04-23T21:25:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75392'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75392')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75392'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75392')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75392'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75392')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75393',
+  (SELECT id FROM gh_personal WHERE cedula = '1036639784'),
+  'Bibiana',
+  '2025-04-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 19)',
+  'Migración',
+  '2025-04-23T21:27:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75393'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75393')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75393'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75393')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75393'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75393')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75394',
+  (SELECT id FROM gh_personal WHERE cedula = '43162718'),
+  'Bibiana',
+  '2025-04-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 20)',
+  'Migración',
+  '2025-04-23T21:30:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75394'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75394')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75394'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75394')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75395',
+  (SELECT id FROM gh_personal WHERE cedula = '1068420489'),
+  'Bibiana',
+  '2025-04-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 21)',
+  'Migración',
+  '2025-04-23T21:43:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75395'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75395')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75395'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75395')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75395'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75395')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75396',
+  (SELECT id FROM gh_personal WHERE cedula = '1033338949'),
+  'Bibiana',
+  '2025-04-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 22)',
+  'Migración',
+  '2025-04-23T21:47:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75396'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75396')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75396'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75396')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75397',
+  (SELECT id FROM gh_personal WHERE cedula = '1036604969'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 23)',
+  'Migración',
+  '2025-04-24T15:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75397'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75397')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75397'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75397')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75397'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75397')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75398',
+  (SELECT id FROM gh_personal WHERE cedula = '43400981'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 24)',
+  'Migración',
+  '2025-04-24T16:01:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75398'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75398')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75398'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75398')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75398'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75398')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75399',
+  (SELECT id FROM gh_personal WHERE cedula = '1017248672'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 25)',
+  'Migración',
+  '2025-04-24T16:04:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75399'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75399')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75399'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75399')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75400',
+  (SELECT id FROM gh_personal WHERE cedula = '8105737'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 26)',
+  'Migración',
+  '2025-04-24T16:12:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75400'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75400')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75400'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75400')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75401',
+  (SELECT id FROM gh_personal WHERE cedula = '1040755956'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 27)',
+  'Migración',
+  '2025-04-24T16:14:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75401'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75401')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75401'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75401')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75402',
+  (SELECT id FROM gh_personal WHERE cedula = '1088000833'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 28)',
+  'Migración',
+  '2025-04-24T16:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75402'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75402')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75402'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75402')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75403',
+  (SELECT id FROM gh_personal WHERE cedula = '1040751199'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 29)',
+  'Migración',
+  '2025-04-24T16:19:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75403'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75403')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75403'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75403')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75404',
+  (SELECT id FROM gh_personal WHERE cedula = '1000922482'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 30)',
+  'Migración',
+  '2025-04-24T16:20:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75404'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75404')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75404'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75404')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75405',
+  (SELECT id FROM gh_personal WHERE cedula = '1025880327'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 31)',
+  'Migración',
+  '2025-04-24T16:22:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75405'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75405')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75405'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75405')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75406',
+  (SELECT id FROM gh_personal WHERE cedula = '1000746961'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 32)',
+  'Migración',
+  '2025-04-24T16:25:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75406'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75406')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75406'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  42'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75406')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  42')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75407',
+  (SELECT id FROM gh_personal WHERE cedula = '1001248991'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 33)',
+  'Migración',
+  '2025-04-24T16:29:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75407'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75407')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75407'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75407')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75408',
+  (SELECT id FROM gh_personal WHERE cedula = '1023630801'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 34)',
+  'Migración',
+  '2025-04-24T16:33:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75408'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75408')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75408'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75408')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75409',
+  (SELECT id FROM gh_personal WHERE cedula = '43792820'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 35)',
+  'Migración',
+  '2025-04-24T18:57:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75409'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75409')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75409'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75409')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75410',
+  (SELECT id FROM gh_personal WHERE cedula = '1128406621'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 36)',
+  'Migración',
+  '2025-04-24T18:59:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75410'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75410')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75410'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75410')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75411',
+  (SELECT id FROM gh_personal WHERE cedula = '1088346231'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 37)',
+  'Migración',
+  '2025-04-24T19:01:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75411'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75411')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75411'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75411')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75412',
+  (SELECT id FROM gh_personal WHERE cedula = '1003059076'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 38)',
+  'Migración',
+  '2025-04-24T19:02:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75412'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75412')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75412'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75412')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75413',
+  (SELECT id FROM gh_personal WHERE cedula = '1072251193'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 39)',
+  'Migración',
+  '2025-04-24T19:04:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75413'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75413')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75413'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75413')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75414',
+  (SELECT id FROM gh_personal WHERE cedula = '1037598604'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 40)',
+  'Migración',
+  '2025-04-24T19:05:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75414'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  3
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75414')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75415',
+  (SELECT id FROM gh_personal WHERE cedula = '1039446142'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 41)',
+  'Migración',
+  '2025-04-24T19:30:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75415'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75415')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75415'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75415')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75416',
+  (SELECT id FROM gh_personal WHERE cedula = '1035423881'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 42)',
+  'Migración',
+  '2025-04-24T19:32:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75416'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75416')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75416'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75416')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75417',
+  (SELECT id FROM gh_personal WHERE cedula = '1022033708'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 43)',
+  'Migración',
+  '2025-04-24T19:33:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75417'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75417')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75417'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75417')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75418',
+  (SELECT id FROM gh_personal WHERE cedula = '1001418286'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 44)',
+  'Migración',
+  '2025-04-24T19:34:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75418'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75418')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75418'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75418')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75419',
+  (SELECT id FROM gh_personal WHERE cedula = '1001418286'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 45)',
+  'Migración',
+  '2025-04-24T19:38:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75419'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75419')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75419'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75419')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75420',
+  (SELECT id FROM gh_personal WHERE cedula = '1001505973'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 46)',
+  'Migración',
+  '2025-04-24T19:43:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75420'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75420')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75420'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75420')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75421',
+  (SELECT id FROM gh_personal WHERE cedula = '1193033290'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 47)',
+  'Migración',
+  '2025-04-24T19:45:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75421'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75421')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75421'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75421')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75422',
+  (SELECT id FROM gh_personal WHERE cedula = '1193033290'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 48)',
+  'Migración',
+  '2025-04-24T19:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75422'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75422')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75422'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75422')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75423',
+  (SELECT id FROM gh_personal WHERE cedula = '1001145577'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 49)',
+  'Migración',
+  '2025-04-24T19:50:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75423'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75423')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75423'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75423')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75424',
+  (SELECT id FROM gh_personal WHERE cedula = '1026159488'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 50)',
+  'Migración',
+  '2025-04-24T19:51:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75424'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75424')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75424'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75424')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75425',
+  (SELECT id FROM gh_personal WHERE cedula = '3486592'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 51)',
+  'Migración',
+  '2025-04-24T19:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75425'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75425')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75425'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75425')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75426',
+  (SELECT id FROM gh_personal WHERE cedula = '43258579'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 52)',
+  'Migración',
+  '2025-04-24T19:56:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75426'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75426')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75426'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75426')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75427',
+  (SELECT id FROM gh_personal WHERE cedula = '71767352'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 53)',
+  'Migración',
+  '2025-04-24T19:58:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75427'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75427')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75427'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75427')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75428',
+  (SELECT id FROM gh_personal WHERE cedula = '98528497'),
+  'Bibiana',
+  '2025-04-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 54)',
+  'Migración',
+  '2025-04-24T20:01:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75428'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75428')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75428'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75428')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75429',
+  (SELECT id FROM gh_personal WHERE cedula = '1027882700'),
+  'Bibiana',
+  '2025-04-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 55)',
+  'Migración',
+  '2025-04-25T14:08:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75429'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75429')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75429'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75429')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75430',
+  (SELECT id FROM gh_personal WHERE cedula = '1130661860'),
+  'Bibiana',
+  '2025-04-28T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 56)',
+  'Migración',
+  '2025-04-28T19:44:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75430'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75430')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75430'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75430')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75431',
+  (SELECT id FROM gh_personal WHERE cedula = '1121825317'),
+  'Bibiana',
+  '2025-04-28T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 57)',
+  'Migración',
+  '2025-04-28T19:46:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75431'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75431')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75431'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75431')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75432',
+  (SELECT id FROM gh_personal WHERE cedula = '1006128721'),
+  'Bibiana',
+  '2025-04-28T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 58)',
+  'Migración',
+  '2025-04-28T19:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75432'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75432')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75432'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75432')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75433',
+  (SELECT id FROM gh_personal WHERE cedula = '1144150988'),
+  'Bibiana',
+  '2025-04-28T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 59)',
+  'Migración',
+  '2025-04-28T19:50:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75433'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75433')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75433'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75433')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75434',
+  (SELECT id FROM gh_personal WHERE cedula = '1143980115'),
+  'Bibiana',
+  '2025-04-28T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 60)',
+  'Migración',
+  '2025-04-28T19:53:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75434'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75434')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75434'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75434')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75435',
+  (SELECT id FROM gh_personal WHERE cedula = '29125299'),
+  'Bibiana',
+  '2025-04-28T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 61)',
+  'Migración',
+  '2025-04-28T19:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75435'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75435')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75435'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75435')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75436',
+  (SELECT id FROM gh_personal WHERE cedula = '1118303397'),
+  'Bibiana',
+  '2025-04-28T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 62)',
+  'Migración',
+  '2025-04-28T19:58:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75436'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75436')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75436'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75436')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75437',
+  (SELECT id FROM gh_personal WHERE cedula = '1140165970'),
+  'Bibiana',
+  '2025-04-28T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 63)',
+  'Migración',
+  '2025-04-28T20:00:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75437'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75437')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75437'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXXL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75437')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXXL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75437'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  44'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75437')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  44')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75438',
+  (SELECT id FROM gh_personal WHERE cedula = '1118290929'),
+  'Bibiana',
+  '2025-04-28T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 64)',
+  'Migración',
+  '2025-04-28T20:01:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75438'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75438')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75438'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75438')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75439',
+  (SELECT id FROM gh_personal WHERE cedula = '71765975'),
+  'Bibiana',
+  '2025-04-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 65)',
+  'Migración',
+  '2025-04-29T19:07:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75439'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75439')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75440',
+  (SELECT id FROM gh_personal WHERE cedula = '1035471851'),
+  'Bibiana',
+  '2025-04-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 66)',
+  'Migración',
+  '2025-04-30T13:41:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75440'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75440')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75441',
+  (SELECT id FROM gh_personal WHERE cedula = '71940777'),
+  'Bibiana',
+  '2025-04-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 67)',
+  'Migración',
+  '2025-04-30T13:42:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75441'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75441')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75442',
+  (SELECT id FROM gh_personal WHERE cedula = '1020451381'),
+  'Bibiana',
+  '2025-05-13T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 68)',
+  'Migración',
+  '2025-05-13T19:47:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75442'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75442')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75443',
+  (SELECT id FROM gh_personal WHERE cedula = '1003191664'),
+  'Bibiana',
+  '2025-05-13T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 69)',
+  'Migración',
+  '2025-05-13T19:50:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75443'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75443')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75444',
+  (SELECT id FROM gh_personal WHERE cedula = '1033342303'),
+  'Bibiana',
+  '2025-05-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 70)',
+  'Migración',
+  '2025-05-22T13:27:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75444'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75444')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75445',
+  (SELECT id FROM gh_personal WHERE cedula = '43253011'),
+  'Estefania',
+  '2025-05-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 71)',
+  'Migración',
+  '2025-05-22T14:16:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75445'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75445')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75445'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75445')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75445'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75445')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75446',
+  (SELECT id FROM gh_personal WHERE cedula = '4551916'),
+  'Estefania',
+  '2025-05-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 72)',
+  'Migración',
+  '2025-05-22T15:28:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75446'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75446')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75446'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75446')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75447',
+  (SELECT id FROM gh_personal WHERE cedula = '1104824687'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 73)',
+  'Migración',
+  '2025-05-26T15:43:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75447'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75447')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75448',
+  (SELECT id FROM gh_personal WHERE cedula = '16796131'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 74)',
+  'Migración',
+  '2025-05-26T15:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75448'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75448')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75449',
+  (SELECT id FROM gh_personal WHERE cedula = '1144204609'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 75)',
+  'Migración',
+  '2025-05-26T15:50:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75449'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75449')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75450',
+  (SELECT id FROM gh_personal WHERE cedula = '94399513'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 76)',
+  'Migración',
+  '2025-05-26T15:52:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75450'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75450')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75451',
+  (SELECT id FROM gh_personal WHERE cedula = '1005705743'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 77)',
+  'Migración',
+  '2025-05-26T15:53:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75451'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75451')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75452',
+  (SELECT id FROM gh_personal WHERE cedula = '1005832836'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 78)',
+  'Migración',
+  '2025-05-26T15:54:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75452'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75452')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75453',
+  (SELECT id FROM gh_personal WHERE cedula = '1113702254'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 79)',
+  'Migración',
+  '2025-05-26T15:56:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75453'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75453')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75454',
+  (SELECT id FROM gh_personal WHERE cedula = '17315809'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 80)',
+  'Migración',
+  '2025-05-26T15:58:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75454'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75454')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75455',
+  (SELECT id FROM gh_personal WHERE cedula = '1140427247'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 81)',
+  'Migración',
+  '2025-05-26T16:00:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75455'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75455')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75456',
+  (SELECT id FROM gh_personal WHERE cedula = '16772472'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 82)',
+  'Migración',
+  '2025-05-26T16:03:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75456'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75456')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75457',
+  (SELECT id FROM gh_personal WHERE cedula = '14609998'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 83)',
+  'Migración',
+  '2025-05-26T16:06:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75457'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75457')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75458',
+  (SELECT id FROM gh_personal WHERE cedula = '1006185517'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 84)',
+  'Migración',
+  '2025-05-26T16:08:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75458'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75458')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75459',
+  (SELECT id FROM gh_personal WHERE cedula = '94376749'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 85)',
+  'Migración',
+  '2025-05-26T16:11:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75459'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75459')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75459'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75459')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75460',
+  (SELECT id FROM gh_personal WHERE cedula = '6102333'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 86)',
+  'Migración',
+  '2025-05-26T16:17:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75460'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75460')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75460'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75460')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75461',
+  (SELECT id FROM gh_personal WHERE cedula = '16772472'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 87)',
+  'Migración',
+  '2025-05-26T16:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75461'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75461')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75462',
+  (SELECT id FROM gh_personal WHERE cedula = '1022033708'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 88)',
+  'Migración',
+  '2025-05-26T16:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75462'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75462')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75463',
+  (SELECT id FROM gh_personal WHERE cedula = '16973164'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 89)',
+  'Migración',
+  '2025-05-26T18:07:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75463'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75463')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75464',
+  (SELECT id FROM gh_personal WHERE cedula = '1110377990'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 90)',
+  'Migración',
+  '2025-05-26T18:08:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75464'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75464')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75465',
+  (SELECT id FROM gh_personal WHERE cedula = '1140929333'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 91)',
+  'Migración',
+  '2025-05-26T18:09:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75465'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75465')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75466',
+  (SELECT id FROM gh_personal WHERE cedula = '1114001329'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 92)',
+  'Migración',
+  '2025-05-26T18:09:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75466'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75466')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75467',
+  (SELECT id FROM gh_personal WHERE cedula = '16883551'),
+  'Bibiana',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 93)',
+  'Migración',
+  '2025-05-26T18:14:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75467'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75467')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75468',
+  (SELECT id FROM gh_personal WHERE cedula = '1022033708'),
+  'Estefania',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 94)',
+  'Migración',
+  '2025-05-26T18:56:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75468'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75468')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75469',
+  (SELECT id FROM gh_personal WHERE cedula = '1001418286'),
+  'Estefania',
+  '2025-05-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 95)',
+  'Migración',
+  '2025-05-26T18:56:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75469'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75469')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75470',
+  (SELECT id FROM gh_personal WHERE cedula = '1045424390'),
+  'Estefania',
+  '2025-05-27T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 96)',
+  'Migración',
+  '2025-05-27T16:34:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75470'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 38'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75470')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 38')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75470'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75470')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75470'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75470')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75471',
+  (SELECT id FROM gh_personal WHERE cedula = '1118290929'),
+  'Bibiana',
+  '2025-05-27T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 97)',
+  'Migración',
+  '2025-05-27T17:42:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75471'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75471')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75471'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75471')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75472',
+  (SELECT id FROM gh_personal WHERE cedula = '29125299'),
+  'Bibiana',
+  '2025-05-27T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 98)',
+  'Migración',
+  '2025-05-27T17:44:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75472'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75472')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75472'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75472')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75473',
+  (SELECT id FROM gh_personal WHERE cedula = '1118290929'),
+  'Estefania',
+  '2025-05-28T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 99)',
+  'Migración',
+  '2025-05-28T17:52:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75473'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75473')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75474',
+  (SELECT id FROM gh_personal WHERE cedula = '29125299'),
+  'Estefania',
+  '2025-05-28T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 100)',
+  'Migración',
+  '2025-05-28T17:53:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75474'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75474')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75475',
+  (SELECT id FROM gh_personal WHERE cedula = '4895949'),
+  'Bibiana',
+  '2025-05-28T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 101)',
+  'Migración',
+  '2025-05-28T19:06:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75475'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75475')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75476',
+  (SELECT id FROM gh_personal WHERE cedula = '1038263151'),
+  'Estefania',
+  '2025-05-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 102)',
+  'Migración',
+  '2025-05-29T13:30:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75476'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75476')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75476'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75476')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75476'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75476')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75477',
+  (SELECT id FROM gh_personal WHERE cedula = '1082874105'),
+  'Estefania',
+  '2025-06-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 103)',
+  'Migración',
+  '2025-06-03T16:26:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75477'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75477')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75477'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75477')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75477'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75477')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75478',
+  (SELECT id FROM gh_personal WHERE cedula = '1000307448'),
+  'Estefania',
+  '2025-06-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 104)',
+  'Migración',
+  '2025-06-03T16:34:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75478'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75478')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75478'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75478')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75478'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75478')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75479',
+  (SELECT id FROM gh_personal WHERE cedula = '1082897050'),
+  'Estefania',
+  '2025-06-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 105)',
+  'Migración',
+  '2025-06-03T16:41:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75479'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75479')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75479'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75479')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75479'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75479')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75480',
+  (SELECT id FROM gh_personal WHERE cedula = '1026152381'),
+  'Estefania',
+  '2025-06-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 106)',
+  'Migración',
+  '2025-06-03T16:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75480'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75480')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75480'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75480')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75480'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75480')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75481',
+  (SELECT id FROM gh_personal WHERE cedula = '71725965'),
+  'Estefania',
+  '2025-06-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 107)',
+  'Migración',
+  '2025-06-03T16:59:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75481'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75481')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75481'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75481')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75482',
+  (SELECT id FROM gh_personal WHERE cedula = '94252356'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 108)',
+  'Migración',
+  '2025-06-04T14:22:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75482'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75482')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75483',
+  (SELECT id FROM gh_personal WHERE cedula = '5964961'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 109)',
+  'Migración',
+  '2025-06-04T14:24:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75483'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75483')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75484',
+  (SELECT id FROM gh_personal WHERE cedula = '15048987'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 110)',
+  'Migración',
+  '2025-06-04T14:28:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75484'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75484')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75485',
+  (SELECT id FROM gh_personal WHERE cedula = '1007895746'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 111)',
+  'Migración',
+  '2025-06-04T14:29:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75485'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75485')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75486',
+  (SELECT id FROM gh_personal WHERE cedula = '71634613'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 112)',
+  'Migración',
+  '2025-06-04T14:31:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75486'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75486')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75487',
+  (SELECT id FROM gh_personal WHERE cedula = '1035855577'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 113)',
+  'Migración',
+  '2025-06-04T14:32:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75487'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75487')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75488',
+  (SELECT id FROM gh_personal WHERE cedula = '1035871906'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 114)',
+  'Migración',
+  '2025-06-04T14:33:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75488'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75488')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75489',
+  (SELECT id FROM gh_personal WHERE cedula = '98558444'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 115)',
+  'Migración',
+  '2025-06-04T14:43:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75489'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75489')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75490',
+  (SELECT id FROM gh_personal WHERE cedula = '1000895464'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 116)',
+  'Migración',
+  '2025-06-04T14:43:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75490'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75490')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75491',
+  (SELECT id FROM gh_personal WHERE cedula = '71266316'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 117)',
+  'Migración',
+  '2025-06-04T14:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75491'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75491')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75492',
+  (SELECT id FROM gh_personal WHERE cedula = '1039023796'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 118)',
+  'Migración',
+  '2025-06-04T15:50:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75492'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75492')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75493',
+  (SELECT id FROM gh_personal WHERE cedula = '831181'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 119)',
+  'Migración',
+  '2025-06-04T15:51:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75493'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75493')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75494',
+  (SELECT id FROM gh_personal WHERE cedula = '71795023'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 120)',
+  'Migración',
+  '2025-06-04T15:52:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75494'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75494')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75495',
+  (SELECT id FROM gh_personal WHERE cedula = '1001450323'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 121)',
+  'Migración',
+  '2025-06-04T15:53:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75495'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75495')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75496',
+  (SELECT id FROM gh_personal WHERE cedula = '1111111111'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 122)',
+  'Migración',
+  '2025-06-04T15:54:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75496'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75496')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  S')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75497',
+  (SELECT id FROM gh_personal WHERE cedula = '1037625490'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 123)',
+  'Migración',
+  '2025-06-04T15:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75497'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75497')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75498',
+  (SELECT id FROM gh_personal WHERE cedula = '1036673031'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 124)',
+  'Migración',
+  '2025-06-04T16:06:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75498'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75498')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75499',
+  (SELECT id FROM gh_personal WHERE cedula = '103862250'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 125)',
+  'Migración',
+  '2025-06-04T16:11:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75499'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75499')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  S')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75500',
+  (SELECT id FROM gh_personal WHERE cedula = '1035471851'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 126)',
+  'Migración',
+  '2025-06-04T16:19:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75500'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75500')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75501',
+  (SELECT id FROM gh_personal WHERE cedula = '1118286764'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 127)',
+  'Migración',
+  '2025-06-04T20:23:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75501'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75501')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75501'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75501')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75501'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75501')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75502',
+  (SELECT id FROM gh_personal WHERE cedula = '1118303067'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 128)',
+  'Migración',
+  '2025-06-04T20:26:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75502'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75502')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75502'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75502')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75503',
+  (SELECT id FROM gh_personal WHERE cedula = '1116376622'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 129)',
+  'Migración',
+  '2025-06-04T20:28:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75503'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75503')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75503'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75503')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75504',
+  (SELECT id FROM gh_personal WHERE cedula = '1086047865'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 130)',
+  'Migración',
+  '2025-06-04T20:30:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75504'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75504')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75504'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75504')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75505',
+  (SELECT id FROM gh_personal WHERE cedula = '1109115259'),
+  'Bibiana',
+  '2025-06-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 131)',
+  'Migración',
+  '2025-06-04T20:32:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75505'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75505')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75505'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75505')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75506',
+  (SELECT id FROM gh_personal WHERE cedula = '1067907703'),
+  'Bibiana',
+  '2025-06-10T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 132)',
+  'Migración',
+  '2025-06-10T16:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75506'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 44'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75506')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 44')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75506'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75506')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75507',
+  (SELECT id FROM gh_personal WHERE cedula = '1040745482'),
+  'Estefania',
+  '2025-06-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 133)',
+  'Migración',
+  '2025-06-11T13:03:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75507'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75507')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75507'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75507')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75507'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75507')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75508',
+  (SELECT id FROM gh_personal WHERE cedula = '1007779091'),
+  'Estefania',
+  '2025-06-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 134)',
+  'Migración',
+  '2025-06-11T13:25:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75508'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75508')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75508'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75508')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75508'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75508')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75509',
+  (SELECT id FROM gh_personal WHERE cedula = '1110284774'),
+  'Estefania',
+  '2025-06-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 135)',
+  'Migración',
+  '2025-06-11T13:26:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75509'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75509')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75509'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75509')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75509'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75509')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75510',
+  (SELECT id FROM gh_personal WHERE cedula = '1110040808'),
+  'Estefania',
+  '2025-06-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 136)',
+  'Migración',
+  '2025-06-11T13:29:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75510'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75510')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75510'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75510')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75510'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75510')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75511',
+  (SELECT id FROM gh_personal WHERE cedula = '1028184728'),
+  'Estefania',
+  '2025-06-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 137)',
+  'Migración',
+  '2025-06-11T13:32:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75511'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75511')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75511'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75511')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75511'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75511')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75512',
+  (SELECT id FROM gh_personal WHERE cedula = '1028161169'),
+  'Estefania',
+  '2025-06-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 138)',
+  'Migración',
+  '2025-06-11T13:33:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75512'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75512')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75512'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75512')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75512'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75512')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75513',
+  (SELECT id FROM gh_personal WHERE cedula = '1144211121'),
+  'Estefania',
+  '2025-06-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 139)',
+  'Migración',
+  '2025-06-11T13:45:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75513'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75513')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75513'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75513')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75513'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75513')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75514',
+  (SELECT id FROM gh_personal WHERE cedula = '1005877611'),
+  'Estefania',
+  '2025-06-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 140)',
+  'Migración',
+  '2025-06-11T14:03:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75514'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75514')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75514'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75514')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75514'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  44'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75514')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  44')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75515',
+  (SELECT id FROM gh_personal WHERE cedula = '1118286764'),
+  'Estefania',
+  '2025-06-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 141)',
+  'Migración',
+  '2025-06-11T14:16:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75515'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75515')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75516',
+  (SELECT id FROM gh_personal WHERE cedula = '1118303067'),
+  'Estefania',
+  '2025-06-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 142)',
+  'Migración',
+  '2025-06-11T14:17:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75516'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75516')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75517',
+  (SELECT id FROM gh_personal WHERE cedula = '1116376622'),
+  'Estefania',
+  '2025-06-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 143)',
+  'Migración',
+  '2025-06-11T14:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75517'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75517')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75518',
+  (SELECT id FROM gh_personal WHERE cedula = '1086047865'),
+  'Estefania',
+  '2025-06-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 144)',
+  'Migración',
+  '2025-06-11T14:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75518'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75518')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75519',
+  (SELECT id FROM gh_personal WHERE cedula = '1109115259'),
+  'Estefania',
+  '2025-06-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 145)',
+  'Migración',
+  '2025-06-11T14:22:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75519'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75519')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75520',
+  (SELECT id FROM gh_personal WHERE cedula = '1130628467'),
+  'Estefania',
+  '2025-06-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 146)',
+  'Migración',
+  '2025-06-11T14:24:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75520'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75520')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75520'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75520')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75520'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75520')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75521',
+  (SELECT id FROM gh_personal WHERE cedula = '1017180467'),
+  'Bibiana',
+  '2025-06-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 147)',
+  'Migración',
+  '2025-06-17T14:36:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75521'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75521')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75522',
+  (SELECT id FROM gh_personal WHERE cedula = '71985543'),
+  'Bibiana',
+  '2025-06-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 148)',
+  'Migración',
+  '2025-06-17T16:37:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75522'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75522')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75523',
+  (SELECT id FROM gh_personal WHERE cedula = '1000211019'),
+  'Estefania',
+  '2025-06-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 149)',
+  'Migración',
+  '2025-06-17T20:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75523'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75523')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75524',
+  (SELECT id FROM gh_personal WHERE cedula = '1001634186'),
+  'Estefania',
+  '2025-06-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 150)',
+  'Migración',
+  '2025-06-17T20:56:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75524'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75524')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75525',
+  (SELECT id FROM gh_personal WHERE cedula = '1026148124'),
+  'Estefania',
+  '2025-06-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 151)',
+  'Migración',
+  '2025-06-17T20:58:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75525'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75525')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75526',
+  (SELECT id FROM gh_personal WHERE cedula = '1026148124'),
+  'Bibiana',
+  '2025-06-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 152)',
+  'Migración',
+  '2025-06-17T21:02:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75526'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75526')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75527',
+  (SELECT id FROM gh_personal WHERE cedula = '5370025'),
+  'Bibiana',
+  '2025-06-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 153)',
+  'Migración',
+  '2025-06-17T21:03:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75527'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75527')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75528',
+  (SELECT id FROM gh_personal WHERE cedula = '4895949'),
+  'Bibiana',
+  '2025-06-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 154)',
+  'Migración',
+  '2025-06-17T21:09:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75528'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75528')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75529',
+  (SELECT id FROM gh_personal WHERE cedula = '71381534'),
+  'Bibiana',
+  '2025-06-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 155)',
+  'Migración',
+  '2025-06-17T21:19:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75529'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75529')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75530',
+  (SELECT id FROM gh_personal WHERE cedula = '6520587'),
+  'Bibiana',
+  '2025-06-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 156)',
+  'Migración',
+  '2025-06-17T21:22:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75530'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75530')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75531',
+  (SELECT id FROM gh_personal WHERE cedula = '1039596223'),
+  'Bibiana',
+  '2025-06-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 157)',
+  'Migración',
+  '2025-06-17T21:26:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75531'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75531')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75532',
+  (SELECT id FROM gh_personal WHERE cedula = '6520587'),
+  'Bibiana',
+  '2025-06-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 158)',
+  'Migración',
+  '2025-06-17T21:28:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75532'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75532')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75533',
+  (SELECT id FROM gh_personal WHERE cedula = '1037598750'),
+  'Bibiana',
+  '2025-06-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 159)',
+  'Migración',
+  '2025-06-18T14:40:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75533'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75533')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75534',
+  (SELECT id FROM gh_personal WHERE cedula = '98763347'),
+  'Bibiana',
+  '2025-06-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 160)',
+  'Migración',
+  '2025-06-18T14:44:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75534'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75534')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75535',
+  (SELECT id FROM gh_personal WHERE cedula = '70162268'),
+  'Bibiana',
+  '2025-06-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 161)',
+  'Migración',
+  '2025-06-18T14:46:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75535'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75535')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75536',
+  (SELECT id FROM gh_personal WHERE cedula = '70162268'),
+  'Bibiana',
+  '2025-06-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 162)',
+  'Migración',
+  '2025-06-18T15:23:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75536'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75536')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75537',
+  (SELECT id FROM gh_personal WHERE cedula = '1017137772'),
+  'Bibiana',
+  '2025-06-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 163)',
+  'Migración',
+  '2025-06-18T15:25:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75537'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75537')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75538',
+  (SELECT id FROM gh_personal WHERE cedula = '1007386760'),
+  'Estefania',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 164)',
+  'Migración',
+  '2025-06-19T13:32:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75538'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75538')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75539',
+  (SELECT id FROM gh_personal WHERE cedula = '1067907703'),
+  'Estefania',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 165)',
+  'Migración',
+  '2025-06-19T14:17:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75539'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75539')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75540',
+  (SELECT id FROM gh_personal WHERE cedula = '1144201858'),
+  'Estefania',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 166)',
+  'Migración',
+  '2025-06-19T20:05:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75540'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75540')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75540'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75540')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75540'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75540')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75541',
+  (SELECT id FROM gh_personal WHERE cedula = '1010079018'),
+  'Estefania',
+  '2025-06-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 167)',
+  'Migración',
+  '2025-06-19T20:13:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75541'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75541')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75541'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75541')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75541'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75541')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75542',
+  (SELECT id FROM gh_personal WHERE cedula = '1040743591'),
+  'Bibiana',
+  '2025-06-20T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 168)',
+  'Migración',
+  '2025-06-20T18:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75542'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75542')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75542'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75542')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75542'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75542')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75543',
+  (SELECT id FROM gh_personal WHERE cedula = '1118286764'),
+  'Estefania',
+  '2025-06-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 169)',
+  'Migración',
+  '2025-06-25T19:00:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75543'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75543')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75543'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75543')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75544',
+  (SELECT id FROM gh_personal WHERE cedula = '1144211121'),
+  'Estefania',
+  '2025-06-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 170)',
+  'Migración',
+  '2025-06-25T19:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75544'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75544')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75544'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75544')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75544'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75544')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75545',
+  (SELECT id FROM gh_personal WHERE cedula = '1007779091'),
+  'Estefania',
+  '2025-06-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 171)',
+  'Migración',
+  '2025-06-25T19:24:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75545'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75545')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75545'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75545')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75546',
+  (SELECT id FROM gh_personal WHERE cedula = '1108334950'),
+  'Estefania',
+  '2025-06-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 172)',
+  'Migración',
+  '2025-06-25T19:28:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75546'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 44'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75546')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 44')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75546'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75546')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75546'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75546')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75547',
+  (SELECT id FROM gh_personal WHERE cedula = '1130628467'),
+  'Estefania',
+  '2025-06-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 173)',
+  'Migración',
+  '2025-06-25T19:43:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75547'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75547')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75547'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75547')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75547'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75547')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75548',
+  (SELECT id FROM gh_personal WHERE cedula = '71393476'),
+  'Estefania',
+  '2025-06-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 174)',
+  'Migración',
+  '2025-06-25T20:29:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75548'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75548')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75549',
+  (SELECT id FROM gh_personal WHERE cedula = '1037524189'),
+  'Estefania',
+  '2025-06-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 175)',
+  'Migración',
+  '2025-06-25T20:30:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75549'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75549')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75550',
+  (SELECT id FROM gh_personal WHERE cedula = '71731792'),
+  'Bibiana',
+  '2025-06-27T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 176)',
+  'Migración',
+  '2025-06-27T13:43:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75550'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75550')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75551',
+  (SELECT id FROM gh_personal WHERE cedula = '1040751758'),
+  'Bibiana',
+  '2025-06-27T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 177)',
+  'Migración',
+  '2025-06-27T13:45:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75551'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75551')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75552',
+  (SELECT id FROM gh_personal WHERE cedula = '1035235723'),
+  'Bibiana',
+  '2025-07-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 178)',
+  'Migración',
+  '2025-07-02T12:35:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75552'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75552')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75553',
+  (SELECT id FROM gh_personal WHERE cedula = '1000206476'),
+  'Bibiana',
+  '2025-07-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 179)',
+  'Migración',
+  '2025-07-02T12:37:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75553'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75553')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75554',
+  (SELECT id FROM gh_personal WHERE cedula = '88271287'),
+  'Estefania',
+  '2025-07-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 180)',
+  'Migración',
+  '2025-07-02T15:19:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75554'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75554')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75554'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75554')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75554'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75554')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75555',
+  (SELECT id FROM gh_personal WHERE cedula = '1025649975'),
+  'Bibiana',
+  '2025-07-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 181)',
+  'Migración',
+  '2025-07-02T19:54:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75555'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 37'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75555')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 37')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75555'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75555')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75555'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75555')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75556',
+  (SELECT id FROM gh_personal WHERE cedula = '1079094093'),
+  'Bibiana',
+  '2025-07-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 182)',
+  'Migración',
+  '2025-07-03T16:22:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75556'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75556')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75556'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75556')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75556'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  42'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75556')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  42')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75557',
+  (SELECT id FROM gh_personal WHERE cedula = '1040743591'),
+  'Bibiana',
+  '2025-07-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 183)',
+  'Migración',
+  '2025-07-03T16:29:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75557'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  42'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75557')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  42')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75558',
+  (SELECT id FROM gh_personal WHERE cedula = '43927118'),
+  'Bibiana',
+  '2025-07-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 184)',
+  'Migración',
+  '2025-07-03T16:42:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75558'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75558')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75559',
+  (SELECT id FROM gh_personal WHERE cedula = '1000100560'),
+  'Bibiana',
+  '2025-07-08T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 185)',
+  'Migración',
+  '2025-07-08T12:53:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75559'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75559')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75560',
+  (SELECT id FROM gh_personal WHERE cedula = '1000100560'),
+  'Bibiana',
+  '2025-07-08T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 186)',
+  'Migración',
+  '2025-07-08T13:10:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75560'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75560')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75561',
+  (SELECT id FROM gh_personal WHERE cedula = '1152216210'),
+  'Bibiana',
+  '2025-07-08T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 187)',
+  'Migración',
+  '2025-07-08T13:14:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75561'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75561')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75562',
+  (SELECT id FROM gh_personal WHERE cedula = '70553645'),
+  'Bibiana',
+  '2025-07-08T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 188)',
+  'Migración',
+  '2025-07-08T13:16:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75562'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75562')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75563',
+  (SELECT id FROM gh_personal WHERE cedula = '15508965'),
+  'Bibiana',
+  '2025-07-08T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 189)',
+  'Migración',
+  '2025-07-08T13:22:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75563'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75563')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75564',
+  (SELECT id FROM gh_personal WHERE cedula = '1007370983'),
+  'Estefania',
+  '2025-07-08T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 190)',
+  'Migración',
+  '2025-07-08T21:21:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75564'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75564')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75564'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75564')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75564'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75564')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75565',
+  (SELECT id FROM gh_personal WHERE cedula = '97600354'),
+  'Bibiana',
+  '2025-07-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 191)',
+  'Migración',
+  '2025-07-09T14:13:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75565'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75565')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75566',
+  (SELECT id FROM gh_personal WHERE cedula = '1214718600'),
+  'Bibiana',
+  '2025-07-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 192)',
+  'Migración',
+  '2025-07-09T14:15:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75566'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75566')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75567',
+  (SELECT id FROM gh_personal WHERE cedula = '98641739'),
+  'Bibiana',
+  '2025-07-10T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 193)',
+  'Migración',
+  '2025-07-10T14:17:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75567'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75567')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75568',
+  (SELECT id FROM gh_personal WHERE cedula = '43162718'),
+  'Estefania',
+  '2025-07-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 194)',
+  'Migración',
+  '2025-07-11T17:33:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75568'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75568')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75568'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75568')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75568'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75568')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75569',
+  (SELECT id FROM gh_personal WHERE cedula = '1039452734'),
+  'Estefania',
+  '2025-07-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 195)',
+  'Migración',
+  '2025-07-11T17:36:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75569'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75569')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75569'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75569')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75569'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75569')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75570',
+  (SELECT id FROM gh_personal WHERE cedula = '1033338949'),
+  'Estefania',
+  '2025-07-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 196)',
+  'Migración',
+  '2025-07-11T19:35:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75570'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75570')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75570'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75570')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75570'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75570')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75571',
+  (SELECT id FROM gh_personal WHERE cedula = '1040743591'),
+  'Estefania',
+  '2025-07-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 197)',
+  'Migración',
+  '2025-07-11T19:37:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75571'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75571')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75571'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75571')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75572',
+  (SELECT id FROM gh_personal WHERE cedula = '1214740345'),
+  'Estefania',
+  '2025-07-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 198)',
+  'Migración',
+  '2025-07-11T19:39:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75572'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75572')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75572'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 6'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75572')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 6')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75573',
+  (SELECT id FROM gh_personal WHERE cedula = '43147520'),
+  'Estefania',
+  '2025-07-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 199)',
+  'Migración',
+  '2025-07-11T19:42:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75573'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75573')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75573'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75573')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75574',
+  (SELECT id FROM gh_personal WHERE cedula = '4551916'),
+  'Estefania',
+  '2025-07-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 200)',
+  'Migración',
+  '2025-07-11T19:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75574'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75574')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75575',
+  (SELECT id FROM gh_personal WHERE cedula = '1128387195'),
+  'Estefania',
+  '2025-07-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 201)',
+  'Migración',
+  '2025-07-11T19:51:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75575'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75575')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75575'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75575')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75576',
+  (SELECT id FROM gh_personal WHERE cedula = '1118286764'),
+  'Estefania',
+  '2025-07-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 202)',
+  'Migración',
+  '2025-07-11T20:27:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75576'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75576')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75577',
+  (SELECT id FROM gh_personal WHERE cedula = '1036628051'),
+  'Bibiana',
+  '2025-07-14T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 203)',
+  'Migración',
+  '2025-07-14T13:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75577'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75577')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75578',
+  (SELECT id FROM gh_personal WHERE cedula = '1036637209'),
+  'Bibiana',
+  '2025-07-14T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 204)',
+  'Migración',
+  '2025-07-14T13:49:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75578'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75578')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75579',
+  (SELECT id FROM gh_personal WHERE cedula = '1037946394'),
+  'Estefania',
+  '2025-07-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 205)',
+  'Migración',
+  '2025-07-18T14:50:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75579'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75579')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75580',
+  (SELECT id FROM gh_personal WHERE cedula = '715252545'),
+  'Estefania',
+  '2025-07-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 206)',
+  'Migración',
+  '2025-07-18T14:53:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75580'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75580')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75581',
+  (SELECT id FROM gh_personal WHERE cedula = '7119440'),
+  'Estefania',
+  '2025-07-21T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 207)',
+  'Migración',
+  '2025-07-21T12:44:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75581'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75581')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75582',
+  (SELECT id FROM gh_personal WHERE cedula = '1056783325'),
+  'Estefania',
+  '2025-07-21T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 208)',
+  'Migración',
+  '2025-07-21T16:52:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75582'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75582')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75583',
+  (SELECT id FROM gh_personal WHERE cedula = '1021802341'),
+  'Estefania',
+  '2025-07-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 209)',
+  'Migración',
+  '2025-07-23T17:01:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75583'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75583')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75583'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75583')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75583'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75583')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75584',
+  (SELECT id FROM gh_personal WHERE cedula = '94061179'),
+  'Estefania',
+  '2025-07-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 210)',
+  'Migración',
+  '2025-07-23T20:22:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75584'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75584')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75584'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75584')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75584'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75584')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75585',
+  (SELECT id FROM gh_personal WHERE cedula = '1130661841'),
+  'Estefania',
+  '2025-07-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 211)',
+  'Migración',
+  '2025-07-23T20:25:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75585'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75585')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75585'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75585')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75585'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75585')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75586',
+  (SELECT id FROM gh_personal WHERE cedula = '1041440515'),
+  'Estefania',
+  '2025-07-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 212)',
+  'Migración',
+  '2025-07-25T19:54:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75586'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75586')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75587',
+  (SELECT id FROM gh_personal WHERE cedula = '98659009'),
+  'Estefania',
+  '2025-07-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 213)',
+  'Migración',
+  '2025-07-29T15:31:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75587'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75587')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75588',
+  (SELECT id FROM gh_personal WHERE cedula = '1040737902'),
+  'Estefania',
+  '2025-07-31T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 214)',
+  'Migración',
+  '2025-07-31T17:50:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75588'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75588')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75588'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75588')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75588'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75588')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75589',
+  (SELECT id FROM gh_personal WHERE cedula = '14280317'),
+  'Estefania',
+  '2025-08-01T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 215)',
+  'Migración',
+  '2025-08-01T13:24:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75589'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75589')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75590',
+  (SELECT id FROM gh_personal WHERE cedula = '1017217508'),
+  'Estefania',
+  '2025-08-01T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 216)',
+  'Migración',
+  '2025-08-01T18:08:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75590'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75590')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75591',
+  (SELECT id FROM gh_personal WHERE cedula = '1022123846'),
+  'Estefania',
+  '2025-08-01T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 217)',
+  'Migración',
+  '2025-08-01T18:09:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75591'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75591')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75592',
+  (SELECT id FROM gh_personal WHERE cedula = '70567895'),
+  'Estefania',
+  '2025-08-01T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 218)',
+  'Migración',
+  '2025-08-01T18:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75592'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75592')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75593',
+  (SELECT id FROM gh_personal WHERE cedula = '71240188'),
+  'Estefania',
+  '2025-08-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 219)',
+  'Migración',
+  '2025-08-04T12:03:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75593'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75593')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75594',
+  (SELECT id FROM gh_personal WHERE cedula = '1026162201'),
+  'Estefania',
+  '2025-08-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 220)',
+  'Migración',
+  '2025-08-04T12:05:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75594'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75594')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75595',
+  (SELECT id FROM gh_personal WHERE cedula = '1040737902'),
+  'Estefania',
+  '2025-08-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 221)',
+  'Migración',
+  '2025-08-04T15:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75595'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75595')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75596',
+  (SELECT id FROM gh_personal WHERE cedula = '70192995'),
+  'Estefania',
+  '2025-08-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 222)',
+  'Migración',
+  '2025-08-04T15:20:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75596'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75596')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75597',
+  (SELECT id FROM gh_personal WHERE cedula = '71292518'),
+  'Estefania',
+  '2025-08-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 223)',
+  'Migración',
+  '2025-08-04T17:04:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75597'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75597')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75598',
+  (SELECT id FROM gh_personal WHERE cedula = '1152469188'),
+  'Estefania',
+  '2025-08-05T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 224)',
+  'Migración',
+  '2025-08-05T19:39:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75598'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75598')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75599',
+  (SELECT id FROM gh_personal WHERE cedula = '16051419'),
+  'Estefania',
+  '2025-08-13T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 225)',
+  'Migración',
+  '2025-08-13T16:50:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75599'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75599')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75600',
+  (SELECT id FROM gh_personal WHERE cedula = '1020396692'),
+  'Estefania',
+  '2025-08-13T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 226)',
+  'Migración',
+  '2025-08-13T16:54:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75600'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75600')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75601',
+  (SELECT id FROM gh_personal WHERE cedula = '15444183'),
+  'Estefania',
+  '2025-08-15T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 227)',
+  'Migración',
+  '2025-08-15T20:46:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75601'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75601')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75601'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75601')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75601'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75601')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75602',
+  (SELECT id FROM gh_personal WHERE cedula = '1017922169'),
+  'Estefania',
+  '2025-08-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 228)',
+  'Migración',
+  '2025-08-22T15:42:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75602'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75602')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75602'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75602')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75602'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75602')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75603',
+  (SELECT id FROM gh_personal WHERE cedula = '1017922169'),
+  'Estefania',
+  '2025-08-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 229)',
+  'Migración',
+  '2025-08-26T16:19:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75603'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75603')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75603'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75603')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75603'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75603')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75604',
+  (SELECT id FROM gh_personal WHERE cedula = '1017162359'),
+  'Estefania',
+  '2025-08-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 230)',
+  'Migración',
+  '2025-08-26T16:20:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75604'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75604')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75605',
+  (SELECT id FROM gh_personal WHERE cedula = '71725965'),
+  'Estefania',
+  '2025-08-27T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 231)',
+  'Migración',
+  '2025-08-27T14:34:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75605'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75605')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75606',
+  (SELECT id FROM gh_personal WHERE cedula = '28134017'),
+  'Estefania',
+  '2025-08-27T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 232)',
+  'Migración',
+  '2025-08-27T21:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75606'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75606')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75607',
+  (SELECT id FROM gh_personal WHERE cedula = '1062430747'),
+  'Estefania',
+  '2025-08-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 233)',
+  'Migración',
+  '2025-08-29T17:23:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75607'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75607')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75607'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75607')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75607'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75607')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75608',
+  (SELECT id FROM gh_personal WHERE cedula = '1040374984'),
+  'Estefania',
+  '2025-09-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 234)',
+  'Migración',
+  '2025-09-02T14:00:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75608'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75608')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75609',
+  (SELECT id FROM gh_personal WHERE cedula = '71397558'),
+  'Estefania',
+  '2025-09-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 235)',
+  'Migración',
+  '2025-09-02T15:23:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75609'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75609')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75610',
+  (SELECT id FROM gh_personal WHERE cedula = '1037545432'),
+  'Estefania',
+  '2025-09-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 236)',
+  'Migración',
+  '2025-09-02T17:20:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75610'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75610')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75611',
+  (SELECT id FROM gh_personal WHERE cedula = '1118293032'),
+  'Estefania',
+  '2025-09-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 237)',
+  'Migración',
+  '2025-09-03T17:23:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75611'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75611')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75611'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75611')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75611'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75611')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75612',
+  (SELECT id FROM gh_personal WHERE cedula = '1035921665'),
+  'Estefania',
+  '2025-09-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 238)',
+  'Migración',
+  '2025-09-04T12:12:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75612'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75612')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75613',
+  (SELECT id FROM gh_personal WHERE cedula = '71195097'),
+  'Estefania',
+  '2025-09-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 239)',
+  'Migración',
+  '2025-09-04T16:01:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75613'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75613')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75614',
+  (SELECT id FROM gh_personal WHERE cedula = '1107102700'),
+  'Estefania',
+  '2025-09-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 240)',
+  'Migración',
+  '2025-09-04T19:36:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75614'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75614')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75614'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75614')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75614'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75614')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75615',
+  (SELECT id FROM gh_personal WHERE cedula = '1073988710'),
+  'Estefania',
+  '2025-09-08T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 241)',
+  'Migración',
+  '2025-09-08T17:20:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75615'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75615')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75615'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75615')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75615'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75615')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75616',
+  (SELECT id FROM gh_personal WHERE cedula = '1040745482'),
+  'Estefania',
+  '2025-09-08T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 242)',
+  'Migración',
+  '2025-09-08T19:01:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75616'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75616')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75616'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75616')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75616'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75616')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75617',
+  (SELECT id FROM gh_personal WHERE cedula = '18400377'),
+  'Estefania',
+  '2025-09-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 243)',
+  'Migración',
+  '2025-09-09T13:11:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75617'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75617')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75618',
+  (SELECT id FROM gh_personal WHERE cedula = '98595039'),
+  'Estefania',
+  '2025-09-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 244)',
+  'Migración',
+  '2025-09-09T16:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75618'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75618')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75619',
+  (SELECT id FROM gh_personal WHERE cedula = '4895949'),
+  'Estefania',
+  '2025-09-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 245)',
+  'Migración',
+  '2025-09-09T16:57:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75619'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75619')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75620',
+  (SELECT id FROM gh_personal WHERE cedula = '1045077138'),
+  'Estefania',
+  '2025-09-12T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 246)',
+  'Migración',
+  '2025-09-12T13:32:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75620'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75620')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75621',
+  (SELECT id FROM gh_personal WHERE cedula = '1238938665'),
+  'Estefania',
+  '2025-09-12T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 247)',
+  'Migración',
+  '2025-09-12T13:33:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75621'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75621')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75622',
+  (SELECT id FROM gh_personal WHERE cedula = '5981155'),
+  'Estefania',
+  '2025-09-12T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 248)',
+  'Migración',
+  '2025-09-12T20:15:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75622'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75622')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75623',
+  (SELECT id FROM gh_personal WHERE cedula = '5051540'),
+  'Estefania',
+  '2025-09-12T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 249)',
+  'Migración',
+  '2025-09-12T20:16:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75623'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75623')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75624',
+  (SELECT id FROM gh_personal WHERE cedula = '5981155'),
+  'Estefania',
+  '2025-09-12T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 250)',
+  'Migración',
+  '2025-09-12T20:20:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75624'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75624')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75625',
+  (SELECT id FROM gh_personal WHERE cedula = '5051540'),
+  'Estefania',
+  '2025-09-12T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 251)',
+  'Migración',
+  '2025-09-12T20:21:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75625'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75625')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75626',
+  (SELECT id FROM gh_personal WHERE cedula = '1037776836'),
+  'Estefania',
+  '2025-09-15T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 252)',
+  'Migración',
+  '2025-09-15T16:43:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75626'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75626')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75626'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75626')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75626'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75626')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75627',
+  (SELECT id FROM gh_personal WHERE cedula = '1035974914'),
+  'Estefania',
+  '2025-09-15T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 253)',
+  'Migración',
+  '2025-09-15T16:53:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75627'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75627')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75628',
+  (SELECT id FROM gh_personal WHERE cedula = '71293531'),
+  'Estefania',
+  '2025-09-16T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 254)',
+  'Migración',
+  '2025-09-16T14:19:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75628'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75628')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75628'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75628')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75629',
+  (SELECT id FROM gh_personal WHERE cedula = '71293531'),
+  'Estefania',
+  '2025-09-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 255)',
+  'Migración',
+  '2025-09-17T21:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75629'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75629')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75630',
+  (SELECT id FROM gh_personal WHERE cedula = '1040756480'),
+  'Estefania',
+  '2025-09-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 256)',
+  'Migración',
+  '2025-09-18T11:52:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75630'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75630')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75631',
+  (SELECT id FROM gh_personal WHERE cedula = '1007413522'),
+  'Estefania',
+  '2025-09-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 257)',
+  'Migración',
+  '2025-09-19T11:52:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75631'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75631')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75632',
+  (SELECT id FROM gh_personal WHERE cedula = '1045497657'),
+  'Estefania',
+  '2025-09-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 258)',
+  'Migración',
+  '2025-09-19T11:54:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75632'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75632')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75633',
+  (SELECT id FROM gh_personal WHERE cedula = '1021924568'),
+  'Estefania',
+  '2025-09-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 259)',
+  'Migración',
+  '2025-09-24T17:57:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75633'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75633')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75633'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75633')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75633'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75633')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75634',
+  (SELECT id FROM gh_personal WHERE cedula = '1027882700'),
+  'Estefania',
+  '2025-09-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 260)',
+  'Migración',
+  '2025-09-24T21:27:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75634'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75634')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75634'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75634')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75635',
+  (SELECT id FROM gh_personal WHERE cedula = '43840726'),
+  'Estefania',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 261)',
+  'Migración',
+  '2025-09-25T19:58:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75635'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75635')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75635'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75635')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75636',
+  (SELECT id FROM gh_personal WHERE cedula = '1130661860'),
+  'Estefania',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 262)',
+  'Migración',
+  '2025-09-25T20:03:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75636'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75636')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75636'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75636')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75637',
+  (SELECT id FROM gh_personal WHERE cedula = '1118290929'),
+  'Estefania',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 263)',
+  'Migración',
+  '2025-09-25T20:06:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75637'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75637')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75637'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75637')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75638',
+  (SELECT id FROM gh_personal WHERE cedula = '1152457795'),
+  'Estefania',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 264)',
+  'Migración',
+  '2025-09-25T20:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75638'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75638')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75639',
+  (SELECT id FROM gh_personal WHERE cedula = '29125299'),
+  'Estefania',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 265)',
+  'Migración',
+  '2025-09-25T20:40:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75639'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75639')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75639'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75639')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75640',
+  (SELECT id FROM gh_personal WHERE cedula = '1006128721'),
+  'Estefania',
+  '2025-09-25T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 266)',
+  'Migración',
+  '2025-09-25T20:41:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75640'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75640')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75640'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75640')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75641',
+  (SELECT id FROM gh_personal WHERE cedula = '98586340'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 267)',
+  'Migración',
+  '2025-09-26T13:37:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75641'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75641')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75642',
+  (SELECT id FROM gh_personal WHERE cedula = '1144150988'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 268)',
+  'Migración',
+  '2025-09-26T19:20:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75642'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75642')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75642'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75642')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75643',
+  (SELECT id FROM gh_personal WHERE cedula = '1143980115'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 269)',
+  'Migración',
+  '2025-09-26T19:25:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75643'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75643')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75643'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75643')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75644',
+  (SELECT id FROM gh_personal WHERE cedula = '1130628467'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 270)',
+  'Migración',
+  '2025-09-26T19:28:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75644'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75644')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75644'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75644')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75645',
+  (SELECT id FROM gh_personal WHERE cedula = '1118303397'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 271)',
+  'Migración',
+  '2025-09-26T19:30:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75645'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75645')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75645'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75645')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75646',
+  (SELECT id FROM gh_personal WHERE cedula = '1118293032'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 272)',
+  'Migración',
+  '2025-09-26T19:32:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75646'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75646')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75646'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75646')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75647',
+  (SELECT id FROM gh_personal WHERE cedula = '31483718'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 273)',
+  'Migración',
+  '2025-09-26T19:37:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75647'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'ANTIFLUIDO'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75647')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'ANTIFLUIDO')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75648',
+  (SELECT id FROM gh_personal WHERE cedula = '1116376622'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 274)',
+  'Migración',
+  '2025-09-26T19:38:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75648'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75648')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75648'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75648')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75649',
+  (SELECT id FROM gh_personal WHERE cedula = '1118286764'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 275)',
+  'Migración',
+  '2025-09-26T19:40:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75649'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75649')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75649'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75649')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75650',
+  (SELECT id FROM gh_personal WHERE cedula = '1109115259'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 276)',
+  'Migración',
+  '2025-09-26T19:42:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75650'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75650')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75650'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75650')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75651',
+  (SELECT id FROM gh_personal WHERE cedula = '1118303067'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 277)',
+  'Migración',
+  '2025-09-26T19:44:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75651'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75651')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75651'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75651')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75652',
+  (SELECT id FROM gh_personal WHERE cedula = '1110040808'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 278)',
+  'Migración',
+  '2025-09-26T19:45:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75652'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75652')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75652'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75652')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75653',
+  (SELECT id FROM gh_personal WHERE cedula = '1028184728'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 279)',
+  'Migración',
+  '2025-09-26T19:47:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75653'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75653')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75653'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75653')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75654',
+  (SELECT id FROM gh_personal WHERE cedula = '1130661841'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 280)',
+  'Migración',
+  '2025-09-26T19:49:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75654'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75654')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75654'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75654')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75655',
+  (SELECT id FROM gh_personal WHERE cedula = '1005877611'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 281)',
+  'Migración',
+  '2025-09-26T19:51:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75655'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75655')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75655'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  44'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75655')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  44')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75656',
+  (SELECT id FROM gh_personal WHERE cedula = '1108334950'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 282)',
+  'Migración',
+  '2025-09-26T20:03:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75656'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75656')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75656'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75656')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75657',
+  (SELECT id FROM gh_personal WHERE cedula = '1144201858'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 283)',
+  'Migración',
+  '2025-09-26T20:05:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75657'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75657')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75657'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75657')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75658',
+  (SELECT id FROM gh_personal WHERE cedula = '1007370983'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 284)',
+  'Migración',
+  '2025-09-26T20:06:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75658'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75658')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75658'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75658')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75659',
+  (SELECT id FROM gh_personal WHERE cedula = '94061179'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 285)',
+  'Migración',
+  '2025-09-26T20:08:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75659'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75659')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75659'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75659')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75660',
+  (SELECT id FROM gh_personal WHERE cedula = '71725965'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 286)',
+  'Migración',
+  '2025-09-26T20:15:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75660'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75660')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75660'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75660')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75661',
+  (SELECT id FROM gh_personal WHERE cedula = '71767352'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 287)',
+  'Migración',
+  '2025-09-26T20:16:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75661'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75661')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75661'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75661')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75662',
+  (SELECT id FROM gh_personal WHERE cedula = '1088000833'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 288)',
+  'Migración',
+  '2025-09-26T20:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75662'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75662')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75662'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75662')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75663',
+  (SELECT id FROM gh_personal WHERE cedula = '1000746961'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 289)',
+  'Migración',
+  '2025-09-26T20:24:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75663'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75663')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75663'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 40'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75663')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 40')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75664',
+  (SELECT id FROM gh_personal WHERE cedula = '1040751199'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 290)',
+  'Migración',
+  '2025-09-26T20:26:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75664'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75664')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75664'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75664')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75665',
+  (SELECT id FROM gh_personal WHERE cedula = '88271287'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 291)',
+  'Migración',
+  '2025-09-26T20:27:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75665'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75665')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75665'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75665')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75666',
+  (SELECT id FROM gh_personal WHERE cedula = '1001248991'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 292)',
+  'Migración',
+  '2025-09-26T20:29:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75666'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75666')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75666'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75666')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75667',
+  (SELECT id FROM gh_personal WHERE cedula = '1023630801'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 293)',
+  'Migración',
+  '2025-09-26T20:31:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75667'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75667')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75667'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75667')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75668',
+  (SELECT id FROM gh_personal WHERE cedula = '43792820'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 294)',
+  'Migración',
+  '2025-09-26T20:47:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75668'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75668')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75668'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75668')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75669',
+  (SELECT id FROM gh_personal WHERE cedula = '1214740345'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 295)',
+  'Migración',
+  '2025-09-26T20:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75669'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75669')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75669'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75669')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75669'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75669')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75670',
+  (SELECT id FROM gh_personal WHERE cedula = '1088346231'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 296)',
+  'Migración',
+  '2025-09-26T20:51:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75670'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75670')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE XXL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75670'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75670')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75671',
+  (SELECT id FROM gh_personal WHERE cedula = '1072251193'),
+  'Estefania',
+  '2025-09-26T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 297)',
+  'Migración',
+  '2025-09-26T20:53:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75671'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75671')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75671'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75671')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75672',
+  (SELECT id FROM gh_personal WHERE cedula = '4053344'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 298)',
+  'Migración',
+  '2025-09-29T15:33:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75672'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75672')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75673',
+  (SELECT id FROM gh_personal WHERE cedula = '1000307448'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 299)',
+  'Migración',
+  '2025-09-29T16:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75673'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75673')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75673'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75673')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75674',
+  (SELECT id FROM gh_personal WHERE cedula = '1037598604'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 300)',
+  'Migración',
+  '2025-09-29T17:45:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75674'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75674')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75675',
+  (SELECT id FROM gh_personal WHERE cedula = '1039446142'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 301)',
+  'Migración',
+  '2025-09-29T17:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75675'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75675')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75675'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75675')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75676',
+  (SELECT id FROM gh_personal WHERE cedula = '1022033708'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 302)',
+  'Migración',
+  '2025-09-29T17:49:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75676'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75676')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75676'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75676')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75677',
+  (SELECT id FROM gh_personal WHERE cedula = '4551916'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 303)',
+  'Migración',
+  '2025-09-29T17:50:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75677'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75677')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75677'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75677')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75678',
+  (SELECT id FROM gh_personal WHERE cedula = '1079094093'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 304)',
+  'Migración',
+  '2025-09-29T17:52:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75678'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75678')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75678'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 42'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75678')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 42')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75679',
+  (SELECT id FROM gh_personal WHERE cedula = '3486592'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 305)',
+  'Migración',
+  '2025-09-29T17:54:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75679'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75679')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE XXL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75679'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75679')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75680',
+  (SELECT id FROM gh_personal WHERE cedula = '1128387195'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 306)',
+  'Migración',
+  '2025-09-29T17:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75680'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75680')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75680'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75680')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75681',
+  (SELECT id FROM gh_personal WHERE cedula = '1128406621'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 307)',
+  'Migración',
+  '2025-09-29T18:02:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75681'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75681')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75681'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75681')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75682',
+  (SELECT id FROM gh_personal WHERE cedula = '98528497'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 308)',
+  'Migración',
+  '2025-09-29T20:08:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75682'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75682')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75682'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75682')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75683',
+  (SELECT id FROM gh_personal WHERE cedula = '43840726'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 309)',
+  'Migración',
+  '2025-09-29T20:10:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75683'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75683')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75683'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75683')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75683'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75683')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75684',
+  (SELECT id FROM gh_personal WHERE cedula = '43845511'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 310)',
+  'Migración',
+  '2025-09-29T20:14:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75684'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75684')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75684'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75684')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75684'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75684')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75685',
+  (SELECT id FROM gh_personal WHERE cedula = '1038768241'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 311)',
+  'Migración',
+  '2025-09-29T20:15:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75685'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75685')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75685'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75685')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75685'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75685')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75686',
+  (SELECT id FROM gh_personal WHERE cedula = '1007643194'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 312)',
+  'Migración',
+  '2025-09-29T20:16:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75686'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75686')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75686'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75686')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75686'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75686')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75687',
+  (SELECT id FROM gh_personal WHERE cedula = '1026144020'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 313)',
+  'Migración',
+  '2025-09-29T20:19:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75687'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75687')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75687'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75687')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75687'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75687')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75688',
+  (SELECT id FROM gh_personal WHERE cedula = '1036603227'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 314)',
+  'Migración',
+  '2025-09-29T20:24:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75688'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75688')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75688'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75688')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75688'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75688')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75689',
+  (SELECT id FROM gh_personal WHERE cedula = '43723793'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 315)',
+  'Migración',
+  '2025-09-29T20:26:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75689'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75689')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75689'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75689')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75689'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75689')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75690',
+  (SELECT id FROM gh_personal WHERE cedula = '1040752488'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 316)',
+  'Migración',
+  '2025-09-29T20:27:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75690'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75690')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75690'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75690')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75690'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75690')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75691',
+  (SELECT id FROM gh_personal WHERE cedula = '1017162359'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 317)',
+  'Migración',
+  '2025-09-29T20:33:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75691'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75691')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75691'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75691')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75691'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75691')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75692',
+  (SELECT id FROM gh_personal WHERE cedula = '1017248672'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 318)',
+  'Migración',
+  '2025-09-29T20:35:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75692'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75692')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO NEGRA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75692'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75692')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75693',
+  (SELECT id FROM gh_personal WHERE cedula = '1037595006'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 319)',
+  'Migración',
+  '2025-09-29T20:37:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75693'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75693')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75693'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75693')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75693'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75693')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75694',
+  (SELECT id FROM gh_personal WHERE cedula = '1039462228'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 320)',
+  'Migración',
+  '2025-09-29T20:38:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75694'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75694')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75694'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75694')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75694'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75694')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75695',
+  (SELECT id FROM gh_personal WHERE cedula = '1036639784'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 321)',
+  'Migración',
+  '2025-09-29T20:42:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75695'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75695')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75695'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75695')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75695'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75695')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75696',
+  (SELECT id FROM gh_personal WHERE cedula = '1041610220'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 322)',
+  'Migración',
+  '2025-09-29T20:44:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75696'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75696')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75696'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75696')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75696'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75696')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75697',
+  (SELECT id FROM gh_personal WHERE cedula = '43162718'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 323)',
+  'Migración',
+  '2025-09-29T20:46:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75697'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75697')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75697'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75697')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75697'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75697')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75698',
+  (SELECT id FROM gh_personal WHERE cedula = '1068420489'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 324)',
+  'Migración',
+  '2025-09-29T20:47:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75698'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75698')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75698'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75698')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75699',
+  (SELECT id FROM gh_personal WHERE cedula = '1039452734'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 325)',
+  'Migración',
+  '2025-09-29T21:06:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75699'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75699')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75699'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75699')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75699'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75699')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75700',
+  (SELECT id FROM gh_personal WHERE cedula = '1033338949'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 326)',
+  'Migración',
+  '2025-09-29T21:07:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75700'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75700')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75700'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75700')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75700'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75700')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75701',
+  (SELECT id FROM gh_personal WHERE cedula = '71290694'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 327)',
+  'Migración',
+  '2025-09-29T21:09:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75701'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75701')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75701'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE XXXL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75701')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE XXXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75702',
+  (SELECT id FROM gh_personal WHERE cedula = '71290694'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 328)',
+  'Migración',
+  '2025-09-29T21:10:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75702'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75702')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75702'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 42'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75702')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 42')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75703',
+  (SELECT id FROM gh_personal WHERE cedula = '1068420489'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 329)',
+  'Migración',
+  '2025-09-29T21:11:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75703'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75703')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75704',
+  (SELECT id FROM gh_personal WHERE cedula = '1036601715'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 330)',
+  'Migración',
+  '2025-09-29T21:13:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75704'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75704')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75704'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75704')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75704'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75704')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75704'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75704')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75705',
+  (SELECT id FROM gh_personal WHERE cedula = '1082897050'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 331)',
+  'Migración',
+  '2025-09-29T21:14:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75705'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75705')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75705'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75705')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75706',
+  (SELECT id FROM gh_personal WHERE cedula = '1082874105'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 332)',
+  'Migración',
+  '2025-09-29T21:15:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75706'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75706')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE  S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75706'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75706')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75707',
+  (SELECT id FROM gh_personal WHERE cedula = '1040755956'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 333)',
+  'Migración',
+  '2025-09-29T21:16:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75707'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75707')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75707'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75707')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75708',
+  (SELECT id FROM gh_personal WHERE cedula = '8105737'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 334)',
+  'Migración',
+  '2025-09-29T21:17:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75708'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75708')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75708'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75708')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75709',
+  (SELECT id FROM gh_personal WHERE cedula = '71292518'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 335)',
+  'Migración',
+  '2025-09-29T21:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75709'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75709')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75709'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75709')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75710',
+  (SELECT id FROM gh_personal WHERE cedula = '43103160'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 336)',
+  'Migración',
+  '2025-09-29T21:19:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75710'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75710')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75710'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75710')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75711',
+  (SELECT id FROM gh_personal WHERE cedula = '1088252459'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 337)',
+  'Migración',
+  '2025-09-29T21:20:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75711'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75711')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75711'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75711')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75712',
+  (SELECT id FROM gh_personal WHERE cedula = '1026152381'),
+  'Estefania',
+  '2025-09-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 338)',
+  'Migración',
+  '2025-09-29T21:22:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75712'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75712')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75712'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75712')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75712'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75712')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75713',
+  (SELECT id FROM gh_personal WHERE cedula = '1017227949'),
+  'Estefania',
+  '2025-09-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 339)',
+  'Migración',
+  '2025-09-30T12:57:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75713'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75713')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75714',
+  (SELECT id FROM gh_personal WHERE cedula = '1121960627'),
+  'Estefania',
+  '2025-09-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 340)',
+  'Migración',
+  '2025-09-30T13:03:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75714'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75714')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75715',
+  (SELECT id FROM gh_personal WHERE cedula = '1023868483'),
+  'Estefania',
+  '2025-09-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 341)',
+  'Migración',
+  '2025-09-30T13:04:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75715'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75715')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75716',
+  (SELECT id FROM gh_personal WHERE cedula = '1036690996'),
+  'Estefania',
+  '2025-09-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 342)',
+  'Migración',
+  '2025-09-30T13:06:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75716'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75716')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75717',
+  (SELECT id FROM gh_personal WHERE cedula = '1035861214'),
+  'Estefania',
+  '2025-09-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 343)',
+  'Migración',
+  '2025-09-30T14:15:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75717'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75717')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75718',
+  (SELECT id FROM gh_personal WHERE cedula = '1026148124'),
+  'Estefania',
+  '2025-09-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 344)',
+  'Migración',
+  '2025-09-30T14:17:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75718'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75718')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75719',
+  (SELECT id FROM gh_personal WHERE cedula = '1039466574'),
+  'Estefania',
+  '2025-09-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 345)',
+  'Migración',
+  '2025-09-30T14:23:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75719'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75719')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75720',
+  (SELECT id FROM gh_personal WHERE cedula = '1026149223'),
+  'Estefania',
+  '2025-09-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 346)',
+  'Migración',
+  '2025-09-30T18:31:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75720'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75720')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75721',
+  (SELECT id FROM gh_personal WHERE cedula = '1039462228'),
+  'Estefania',
+  '2025-09-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 347)',
+  'Migración',
+  '2025-09-30T20:41:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75721'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75721')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75721'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75721')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75721'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75721')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75722',
+  (SELECT id FROM gh_personal WHERE cedula = '1068420489'),
+  'Estefania',
+  '2025-09-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 348)',
+  'Migración',
+  '2025-09-30T20:45:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75722'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75722')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75723',
+  (SELECT id FROM gh_personal WHERE cedula = '1036639784'),
+  'Estefania',
+  '2025-09-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 349)',
+  'Migración',
+  '2025-09-30T20:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75723'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75723')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75723'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75723')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75723'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75723')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75724',
+  (SELECT id FROM gh_personal WHERE cedula = '1027882700'),
+  'Estefania',
+  '2025-10-01T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 350)',
+  'Migración',
+  '2025-10-01T13:13:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75724'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75724')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75724'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75724')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75724'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75724')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 16')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75725',
+  (SELECT id FROM gh_personal WHERE cedula = '71725965'),
+  'Estefania',
+  '2025-10-01T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 351)',
+  'Migración',
+  '2025-10-01T13:22:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75725'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75725')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75725'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75725')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75725'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75725')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75726',
+  (SELECT id FROM gh_personal WHERE cedula = '1037598604'),
+  'Estefania',
+  '2025-10-01T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 352)',
+  'Migración',
+  '2025-10-01T14:51:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75726'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75726')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75727',
+  (SELECT id FROM gh_personal WHERE cedula = '1023522397'),
+  'Estefania',
+  '2025-10-01T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 353)',
+  'Migración',
+  '2025-10-01T15:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75727'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75727')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75727'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75727')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75727'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75727')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75728',
+  (SELECT id FROM gh_personal WHERE cedula = '1007643194'),
+  'Estefania',
+  '2025-10-01T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 354)',
+  'Migración',
+  '2025-10-01T17:14:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75728'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75728')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75729',
+  (SELECT id FROM gh_personal WHERE cedula = '1128406621'),
+  'Estefania',
+  '2025-10-01T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 355)',
+  'Migración',
+  '2025-10-01T17:32:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75729'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75729')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75729'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75729')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75730',
+  (SELECT id FROM gh_personal WHERE cedula = '71725965'),
+  'Estefania',
+  '2025-10-01T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 356)',
+  'Migración',
+  '2025-10-01T21:19:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75730'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75730')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75731',
+  (SELECT id FROM gh_personal WHERE cedula = '98715267'),
+  'Estefania',
+  '2025-10-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 357)',
+  'Migración',
+  '2025-10-02T15:39:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75731'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75731')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75732',
+  (SELECT id FROM gh_personal WHERE cedula = '1214729139'),
+  'Estefania',
+  '2025-10-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 358)',
+  'Migración',
+  '2025-10-02T15:41:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75732'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75732')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75733',
+  (SELECT id FROM gh_personal WHERE cedula = '1214740345'),
+  'Estefania',
+  '2025-10-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 359)',
+  'Migración',
+  '2025-10-02T19:40:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75733'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75733')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75733'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75733')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75734',
+  (SELECT id FROM gh_personal WHERE cedula = '1214740345'),
+  'Estefania',
+  '2025-10-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 360)',
+  'Migración',
+  '2025-10-02T19:41:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75734'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 35'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75734')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 35')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75735',
+  (SELECT id FROM gh_personal WHERE cedula = '43840726'),
+  'Estefania',
+  '2025-10-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 361)',
+  'Migración',
+  '2025-10-02T19:44:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75735'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75735')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75736',
+  (SELECT id FROM gh_personal WHERE cedula = '52183491'),
+  'Estefania',
+  '2025-10-02T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 362)',
+  'Migración',
+  '2025-10-02T19:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75736'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75736')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75736'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75736')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75736'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75736')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75737',
+  (SELECT id FROM gh_personal WHERE cedula = '1128476187'),
+  'Estefania',
+  '2025-10-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 363)',
+  'Migración',
+  '2025-10-03T12:35:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75737'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75737')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75738',
+  (SELECT id FROM gh_personal WHERE cedula = '7035899'),
+  'Estefania',
+  '2025-10-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 364)',
+  'Migración',
+  '2025-10-03T12:37:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75738'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75738')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75739',
+  (SELECT id FROM gh_personal WHERE cedula = '1001367879'),
+  'Estefania',
+  '2025-10-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 365)',
+  'Migración',
+  '2025-10-03T16:03:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75739'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75739')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75740',
+  (SELECT id FROM gh_personal WHERE cedula = '3486592'),
+  'Estefania',
+  '2025-10-06T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 366)',
+  'Migración',
+  '2025-10-06T14:09:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75740'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75740')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75741',
+  (SELECT id FROM gh_personal WHERE cedula = '98550136'),
+  'Estefania',
+  '2025-10-07T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 367)',
+  'Migración',
+  '2025-10-07T18:04:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75741'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75741')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75742',
+  (SELECT id FROM gh_personal WHERE cedula = '71393476'),
+  'Estefania',
+  '2025-10-07T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 368)',
+  'Migración',
+  '2025-10-07T18:45:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75742'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75742')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75743',
+  (SELECT id FROM gh_personal WHERE cedula = '1039462228'),
+  'Estefania',
+  '2025-10-07T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 369)',
+  'Migración',
+  '2025-10-07T20:30:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75743'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 37'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75743')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 37')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75744',
+  (SELECT id FROM gh_personal WHERE cedula = '98631515'),
+  'Estefania',
+  '2025-10-08T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 370)',
+  'Migración',
+  '2025-10-08T13:43:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75744'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75744')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75745',
+  (SELECT id FROM gh_personal WHERE cedula = '1028018100'),
+  'Estefania',
+  '2025-10-08T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 371)',
+  'Migración',
+  '2025-10-08T13:47:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75745'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75745')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75746',
+  (SELECT id FROM gh_personal WHERE cedula = '1037668748'),
+  'Estefania',
+  '2025-10-16T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 372)',
+  'Migración',
+  '2025-10-16T17:49:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75746'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75746')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75747',
+  (SELECT id FROM gh_personal WHERE cedula = '1082897050'),
+  'Estefania',
+  '2025-10-16T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 373)',
+  'Migración',
+  '2025-10-16T20:44:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75747'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75747')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75748',
+  (SELECT id FROM gh_personal WHERE cedula = '1063283514'),
+  'Estefania',
+  '2025-10-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 374)',
+  'Migración',
+  '2025-10-17T16:16:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75748'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75748')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75748'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75748')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75748'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75748')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75749',
+  (SELECT id FROM gh_personal WHERE cedula = '71750546'),
+  'Estefania',
+  '2025-10-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 375)',
+  'Migración',
+  '2025-10-17T17:15:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75749'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75749')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75750',
+  (SELECT id FROM gh_personal WHERE cedula = '18189021'),
+  'Estefania',
+  '2025-10-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 376)',
+  'Migración',
+  '2025-10-17T19:30:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75750'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75750')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75751',
+  (SELECT id FROM gh_personal WHERE cedula = '8434351'),
+  'Estefania',
+  '2025-10-20T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 377)',
+  'Migración',
+  '2025-10-20T17:50:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75751'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75751')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75752',
+  (SELECT id FROM gh_personal WHERE cedula = '1000895626'),
+  'Estefania',
+  '2025-10-20T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 378)',
+  'Migración',
+  '2025-10-20T17:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75752'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75752')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75753',
+  (SELECT id FROM gh_personal WHERE cedula = '1037524189'),
+  'Estefania',
+  '2025-10-20T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 379)',
+  'Migración',
+  '2025-10-20T19:32:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75753'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75753')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75754',
+  (SELECT id FROM gh_personal WHERE cedula = '1000755246'),
+  'Estefania',
+  '2025-10-21T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 380)',
+  'Migración',
+  '2025-10-21T12:34:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75754'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75754')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75755',
+  (SELECT id FROM gh_personal WHERE cedula = '1007530363'),
+  'Estefania',
+  '2025-10-21T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 381)',
+  'Migración',
+  '2025-10-21T12:36:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75755'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75755')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75756',
+  (SELECT id FROM gh_personal WHERE cedula = '1007814097'),
+  'Estefania',
+  '2025-10-21T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 382)',
+  'Migración',
+  '2025-10-21T12:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75756'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75756')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75757',
+  (SELECT id FROM gh_personal WHERE cedula = '1017248672'),
+  'Estefania',
+  '2025-10-21T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 383)',
+  'Migración',
+  '2025-10-21T15:24:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75757'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75757')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75758',
+  (SELECT id FROM gh_personal WHERE cedula = '1079912281'),
+  'Estefania',
+  '2025-10-21T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 384)',
+  'Migración',
+  '2025-10-21T20:00:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75758'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75758')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75759',
+  (SELECT id FROM gh_personal WHERE cedula = '1007895746'),
+  'Estefania',
+  '2025-10-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 385)',
+  'Migración',
+  '2025-10-22T14:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75759'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75759')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75760',
+  (SELECT id FROM gh_personal WHERE cedula = '1023526126'),
+  'Estefania',
+  '2025-10-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 386)',
+  'Migración',
+  '2025-10-23T12:11:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75760'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75760')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75761',
+  (SELECT id FROM gh_personal WHERE cedula = '1068420489'),
+  'Estefania',
+  '2025-10-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 387)',
+  'Migración',
+  '2025-10-23T12:28:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75761'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75761')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75761'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75761')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75762',
+  (SELECT id FROM gh_personal WHERE cedula = '1040737902'),
+  'Estefania',
+  '2025-10-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 388)',
+  'Migración',
+  '2025-10-23T16:42:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75762'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75762')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75762'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75762')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75763',
+  (SELECT id FROM gh_personal WHERE cedula = '1040737902'),
+  'Estefania',
+  '2025-10-23T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 389)',
+  'Migración',
+  '2025-10-23T16:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75763'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75763')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75763'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75763')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA HOMBRE M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75763'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75763')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75764',
+  (SELECT id FROM gh_personal WHERE cedula = '8295011'),
+  'Estefania',
+  '2025-10-27T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 390)',
+  'Migración',
+  '2025-10-27T16:12:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75764'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75764')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75765',
+  (SELECT id FROM gh_personal WHERE cedula = '1036660698'),
+  'Estefania',
+  '2025-10-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 391)',
+  'Migración',
+  '2025-10-29T12:43:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75765'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75765')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75766',
+  (SELECT id FROM gh_personal WHERE cedula = '1148205622'),
+  'Estefania',
+  '2025-10-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 392)',
+  'Migración',
+  '2025-10-29T12:45:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75766'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75766')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75767',
+  (SELECT id FROM gh_personal WHERE cedula = '1026158274'),
+  'Estefania',
+  '2025-10-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 393)',
+  'Migración',
+  '2025-10-29T18:57:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75767'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75767')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75768',
+  (SELECT id FROM gh_personal WHERE cedula = '1112160663'),
+  'Estefania',
+  '2025-10-29T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 394)',
+  'Migración',
+  '2025-10-29T18:59:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75768'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75768')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75769',
+  (SELECT id FROM gh_personal WHERE cedula = '1025761115'),
+  'Estefania',
+  '2025-10-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 395)',
+  'Migración',
+  '2025-10-30T13:52:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75769'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75769')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75770',
+  (SELECT id FROM gh_personal WHERE cedula = '8433512'),
+  'Estefania',
+  '2025-10-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 396)',
+  'Migración',
+  '2025-10-30T13:54:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75770'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75770')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75771',
+  (SELECT id FROM gh_personal WHERE cedula = '1336303'),
+  'Estefania',
+  '2025-10-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 397)',
+  'Migración',
+  '2025-10-30T15:27:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75771'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75771')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75772',
+  (SELECT id FROM gh_personal WHERE cedula = '5370025'),
+  'Estefania',
+  '2025-10-30T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 398)',
+  'Migración',
+  '2025-10-30T15:31:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75772'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75772')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75773',
+  (SELECT id FROM gh_personal WHERE cedula = '43103160'),
+  'Estefania',
+  '2025-11-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 399)',
+  'Migración',
+  '2025-11-04T17:17:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75773'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 38'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75773')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75774',
+  (SELECT id FROM gh_personal WHERE cedula = '71697454'),
+  'Estefania',
+  '2025-11-05T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 400)',
+  'Migración',
+  '2025-11-05T17:46:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75774'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75774')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75775',
+  (SELECT id FROM gh_personal WHERE cedula = '1036648093'),
+  'Estefania',
+  '2025-11-05T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 401)',
+  'Migración',
+  '2025-11-05T17:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75775'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75775')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75776',
+  (SELECT id FROM gh_personal WHERE cedula = '43927118'),
+  'Estefania',
+  '2025-11-06T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 402)',
+  'Migración',
+  '2025-11-06T12:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75776'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75776')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 41')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75776'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75776')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75776'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75776')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75777',
+  (SELECT id FROM gh_personal WHERE cedula = '1035918305'),
+  'Estefania',
+  '2025-11-07T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 403)',
+  'Migración',
+  '2025-11-07T16:57:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75777'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75777')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75777'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75777')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75777'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 40'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75777')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 40')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75778',
+  (SELECT id FROM gh_personal WHERE cedula = '1017200099'),
+  'Estefania',
+  '2025-11-13T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 404)',
+  'Migración',
+  '2025-11-13T12:38:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75778'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75778')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75779',
+  (SELECT id FROM gh_personal WHERE cedula = '1035918305'),
+  'Estefania',
+  '2025-11-13T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 405)',
+  'Migración',
+  '2025-11-13T15:46:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75779'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75779')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75780',
+  (SELECT id FROM gh_personal WHERE cedula = '1035918305'),
+  'Estefania',
+  '2025-11-13T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 406)',
+  'Migración',
+  '2025-11-13T15:46:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75780'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75780')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75780'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75780')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75781',
+  (SELECT id FROM gh_personal WHERE cedula = '1040745482'),
+  'Estefania',
+  '2025-11-13T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 407)',
+  'Migración',
+  '2025-11-13T15:47:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75781'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75781')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75781'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75781')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 40')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75782',
+  (SELECT id FROM gh_personal WHERE cedula = '1048067793'),
+  'Estefania',
+  '2025-11-13T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 408)',
+  'Migración',
+  '2025-11-13T17:14:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75782'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75782')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75783',
+  (SELECT id FROM gh_personal WHERE cedula = '72204766'),
+  'Estefania',
+  '2025-11-13T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 409)',
+  'Migración',
+  '2025-11-13T17:15:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75783'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75783')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75784',
+  (SELECT id FROM gh_personal WHERE cedula = '1023630801'),
+  'Estefania',
+  '2025-11-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 410)',
+  'Migración',
+  '2025-11-19T14:53:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75784'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75784')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75784'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75784')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75785',
+  (SELECT id FROM gh_personal WHERE cedula = '1001367879'),
+  'Estefania',
+  '2025-11-21T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 411)',
+  'Migración',
+  '2025-11-21T18:25:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75785'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75785')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75786',
+  (SELECT id FROM gh_personal WHERE cedula = '1040756480'),
+  'Estefania',
+  '2025-11-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 412)',
+  'Migración',
+  '2025-11-24T13:55:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75786'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75786')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75786'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75786')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75786'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75786')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75787',
+  (SELECT id FROM gh_personal WHERE cedula = '1025761930'),
+  'Estefania',
+  '2025-11-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 413)',
+  'Migración',
+  '2025-11-24T16:17:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75787'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75787')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75788',
+  (SELECT id FROM gh_personal WHERE cedula = '71741158'),
+  'Estefania',
+  '2025-11-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 414)',
+  'Migración',
+  '2025-11-24T16:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75788'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75788')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75789',
+  (SELECT id FROM gh_personal WHERE cedula = '71264883'),
+  'Estefania',
+  '2025-11-24T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 415)',
+  'Migración',
+  '2025-11-24T16:19:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75789'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75789')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75790',
+  (SELECT id FROM gh_personal WHERE cedula = '43400943'),
+  'Estefania',
+  '2025-12-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 416)',
+  'Migración',
+  '2025-12-03T17:18:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75790'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75790')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75790'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75790')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75791',
+  (SELECT id FROM gh_personal WHERE cedula = '32151233'),
+  'Estefania',
+  '2025-12-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 417)',
+  'Migración',
+  '2025-12-03T19:30:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75791'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75791')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75791'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 6'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75791')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 6')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75792',
+  (SELECT id FROM gh_personal WHERE cedula = '1037610725'),
+  'Estefania',
+  '2025-12-03T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 418)',
+  'Migración',
+  '2025-12-03T20:04:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75792'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75792')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75792'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75792')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75793',
+  (SELECT id FROM gh_personal WHERE cedula = '1026137745'),
+  'Estefania',
+  '2025-12-04T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 419)',
+  'Migración',
+  '2025-12-04T13:23:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75793'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75793')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 38')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75793'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75793')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75793'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75793')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75794',
+  (SELECT id FROM gh_personal WHERE cedula = '1034991472'),
+  'Estefania',
+  '2025-12-05T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 420)',
+  'Migración',
+  '2025-12-05T15:46:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75794'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75794')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75794'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75794')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75794'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75794')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75795',
+  (SELECT id FROM gh_personal WHERE cedula = '1018233082'),
+  'Estefania',
+  '2025-12-05T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 421)',
+  'Migración',
+  '2025-12-05T17:02:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75795'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75795')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75796',
+  (SELECT id FROM gh_personal WHERE cedula = '71748870'),
+  'Estefania',
+  '2025-12-05T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 422)',
+  'Migración',
+  '2025-12-05T17:06:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75796'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75796')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75797',
+  (SELECT id FROM gh_personal WHERE cedula = '1040737902'),
+  'Estefania',
+  '2025-12-05T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 423)',
+  'Migración',
+  '2025-12-05T19:45:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75797'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75797')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75798',
+  (SELECT id FROM gh_personal WHERE cedula = '1001456161'),
+  'Estefania',
+  '2025-12-05T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 424)',
+  'Migración',
+  '2025-12-05T19:50:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75798'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75798')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75798'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75798')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75798'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75798')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75799',
+  (SELECT id FROM gh_personal WHERE cedula = '1034991472'),
+  'Estefania',
+  '2025-12-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 425)',
+  'Migración',
+  '2025-12-09T17:12:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75799'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75799')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75799'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75799')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75799'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75799')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75800',
+  (SELECT id FROM gh_personal WHERE cedula = '1026137745'),
+  'Estefania',
+  '2025-12-09T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 426)',
+  'Migración',
+  '2025-12-09T18:48:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75800'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75800')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75800'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75800')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75800'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75800')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75801',
+  (SELECT id FROM gh_personal WHERE cedula = '1035972220'),
+  'Estefania',
+  '2025-12-10T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 427)',
+  'Migración',
+  '2025-12-10T18:25:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75801'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 38'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75801')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 38')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75801'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75801')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75801'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75801')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75802',
+  (SELECT id FROM gh_personal WHERE cedula = '98627573'),
+  'Estefania',
+  '2025-12-11T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 428)',
+  'Migración',
+  '2025-12-11T12:35:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75802'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75802')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75803',
+  (SELECT id FROM gh_personal WHERE cedula = '1021924568'),
+  'Estefania',
+  '2025-12-15T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 429)',
+  'Migración',
+  '2025-12-15T12:47:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75803'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75803')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75804',
+  (SELECT id FROM gh_personal WHERE cedula = '1152717744'),
+  'Estefania',
+  '2025-12-16T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 430)',
+  'Migración',
+  '2025-12-16T15:52:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75804'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75804')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75805',
+  (SELECT id FROM gh_personal WHERE cedula = '71790541'),
+  'Estefania',
+  '2025-12-16T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 431)',
+  'Migración',
+  '2025-12-16T15:54:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75805'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75805')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75806',
+  (SELECT id FROM gh_personal WHERE cedula = '1039422713'),
+  'Estefania',
+  '2025-12-16T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 432)',
+  'Migración',
+  '2025-12-16T18:15:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75806'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75806')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75807',
+  (SELECT id FROM gh_personal WHERE cedula = '70003223'),
+  'Estefania',
+  '2025-12-16T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 433)',
+  'Migración',
+  '2025-12-16T18:17:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75807'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75807')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75808',
+  (SELECT id FROM gh_personal WHERE cedula = '43878355'),
+  'Estefania',
+  '2025-12-17T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 434)',
+  'Migración',
+  '2025-12-17T20:59:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75808'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75808')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75808'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75808')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75808'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75808')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75809',
+  (SELECT id FROM gh_personal WHERE cedula = '1040751758'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 435)',
+  'Migración',
+  '2025-12-18T12:26:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75809'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75809')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75810',
+  (SELECT id FROM gh_personal WHERE cedula = '1003465260'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 436)',
+  'Migración',
+  '2025-12-18T20:04:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75810'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75810')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75810'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75810')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75811',
+  (SELECT id FROM gh_personal WHERE cedula = '1020396692'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 437)',
+  'Migración',
+  '2025-12-18T20:24:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75811'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75811')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75812',
+  (SELECT id FROM gh_personal WHERE cedula = '1037576609'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 438)',
+  'Migración',
+  '2025-12-18T20:26:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75812'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75812')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75813',
+  (SELECT id FROM gh_personal WHERE cedula = '1007161142'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 439)',
+  'Migración',
+  '2025-12-18T20:28:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75813'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75813')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75814',
+  (SELECT id FROM gh_personal WHERE cedula = '1001030721'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 440)',
+  'Migración',
+  '2025-12-18T20:30:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75814'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75814')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75815',
+  (SELECT id FROM gh_personal WHERE cedula = '1027955385'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 441)',
+  'Migración',
+  '2025-12-18T20:31:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75815'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75815')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75816',
+  (SELECT id FROM gh_personal WHERE cedula = '1017198051'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 442)',
+  'Migración',
+  '2025-12-18T20:35:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75816'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75816')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75817',
+  (SELECT id FROM gh_personal WHERE cedula = '1035871625'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 443)',
+  'Migración',
+  '2025-12-18T20:38:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75817'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75817')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75818',
+  (SELECT id FROM gh_personal WHERE cedula = '1005362857'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 444)',
+  'Migración',
+  '2025-12-18T20:39:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75818'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75818')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75819',
+  (SELECT id FROM gh_personal WHERE cedula = '1192732262'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 445)',
+  'Migración',
+  '2025-12-18T20:40:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75819'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75819')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75820',
+  (SELECT id FROM gh_personal WHERE cedula = '1040494197'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 446)',
+  'Migración',
+  '2025-12-18T20:42:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75820'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75820')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75821',
+  (SELECT id FROM gh_personal WHERE cedula = '98696759'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 447)',
+  'Migración',
+  '2025-12-18T20:43:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75821'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75821')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75822',
+  (SELECT id FROM gh_personal WHERE cedula = '1020103395'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 448)',
+  'Migración',
+  '2025-12-18T20:44:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75822'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75822')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75823',
+  (SELECT id FROM gh_personal WHERE cedula = '1002084834'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 449)',
+  'Migración',
+  '2025-12-18T20:46:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75823'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75823')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75824',
+  (SELECT id FROM gh_personal WHERE cedula = '1039088479'),
+  'Estefania',
+  '2025-12-18T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 450)',
+  'Migración',
+  '2025-12-18T20:47:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75824'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75824')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75825',
+  (SELECT id FROM gh_personal WHERE cedula = '1017227949'),
+  'Estefania',
+  '2025-12-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 451)',
+  'Migración',
+  '2025-12-19T12:00:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75825'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75825')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75826',
+  (SELECT id FROM gh_personal WHERE cedula = '1121960627'),
+  'Estefania',
+  '2025-12-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 452)',
+  'Migración',
+  '2025-12-19T12:01:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75826'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75826')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75827',
+  (SELECT id FROM gh_personal WHERE cedula = '1000206476'),
+  'Estefania',
+  '2025-12-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 453)',
+  'Migración',
+  '2025-12-19T12:03:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75827'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75827')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75828',
+  (SELECT id FROM gh_personal WHERE cedula = '1035235723'),
+  'Estefania',
+  '2025-12-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 454)',
+  'Migración',
+  '2025-12-19T12:10:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75828'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75828')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XXXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75829',
+  (SELECT id FROM gh_personal WHERE cedula = '1003465260'),
+  'Estefania',
+  '2025-12-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 455)',
+  'Migración',
+  '2025-12-19T14:14:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75829'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75829')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75830',
+  (SELECT id FROM gh_personal WHERE cedula = '1021924568'),
+  'Estefania',
+  '2025-12-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 456)',
+  'Migración',
+  '2025-12-19T17:03:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75830'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75830')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75831',
+  (SELECT id FROM gh_personal WHERE cedula = '1017200099'),
+  'Estefania',
+  '2025-12-19T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 457)',
+  'Migración',
+  '2025-12-19T20:41:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75831'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75831')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75832',
+  (SELECT id FROM gh_personal WHERE cedula = '71394056'),
+  'Estefania',
+  '2025-12-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 458)',
+  'Migración',
+  '2025-12-22T15:09:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75832'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75832')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  L')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75833',
+  (SELECT id FROM gh_personal WHERE cedula = '71240858'),
+  'Estefania',
+  '2025-12-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 459)',
+  'Migración',
+  '2025-12-22T15:11:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75833'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75833')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75834',
+  (SELECT id FROM gh_personal WHERE cedula = '71493872'),
+  'Estefania',
+  '2025-12-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 460)',
+  'Migración',
+  '2025-12-22T19:17:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75834'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75834')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+INSERT INTO gh_asignaciones_personal (numero_asignacion, personal_id, autorizado_por, fecha, observaciones, usuario_control, fecha_control) 
+VALUES (
+  'ASIG-75835',
+  (SELECT id FROM gh_personal WHERE cedula = '98579515'),
+  'Estefania',
+  '2025-12-22T05:00:00.000Z',
+  'Migrado de sistema legado (ID: 461)',
+  'Migración',
+  '2025-12-22T19:22:00.000Z'
+) ON CONFLICT (numero_asignacion) DO NOTHING;
+
+INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75835'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_asignaciones_personal_detalle 
+  WHERE asignacion_id = (SELECT id FROM gh_asignaciones_personal WHERE numero_asignacion = 'ASIG-75835')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  M')
+);
+
+-- --- DEVOLUCIONES ---
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-1',
+  (SELECT id FROM gh_personal WHERE cedula = '1026148124'),
+  'Migrado de sistema legado (ID: 1, Bodega: 00)',
+  '2025-06-17T05:00:00.000Z',
+  'Migración',
+  '2025-06-17T21:45:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-1'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-1')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-2',
+  (SELECT id FROM gh_personal WHERE cedula = '1026148124'),
+  'Migrado de sistema legado (ID: 2, Bodega: 00)',
+  '2025-06-17T05:00:00.000Z',
+  'Migración',
+  '2025-06-17T21:45:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-2'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-2')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-3',
+  (SELECT id FROM gh_personal WHERE cedula = '70162268'),
+  'Migrado de sistema legado (ID: 3, Bodega: 00)',
+  '2025-06-18T05:00:00.000Z',
+  'Migración',
+  '2025-06-18T15:04:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-3'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-3')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-4',
+  (SELECT id FROM gh_personal WHERE cedula = '1130628467'),
+  'Migrado de sistema legado (ID: 4, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T16:50:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-4'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-4')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-4'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-4')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-4'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-4')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-5',
+  (SELECT id FROM gh_personal WHERE cedula = '1130628467'),
+  'Migrado de sistema legado (ID: 5, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T16:51:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-5'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-5')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-5'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-5')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-5'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-5')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-6',
+  (SELECT id FROM gh_personal WHERE cedula = '1040743591'),
+  'Migrado de sistema legado (ID: 6, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T16:51:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-6'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-6')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-6'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-6')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-6'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-6')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-7',
+  (SELECT id FROM gh_personal WHERE cedula = '1040743591'),
+  'Migrado de sistema legado (ID: 7, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T16:57:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-7'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-7')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-7'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-7')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-7'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-7')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-8',
+  (SELECT id FROM gh_personal WHERE cedula = '1040743591'),
+  'Migrado de sistema legado (ID: 8, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T16:57:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-8'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-8')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-8'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-8')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE XXL')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-8'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-8')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-9',
+  (SELECT id FROM gh_personal WHERE cedula = '1118286764'),
+  'Migrado de sistema legado (ID: 9, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T17:02:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-9'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-9')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-9'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-9')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-9'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-9')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-10',
+  (SELECT id FROM gh_personal WHERE cedula = '1118286764'),
+  'Migrado de sistema legado (ID: 10, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T17:02:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-10'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-10')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-10'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-10')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-10'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-10')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-11',
+  (SELECT id FROM gh_personal WHERE cedula = '1118286764'),
+  'Migrado de sistema legado (ID: 11, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T17:02:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-11'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-11')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-12',
+  (SELECT id FROM gh_personal WHERE cedula = '1118286764'),
+  'Migrado de sistema legado (ID: 12, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T17:02:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-12'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-12')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-12'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-12')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-12'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-12')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-13',
+  (SELECT id FROM gh_personal WHERE cedula = '1118286764'),
+  'Migrado de sistema legado (ID: 13, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T17:02:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-13'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-13')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-14',
+  (SELECT id FROM gh_personal WHERE cedula = '1118286764'),
+  'Migrado de sistema legado (ID: 14, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T17:02:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-14'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-14')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-15',
+  (SELECT id FROM gh_personal WHERE cedula = '1007779091'),
+  'Migrado de sistema legado (ID: 15, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T17:04:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-15'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-15')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-15'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-15')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-15'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-15')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-16',
+  (SELECT id FROM gh_personal WHERE cedula = '1007779091'),
+  'Migrado de sistema legado (ID: 16, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T17:04:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-16'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-16')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-16'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-16')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-16'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-16')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-17',
+  (SELECT id FROM gh_personal WHERE cedula = '1007779091'),
+  'Migrado de sistema legado (ID: 17, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T17:04:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-17'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-17')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-17'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-17')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-17'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-17')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-18',
+  (SELECT id FROM gh_personal WHERE cedula = '1007779091'),
+  'Migrado de sistema legado (ID: 18, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T17:04:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-18'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-18')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-18'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-18')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-18'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-18')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-19',
+  (SELECT id FROM gh_personal WHERE cedula = '1007779091'),
+  'Migrado de sistema legado (ID: 19, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T17:04:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-19'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-19')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-19'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-19')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-19'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-19')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-20',
+  (SELECT id FROM gh_personal WHERE cedula = '1007779091'),
+  'Migrado de sistema legado (ID: 20, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T18:50:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-20'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-20')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-20'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-20')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-20'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-20')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-21',
+  (SELECT id FROM gh_personal WHERE cedula = '1007779091'),
+  'Migrado de sistema legado (ID: 21, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T18:50:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-21'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-21')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-21'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-21')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE 30')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-21'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-21')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-22',
+  (SELECT id FROM gh_personal WHERE cedula = '1118286764'),
+  'Migrado de sistema legado (ID: 22, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T18:54:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-22'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-22')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-23',
+  (SELECT id FROM gh_personal WHERE cedula = '1118286764'),
+  'Migrado de sistema legado (ID: 23, Bodega: 00)',
+  '2025-06-25T05:00:00.000Z',
+  'Migración',
+  '2025-06-25T18:54:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-23'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-23')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-23'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-23')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-23'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-23')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-24',
+  (SELECT id FROM gh_personal WHERE cedula = '1037595006'),
+  'Migrado de sistema legado (ID: 24, Bodega: 00)',
+  '2025-07-11T05:00:00.000Z',
+  'Migración',
+  '2025-07-11T17:29:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-24'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-24')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-24'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-24')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-24'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-24')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 10')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-25',
+  (SELECT id FROM gh_personal WHERE cedula = '43162718'),
+  'Migrado de sistema legado (ID: 25, Bodega: 00)',
+  '2025-07-11T05:00:00.000Z',
+  'Migración',
+  '2025-07-11T17:32:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-25'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-25')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-25'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-25')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-26',
+  (SELECT id FROM gh_personal WHERE cedula = '1033338949'),
+  'Migrado de sistema legado (ID: 26, Bodega: 00)',
+  '2025-07-11T05:00:00.000Z',
+  'Migración',
+  '2025-07-11T19:33:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-26'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-26')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA L')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-26'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-26')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-27',
+  (SELECT id FROM gh_personal WHERE cedula = '1022033708'),
+  'Migrado de sistema legado (ID: 27, Bodega: 00)',
+  '2025-07-11T05:00:00.000Z',
+  'Migración',
+  '2025-07-11T19:46:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-27'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-27')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-28',
+  (SELECT id FROM gh_personal WHERE cedula = '1118290929'),
+  'Migrado de sistema legado (ID: 28, Bodega: 00)',
+  '2025-07-11T05:00:00.000Z',
+  'Migración',
+  '2025-07-11T19:52:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-28'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-28')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-28'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-28')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-29',
+  (SELECT id FROM gh_personal WHERE cedula = '29125299'),
+  'Migrado de sistema legado (ID: 29, Bodega: 00)',
+  '2025-07-11T05:00:00.000Z',
+  'Migración',
+  '2025-07-11T19:53:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-29'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-29')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-29'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-29')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-30',
+  (SELECT id FROM gh_personal WHERE cedula = '29125299'),
+  'Migrado de sistema legado (ID: 30, Bodega: 00)',
+  '2025-07-11T05:00:00.000Z',
+  'Migración',
+  '2025-07-11T19:53:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-30'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-30')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-30'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-30')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-31',
+  (SELECT id FROM gh_personal WHERE cedula = '1144211121'),
+  'Migrado de sistema legado (ID: 31, Bodega: 00)',
+  '2025-07-11T05:00:00.000Z',
+  'Migración',
+  '2025-07-11T20:34:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-31'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-31')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-31'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-31')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-31'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-31')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-32',
+  (SELECT id FROM gh_personal WHERE cedula = '16772472'),
+  'Migrado de sistema legado (ID: 32, Bodega: 00)',
+  '2025-07-16T05:00:00.000Z',
+  'Migración',
+  '2025-07-16T18:54:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-32'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-32')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS XL')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-33',
+  (SELECT id FROM gh_personal WHERE cedula = '1040737902'),
+  'Migrado de sistema legado (ID: 33, Bodega: 00)',
+  '2025-08-04T05:00:00.000Z',
+  'Migración',
+  '2025-08-04T11:16:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-33'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-33')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 40')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-33'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-33')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-33'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-33')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-34',
+  (SELECT id FROM gh_personal WHERE cedula = '1017922169'),
+  'Migrado de sistema legado (ID: 34, Bodega: 00)',
+  '2025-08-26T05:00:00.000Z',
+  'Migración',
+  '2025-08-26T16:18:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-34'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-34')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 43')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-34'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-34')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  XL')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-34'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-34')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  34')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-35',
+  (SELECT id FROM gh_personal WHERE cedula = '5051540'),
+  'Migrado de sistema legado (ID: 35, Bodega: 00)',
+  '2025-09-12T05:00:00.000Z',
+  'Migración',
+  '2025-09-12T20:19:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-35'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-35')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-36',
+  (SELECT id FROM gh_personal WHERE cedula = '5981155'),
+  'Migrado de sistema legado (ID: 36, Bodega: 00)',
+  '2025-09-12T05:00:00.000Z',
+  'Migración',
+  '2025-09-12T20:20:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-36'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-36')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA T-SHIRT CONTRATISTAS  XXL')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-37',
+  (SELECT id FROM gh_personal WHERE cedula = '43840726'),
+  'Migrado de sistema legado (ID: 37, Bodega: 00)',
+  '2025-09-25T05:00:00.000Z',
+  'Migración',
+  '2025-09-25T19:59:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-37'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-37')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-37'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-37')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-38',
+  (SELECT id FROM gh_personal WHERE cedula = '1039462228'),
+  'Migrado de sistema legado (ID: 38, Bodega: 00)',
+  '2025-09-30T05:00:00.000Z',
+  'Migración',
+  '2025-09-30T20:41:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-38'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-38')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA   S')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-38'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-38')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA S')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-38'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-38')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-39',
+  (SELECT id FROM gh_personal WHERE cedula = '1036639784'),
+  'Migrado de sistema legado (ID: 39, Bodega: 00)',
+  '2025-09-30T05:00:00.000Z',
+  'Migración',
+  '2025-09-30T20:54:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-39'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-39')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-39'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-39')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-39'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-39')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-40',
+  (SELECT id FROM gh_personal WHERE cedula = '1036639784'),
+  'Migrado de sistema legado (ID: 40, Bodega: 00)',
+  '2025-09-30T05:00:00.000Z',
+  'Migración',
+  '2025-09-30T20:54:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-40'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-40')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-40'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-40')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-40'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-40')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-41',
+  (SELECT id FROM gh_personal WHERE cedula = '1036639784'),
+  'Migrado de sistema legado (ID: 41, Bodega: 00)',
+  '2025-09-30T05:00:00.000Z',
+  'Migración',
+  '2025-09-30T20:54:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-41'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-41')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-41'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-41')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-41'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-41')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-42',
+  (SELECT id FROM gh_personal WHERE cedula = '1036639784'),
+  'Migrado de sistema legado (ID: 42, Bodega: 00)',
+  '2025-09-30T05:00:00.000Z',
+  'Migración',
+  '2025-09-30T20:54:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-42'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-42')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-42'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-42')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-42'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-42')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-43',
+  (SELECT id FROM gh_personal WHERE cedula = '1036639784'),
+  'Migrado de sistema legado (ID: 43, Bodega: 00)',
+  '2025-09-30T05:00:00.000Z',
+  'Migración',
+  '2025-09-30T20:54:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-43'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-43')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-43'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-43')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-43'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-43')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-44',
+  (SELECT id FROM gh_personal WHERE cedula = '1036639784'),
+  'Migrado de sistema legado (ID: 44, Bodega: 00)',
+  '2025-09-30T05:00:00.000Z',
+  'Migración',
+  '2025-09-30T20:54:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-44'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-44')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-44'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-44')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-44'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-44')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-45',
+  (SELECT id FROM gh_personal WHERE cedula = '1036639784'),
+  'Migrado de sistema legado (ID: 45, Bodega: 00)',
+  '2025-09-30T05:00:00.000Z',
+  'Migración',
+  '2025-09-30T20:54:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-45'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-45')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-45'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-45')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-45'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-45')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-46',
+  (SELECT id FROM gh_personal WHERE cedula = '1036639784'),
+  'Migrado de sistema legado (ID: 46, Bodega: 00)',
+  '2025-09-30T05:00:00.000Z',
+  'Migración',
+  '2025-09-30T20:54:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-46'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-46')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-46'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-46')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-46'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-46')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-47',
+  (SELECT id FROM gh_personal WHERE cedula = '1036639784'),
+  'Migrado de sistema legado (ID: 47, Bodega: 00)',
+  '2025-09-30T05:00:00.000Z',
+  'Migración',
+  '2025-09-30T20:54:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-47'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-47')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-47'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-47')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO TURQUESA  DAMA M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-47'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-47')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-48',
+  (SELECT id FROM gh_personal WHERE cedula = '1027882700'),
+  'Migrado de sistema legado (ID: 48, Bodega: 00)',
+  '2025-10-01T05:00:00.000Z',
+  'Migración',
+  '2025-10-01T12:44:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-48'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-48')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-48'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-48')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-49',
+  (SELECT id FROM gh_personal WHERE cedula = '1027882700'),
+  'Migrado de sistema legado (ID: 49, Bodega: 00)',
+  '2025-10-01T05:00:00.000Z',
+  'Migración',
+  '2025-10-01T12:44:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-49'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-49')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-49'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-49')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-50',
+  (SELECT id FROM gh_personal WHERE cedula = '1027882700'),
+  'Migrado de sistema legado (ID: 50, Bodega: 00)',
+  '2025-10-01T05:00:00.000Z',
+  'Migración',
+  '2025-10-01T12:44:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-50'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-50')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS FEMENINO 12')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-51',
+  (SELECT id FROM gh_personal WHERE cedula = '1027882700'),
+  'Migrado de sistema legado (ID: 51, Bodega: 00)',
+  '2025-10-01T05:00:00.000Z',
+  'Migración',
+  '2025-10-01T13:11:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-51'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-51')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-51'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-51')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 14')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-52',
+  (SELECT id FROM gh_personal WHERE cedula = '71725965'),
+  'Migrado de sistema legado (ID: 52, Bodega: 00)',
+  '2025-10-01T05:00:00.000Z',
+  'Migración',
+  '2025-10-01T13:21:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-52'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-52')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS  HOMBRE  M')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-52'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-52')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  28')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-53',
+  (SELECT id FROM gh_personal WHERE cedula = '1128406621'),
+  'Migrado de sistema legado (ID: 53, Bodega: 00)',
+  '2025-10-01T05:00:00.000Z',
+  'Migración',
+  '2025-10-01T17:30:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-53'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-53')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  L')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-53'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-53')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 18')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-54',
+  (SELECT id FROM gh_personal WHERE cedula = '1214740345'),
+  'Migrado de sistema legado (ID: 54, Bodega: 00)',
+  '2025-10-02T05:00:00.000Z',
+  'Migración',
+  '2025-10-02T19:35:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-54'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-54')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 36')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-54'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-54')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA DAMA  S')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-54'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-54')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS  FEMENINO 8')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-55',
+  (SELECT id FROM gh_personal WHERE cedula = '1039462228'),
+  'Migrado de sistema legado (ID: 55, Bodega: 00)',
+  '2025-10-07T05:00:00.000Z',
+  'Migración',
+  '2025-10-07T20:51:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-55'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 37'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-55')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 37')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-56',
+  (SELECT id FROM gh_personal WHERE cedula = '1039462228'),
+  'Migrado de sistema legado (ID: 56, Bodega: 00)',
+  '2025-10-07T05:00:00.000Z',
+  'Migración',
+  '2025-10-07T20:51:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-56'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 37'),
+  0
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-56')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 37')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-57',
+  (SELECT id FROM gh_personal WHERE cedula = '1068420489'),
+  'Migrado de sistema legado (ID: 57, Bodega: 00)',
+  '2025-10-23T05:00:00.000Z',
+  'Migración',
+  '2025-10-23T12:28:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-57'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-57')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-58',
+  (SELECT id FROM gh_personal WHERE cedula = '1040737902'),
+  'Migrado de sistema legado (ID: 58, Bodega: 00)',
+  '2025-10-23T05:00:00.000Z',
+  'Migración',
+  '2025-10-23T16:48:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-58'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-58')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-58'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-58')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  38')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-59',
+  (SELECT id FROM gh_personal WHERE cedula = '1035918305'),
+  'Migrado de sistema legado (ID: 59, Bodega: 00)',
+  '2025-11-13T05:00:00.000Z',
+  'Migración',
+  '2025-11-13T15:45:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-59'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-59')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 42')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-59'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-59')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO BLANCA HOMBRE  XL')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-59'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 40'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-59')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS MASCULINO 40')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-60',
+  (SELECT id FROM gh_personal WHERE cedula = '1034991472'),
+  'Migrado de sistema legado (ID: 60, Bodega: 00)',
+  '2025-12-09T05:00:00.000Z',
+  'Migración',
+  '2025-12-09T17:12:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-60'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-60')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 39')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-60'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-60')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-60'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-60')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  36')
+);
+
+INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, fecha_control) 
+VALUES (
+  'DEV-61',
+  (SELECT id FROM gh_personal WHERE cedula = '1026137745'),
+  'Migrado de sistema legado (ID: 61, Bodega: 00)',
+  '2025-12-09T05:00:00.000Z',
+  'Migración',
+  '2025-12-09T18:47:00.000Z'
+) ON CONFLICT (numero_devolucion) DO NOTHING;
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-61'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 38'),
+  1
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-61')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'BOTAS KONDOR 38')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-61'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-61')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'CAMISETA POLO GRIS HOMBRE L')
+);
+
+INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
+SELECT 
+  (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-61'),
+  (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32'),
+  2
+WHERE NOT EXISTS (
+  SELECT 1 FROM gh_devoluciones_personal_detalle 
+  WHERE devolucion_id = (SELECT id FROM gh_devoluciones_personal WHERE numero_devolucion = 'DEV-61')
+    AND elemento_id = (SELECT id FROM gh_elementos WHERE nombre = 'JEANS HOMBRE  32')
+);
+
+-- --- RECONSTRUCCIÓN DE INVENTARIO PERSONAL ---
+DELETE FROM gh_inventario_personal;
+
+INSERT INTO gh_inventario_personal (personal_id, elemento_id, stock, fecha_actualizacion)
+SELECT p_inv.personal_id, p_inv.elemento_id, SUM(p_inv.stock) as stock, CURRENT_TIMESTAMP
+FROM (
+  SELECT a.personal_id, d.elemento_id, SUM(d.cantidad) AS stock
+  FROM gh_asignaciones_personal_detalle d
+  JOIN gh_asignaciones_personal a ON d.asignacion_id = a.id
+  GROUP BY a.personal_id, d.elemento_id
+  UNION ALL
+  SELECT r.personal_id, d.elemento_id, -SUM(d.cantidad) AS stock
+  FROM gh_devoluciones_personal_detalle d
+  JOIN gh_devoluciones_personal r ON d.devolucion_id = r.id
+  GROUP BY r.personal_id, d.elemento_id
+) p_inv
+GROUP BY p_inv.personal_id, p_inv.elemento_id
+HAVING SUM(p_inv.stock) > 0;
+
+COMMIT;

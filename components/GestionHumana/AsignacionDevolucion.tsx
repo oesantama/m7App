@@ -547,169 +547,18 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
     XLSX.writeFile(wb, `GH_${activeTab === 'asignaciones' ? 'Asignaciones' : 'Devoluciones'}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const exportToPDF = (record: any) => {
+  const exportToPDF = async (record: any) => {
     const isAsig = activeTab === 'asignaciones';
-    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
-    const pageW = doc.internal.pageSize.getWidth();
-    const margin = 18;
-    let y = margin;
-
-    // Header bar
-    doc.setFillColor(15, 23, 42); // slate-900
-    doc.rect(0, 0, pageW, 22, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('MILLA 7', margin, 13);
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text(isAsig ? 'ASIGNACIÓN DE ELEMENTOS A PERSONAL' : 'DEVOLUCIÓN DE ELEMENTOS A BODEGA', pageW - margin, 13, { align: 'right' });
-    y = 30;
-
-    // Title box
-    doc.setFillColor(241, 245, 249); // slate-100
-    doc.roundedRect(margin, y, pageW - margin * 2, 14, 3, 3, 'F');
-    doc.setTextColor(15, 23, 42);
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text(isAsig ? `ASIGNACIÓN No. ${record.numero_asignacion}` : `DEVOLUCIÓN No. ${record.numero_devolucion}`, pageW / 2, y + 9, { align: 'center' });
-    y += 20;
-
-    // Info grid
-    doc.setFontSize(8);
-    const col1 = margin;
-    const col2 = margin + (pageW - margin * 2) / 2 + 4;
-
-    const addField = (label: string, value: string, x: number, curY: number) => {
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(100, 116, 139); // slate-500
-      doc.text(label.toUpperCase(), x, curY);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(15, 23, 42);
-      doc.text(value || '—', x, curY + 5);
-    };
-
-    addField('Funcionario', record.personal_nombre || '', col1, y);
-    addField('Documento', record.personal_documento || '', col2, y);
-    y += 12;
-    if (isAsig) {
-      addField('Autorizado Por', record.autorizado_por || '', col1, y);
-    } else {
-      addField('Motivo', record.motivo || '', col1, y);
-    }
-    addField('Fecha Operación', new Date(record.fecha).toLocaleDateString('es-CO'), col2, y);
-    y += 12;
-    addField('Registrado Por', record.usuario_control || '', col1, y);
-    addField('Fecha Registro', record.fecha_control ? new Date(record.fecha_control).toLocaleString('es-CO') : '', col2, y);
-    y += 16;
-
-    // Separator
-    doc.setDrawColor(226, 232, 240);
-    doc.line(margin, y, pageW - margin, y);
-    y += 6;
-
-    // Detail table
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    doc.setTextColor(15, 23, 42);
-    doc.text(isAsig ? 'ELEMENTOS ASIGNADOS' : 'ELEMENTOS DEVUELTOS', margin, y);
-    y += 4;
-
-    const tableBody = (record.details || []).map((det: any) => [
-      det.elemento_nombre || '',
-      String(det.cantidad || 0),
-      det.es_serializado && det.serials?.length ? det.serials.join(', ') : 'N/A',
-    ]);
-
-    autoTable(doc, {
-      startY: y,
-      margin: { left: margin, right: margin },
-      head: [['Elemento', 'Cantidad', 'Seriales']],
-      body: tableBody.length > 0 ? tableBody : [['Sin detalle', '', '']],
-      styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold', fontSize: 8 },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      columnStyles: { 0: { cellWidth: 'auto' }, 1: { cellWidth: 22, halign: 'center' }, 2: { cellWidth: 70 } },
-    });
-
-    y = (doc as any).lastAutoTable.finalY + 8;
-
-    // Observations
-    if (record.observaciones) {
-      doc.setFillColor(248, 250, 252);
-      doc.roundedRect(margin, y, pageW - margin * 2, 14, 2, 2, 'F');
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(100, 116, 139);
-      doc.text('OBSERVACIONES', margin + 4, y + 5);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(15, 23, 42);
-      doc.text(record.observaciones, margin + 4, y + 10);
-      y += 20;
-    }
-
-    // Signature section — ensure space
-    const sigBoxH = 36;
-    const sigY = Math.max(y + 8, doc.internal.pageSize.getHeight() - sigBoxH - margin - 10);
-    const halfW = (pageW - margin * 2 - 8) / 2;
-
-    const drawSigBox = (x: number, label: string, name: string, doc2: string, signed: boolean, signedBy?: string, signDate?: string) => {
-      doc.setDrawColor(203, 213, 225);
-      doc.setLineWidth(0.4);
-      doc.roundedRect(x, sigY, halfW, sigBoxH, 2, 2);
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(100, 116, 139);
-      doc.text(label, x + halfW / 2, sigY + 5, { align: 'center' });
-
-      if (signed) {
-        // Green signed box
-        doc.setFillColor(209, 250, 229); // emerald-100
-        doc.roundedRect(x + 4, sigY + 9, halfW - 8, 14, 2, 2, 'F');
-        doc.setTextColor(5, 150, 105); // emerald-600
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.text('✓ FIRMADO DIGITALMENTE', x + halfW / 2, sigY + 17, { align: 'center' });
-        doc.setFontSize(7);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(15, 23, 42);
-        if (signedBy) doc.text(signedBy, x + halfW / 2, sigY + 24, { align: 'center' });
-        if (signDate) doc.text(signDate, x + halfW / 2, sigY + 29, { align: 'center' });
+    try {
+      if (isAsig) {
+        await api.downloadAsignacionPDF(record.id);
       } else {
-        // Blank signature line
-        doc.setDrawColor(148, 163, 184);
-        doc.line(x + 10, sigY + 26, x + halfW - 10, sigY + 26);
+        await api.downloadDevolucionPDF(record.id);
       }
-
-      doc.setFontSize(7);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(15, 23, 42);
-      doc.text(name, x + halfW / 2, sigY + sigBoxH - 8, { align: 'center' });
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 116, 139);
-      if (doc2) doc.text(doc2, x + halfW / 2, sigY + sigBoxH - 4, { align: 'center' });
-    };
-
-    const isSigned = record.firma_estado === 'FIRMADO';
-    drawSigBox(
-      margin,
-      isAsig ? 'FIRMA FUNCIONARIO (RECIBE)' : 'FIRMA FUNCIONARIO (DEVUELVE)',
-      record.personal_nombre || '',
-      record.personal_documento ? `CC/CE: ${record.personal_documento}` : '',
-      isSigned,
-      record.firmado_por,
-      record.fecha_firma ? new Date(record.fecha_firma).toLocaleDateString('es-CO') : undefined,
-    );
-    drawSigBox(
-      margin + halfW + 8,
-      'FIRMA QUIEN REGISTRA',
-      record.usuario_control || '',
-      '',
-      false,
-    );
-
-    const fileName = isAsig ? `${record.numero_asignacion}.pdf` : `${record.numero_devolucion}.pdf`;
-    doc.save(fileName);
+      toast.success('Documento PDF descargado exitosamente.');
+    } catch (err: any) {
+      toast.error(err.message || 'Error al descargar el acta PDF.');
+    }
   };
 
   return (
@@ -775,7 +624,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
             onChange={val => setSearchPersonalId(val)}
             options={personalList.map(p => ({
               value: p.id,
-              label: `${p.nombre} (${p.documento})`
+              label: `${p.nombre} (${p.cedula})`
             }))}
           />
         </div>
@@ -1140,7 +989,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                     onChange={handlePersonalChange}
                     options={personalList.map(p => ({
                       value: p.id,
-                      label: `${p.nombre} (${p.documento})`
+                      label: `${p.nombre} (${p.cedula})`
                     }))}
                   />
                 </div>
