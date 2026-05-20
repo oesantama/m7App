@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import { User } from '../../types';
 import { Icons } from '../../constants';
 import SearchableSelect from '../common/SearchableSelect';
+import { DataTable, ColumnDef } from '../shared/DataTable';
 
 interface PersonalRecord {
   id: number;
@@ -162,80 +163,194 @@ const Personal: React.FC<Props> = ({ user }) => {
     api.getEstados().then(setEstados).catch(() => {});
   }, [activeTab]); // Solo cuando cambia la pestaña
 
-  const filteredPersonal = useMemo(() => 
-    personal.filter(p => 
-      p.nombre.toLowerCase().includes(search.toLowerCase()) || 
-      p.cedula.includes(search)
-    ), [personal, search]
-  );
+  const personalColumns = useMemo<ColumnDef<PersonalRecord>[]>(() => [
+    {
+      header: 'Nombre / Cédula',
+      key: 'nombre',
+      render: (p) => (
+        <div>
+          <p className="font-black text-slate-900 uppercase">{p.nombre}</p>
+          <p className="text-[9px] text-slate-400">CC: {p.cedula}</p>
+        </div>
+      )
+    },
+    {
+      header: 'Cargo / Área',
+      key: 'cargo',
+      render: (p) => (
+        <div>
+          <p className="uppercase">{p.cargo || '—'}</p>
+          <p className="text-[9px] text-indigo-400 uppercase font-black">{p.area_nombre || 'Sin Área'}</p>
+        </div>
+      )
+    },
+    {
+      header: 'Contacto',
+      key: 'celular_personal',
+      render: (p) => (
+        <div>
+          <p>{p.celular_personal || '—'}</p>
+          <p className="text-[9px] text-slate-400 lowercase font-medium">{p.correo_personal || ''}</p>
+        </div>
+      )
+    },
+    {
+      header: 'Fecha Ingreso',
+      key: 'fecha_ingreso',
+      render: (p) => (
+        <span className="text-slate-400">
+          {p.fecha_ingreso ? new Date(p.fecha_ingreso).toLocaleDateString() : '—'}
+        </span>
+      )
+    },
+    {
+      header: 'Estado',
+      key: 'estado',
+      render: (p) => (
+        <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter ${p.estado === 'EST-01' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+          {estados.find(e => e.id === p.estado)?.name || p.estado}
+        </span>
+      )
+    },
+    {
+      header: 'Acciones',
+      key: 'acciones',
+      sortable: false,
+      render: (p) => (
+        <div className="flex items-center justify-end gap-1.5">
+          <button onClick={() => openEdit(p)} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100">
+            <Icons.Edit className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )
+    }
+  ], [estados]);
 
-  const filteredEncuestas = useMemo(() => 
-    encuestas.filter(e => 
-      e.cedula.includes(encuestasSearch) ||
-      (e.usuario_control || '').toLowerCase().includes(encuestasSearch.toLowerCase())
-    ), [encuestas, encuestasSearch]
-  );
+  const encuestasColumns = useMemo<ColumnDef<EncuestaRecord>[]>(() => [
+    {
+      header: 'Personal',
+      key: 'cedula',
+      render: (e) => {
+        const persona = personal.find(p => p.cedula === e.cedula);
+        return (
+          <div>
+            {persona && <p className="font-black text-slate-900 uppercase text-[11px]">{persona.nombre}</p>}
+            <p className={`text-[9px] font-bold ${persona ? 'text-slate-400' : 'font-black text-slate-900'}`}>CC: {e.cedula}</p>
+          </div>
+        );
+      }
+    },
+    {
+      header: 'Fecha Activación',
+      key: 'fecha_activacion',
+      render: (e) => (
+        <span className="text-slate-400">
+          {new Date(e.fecha_activacion).toLocaleString()}
+        </span>
+      )
+    },
+    {
+      header: 'Estado',
+      key: 'estado',
+      render: (e) => (
+        <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${e.estado === 'EST-05' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : e.estado === 'EST-01' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
+          {estados.find(est => est.id === e.estado)?.name || e.estado}
+        </span>
+      )
+    },
+    {
+      header: 'Activado por',
+      key: 'usuario_control',
+      render: (e) => (
+        <span className="text-slate-400 uppercase">{e.usuario_control}</span>
+      )
+    },
+    {
+      header: 'Acciones',
+      key: 'acciones',
+      sortable: false,
+      render: (e) => (
+        <div className="flex justify-end gap-1.5">
+          {e.estado === 'EST-01' && (
+            <button onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/publico/encuesta?id=${e.id}`);
+              toast.success('Link copiado');
+            }} className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200" title="Copiar Link">
+              <Icons.Copy className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {e.estado === 'EST-01' && (
+            confirmDeactivate === e.id ? (
+              <div className="flex items-center gap-1.5 animate-in slide-in-from-right-3">
+                <span className="text-[9px] text-rose-500 font-black uppercase tracking-tighter">¿Inactivar?</span>
+                <button onClick={() => handleDeactivate(e.id)} className="px-2 py-1 bg-rose-500 text-white rounded-md text-[9px] font-black uppercase">Sí</button>
+                <button onClick={() => setConfirmDeactivate(null)} className="px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-[9px] font-black uppercase">No</button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmDeactivate(e.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100" title="Inactivar Encuesta">
+                <Icons.X className="w-3.5 h-3.5" />
+              </button>
+            )
+          )}
+        </div>
+      )
+    }
+  ], [personal, estados, confirmDeactivate]);
 
-  // Lógica de Paginación Reutilizable
-  const paginate = (items: any[], page: number, limit: number) => {
-    if (limit === 0) return items; // TODOS
-    const start = (page - 1) * limit;
-    return items.slice(start, start + limit);
-  };
-
-  const paginatedPersonal = useMemo(() => paginate(filteredPersonal, personalPage, personalLimit), [filteredPersonal, personalPage, personalLimit]);
-  const paginatedEncuestas = useMemo(() => paginate(filteredEncuestas, encuestasPage, encuestasLimit), [filteredEncuestas, encuestasPage, encuestasLimit]);
-  const paginatedResultados = useMemo(() => paginate(resultados, resultadosPage, resultadosLimit), [resultados, resultadosPage, resultadosLimit]);
-
-  const totalPagesPersonal = Math.max(1, Math.ceil(filteredPersonal.length / personalLimit)) || 1;
-  const totalPagesEncuestas = Math.max(1, Math.ceil(filteredEncuestas.length / encuestasLimit)) || 1;
-  const totalPagesResultados = Math.max(1, Math.ceil(resultados.length / resultadosLimit)) || 1;
-
-  const exportPersonalExcel = () => {
-    if (filteredPersonal.length === 0) { toast.error('No hay datos para exportar.'); return; }
-    const data = filteredPersonal.map(p => ({
-      NOMBRE:              p.nombre,
-      CÉDULA:              p.cedula,
-      CARGO:               p.cargo || '',
-      ÁREA:                p.area_nombre || '',
-      EPS:                 p.eps || '',
-      AFP:                 p.afp || '',
-      CELULAR:             p.celular_personal || '',
-      CORREO:              p.correo_personal || '',
-      'FECHA INGRESO':     p.fecha_ingreso ? new Date(p.fecha_ingreso).toLocaleDateString('es-CO') : '',
-      ESTADO:              p.estado === 'EST-01' ? 'ACTIVO' : 'INACTIVO',
-      'ES JEFE':           p.es_jefe ? 'SÍ' : 'NO',
-      'JEFE INMEDIATO':    p.jefe_nombre || '',
-      PLACA:               p.placa || '',
-      OPERACIÓN:           p.operacion || '',
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    ws['!cols'] = [20, 14, 22, 18, 16, 16, 14, 28, 14, 10, 8, 20, 12, 20].map(w => ({ wch: w }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Personal');
-    XLSX.writeFile(wb, `personal_gh_${new Date().toISOString().slice(0,10)}.xlsx`);
-    toast.success(`${data.length} registros exportados.`);
-  };
-
-  const exportEncuestasExcel = () => {
-    if (filteredEncuestas.length === 0) { toast.error('No hay datos para exportar.'); return; }
-    const data = filteredEncuestas.map(e => {
-      const persona = personal.find(p => p.cedula === e.cedula);
-      return {
-        NOMBRE:            persona?.nombre || '',
-        CÉDULA:            e.cedula,
-        'FECHA ACTIVACIÓN': new Date(e.fecha_activacion).toLocaleString('es-CO', { timeZone: 'America/Bogota' }),
-        ESTADO:            e.estado,
-        'ACTIVADO POR':    e.usuario_control || '',
-      };
-    });
-    const ws = XLSX.utils.json_to_sheet(data);
-    ws['!cols'] = [28,14,22,14,20].map(w => ({ wch: w }));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Encuestas');
-    XLSX.writeFile(wb, `encuestas_asignadas_${new Date().toISOString().slice(0,10)}.xlsx`);
-    toast.success(`${data.length} registros exportados.`);
-  };
+  const resultadosColumns = useMemo<ColumnDef<any>[]>(() => [
+    {
+      header: 'Colaborador / Cedula',
+      key: 'nombre',
+      render: (r) => (
+        <div>
+          <p className="text-[11px] font-black text-slate-900 uppercase leading-none">{r.nombre}</p>
+          <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">CC: {r.cedula}</p>
+        </div>
+      )
+    },
+    {
+      header: 'Cargo',
+      key: 'cargo',
+      render: (r) => <span className="uppercase text-[10px] font-bold text-slate-600">{r.cargo || '—'}</span>
+    },
+    {
+      header: 'Área',
+      key: 'area_nombre',
+      render: (r) => <span className="uppercase text-[10px] font-bold text-slate-600">{r.area_nombre || '—'}</span>
+    },
+    {
+      header: 'Fecha Realización',
+      key: 'fecha_realizacion',
+      render: (r) => <span className="text-[10px] text-slate-500 font-medium">{new Date(r.fecha_realizacion).toLocaleString()}</span>
+    },
+    {
+      header: 'Reporte',
+      key: 'acciones',
+      sortable: false,
+      render: (r) => (
+        <div className="flex items-center justify-end gap-2">
+          <button 
+            onClick={async () => {
+              try {
+                const detail = await api.getEncuestaDetail(r.id);
+                setShowDetail(detail);
+              } catch {
+                toast.error('Error al cargar detalle');
+              }
+            }}
+            className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2"
+          >
+            <Icons.Eye className="w-4 h-4" />
+            <span className="text-[9px] font-black uppercase">Ver Detalle</span>
+          </button>
+          <button onClick={() => api.downloadSurveyPDF(r.id)} className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-all flex items-center gap-2">
+            <Icons.FileText className="w-4 h-4" />
+            <span className="text-[9px] font-black uppercase">PDF</span>
+          </button>
+        </div>
+      )
+    }
+  ], []);
 
   const handleSave = async () => {
     if (!form.nombre || !form.cedula) {
@@ -349,148 +464,21 @@ const Personal: React.FC<Props> = ({ user }) => {
 
         <div className="p-6">
           {activeTab === 'personal' ? (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="bg-slate-50 h-10 px-4 rounded-xl flex items-center gap-3 w-full sm:w-72 border border-slate-100">
-                  <Icons.Search className="w-3.5 h-3.5 text-slate-400" />
-                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder="BUSCAR POR NOMBRE O CÉDULA..." className="bg-transparent border-none outline-none font-bold text-[11px] uppercase text-slate-700 w-full" />
-                </div>
-                <button onClick={exportPersonalExcel}
-                  className="h-10 px-4 flex items-center gap-2 border border-emerald-300 text-emerald-700 bg-emerald-50 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-all">
-                  <Icons.Download className="w-3.5 h-3.5" />
-                  Exportar Excel ({filteredPersonal.length})
-                </button>
-              </div>
-
-              <div className="overflow-x-auto rounded-2xl border border-slate-100">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 text-[9px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                      <th className="px-4 py-3">Nombre / Cédula</th>
-                      <th className="px-4 py-3">Cargo / Área</th>
-                      <th className="px-4 py-3">Contacto</th>
-                      <th className="px-4 py-3">Fecha Ingreso</th>
-                      <th className="px-4 py-3">Estado</th>
-                      <th className="px-4 py-3 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-[11px] font-bold text-slate-600">
-                    {paginatedPersonal.map(p => (
-                      <tr key={p.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3">
-                          <p className="font-black text-slate-900 uppercase">{p.nombre}</p>
-                          <p className="text-[9px] text-slate-400">CC: {p.cedula}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="uppercase">{p.cargo || '—'}</p>
-                          <p className="text-[9px] text-indigo-400 uppercase font-black">{p.area_nombre || 'Sin Área'}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p>{p.celular_personal || '—'}</p>
-                          <p className="text-[9px] text-slate-400 lowercase font-medium">{p.correo_personal || ''}</p>
-                        </td>
-                        <td className="px-4 py-3 text-slate-400">
-                          {p.fecha_ingreso ? new Date(p.fecha_ingreso).toLocaleDateString() : '—'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter ${p.estado === 'EST-01' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
-                            {estados.find(e => e.id === p.estado)?.name || p.estado}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-1.5">
-                            <button onClick={() => openEdit(p)} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100">
-                              <Icons.Edit className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <Pagination 
-                total={filteredPersonal.length}
-                page={personalPage}
-                limit={personalLimit}
-                onPageChange={setPersonalPage}
-                onLimitChange={(l) => { setPersonalLimit(l); setPersonalPage(1); }}
-              />
-            </div>
+            <DataTable
+              data={personal}
+              columns={personalColumns}
+              searchPlaceholder="BUSCAR POR NOMBRE O CÉDULA..."
+              excelFileName={`personal_gh_${new Date().toISOString().slice(0, 10)}.xlsx`}
+              excelSheetName="Personal"
+            />
           ) : activeTab === 'encuestas' ? (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="bg-slate-50 h-10 px-4 rounded-xl flex items-center gap-3 w-full sm:w-72 border border-slate-100">
-                  <Icons.Search className="w-3.5 h-3.5 text-slate-400" />
-                  <input value={encuestasSearch} onChange={e => { setEncuestasSearch(e.target.value); setEncuestasPage(1); }} placeholder="BUSCAR POR CÉDULA O USUARIO..." className="bg-transparent border-none outline-none font-bold text-[11px] uppercase text-slate-700 w-full" />
-                </div>
-                <button onClick={exportEncuestasExcel}
-                  className="h-10 px-4 flex items-center gap-2 border border-emerald-300 text-emerald-700 bg-emerald-50 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-all">
-                  <Icons.Download className="w-3.5 h-3.5" />
-                  Exportar Excel ({filteredEncuestas.length})
-                </button>
-              </div>
-
-              <div className="overflow-x-auto rounded-2xl border border-slate-100">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-slate-50 text-[9px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                      <th className="px-4 py-3">Personal</th>
-                      <th className="px-4 py-3">Fecha Activación</th>
-                      <th className="px-4 py-3">Estado</th>
-                      <th className="px-4 py-3">Activado por</th>
-                      <th className="px-4 py-3 text-right">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="text-[11px] font-bold text-slate-600">
-                    {paginatedEncuestas.map(e => {
-                      const persona = personal.find(p => p.cedula === e.cedula);
-                      return (
-                        <tr key={e.id} className="border-b border-slate-50">
-                          <td className="px-4 py-3">
-                            {persona && <p className="font-black text-slate-900 uppercase text-[11px]">{persona.nombre}</p>}
-                            <p className={`text-[9px] font-bold ${persona ? 'text-slate-400' : 'font-black text-slate-900'}`}>CC: {e.cedula}</p>
-                          </td>
-                          <td className="px-4 py-3">{new Date(e.fecha_activacion).toLocaleString()}</td>
-                          <td className="px-4 py-3">
-                            <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${e.estado === 'EST-05' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : e.estado === 'EST-01' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
-                              {estados.find(est => est.id === e.estado)?.name || e.estado}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-400 uppercase">{e.usuario_control}</td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex justify-end gap-1.5">
-                              {e.estado === 'EST-01' && (
-                                <button onClick={() => {
-                                  navigator.clipboard.writeText(`${window.location.origin}/publico/encuesta?id=${e.id}`);
-                                  toast.success('Link copiado');
-                                }} className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200" title="Copiar Link">
-                                  <Icons.Copy className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                              {e.estado === 'EST-01' && (
-                                <button onClick={() => setConfirmDeactivate(e.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100" title="Inactivar Encuesta">
-                                  <Icons.X className="w-3.5 h-3.5" />
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <Pagination 
-                total={filteredEncuestas.length}
-                page={encuestasPage}
-                limit={encuestasLimit}
-                onPageChange={setEncuestasPage}
-                onLimitChange={(l) => { setEncuestasLimit(l); setEncuestasPage(1); }}
-              />
-            </div>
+            <DataTable
+              data={encuestas}
+              columns={encuestasColumns}
+              searchPlaceholder="BUSCAR POR CÉDULA O USUARIO..."
+              excelFileName={`encuestas_asignadas_${new Date().toISOString().slice(0, 10)}.xlsx`}
+              excelSheetName="Encuestas"
+            />
           ) : activeTab === 'consultar' ? (
             <div className="space-y-4">
               {/* Filtros */}
@@ -536,85 +524,20 @@ const Personal: React.FC<Props> = ({ user }) => {
                 <div className="flex gap-2 lg:col-span-3">
                   <button 
                     onClick={handleConsultar}
-                    className="h-10 px-6 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-sm flex-1 justify-center whitespace-now nowrap"
+                    className="h-10 px-6 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-sm flex-1 justify-center whitespace-nowrap"
                   >
                     <Icons.Search className="w-4 h-4" />
                     <span className="text-[10px] font-black uppercase">Consultar</span>
                   </button>
-                  <button 
-                    onClick={() => api.exportEncuestasExcel({ from: filterDates.from, to: filterDates.to, search: filterSearch, areaId: filterArea || undefined })}
-                    className="h-10 px-4 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all flex items-center gap-2 shadow-sm whitespace-now nowrap"
-                    title="Exportar a Excel"
-                  >
-                    <Icons.Download className="w-4 h-4" />
-                    <span className="text-[10px] font-black uppercase">Excel</span>
-                  </button>
                 </div>
               </div>
 
-              <div className="overflow-x-auto rounded-3xl border border-slate-100 shadow-sm">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-50 border-b border-slate-100">
-                    <tr>
-                      <th className="px-4 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Colaborador / Cedula</th>
-                      <th className="px-4 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Cargo</th>
-                      <th className="px-4 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Área</th>
-                      <th className="px-4 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400">Fecha Realización</th>
-                      <th className="px-4 py-4 text-[10px] font-black uppercase tracking-wider text-slate-400 text-right">Reporte</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {paginatedResultados.map(r => (
-                      <tr key={r.id} className="hover:bg-slate-50/50 transition-all">
-                        <td className="px-4 py-4">
-                          <p className="text-[11px] font-black text-slate-900 uppercase leading-none">{r.nombre}</p>
-                          <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase">CC: {r.cedula}</p>
-                        </td>
-                        <td className="px-4 py-4 uppercase text-[10px] font-bold text-slate-600">{r.cargo || '—'}</td>
-                        <td className="px-4 py-4 uppercase text-[10px] font-bold text-slate-600">{r.area_nombre || '—'}</td>
-                        <td className="px-4 py-4 text-[10px] text-slate-500 font-medium">{new Date(r.fecha_realizacion).toLocaleString()}</td>
-                        <td className="px-4 py-4">
-                          <div className="flex items-center justify-end gap-2">
-                            <button 
-                              onClick={async () => {
-                                try {
-                                  const detail = await api.getEncuestaDetail(r.id);
-                                  setShowDetail(detail);
-                                } catch {
-                                  toast.error('Error al cargar detalle');
-                                }
-                              }}
-                              className="p-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-2"
-                            >
-                              <Icons.Eye className="w-4 h-4" />
-                              <span className="text-[9px] font-black uppercase">Ver Detalle</span>
-                            </button>
-                            <button onClick={() => api.downloadSurveyPDF(r.id)} className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-all flex items-center gap-2">
-                              <Icons.FileText className="w-4 h-4" />
-                              <span className="text-[9px] font-black uppercase">PDF</span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                    {resultados.length === 0 && (
-                      <tr>
-                        <td colSpan={5} className="px-4 py-16 text-center">
-                          <Icons.Search className="w-8 h-8 text-slate-200 mx-auto mb-3" />
-                          <p className="text-slate-300 uppercase font-black text-[10px]">No se encontraron encuestas con estos filtros</p>
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <Pagination 
-                total={resultados.length}
-                page={resultadosPage}
-                limit={resultadosLimit}
-                onPageChange={setResultadosPage}
-                onLimitChange={(l) => { setResultadosLimit(l); setResultadosPage(1); }}
+              <DataTable
+                data={resultados}
+                columns={resultadosColumns}
+                searchPlaceholder="FILTRAR POR CUALQUIER CAMPO..."
+                excelFileName={`resultados_encuestas_${new Date().toISOString().slice(0, 10)}.xlsx`}
+                excelSheetName="Resultados"
               />
             </div>
           ) : null}

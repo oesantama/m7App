@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User } from '../../types';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
+import { DataTable, ColumnDef } from '../shared/DataTable';
 import * as XLSX from 'xlsx';
 import {
   Package, Users, Search, RefreshCw, Barcode,
@@ -36,8 +37,175 @@ const ConsultasInventario: React.FC<Props> = ({ user }) => {
   const [elementosList, setElementosList] = useState<any[]>([]);
   const [personalList, setPersonalList] = useState<any[]>([]);
 
-  // Expanded rows
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  // View modals
+  const [viewSerials, setViewSerials] = useState<any | null>(null);
+  const [viewPersonalActivos, setViewPersonalActivos] = useState<any | null>(null);
+  const [viewMovimientoItems, setViewMovimientoItems] = useState<any | null>(null);
+
+  const bodegaColumns = React.useMemo<ColumnDef<any>[]>(() => [
+    {
+      header: 'Elemento',
+      key: 'elemento_nombre',
+      render: (row) => <span className="font-black text-slate-900">{row.elemento_nombre}</span>
+    },
+    {
+      header: 'Tipo',
+      key: 'tipo_nombre',
+      render: (row) => <span className="text-slate-500 font-bold">{row.tipo_nombre || '—'}</span>
+    },
+    {
+      header: 'Serializado',
+      key: 'es_serializado',
+      render: (row) => row.es_serializado
+        ? <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-[9px] font-black uppercase">Sí</span>
+        : <span className="px-2.5 py-1 bg-slate-50 border border-slate-200 text-slate-400 rounded-lg text-[9px] font-black uppercase">No</span>
+    },
+    {
+      header: 'Stock Bodega',
+      key: 'stock',
+      render: (row) => <span className={`text-lg font-black ${Number(row.stock) === 0 ? 'text-rose-500' : 'text-emerald-600'}`}>{row.stock}</span>
+    },
+    {
+      header: 'Detalle',
+      key: 'acciones',
+      sortable: false,
+      render: (row) => row.es_serializado && (
+        <button
+          onClick={() => setViewSerials(row)}
+          className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors text-[10px] uppercase tracking-wider flex items-center gap-1.5 ml-auto"
+        >
+          <Barcode size={11} /> Seriales
+        </button>
+      )
+    }
+  ], []);
+
+  const personalColumns = React.useMemo<ColumnDef<any>[]>(() => [
+    {
+      header: 'Funcionario',
+      key: 'personal_nombre',
+      render: (row) => <span className="font-black text-slate-900">{row.personal_nombre}</span>
+    },
+    {
+      header: 'Documento',
+      key: 'personal_documento',
+      render: (row) => <span className="text-slate-500 font-bold">{row.personal_documento}</span>
+    },
+    {
+      header: 'Cargo',
+      key: 'cargo',
+      render: (row) => <span className="text-slate-500 font-bold">{row.cargo || '—'}</span>
+    },
+    {
+      header: 'Elementos',
+      key: 'items_count',
+      render: (row) => <span className="font-black text-indigo-600">{row.items.length}</span>
+    },
+    {
+      header: 'Total Unidades',
+      key: 'total_items',
+      render: (row) => <span className="font-black text-emerald-600 text-base">{row.totalItems}</span>
+    },
+    {
+      header: 'Acción',
+      key: 'acciones',
+      sortable: false,
+      render: (row) => (
+        <button
+          onClick={() => setViewPersonalActivos(row)}
+          className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors text-[10px] uppercase tracking-wider flex items-center gap-1.5 ml-auto"
+        >
+          <Package size={11} /> Ver Activos
+        </button>
+      )
+    }
+  ], []);
+
+  const historialColumns = React.useMemo<ColumnDef<any>[]>(() => [
+    {
+      header: 'Documento',
+      key: 'numero',
+      render: (row) => <span className="font-black text-slate-900">{row.numero}</span>
+    },
+    {
+      header: 'Tipo',
+      key: 'tipo',
+      render: (row) => row.tipo === 'ENTREGA' ? (
+        <span className="px-2 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-[9px] font-black uppercase">
+          Entrega
+        </span>
+      ) : (
+        <span className="px-2 py-1 bg-orange-50 border border-orange-200 text-orange-700 rounded-lg text-[9px] font-black uppercase">
+          Devolución
+        </span>
+      )
+    },
+    {
+      header: 'Fecha',
+      key: 'fecha',
+      render: (row) => <span className="text-slate-500 font-bold">{new Date(row.fecha).toLocaleDateString('es-CO')}</span>
+    },
+    {
+      header: 'Colaborador',
+      key: 'personal_nombre',
+      render: (row) => (
+        <div className="font-bold text-slate-900">
+          {row.personal_nombre}
+          <div className="text-[10px] text-slate-400 font-bold">C.C. {row.personal_documento}</div>
+        </div>
+      )
+    },
+    {
+      header: 'Detalles / Obs',
+      key: 'observaciones',
+      render: (row) => <span className="max-w-xs truncate text-slate-500 font-medium block">{row.observaciones || '—'}</span>
+    },
+    {
+      header: 'Firma',
+      key: 'firma_estado',
+      render: (row) => row.firma_estado === 'FIRMADO' ? (
+        <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-[9px] font-black uppercase">
+          Firmado
+        </span>
+      ) : (
+        <span className="px-2 py-0.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-[9px] font-black uppercase">
+          Pendiente
+        </span>
+      )
+    },
+    {
+      header: 'Acciones',
+      key: 'acciones',
+      sortable: false,
+      render: (row) => (
+        <div className="flex justify-end gap-1.5">
+          <button
+            onClick={() => setViewMovimientoItems(row)}
+            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors text-[9px] uppercase tracking-wider flex items-center gap-1"
+          >
+            <Package size={11} /> Items
+          </button>
+          <button
+            onClick={async () => {
+              try {
+                if (row.tipo === 'ENTREGA') {
+                  await api.downloadAsignacionPDF(row.id);
+                } else {
+                  await api.downloadDevolucionPDF(row.id);
+                }
+              } catch (err: any) {
+                toast.error(err.message || 'Error al descargar PDF');
+              }
+            }}
+            className="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg hover:border-slate-300 transition-colors"
+            title="Descargar PDF"
+          >
+            <Download size={13} />
+          </button>
+        </div>
+      )
+    }
+  ], []);
 
   useEffect(() => {
     loadCatalogs();
@@ -331,19 +499,19 @@ const ConsultasInventario: React.FC<Props> = ({ user }) => {
       {/* Tabs */}
       <div className="bg-slate-100 p-1.5 rounded-2xl flex gap-2">
         <button
-          onClick={() => { setActiveTab('bodega'); setExpandedKey(null); }}
+          onClick={() => { setActiveTab('bodega'); setViewSerials(null); setViewPersonalActivos(null); setViewMovimientoItems(null); }}
           className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${activeTab === 'bodega' ? 'bg-white text-slate-900 shadow-md font-black' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <BoxIcon size={15} className="text-indigo-500" /> Inventario Bodega
         </button>
         <button
-          onClick={() => { setActiveTab('personal'); setExpandedKey(null); }}
+          onClick={() => { setActiveTab('personal'); setViewSerials(null); setViewPersonalActivos(null); setViewMovimientoItems(null); }}
           className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${activeTab === 'personal' ? 'bg-white text-slate-900 shadow-md font-black' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <Users size={15} className="text-emerald-500" /> Inventario Personal
         </button>
         <button
-          onClick={() => { setActiveTab('historial'); setExpandedKey(null); }}
+          onClick={() => { setActiveTab('historial'); setViewSerials(null); setViewPersonalActivos(null); setViewMovimientoItems(null); }}
           className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${activeTab === 'historial' ? 'bg-white text-slate-900 shadow-md font-black' : 'text-slate-500 hover:text-slate-900'}`}
         >
           <RefreshCw size={15} className="text-blue-500 animate-none" /> Historial Movimientos
@@ -391,83 +559,16 @@ const ConsultasInventario: React.FC<Props> = ({ user }) => {
               <button type="button" onClick={resetBodega} className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all text-xs uppercase">
                 Limpiar
               </button>
-              <button type="button" onClick={exportBodegaExcel} className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all flex items-center gap-2 text-xs uppercase">
-                <Download size={13} /> Excel
-              </button>
             </div>
           </form>
 
-          {/* Bodega table */}
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-900 text-white text-[10px] uppercase tracking-widest font-black">
-                    <th className="p-4 pl-6">Elemento</th>
-                    <th className="p-4">Tipo</th>
-                    <th className="p-4 text-center w-24">Serializado</th>
-                    <th className="p-4 text-center w-28">Stock Bodega</th>
-                    <th className="p-4 text-right pr-6 w-28">Detalle</th>
-                  </tr>
-                </thead>
-                <tbody className="text-xs">
-                  {isLoading ? (
-                    <tr><td colSpan={5} className="p-10 text-center text-slate-400"><div className="flex justify-center mb-2"><RefreshCw className="animate-spin text-indigo-500" size={24} /></div>Cargando inventario...</td></tr>
-                  ) : bodegaData.length === 0 ? (
-                    <tr><td colSpan={5} className="p-10 text-center text-slate-400 font-bold uppercase tracking-wider">No hay registros de inventario.</td></tr>
-                  ) : bodegaData.map(item => (
-                    <React.Fragment key={item.elemento_id}>
-                      <tr className="border-b border-slate-100 hover:bg-slate-50/50 font-bold text-slate-700">
-                        <td className="p-4 pl-6 font-black text-slate-900">{item.elemento_nombre}</td>
-                        <td className="p-4 text-slate-500">{item.tipo_nombre || '—'}</td>
-                        <td className="p-4 text-center">
-                          {item.es_serializado
-                            ? <span className="px-2 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-[9px] font-black uppercase">Sí</span>
-                            : <span className="px-2 py-1 bg-slate-50 border border-slate-200 text-slate-400 rounded-lg text-[9px] font-black uppercase">No</span>}
-                        </td>
-                        <td className="p-4 text-center">
-                          <span className={`text-xl font-black ${Number(item.stock) === 0 ? 'text-rose-500' : 'text-emerald-600'}`}>{item.stock}</span>
-                        </td>
-                        <td className="p-4 text-right pr-6">
-                          {item.es_serializado && (
-                            <button
-                              onClick={() => setExpandedKey(expandedKey === `b-${item.elemento_id}` ? null : `b-${item.elemento_id}`)}
-                              className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors text-[10px] uppercase tracking-wider flex items-center gap-1.5 ml-auto"
-                            >
-                              <Barcode size={11} /> Seriales
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                      {expandedKey === `b-${item.elemento_id}` && item.es_serializado && (
-                        <tr className="bg-slate-50/70">
-                          <td colSpan={5} className="p-5 pl-10 border-b border-slate-100">
-                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Seriales de {item.elemento_nombre}:</div>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                              {item.serials?.length === 0 ? (
-                                <span className="text-xs text-slate-400 font-bold col-span-4">Sin seriales registrados.</span>
-                              ) : item.serials?.map((s: any, i: number) => (
-                                <div key={i} className="bg-white border border-slate-200 rounded-xl p-2.5 flex flex-col gap-1">
-                                  <div className="flex items-center gap-1.5">
-                                    <Barcode size={11} className="text-slate-400" />
-                                    <span className="text-[10px] font-black text-slate-800 uppercase">{s.serial}</span>
-                                  </div>
-                                  <div className="flex items-center justify-between">
-                                    {estadoSerialBadge(s.estado_serial)}
-                                    {s.asignado_a && <span className="text-[9px] text-slate-500 font-bold truncate ml-1">{s.asignado_a.split(' ')[0]}</span>}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <DataTable
+            data={bodegaData}
+            columns={bodegaColumns}
+            searchPlaceholder="Buscar en bodega..."
+            excelFileName={`GH_Inventario_Bodega_${new Date().toISOString().split('T')[0]}.xlsx`}
+            excelSheetName="Bodega"
+          />
         </>
       )}
 
@@ -521,89 +622,16 @@ const ConsultasInventario: React.FC<Props> = ({ user }) => {
               <button type="button" onClick={resetPersonal} className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all text-xs uppercase">
                 Limpiar
               </button>
-              <button type="button" onClick={exportPersonalExcel} className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all flex items-center gap-2 text-xs uppercase">
-                <Download size={13} /> Excel
-              </button>
             </div>
           </form>
 
-          {/* Personal table - grouped by person */}
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-900 text-white text-[10px] uppercase tracking-widest font-black">
-                    <th className="p-4 pl-6">Funcionario</th>
-                    <th className="p-4">Documento</th>
-                    <th className="p-4">Cargo</th>
-                    <th className="p-4 text-center w-24">Elementos</th>
-                    <th className="p-4 text-center w-28">Total Unidades</th>
-                    <th className="p-4 text-right pr-6 w-28">Detalle</th>
-                  </tr>
-                </thead>
-                <tbody className="text-xs">
-                  {isLoading ? (
-                    <tr><td colSpan={6} className="p-10 text-center text-slate-400"><div className="flex justify-center mb-2"><RefreshCw className="animate-spin text-emerald-500" size={24} /></div>Cargando inventario...</td></tr>
-                  ) : Object.keys(personalGrouped).length === 0 ? (
-                    <tr><td colSpan={6} className="p-10 text-center text-slate-400 font-bold uppercase tracking-wider">No hay activos asignados al personal.</td></tr>
-                  ) : Object.values(personalGrouped).map((group: any) => (
-                    <React.Fragment key={group.personal_id}>
-                      <tr className="border-b border-slate-100 hover:bg-slate-50/50 font-bold text-slate-700">
-                        <td className="p-4 pl-6 font-black text-slate-900">{group.personal_nombre}</td>
-                        <td className="p-4 text-slate-500">{group.personal_documento}</td>
-                        <td className="p-4 text-slate-500">{group.cargo || '—'}</td>
-                        <td className="p-4 text-center font-black text-indigo-600">{group.items.length}</td>
-                        <td className="p-4 text-center font-black text-emerald-600 text-lg">{group.totalItems}</td>
-                        <td className="p-4 text-right pr-6">
-                          <button
-                            onClick={() => setExpandedKey(expandedKey === `p-${group.personal_id}` ? null : `p-${group.personal_id}`)}
-                            className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors text-[10px] uppercase tracking-wider flex items-center gap-1.5 ml-auto"
-                          >
-                            <Package size={11} /> Ver activos
-                          </button>
-                        </td>
-                      </tr>
-                      {expandedKey === `p-${group.personal_id}` && (
-                        <tr className="bg-slate-50/70">
-                          <td colSpan={6} className="p-5 pl-10 border-b border-slate-100">
-                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Activos de {group.personal_nombre}:</div>
-                            <div className="space-y-3">
-                              {group.items.map((item: any, i: number) => (
-                                <div key={i} className="bg-white border border-slate-200 rounded-2xl p-4">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div>
-                                      <span className="font-black text-slate-900 text-xs">{item.elemento_nombre}</span>
-                                      <span className="ml-2 text-[9px] text-slate-400 font-bold uppercase">{item.tipo_nombre}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      {item.es_serializado
-                                        ? <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg text-[9px] font-black uppercase">Serializado</span>
-                                        : null}
-                                      <span className="text-sm font-black text-emerald-600">x{item.stock}</span>
-                                    </div>
-                                  </div>
-                                  {item.es_serializado && item.serials?.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5 mt-2">
-                                      {item.serials.map((s: any, si: number) => (
-                                        <span key={si} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg text-[9px] font-black tracking-wider uppercase flex items-center gap-1">
-                                          <Barcode size={9} /> {s.serial}
-                                          {s.fecha_asignacion && <span className="text-[8px] text-indigo-400 font-normal ml-1">({new Date(s.fecha_asignacion).toLocaleDateString('es-CO')})</span>}
-                                        </span>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <DataTable
+            data={Object.values(personalGrouped)}
+            columns={personalColumns}
+            searchPlaceholder="Buscar en inventario personal..."
+            excelFileName={`GH_Inventario_Personal_${new Date().toISOString().split('T')[0]}.xlsx`}
+            excelSheetName="Inventario Personal"
+          />
         </>
       )}
 
@@ -678,152 +706,153 @@ const ConsultasInventario: React.FC<Props> = ({ user }) => {
               <button type="button" onClick={resetHistorial} className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-all text-xs uppercase">
                 Limpiar
               </button>
-              <button type="button" onClick={exportHistorialExcel} className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all flex items-center gap-2 text-xs uppercase">
-                <Download size={13} /> Excel
-              </button>
             </div>
           </form>
 
-          {/* Historial table */}
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-900 text-white text-[10px] uppercase tracking-widest font-black">
-                    <th className="p-4 pl-6">Documento</th>
-                    <th className="p-4">Tipo</th>
-                    <th className="p-4">Fecha</th>
-                    <th className="p-4">Colaborador</th>
-                    <th className="p-4">Detalles / Obs</th>
-                    <th className="p-4 text-center">Firma</th>
-                    <th className="p-4 text-right pr-6 w-32">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="text-xs">
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan={7} className="p-10 text-center text-slate-400">
-                        <div className="flex justify-center mb-2">
-                          <RefreshCw className="animate-spin text-blue-500" size={24} />
-                        </div>
-                        Cargando historial de movimientos...
-                      </td>
-                    </tr>
-                  ) : historialData.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="p-10 text-center text-slate-400 font-bold uppercase tracking-wider">
-                        No hay movimientos registrados para este criterio.
-                      </td>
-                    </tr>
-                  ) : historialData.map(mov => (
-                    <React.Fragment key={`${mov.tipo}-${mov.id}`}>
-                      <tr className="border-b border-slate-100 hover:bg-slate-50/50 font-bold text-slate-700">
-                        <td className="p-4 pl-6 font-black text-slate-900">{mov.numero}</td>
-                        <td className="p-4">
-                          {mov.tipo === 'ENTREGA' ? (
-                            <span className="px-2 py-1 bg-blue-50 border border-blue-200 text-blue-700 rounded-lg text-[9px] font-black uppercase">
-                              Entrega
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 bg-orange-50 border border-orange-200 text-orange-700 rounded-lg text-[9px] font-black uppercase">
-                              Devolución
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-4 text-slate-500">
-                          {new Date(mov.fecha).toLocaleDateString('es-CO')}
-                        </td>
-                        <td className="p-4 font-black text-slate-900">
-                          {mov.personal_nombre}
-                          <div className="text-[10px] text-slate-400 font-bold">C.C. {mov.personal_documento}</div>
-                        </td>
-                        <td className="p-4 max-w-xs truncate text-slate-500 font-medium">
-                          {mov.observaciones || '—'}
-                        </td>
-                        <td className="p-4 text-center">
-                          {mov.firma_estado === 'FIRMADO' ? (
-                            <span className="px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-[9px] font-black uppercase">
-                              Firmado
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-[9px] font-black uppercase">
-                              Pendiente
-                            </span>
-                          )}
-                        </td>
-                        <td className="p-4 text-right pr-6 flex justify-end gap-1.5">
-                          <button
-                            onClick={() => setExpandedKey(expandedKey === `h-${mov.tipo}-${mov.id}` ? null : `h-${mov.tipo}-${mov.id}`)}
-                            className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors text-[9px] uppercase tracking-wider flex items-center gap-1"
-                          >
-                            <Package size={11} /> Items
-                          </button>
-                          <button
-                            onClick={async () => {
-                              try {
-                                if (mov.tipo === 'ENTREGA') {
-                                  await api.downloadAsignacionPDF(mov.id);
-                                } else {
-                                  await api.downloadDevolucionPDF(mov.id);
-                                }
-                              } catch (err: any) {
-                                toast.error(err.message || 'Error al descargar PDF');
-                              }
-                            }}
-                            className="p-1.5 bg-blue-550 hover:bg-blue-600 text-slate-700 border border-slate-200 rounded-lg hover:border-slate-300 transition-colors"
-                            title="Descargar PDF"
-                          >
-                            <Download size={13} />
-                          </button>
-                        </td>
-                      </tr>
-                      {expandedKey === `h-${mov.tipo}-${mov.id}` && (
-                        <tr className="bg-slate-50/70">
-                          <td colSpan={7} className="p-5 pl-10 border-b border-slate-100">
-                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">
-                              Artículos en el documento:
-                            </div>
-                            <div className="space-y-3">
-                              {mov.details?.length === 0 ? (
-                                <span className="text-xs text-slate-400 font-bold">Sin elementos registrados.</span>
-                              ) : (
-                                mov.details.map((item: any, idx: number) => (
-                                  <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-2">
-                                    <div>
-                                      <span className="font-black text-slate-900 text-xs">{item.elemento_nombre}</span>
-                                      {item.es_serializado && (
-                                        <span className="ml-2 px-1.5 py-0.5 bg-indigo-50 border border-indigo-150 text-indigo-700 rounded-lg text-[9px] font-black uppercase">
-                                          Serializado
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                      <span className="text-sm font-black text-indigo-600">x{item.cantidad}</span>
-                                      {item.serials && item.serials.length > 0 && (
-                                        <div className="flex flex-wrap gap-1">
-                                          {item.serials.map((s: string, si: number) => (
-                                            <span key={si} className="px-2 py-0.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-[9px] font-bold uppercase tracking-wider">
-                                              {s}
-                                            </span>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <DataTable
+            data={historialData}
+            columns={historialColumns}
+            searchPlaceholder="Buscar en historial..."
+            excelFileName={`GH_Historial_Movimientos_${new Date().toISOString().split('T')[0]}.xlsx`}
+            excelSheetName="Historial Movimientos"
+          />
         </>
       )}
+
+      {/* Bodega serials modal */}
+      {viewSerials && (
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden flex flex-col my-8 animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-8 py-6 bg-indigo-600 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <Barcode size={24} />
+                <div>
+                  <h3 className="font-black text-lg tracking-tight uppercase">
+                    Seriales Registrados
+                  </h3>
+                  <p className="text-[11px] text-white/80 font-bold uppercase mt-0.5">{viewSerials.elemento_nombre}</p>
+                </div>
+              </div>
+              <button onClick={() => setViewSerials(null)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/25 hover:bg-white/35 text-white font-black text-sm transition-all">
+                ×
+              </button>
+            </div>
+            <div className="p-8 overflow-y-auto max-h-[70vh] custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {viewSerials.serials?.length === 0 ? (
+                  <span className="text-xs text-slate-400 font-bold col-span-2 text-center py-8">Sin seriales registrados en bodega.</span>
+                ) : viewSerials.serials?.map((s: any, i: number) => (
+                  <div key={i} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col gap-2 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <Barcode size={14} className="text-slate-400" />
+                      <span className="text-xs font-black text-slate-800 uppercase tracking-wider">{s.serial}</span>
+                    </div>
+                    <div className="flex items-center justify-between mt-1">
+                      {estadoSerialBadge(s.estado_serial)}
+                      {s.asignado_a && (
+                        <span className="text-[10px] text-slate-500 font-black truncate max-w-[150px]" title={s.asignado_a}>
+                          {s.asignado_a}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Personal actives modal */}
+      {viewPersonalActivos && (
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden flex flex-col my-8 animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-8 py-6 bg-emerald-600 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <Users size={24} />
+                <div>
+                  <h3 className="font-black text-lg tracking-tight uppercase">
+                    Activos Asignados
+                  </h3>
+                  <p className="text-[11px] text-white/80 font-bold uppercase mt-0.5">{viewPersonalActivos.personal_nombre}</p>
+                </div>
+              </div>
+              <button onClick={() => setViewPersonalActivos(null)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/25 hover:bg-white/35 text-white font-black text-sm transition-all">
+                ×
+              </button>
+            </div>
+            <div className="p-8 overflow-y-auto max-h-[70vh] custom-scrollbar space-y-3">
+              {viewPersonalActivos.items?.length === 0 ? (
+                <p className="text-xs text-slate-400 font-bold text-center py-8">Sin activos asignados.</p>
+              ) : viewPersonalActivos.items.map((item: any, i: number) => (
+                <div key={i} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col gap-2 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="font-black text-slate-900 text-xs">{item.elemento_nombre}</span>
+                      <span className="ml-2 text-[9px] text-slate-400 font-bold uppercase tracking-wider">{item.tipo_nombre}</span>
+                    </div>
+                    <span className="text-xs font-black text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-lg">x{item.stock}</span>
+                  </div>
+                  {item.es_serializado && item.serials?.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1 border-t border-slate-200/60 pt-2">
+                      {item.serials.map((s: any, si: number) => (
+                        <span key={si} className="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Barcode size={9} /> {s.serial}
+                          {s.fecha_asignacion && <span className="text-[8px] text-slate-400 font-medium ml-1">({new Date(s.fecha_asignacion).toLocaleDateString('es-CO')})</span>}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Movement items modal */}
+      {viewMovimientoItems && (
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden flex flex-col my-8 animate-in fade-in zoom-in-95 duration-200">
+            <div className={`px-8 py-6 text-white flex justify-between items-center shrink-0 ${viewMovimientoItems.tipo === 'ENTREGA' ? 'bg-blue-600' : 'bg-orange-500'}`}>
+              <div className="flex items-center gap-3">
+                <FileText size={24} />
+                <div>
+                  <h3 className="font-black text-lg tracking-tight uppercase">
+                    Items del Documento
+                  </h3>
+                  <p className="text-[11px] text-white/80 font-bold uppercase mt-0.5">{viewMovimientoItems.numero} - {viewMovimientoItems.tipo}</p>
+                </div>
+              </div>
+              <button onClick={() => setViewMovimientoItems(null)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/25 hover:bg-white/35 text-white font-black text-sm transition-all">
+                ×
+              </button>
+            </div>
+            <div className="p-8 overflow-y-auto max-h-[70vh] custom-scrollbar space-y-3">
+              {viewMovimientoItems.details?.length === 0 ? (
+                <p className="text-xs text-slate-400 font-bold text-center py-8">Sin artículos registrados.</p>
+              ) : viewMovimientoItems.details.map((item: any, idx: number) => (
+                <div key={idx} className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col gap-2 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-slate-900 text-xs">{item.elemento_nombre}</span>
+                    <span className={`text-xs font-black px-2 py-0.5 rounded-lg border ${viewMovimientoItems.tipo === 'ENTREGA' ? 'bg-blue-50 border-blue-100 text-blue-600' : 'bg-orange-50 border-orange-100 text-orange-600'}`}>x{item.cantidad}</span>
+                  </div>
+                  {item.es_serializado && item.serials && item.serials.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-1 border-t border-slate-200/60 pt-2">
+                      {item.serials.map((s: string, si: number) => (
+                        <span key={si} className="px-2 py-0.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-[9px] font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Barcode size={9} /> {s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

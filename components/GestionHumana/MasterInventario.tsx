@@ -3,6 +3,7 @@ import { User, MasterRecord } from '../../types';
 import { FileDown, FileUp, Plus, Edit2, Trash2, Search, Settings2, Package, Save, X, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '../../services/api';
+import { DataTable, ColumnDef } from '../shared/DataTable';
 import * as XLSX from 'xlsx';
 import { hasPermission } from '../../utils/permissions';
 
@@ -40,6 +41,132 @@ export default function MasterInventario({ user }: Props) {
   const canCreate = hasPermission(user, 'MASTER_INVENTARIO_GH', 'create');
   const canEdit = hasPermission(user, 'MASTER_INVENTARIO_GH', 'edit');
   const canDelete = hasPermission(user, 'MASTER_INVENTARIO_GH', 'delete');
+
+  const elementosColumns = React.useMemo<ColumnDef<any>[]>(() => [
+    {
+      header: 'ID',
+      key: 'id',
+      render: (row) => <span className="font-bold text-slate-900">#{row.id}</span>
+    },
+    {
+      header: 'Nombre',
+      key: 'nombre',
+      render: (row) => <span className="font-bold text-slate-700 uppercase">{row.nombre}</span>
+    },
+    {
+      header: 'Tipo',
+      key: 'tipo_nombre',
+      render: (row) => (
+        <span className="inline-flex px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-bold uppercase">
+          {row.tipo_nombre || 'N/A'}
+        </span>
+      )
+    },
+    {
+      header: 'Serializado',
+      key: 'es_serializado',
+      render: (row) => (
+        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+          row.es_serializado ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-500'
+        }`}>
+          {row.es_serializado ? 'SÍ' : 'NO'}
+        </span>
+      )
+    },
+    {
+      header: 'Estado',
+      key: 'estado_id',
+      render: (row) => (
+        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-black uppercase ${
+          row.estado_id === 'EST-01' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+        }`}>
+          {row.estado_id === 'EST-01' ? 'ACTIVO' : 'INACTIVO'}
+        </span>
+      )
+    },
+    {
+      header: 'Último Control',
+      key: 'usuario_control',
+      render: (row) => (
+        <div>
+          <p className="text-slate-900 font-medium">{row.usuario_control || 'Sistema'}</p>
+          <p className="text-xs text-slate-400">{new Date(row.fecha_control).toLocaleDateString('es-CO')}</p>
+        </div>
+      )
+    },
+    {
+      header: 'Acciones',
+      key: 'acciones',
+      sortable: false,
+      render: (row) => (
+        <div className="flex justify-end gap-2">
+          {canEdit && (
+            <button onClick={() => openModal(row)} className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors">
+              <Edit2 size={18} />
+            </button>
+          )}
+          {canDelete && (
+            <button onClick={() => setDeleteItemId(row.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+              <Trash2 size={18} />
+            </button>
+          )}
+        </div>
+      )
+    }
+  ], [canEdit, canDelete, tipos]);
+
+  const tiposColumns = React.useMemo<ColumnDef<any>[]>(() => [
+    {
+      header: 'ID',
+      key: 'id',
+      render: (row) => <span className="font-bold text-slate-900">#{row.id}</span>
+    },
+    {
+      header: 'Nombre',
+      key: 'nombre',
+      render: (row) => <span className="font-bold text-slate-700 uppercase">{row.nombre}</span>
+    },
+    {
+      header: 'Estado',
+      key: 'estado_id',
+      render: (row) => (
+        <span className={`inline-flex px-3 py-1 rounded-full text-xs font-black uppercase ${
+          row.estado_id === 'EST-01' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+        }`}>
+          {row.estado_id === 'EST-01' ? 'ACTIVO' : 'INACTIVO'}
+        </span>
+      )
+    },
+    {
+      header: 'Último Control',
+      key: 'usuario_control',
+      render: (row) => (
+        <div>
+          <p className="text-slate-900 font-medium">{row.usuario_control || 'Sistema'}</p>
+          <p className="text-xs text-slate-400">{new Date(row.fecha_control).toLocaleDateString('es-CO')}</p>
+        </div>
+      )
+    },
+    {
+      header: 'Acciones',
+      key: 'acciones',
+      sortable: false,
+      render: (row) => (
+        <div className="flex justify-end gap-2">
+          {canEdit && (
+            <button onClick={() => openModal(row)} className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors">
+              <Edit2 size={18} />
+            </button>
+          )}
+          {canDelete && (
+            <button onClick={() => setDeleteItemId(row.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
+              <Trash2 size={18} />
+            </button>
+          )}
+        </div>
+      )
+    }
+  ], [canEdit, canDelete]);
 
   useEffect(() => {
     if (canView) {
@@ -458,122 +585,13 @@ export default function MasterInventario({ user }: Props) {
         </button>
       </div>
 
-      <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-            <input
-              type="text"
-              placeholder="Buscar por nombre..."
-              value={searchTerm}
-              onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all font-medium text-slate-700"
-            />
-          </div>
-          <div className="text-sm font-bold text-slate-400 uppercase tracking-widest">
-            Total: {filteredData.length}
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-widest font-black">
-                <th className="p-4 pl-6 border-b border-slate-100">ID</th>
-                <th className="p-4 border-b border-slate-100">Nombre</th>
-                {activeTab === 'elementos' && <th className="p-4 border-b border-slate-100">Tipo</th>}
-                {activeTab === 'elementos' && <th className="p-4 border-b border-slate-100">Serializado</th>}
-                <th className="p-4 border-b border-slate-100">Estado</th>
-                <th className="p-4 border-b border-slate-100 hidden md:table-cell">Último Control</th>
-                <th className="p-4 border-b border-slate-100 text-right pr-6">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} className="p-10 text-center text-slate-400">
-                    <div className="flex justify-center mb-2"><RefreshCw className="animate-spin" size={24} /></div>
-                    Cargando información...
-                  </td>
-                </tr>
-              ) : paginatedData.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="p-10 text-center text-slate-400 font-medium">
-                    No se encontraron registros.
-                  </td>
-                </tr>
-              ) : (
-                paginatedData.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                    <td className="p-4 pl-6 font-bold text-slate-900">#{item.id}</td>
-                    <td className="p-4 font-bold text-slate-700">{item.nombre}</td>
-                    {activeTab === 'elementos' && (
-                      <td className="p-4 text-slate-600">
-                        <span className="inline-flex px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md text-xs font-bold">
-                          {item.tipo_nombre || 'N/A'}
-                        </span>
-                      </td>
-                    )}
-                    {activeTab === 'elementos' && (
-                      <td className="p-4 text-slate-600">
-                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                          item.es_serializado ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-500'
-                        }`}>
-                          {item.es_serializado ? 'SÍ' : 'NO'}
-                        </span>
-                      </td>
-                    )}
-                    <td className="p-4">
-                      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-black uppercase ${
-                        item.estado_id === 'EST-01' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                      }`}>
-                        {item.estado_id === 'EST-01' ? 'ACTIVO' : 'INACTIVO'}
-                      </span>
-                    </td>
-                    <td className="p-4 hidden md:table-cell">
-                      <p className="text-slate-900 font-medium">{item.usuario_control || 'Sistema'}</p>
-                      <p className="text-xs text-slate-400">{new Date(item.fecha_control).toLocaleDateString()}</p>
-                    </td>
-                    <td className="p-4 pr-6 text-right space-x-2">
-                      {canEdit && (
-                        <button onClick={() => openModal(item)} className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors">
-                          <Edit2 size={18} />
-                        </button>
-                      )}
-                      {canDelete && (
-                        <button onClick={() => setDeleteItemId(item.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
-                          <Trash2 size={18} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {totalPages > 1 && (
-          <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
-            <span className="text-sm font-medium text-slate-500">
-              Mostrando {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, filteredData.length)} de {filteredData.length}
-            </span>
-            <div className="flex gap-1">
-              {Array.from({ length: totalPages }).map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setCurrentPage(i + 1)}
-                  className={`w-8 h-8 flex items-center justify-center rounded-lg font-bold text-sm transition-colors ${
-                    currentPage === i + 1 ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
+      <DataTable
+        data={activeTab === 'elementos' ? elementos : tipos}
+        columns={activeTab === 'elementos' ? elementosColumns : tiposColumns}
+        searchPlaceholder="Buscar por nombre..."
+        excelFileName={`GH_Master_Inventario_${activeTab === 'elementos' ? 'Elementos' : 'Tipos'}_${new Date().toISOString().split('T')[0]}.xlsx`}
+        excelSheetName={activeTab === 'elementos' ? 'Códigos Elementos' : 'Tipos de Elementos'}
+      />
 
       {showModal && (
         <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">

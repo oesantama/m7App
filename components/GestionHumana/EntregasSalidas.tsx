@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User } from '../../types';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
+import { DataTable, ColumnDef } from '../shared/DataTable';
 import { 
   Plus, Trash2, Save, Search, Calendar, X, FileText, 
   Package, RefreshCw, AlertCircle, Eye, ShoppingCart, 
@@ -113,8 +114,167 @@ const EntregasSalidas: React.FC<Props> = ({ user }) => {
   const [provClientesList, setProvClientesList] = useState<any[]>([]);
   const [personalList, setPersonalList] = useState<any[]>([]);
 
-  // Expanded row tracking for Details view
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  // View detail modal state
+  const [viewTransactionDetails, setViewTransactionDetails] = useState<any | null>(null);
+
+  const ordenesColumns = React.useMemo<ColumnDef<any>[]>(() => [
+    {
+      header: 'ID',
+      key: 'id',
+      render: (row) => <span className="font-bold text-slate-900">#{row.id}</span>
+    },
+    {
+      header: 'Identificador',
+      key: 'numero_orden',
+      render: (row) => <span className="font-black uppercase text-slate-800">OC - {row.numero_orden}</span>
+    },
+    {
+      header: 'Proveedor',
+      key: 'proveedor_nombre',
+      render: (row) => <span className="font-bold text-slate-700 uppercase">{row.proveedor_nombre || getProviderName(row.proveedor) || 'N/A'}</span>
+    },
+    {
+      header: 'Fecha Operación',
+      key: 'fecha',
+      render: (row) => <span className="font-medium text-slate-500">{new Date(row.fecha).toLocaleDateString('es-CO')}</span>
+    },
+    {
+      header: 'Estado OC',
+      key: 'estado',
+      render: (row) => (
+        <span className={`inline-flex px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
+          row.estado === 'PENDIENTE' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+        }`}>
+          {row.estado}
+        </span>
+      )
+    },
+    {
+      header: 'Registrado Por',
+      key: 'usuario_control',
+      render: (row) => (
+        <div>
+          <p className="font-semibold text-slate-700">{row.usuario_control || 'Sistema'}</p>
+          <p className="text-[10px] text-slate-400">{new Date(row.fecha_control).toLocaleDateString('es-CO')}</p>
+        </div>
+      )
+    },
+    {
+      header: 'Acción',
+      key: 'acciones',
+      sortable: false,
+      render: (row) => (
+        <button
+          onClick={() => setViewTransactionDetails(row)}
+          className="flex items-center gap-1 ml-auto py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors font-bold text-[10px] uppercase border border-slate-200"
+        >
+          <Eye size={12} /> Ver Detalle
+        </button>
+      )
+    }
+  ], [provClientesList]);
+
+  const entradasColumns = React.useMemo<ColumnDef<any>[]>(() => [
+    {
+      header: 'ID',
+      key: 'id',
+      render: (row) => <span className="font-bold text-slate-900">#{row.id}</span>
+    },
+    {
+      header: 'Identificador',
+      key: 'numero_factura',
+      render: (row) => <span className="font-black uppercase text-slate-800">FC - {row.numero_factura}</span>
+    },
+    {
+      header: 'Proveedor',
+      key: 'proveedor_nombre',
+      render: (row) => <span className="font-bold text-slate-700 uppercase">{row.proveedor_nombre || getProviderName(row.proveedor) || 'N/A'}</span>
+    },
+    {
+      header: 'Fecha Operación',
+      key: 'fecha',
+      render: (row) => <span className="font-medium text-slate-500">{new Date(row.fecha).toLocaleDateString('es-CO')}</span>
+    },
+    {
+      header: 'Origen OC',
+      key: 'orden_numero',
+      render: (row) => <span className="font-semibold text-slate-500">{row.orden_numero ? `OC - ${row.orden_numero}` : 'Ingreso Directo'}</span>
+    },
+    {
+      header: 'Recibido Por',
+      key: 'quien_recibio_nombre',
+      render: (row) => <span className="font-bold text-indigo-600 uppercase">{row.quien_recibio_nombre || 'N/A'}</span>
+    },
+    {
+      header: 'Registrado Por',
+      key: 'usuario_control',
+      render: (row) => (
+        <div>
+          <p className="font-semibold text-slate-700">{row.usuario_control || 'Sistema'}</p>
+          <p className="text-[10px] text-slate-400">{new Date(row.fecha_control).toLocaleDateString('es-CO')}</p>
+        </div>
+      )
+    },
+    {
+      header: 'Acción',
+      key: 'acciones',
+      sortable: false,
+      render: (row) => (
+        <button
+          onClick={() => setViewTransactionDetails(row)}
+          className="flex items-center gap-1 ml-auto py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors font-bold text-[10px] uppercase border border-slate-200"
+        >
+          <Eye size={12} /> Ver Detalle
+        </button>
+      )
+    }
+  ], [provClientesList]);
+
+  const salidasColumns = React.useMemo<ColumnDef<any>[]>(() => [
+    {
+      header: 'ID',
+      key: 'id',
+      render: (row) => <span className="font-bold text-slate-900">#{row.id}</span>
+    },
+    {
+      header: 'Identificador',
+      key: 'numero_salida',
+      render: (row) => <span className="font-black uppercase text-slate-800">DEV - {row.numero_salida}</span>
+    },
+    {
+      header: 'Proveedor',
+      key: 'proveedor_nombre',
+      render: (row) => <span className="font-bold text-slate-700 uppercase">{row.proveedor_nombre || getProviderName(row.proveedor) || 'N/A'}</span>
+    },
+    {
+      header: 'Fecha Operación',
+      key: 'fecha',
+      render: (row) => <span className="font-medium text-slate-500">{new Date(row.fecha).toLocaleDateString('es-CO')}</span>
+    },
+    {
+      header: 'Registrado Por',
+      key: 'usuario_control',
+      render: (row) => (
+        <div>
+          <p className="font-semibold text-slate-700">{row.usuario_control || 'Sistema'}</p>
+          <p className="text-[10px] text-slate-400">{new Date(row.fecha_control).toLocaleDateString('es-CO')}</p>
+        </div>
+      )
+    },
+    {
+      header: 'Acción',
+      key: 'acciones',
+      sortable: false,
+      render: (row) => (
+        <button
+          onClick={() => setViewTransactionDetails(row)}
+          className="flex items-center gap-1 ml-auto py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors font-bold text-[10px] uppercase border border-slate-200"
+        >
+          <Eye size={12} /> Ver Detalle
+        </button>
+      )
+    }
+  ], [provClientesList]);
 
   // Filters State
   const [searchId, setSearchId] = useState('');
@@ -563,7 +723,7 @@ const EntregasSalidas: React.FC<Props> = ({ user }) => {
       {/* Tabs */}
       <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full max-w-lg border border-slate-200/50">
         <button 
-          onClick={() => { setActiveTab('ordenes'); setExpandedId(null); }}
+          onClick={() => { setActiveTab('ordenes'); setViewTransactionDetails(null); }}
           className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
             activeTab === 'ordenes' ? 'bg-white text-slate-900 shadow-md font-black' : 'text-slate-500 hover:text-slate-900'
           }`}
@@ -571,7 +731,7 @@ const EntregasSalidas: React.FC<Props> = ({ user }) => {
           <ShoppingCart size={15} /> Órdenes de Compra
         </button>
         <button 
-          onClick={() => { setActiveTab('entradas'); setExpandedId(null); }}
+          onClick={() => { setActiveTab('entradas'); setViewTransactionDetails(null); }}
           className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
             activeTab === 'entradas' ? 'bg-white text-slate-900 shadow-md font-black' : 'text-slate-500 hover:text-slate-900'
           }`}
@@ -579,7 +739,7 @@ const EntregasSalidas: React.FC<Props> = ({ user }) => {
           <ArrowDownLeft size={15} className="text-emerald-500" /> Entradas a Bodega
         </button>
         <button 
-          onClick={() => { setActiveTab('salidas'); setExpandedId(null); }}
+          onClick={() => { setActiveTab('salidas'); setViewTransactionDetails(null); }}
           className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
             activeTab === 'salidas' ? 'bg-white text-slate-900 shadow-md font-black' : 'text-slate-500 hover:text-slate-900'
           }`}
@@ -641,145 +801,13 @@ const EntregasSalidas: React.FC<Props> = ({ user }) => {
       </form>
 
       {/* Main Records List */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-900 text-white text-[10px] uppercase tracking-widest font-black">
-                <th className="p-4 pl-6 w-16">ID</th>
-                <th className="p-4">Identificador</th>
-                <th className="p-4">Proveedor</th>
-                <th className="p-4">Fecha Operación</th>
-                {activeTab === 'ordenes' && <th className="p-4">Estado OC</th>}
-                {activeTab === 'entradas' && <th className="p-4">Origen OC</th>}
-                {activeTab === 'entradas' && <th className="p-4">Recibido Por</th>}
-                <th className="p-4 hidden md:table-cell">Registrado Por</th>
-                <th className="p-4 text-right pr-6 w-32">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="text-xs">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={activeTab === 'entradas' ? 9 : 8} className="p-10 text-center text-slate-400">
-                    <div className="flex justify-center mb-2"><RefreshCw className="animate-spin" size={24} /></div>
-                    Buscando registros en el servidor...
-                  </td>
-                </tr>
-              ) : (activeTab === 'ordenes' ? ordenes : activeTab === 'entradas' ? entradas : salidas).length === 0 ? (
-                <tr>
-                  <td colSpan={activeTab === 'entradas' ? 9 : 8} className="p-12 text-center text-slate-400 font-bold uppercase tracking-wider">
-                    No se encontraron movimientos registrados para este mes.
-                  </td>
-                </tr>
-              ) : (
-                (activeTab === 'ordenes' ? ordenes : activeTab === 'entradas' ? entradas : salidas).map((item) => {
-                  const isExpanded = expandedId === item.id;
-                  return (
-                    <React.Fragment key={item.id}>
-                      <tr className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-                        <td className="p-4 pl-6 font-bold text-slate-900">#{item.id}</td>
-                        <td className="p-4 font-black uppercase text-slate-800">
-                          {activeTab === 'ordenes' ? `OC - ${item.numero_orden}` : activeTab === 'entradas' ? `FC - ${item.numero_factura}` : `DEV - ${item.numero_salida}`}
-                        </td>
-                        <td className="p-4 font-bold text-slate-700 uppercase">{item.proveedor_nombre || getProviderName(item.proveedor) || 'N/A'}</td>
-                        <td className="p-4 font-medium text-slate-500">{new Date(item.fecha).toLocaleDateString()}</td>
-                        
-                        {/* Tab Specific Badges */}
-                        {activeTab === 'ordenes' && (
-                          <td className="p-4">
-                            <span className={`inline-flex px-2 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                              item.estado === 'PENDIENTE' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
-                            }`}>
-                              {item.estado}
-                            </span>
-                          </td>
-                        )}
-                        {activeTab === 'entradas' && (
-                          <td className="p-4 font-semibold text-slate-500">
-                            {item.orden_numero ? `OC - ${item.orden_numero}` : 'Ingreso Directo'}
-                          </td>
-                        )}
-                        {activeTab === 'entradas' && (
-                          <td className="p-4 font-bold text-indigo-600 uppercase">
-                            {item.quien_recibio_nombre || 'N/A'}
-                          </td>
-                        )}
-
-                        <td className="p-4 hidden md:table-cell">
-                          <p className="font-semibold text-slate-700">{item.usuario_control || 'Sistema'}</p>
-                          <p className="text-[10px] text-slate-400">{new Date(item.fecha_control).toLocaleDateString()}</p>
-                        </td>
-
-                        <td className="p-4 pr-6 text-right">
-                          <button 
-                            onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                            className="flex items-center gap-1 ml-auto py-2 px-3 hover:bg-slate-100 text-slate-600 rounded-lg transition-colors font-bold text-[10px] uppercase border border-slate-200"
-                          >
-                            <Eye size={12} /> {isExpanded ? 'Ocultar' : 'Ver Detalle'}
-                          </button>
-                        </td>
-                      </tr>
-
-                      {/* Nested Sub-Table Detail View */}
-                      {isExpanded && (
-                        <tr>
-                          <td colSpan={activeTab === 'entradas' ? 9 : 8} className="p-6 bg-slate-50 border-b border-slate-200">
-                            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-inner p-5 space-y-4">
-                              <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-2">Artículos del Documento</h4>
-                              <table className="w-full text-left border-collapse">
-                                <thead>
-                                  <tr className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                                    <th className="p-2.5">Código Elemento</th>
-                                    <th className="p-2.5">¿Serializado?</th>
-                                    <th className="p-2.5 text-center">Cantidad</th>
-                                    <th className="p-2.5 text-right">Precio Unitario</th>
-                                    <th className="p-2.5 text-right">Subtotal</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {item.details?.map((det: any, idx: number) => (
-                                    <tr key={idx} className="border-b border-slate-50 last:border-b-0 text-slate-700">
-                                      <td className="p-2.5 font-bold uppercase text-slate-700">{det.elemento_nombre}</td>
-                                      <td className="p-2.5">
-                                        <span className={`inline-flex px-2 py-0.5 rounded text-[8px] font-black ${
-                                          det.es_serializado ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
-                                        }`}>
-                                          {det.es_serializado ? 'SÍ' : 'NO'}
-                                        </span>
-                                      </td>
-                                      <td className="p-2.5 text-center font-bold">{det.cantidad}</td>
-                                      <td className="p-2.5 text-right font-semibold">${Number(det.valor_unitario).toLocaleString()}</td>
-                                      <td className="p-2.5 text-right font-black text-slate-900">${(Number(det.valor_unitario) * det.cantidad).toLocaleString()}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                                <tfoot>
-                                  <tr className="bg-slate-50/50 font-black text-slate-900">
-                                    <td colSpan={4} className="p-3 text-right text-[10px] uppercase tracking-wider">Total Transacción:</td>
-                                    <td className="p-3 text-right text-sm">
-                                      ${item.details?.reduce((acc: number, det: any) => acc + (Number(det.valor_unitario) * det.cantidad), 0).toLocaleString()}
-                                    </td>
-                                  </tr>
-                                </tfoot>
-                              </table>
-                              {item.observaciones && (
-                                <div className="mt-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
-                                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Observaciones</p>
-                                  <p className="text-xs font-semibold text-slate-600 mt-1 uppercase">{item.observaciones}</p>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        data={activeTab === 'ordenes' ? ordenes : activeTab === 'entradas' ? entradas : salidas}
+        columns={activeTab === 'ordenes' ? ordenesColumns : activeTab === 'entradas' ? entradasColumns : salidasColumns}
+        searchPlaceholder={`Buscar en ${activeTab === 'ordenes' ? 'órdenes' : activeTab === 'entradas' ? 'entradas' : 'salidas'}...`}
+        excelFileName={`GH_${activeTab === 'ordenes' ? 'Ordenes_Compra' : activeTab === 'entradas' ? 'Entradas_Bodega' : 'Salidas_Proveedor'}_${new Date().toISOString().split('T')[0]}.xlsx`}
+        excelSheetName={activeTab === 'ordenes' ? 'Ordenes de Compra' : activeTab === 'entradas' ? 'Entradas a Bodega' : 'Salidas a Proveedor'}
+      />
 
       {/* Main Creation Modal */}
       {showNewModal && (
@@ -1544,6 +1572,104 @@ const EntregasSalidas: React.FC<Props> = ({ user }) => {
           </div>
         </div>
       )}
+
+      {/* Details modal */}
+      {viewTransactionDetails && (
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-3xl rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden flex flex-col my-8 animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-8 py-6 bg-slate-900 text-white flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                <FileText size={24} />
+                <div>
+                  <h3 className="font-black text-lg tracking-tight uppercase">
+                    Detalle de Transacción
+                  </h3>
+                  <p className="text-[11px] text-white/80 font-bold uppercase mt-0.5">
+                    {viewTransactionDetails.numero_orden ? `OC - ${viewTransactionDetails.numero_orden}` : viewTransactionDetails.numero_factura ? `FC - ${viewTransactionDetails.numero_factura}` : `DEV - ${viewTransactionDetails.numero_salida}`}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setViewTransactionDetails(null)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/25 hover:bg-white/35 text-white font-black text-sm transition-all">
+                ×
+              </button>
+            </div>
+            
+            <div className="p-8 overflow-y-auto max-h-[70vh] custom-scrollbar space-y-6">
+              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div>
+                  <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Proveedor</span>
+                  <span className="text-xs font-bold text-slate-800 uppercase">{viewTransactionDetails.proveedor_nombre || getProviderName(viewTransactionDetails.proveedor) || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Fecha Operación</span>
+                  <span className="text-xs font-bold text-slate-800">{new Date(viewTransactionDetails.fecha).toLocaleDateString('es-CO')}</span>
+                </div>
+                {viewTransactionDetails.orden_numero && (
+                  <div>
+                    <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Orden de Compra Origen</span>
+                    <span className="text-xs font-bold text-slate-800">OC - {viewTransactionDetails.orden_numero}</span>
+                  </div>
+                )}
+                {viewTransactionDetails.quien_recibio_nombre && (
+                  <div>
+                    <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Recibido Por</span>
+                    <span className="text-xs font-bold text-indigo-650 uppercase">{viewTransactionDetails.quien_recibio_nombre}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Artículos del Documento</h4>
+                <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-wider border-b border-slate-200">
+                        <th className="p-3 pl-4">Código Elemento</th>
+                        <th className="p-3 text-center">Cantidad</th>
+                        <th className="p-3 text-right">Precio Unitario</th>
+                        <th className="p-3 text-right pr-4">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-xs">
+                      {viewTransactionDetails.details?.map((det: any, idx: number) => (
+                        <tr key={idx} className="border-b border-slate-100 last:border-b-0 text-slate-700 font-medium">
+                          <td className="p-3 pl-4">
+                            <p className="font-bold uppercase text-slate-800">{det.elemento_nombre}</p>
+                            {det.es_serializado && (
+                              <span className="inline-flex px-1.5 py-0.5 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-[8px] font-black uppercase mt-1">
+                                Serializado
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-3 text-center font-bold text-slate-900">{det.cantidad}</td>
+                          <td className="p-3 text-right text-slate-500">${Number(det.valor_unitario).toLocaleString('es-CO')}</td>
+                          <td className="p-3 text-right pr-4 font-black text-slate-900">${(Number(det.valor_unitario) * det.cantidad).toLocaleString('es-CO')}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-50 font-black text-slate-900 border-t border-slate-200">
+                        <td colSpan={3} className="p-3.5 text-right text-[10px] uppercase tracking-wider">Total:</td>
+                        <td className="p-3.5 text-right pr-4 text-sm font-black text-slate-900">
+                          ${viewTransactionDetails.details?.reduce((acc: number, det: any) => acc + (Number(det.valor_unitario) * det.cantidad), 0).toLocaleString('es-CO')}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+
+              {viewTransactionDetails.observaciones && (
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                  <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Observaciones</span>
+                  <p className="text-xs font-bold text-slate-600 mt-1 uppercase leading-relaxed">{viewTransactionDetails.observaciones}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

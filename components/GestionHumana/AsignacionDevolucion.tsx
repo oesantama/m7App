@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { User } from '../../types';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
+import { DataTable, ColumnDef } from '../shared/DataTable';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -135,8 +136,8 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
   const [fechaInicio, setFechaInicio] = useState('');
   const [fechaFin, setFechaFin] = useState('');
 
-  // Row Expansion
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  // Row Expansion / Details Modal
+  const [viewDetail, setViewDetail] = useState<any | null>(null);
 
   // Main Modal for new movements
   const [showModal, setShowModal] = useState(false);
@@ -179,6 +180,204 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
   const isAdmin = user.roleId === 'ROL-01' || (user as any).role_id === 'ROL-01' || user.email === 'admin@millasiete.com';
   const canCreate = isAdmin || user.permissions?.some((p: any) => p.module === 'MASTER_INVENTARIO_GH' && p.actions.includes('create'));
   const canEdit = canCreate || user.permissions?.some((p: any) => p.module === 'MASTER_INVENTARIO_GH' && p.actions.includes('edit'));
+
+  const asignacionesColumns = React.useMemo<ColumnDef<any>[]>(() => [
+    {
+      header: 'ID',
+      key: 'id',
+      render: (asig) => <span className="text-slate-400">#{asig.id}</span>
+    },
+    {
+      header: 'Identificador',
+      key: 'numero_asignacion',
+      render: (asig) => <span className="font-black text-slate-900">{asig.numero_asignacion}</span>
+    },
+    {
+      header: 'Funcionario',
+      key: 'personal_nombre',
+      render: (asig) => <span>{asig.personal_nombre || `Funcionario ID: ${asig.personal_id}`}</span>
+    },
+    {
+      header: 'Fecha Operación',
+      key: 'fecha',
+      render: (asig) => <span>{new Date(asig.fecha).toLocaleDateString()}</span>
+    },
+    {
+      header: 'Autorizado Por',
+      key: 'autorizado_por',
+      render: (asig) => <span className="text-indigo-600 font-black">{asig.autorizado_por}</span>
+    },
+    {
+      header: 'Registrado Por',
+      key: 'usuario_control',
+      render: (asig) => (
+        <div className="text-slate-400 font-medium">
+          {asig.usuario_control}
+          <div className="text-[9px]">{new Date(asig.fecha_control).toLocaleString()}</div>
+        </div>
+      )
+    },
+    {
+      header: 'Firma',
+      key: 'firma_estado',
+      render: (asig) => (
+        <div className="text-center">
+          {asig.firma_estado === 'FIRMADO' ? (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                <ShieldCheck size={10} /> Firmado
+              </span>
+              <span className="text-[9px] text-slate-600 font-bold">{asig.personal_nombre?.split(' ')[0]}</span>
+              {asig.fecha_firma && (
+                <span className="text-[9px] text-slate-400 font-medium">
+                  {new Date(asig.fecha_firma).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+          ) : (
+            (() => {
+              const isOwnRecord = user.documentNumber && asig.personal_documento === user.documentNumber;
+              const canSign = canEdit || isOwnRecord;
+              return canSign ? (
+                <button
+                  onClick={() => setFirmaModal({ isOpen: true, asignacionId: asig.id, personalNombre: asig.personal_nombre || '', clave: '', isSigning: false, tab: 'asignaciones' })}
+                  className="inline-flex flex-col items-center gap-0.5 px-2.5 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors"
+                >
+                  <span className="flex items-center gap-1"><Clock size={10} /> Pendiente</span>
+                  <span className="text-[8px] text-amber-600 normal-case font-bold">{asig.personal_nombre?.split(' ')[0]}</span>
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 border border-slate-200 text-slate-400 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                  <Clock size={10} /> Pendiente
+                </span>
+              );
+            })()
+          )}
+        </div>
+      )
+    },
+    {
+      header: 'Acción',
+      key: 'acciones',
+      sortable: false,
+      render: (asig) => (
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={() => exportToPDF(asig)}
+            title="Exportar PDF"
+            className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg transition-colors border border-red-200"
+          >
+            <FileDown size={12} />
+          </button>
+          <button
+            onClick={() => setViewDetail(asig)}
+            className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors text-[10px] uppercase tracking-wider flex items-center gap-1.5"
+          >
+            <FileText size={11} /> Detalle
+          </button>
+        </div>
+      )
+    }
+  ], [user, canEdit]);
+
+  const devolucionesColumns = React.useMemo<ColumnDef<any>[]>(() => [
+    {
+      header: 'ID',
+      key: 'id',
+      render: (dev) => <span className="text-slate-400">#{dev.id}</span>
+    },
+    {
+      header: 'Identificador',
+      key: 'numero_devolucion',
+      render: (dev) => <span className="font-black text-slate-900">{dev.numero_devolucion}</span>
+    },
+    {
+      header: 'Funcionario',
+      key: 'personal_nombre',
+      render: (dev) => <span>{dev.personal_nombre || `Funcionario ID: ${dev.personal_id}`}</span>
+    },
+    {
+      header: 'Fecha Operación',
+      key: 'fecha',
+      render: (dev) => <span>{new Date(dev.fecha).toLocaleDateString()}</span>
+    },
+    {
+      header: 'Motivo Devolución',
+      key: 'motivo',
+      render: (dev) => <span className="text-rose-500 font-black truncate max-w-xs block">{dev.motivo}</span>
+    },
+    {
+      header: 'Registrado Por',
+      key: 'usuario_control',
+      render: (dev) => (
+        <div className="text-slate-400 font-medium">
+          {dev.usuario_control}
+          <div className="text-[9px]">{new Date(dev.fecha_control).toLocaleString()}</div>
+        </div>
+      )
+    },
+    {
+      header: 'Firma',
+      key: 'firma_estado',
+      render: (dev) => (
+        <div className="text-center">
+          {dev.firma_estado === 'FIRMADO' ? (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                <ShieldCheck size={10} /> Firmado
+              </span>
+              <span className="text-[9px] text-slate-600 font-bold">{dev.personal_nombre?.split(' ')[0]}</span>
+              {dev.fecha_firma && (
+                <span className="text-[9px] text-slate-400 font-medium">
+                  {new Date(dev.fecha_firma).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+          ) : (
+            (() => {
+              const isOwnRecord = user.documentNumber && dev.personal_documento === user.documentNumber;
+              const canSign = canEdit || isOwnRecord;
+              return canSign ? (
+                <button
+                  onClick={() => setFirmaModal({ isOpen: true, asignacionId: dev.id, personalNombre: dev.personal_nombre || '', clave: '', isSigning: false, tab: 'devoluciones' })}
+                  className="inline-flex flex-col items-center gap-0.5 px-2.5 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors"
+                >
+                  <span className="flex items-center gap-1"><Clock size={10} /> Pendiente</span>
+                  <span className="text-[8px] text-amber-600 normal-case font-bold">{dev.personal_nombre?.split(' ')[0]}</span>
+                </button>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 border border-slate-200 text-slate-400 rounded-lg text-[9px] font-black uppercase tracking-wider">
+                  <Clock size={10} /> Pendiente
+                </span>
+              );
+            })()
+          )}
+        </div>
+      )
+    },
+    {
+      header: 'Acción',
+      key: 'acciones',
+      sortable: false,
+      render: (dev) => (
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={() => exportToPDF(dev)}
+            title="Exportar PDF"
+            className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg transition-colors border border-red-200"
+          >
+            <FileDown size={12} />
+          </button>
+          <button
+            onClick={() => setViewDetail(dev)}
+            className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors text-[10px] uppercase tracking-wider flex items-center gap-1.5"
+          >
+            <FileText size={11} /> Detalle
+          </button>
+        </div>
+      )
+    }
+  ], [user, canEdit]);
 
   // Auto-focus barcode input
   useEffect(() => {
@@ -587,7 +786,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       {/* Navigation tabs */}
       <div className="bg-slate-100 p-1.5 rounded-2xl flex gap-2">
         <button 
-          onClick={() => { setActiveTab('asignaciones'); setExpandedId(null); }}
+          onClick={() => { setActiveTab('asignaciones'); setViewDetail(null); }}
           className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
             activeTab === 'asignaciones' ? 'bg-white text-slate-900 shadow-md font-black' : 'text-slate-500 hover:text-slate-900'
           }`}
@@ -595,7 +794,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
           <UserCheck size={15} className="text-indigo-500" /> Asignaciones a Personal
         </button>
         <button 
-          onClick={() => { setActiveTab('devoluciones'); setExpandedId(null); }}
+          onClick={() => { setActiveTab('devoluciones'); setViewDetail(null); }}
           className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
             activeTab === 'devoluciones' ? 'bg-white text-slate-900 shadow-md font-black' : 'text-slate-500 hover:text-slate-900'
           }`}
@@ -656,300 +855,24 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
         </div>
       </form>
 
-      {/* Actions bar */}
-      <div className="flex justify-end">
-        <button
-          onClick={exportToExcel}
-          className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all text-[10px] uppercase tracking-wider shadow-sm"
-        >
-          <Download size={13} /> Exportar Excel
-        </button>
-      </div>
-
       {/* Main Records List */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-900 text-white text-[10px] uppercase tracking-widest font-black">
-                <th className="p-4 pl-6 w-16">ID</th>
-                <th className="p-4">Identificador</th>
-                <th className="p-4">Funcionario</th>
-                <th className="p-4">Fecha Operación</th>
-                {activeTab === 'asignaciones' ? (
-                  <th className="p-4">Autorizado Por</th>
-                ) : (
-                  <th className="p-4">Motivo Devolución</th>
-                )}
-                <th className="p-4 hidden md:table-cell">Registrado Por</th>
-                {activeTab === 'asignaciones' && <th className="p-4 text-center w-28">Firma</th>}
-                <th className="p-4 text-right pr-6 w-32">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="text-xs">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={7} className="p-10 text-center text-slate-400">
-                    <div className="flex justify-center mb-2"><RefreshCw className="animate-spin text-indigo-500" size={24} /></div>
-                    Buscando registros en el servidor...
-                  </td>
-                </tr>
-              ) : activeTab === 'asignaciones' ? (
-                (() => {
-                  const visibleAsignaciones = canEdit
-                    ? asignaciones
-                    : asignaciones.filter(a => user.documentNumber && a.personal_documento === user.documentNumber);
-                  if (visibleAsignaciones.length === 0) return (
-                    <tr>
-                      <td colSpan={8} className="p-10 text-center text-slate-400 font-bold uppercase tracking-wider">
-                        No se encontraron asignaciones registradas.
-                      </td>
-                    </tr>
-                  );
-                  return (
-                    <>
-                      {visibleAsignaciones.map(asig => (
-                        <React.Fragment key={asig.id}>
-                          <tr className="border-b border-slate-100 hover:bg-slate-50/50 font-bold text-slate-700">
-                            <td className="p-4 pl-6 text-slate-400">#{asig.id}</td>
-                            <td className="p-4 font-black text-slate-900">{asig.numero_asignacion}</td>
-                            <td className="p-4">{asig.personal_nombre || `Funcionario ID: ${asig.personal_id}`}</td>
-                            <td className="p-4">{new Date(asig.fecha).toLocaleDateString()}</td>
-                            <td className="p-4 text-indigo-600 font-black">{asig.autorizado_por}</td>
-                            <td className="p-4 hidden md:table-cell text-slate-400 font-medium">
-                              {asig.usuario_control}
-                              <div className="text-[9px]">{new Date(asig.fecha_control).toLocaleString()}</div>
-                            </td>
-                            <td className="p-4 text-center">
-                              {asig.firma_estado === 'FIRMADO' ? (
-                                <div className="flex flex-col items-center gap-0.5">
-                                  <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-[9px] font-black uppercase tracking-wider">
-                                    <ShieldCheck size={10} /> Firmado
-                                  </span>
-                                  <span className="text-[9px] text-slate-600 font-bold">{asig.personal_nombre?.split(' ')[0]}</span>
-                                  {asig.fecha_firma && (
-                                    <span className="text-[9px] text-slate-400 font-medium">
-                                      {new Date(asig.fecha_firma).toLocaleDateString()}
-                                    </span>
-                                  )}
-                                </div>
-                              ) : (
-                                (() => {
-                                  const isOwnRecord = user.documentNumber && asig.personal_documento === user.documentNumber;
-                                  const canSign = canEdit || isOwnRecord;
-                                  return canSign ? (
-                                    <button
-                                      onClick={() => setFirmaModal({ isOpen: true, asignacionId: asig.id, personalNombre: asig.personal_nombre || '', clave: '', isSigning: false, tab: 'asignaciones' })}
-                                      className="inline-flex flex-col items-center gap-0.5 px-2.5 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors"
-                                    >
-                                      <span className="flex items-center gap-1"><Clock size={10} /> Pendiente</span>
-                                      <span className="text-[8px] text-amber-600 normal-case font-bold">{asig.personal_nombre?.split(' ')[0]}</span>
-                                    </button>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 border border-slate-200 text-slate-400 rounded-lg text-[9px] font-black uppercase tracking-wider">
-                                      <Clock size={10} /> Pendiente
-                                    </span>
-                                  );
-                                })()
-                              )}
-                            </td>
-                            <td className="p-4 text-right pr-6">
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={() => exportToPDF(asig)}
-                                  title="Exportar PDF"
-                                  className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg transition-colors border border-red-200"
-                                >
-                                  <FileDown size={12} />
-                                </button>
-                                <button
-                                  onClick={() => setExpandedId(expandedId === asig.id ? null : asig.id)}
-                                  className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors text-[10px] uppercase tracking-wider flex items-center gap-1.5"
-                                >
-                                  <FileText size={11} /> {expandedId === asig.id ? 'Ocultar' : 'Detalle'}
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                          {expandedId === asig.id && (
-                            <tr className="bg-slate-50/70">
-                              <td colSpan={8} className="p-6 pl-10 border-b border-slate-100">
-                                <div className="space-y-4">
-                                  <div>
-                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Elementos Asignados:</h4>
-                                    <div className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden shadow-sm">
-                                      <table className="w-full text-left text-xs font-semibold text-slate-600">
-                                        <thead>
-                                          <tr className="bg-slate-100 text-slate-500 font-black text-[9px] uppercase tracking-widest border-b border-slate-200">
-                                            <th className="p-3 pl-5">Elemento</th>
-                                            <th className="p-3 text-center">Cantidad</th>
-                                            <th className="p-3">Seriales</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {asig.details?.map((det: any, idx: number) => (
-                                            <tr key={idx} className="border-b border-slate-100 last:border-b-0">
-                                              <td className="p-3 pl-5 font-bold text-slate-800">{det.elemento_nombre}</td>
-                                              <td className="p-3 text-center font-black text-slate-900">{det.cantidad}</td>
-                                              <td className="p-3">
-                                                {det.es_serializado ? (
-                                                  <div className="flex flex-wrap gap-1.5">
-                                                    {det.serials?.map((s: string, sIdx: number) => (
-                                                      <span key={sIdx} className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg text-[9px] font-black tracking-wider uppercase flex items-center gap-1">
-                                                        <Barcode size={9} /> {s}
-                                                      </span>
-                                                    ))}
-                                                  </div>
-                                                ) : (
-                                                  <span className="text-[10px] text-slate-400 uppercase font-black">N/A (No Serializado)</span>
-                                                )}
-                                              </td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
-                                    </div>
-                                  </div>
-                                  {asig.observaciones && (
-                                    <div className="bg-white p-3.5 rounded-xl border border-slate-200/60 flex items-start gap-2 shadow-sm">
-                                      <MessageSquare size={14} className="text-slate-400 shrink-0 mt-0.5" />
-                                      <div>
-                                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Observaciones:</div>
-                                        <p className="text-xs text-slate-700 font-medium mt-0.5">{asig.observaciones}</p>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </>
-                  );
-                })()
-              ) : (
-                devoluciones.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="p-10 text-center text-slate-400 font-bold uppercase tracking-wider">
-                      No se encontraron devoluciones registradas.
-                    </td>
-                  </tr>
-                ) : (
-                  devoluciones.map(dev => (
-                    <React.Fragment key={dev.id}>
-                      <tr className="border-b border-slate-100 hover:bg-slate-50/50 font-bold text-slate-700">
-                        <td className="p-4 pl-6 text-slate-400">#{dev.id}</td>
-                        <td className="p-4 font-black text-slate-900">{dev.numero_devolucion}</td>
-                        <td className="p-4">{dev.personal_nombre || `Funcionario ID: ${dev.personal_id}`}</td>
-                        <td className="p-4">{new Date(dev.fecha).toLocaleDateString()}</td>
-                        <td className="p-4 text-rose-500 font-black truncate max-w-xs">{dev.motivo}</td>
-                        <td className="p-4 hidden md:table-cell text-slate-400 font-medium">
-                          {dev.usuario_control}
-                          <div className="text-[9px]">{new Date(dev.fecha_control).toLocaleString()}</div>
-                        </td>
-                        <td className="p-4 text-center">
-                          {dev.firma_estado === 'FIRMADO' ? (
-                            <div className="flex flex-col items-center gap-0.5">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-[9px] font-black uppercase tracking-wider">
-                                <ShieldCheck size={10} /> Firmado
-                              </span>
-                              <span className="text-[9px] text-slate-600 font-bold">{dev.personal_nombre?.split(' ')[0]}</span>
-                              {dev.fecha_firma && (
-                                <span className="text-[9px] text-slate-400 font-medium">
-                                  {new Date(dev.fecha_firma).toLocaleDateString()}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            (() => {
-                              const isOwnRecord = user.documentNumber && dev.personal_documento === user.documentNumber;
-                              const canSign = canEdit || isOwnRecord;
-                              return canSign ? (
-                                <button
-                                  onClick={() => setFirmaModal({ isOpen: true, asignacionId: dev.id, personalNombre: dev.personal_nombre || '', clave: '', isSigning: false, tab: 'devoluciones' })}
-                                  className="inline-flex flex-col items-center gap-0.5 px-2.5 py-1.5 bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 rounded-lg text-[9px] font-black uppercase tracking-wider transition-colors"
-                                >
-                                  <span className="flex items-center gap-1"><Clock size={10} /> Pendiente</span>
-                                  <span className="text-[8px] text-amber-600 normal-case font-bold">{dev.personal_nombre?.split(' ')[0]}</span>
-                                </button>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-50 border border-slate-200 text-slate-400 rounded-lg text-[9px] font-black uppercase tracking-wider">
-                                  <Clock size={10} /> Pendiente
-                                </span>
-                              );
-                            })()
-                          )}
-                        </td>
-                        <td className="p-4 text-right pr-6">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => exportToPDF(dev)}
-                              title="Exportar PDF"
-                              className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-lg transition-colors border border-red-200"
-                            >
-                              <FileDown size={12} />
-                            </button>
-                            <button
-                              onClick={() => setExpandedId(expandedId === dev.id ? null : dev.id)}
-                              className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors text-[10px] uppercase tracking-wider flex items-center gap-1.5"
-                            >
-                              <FileText size={11} /> {expandedId === dev.id ? 'Ocultar' : 'Detalle'}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      {expandedId === dev.id && (
-                        <tr className="bg-slate-50/70">
-                          <td colSpan={8} className="p-6 pl-10 border-b border-slate-100">
-                            <div className="space-y-4">
-                              <div>
-                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Elementos Devueltos:</h4>
-                                <div className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden shadow-sm">
-                                  <table className="w-full text-left text-xs font-semibold text-slate-600">
-                                    <thead>
-                                      <tr className="bg-slate-100 text-slate-500 font-black text-[9px] uppercase tracking-widest border-b border-slate-200">
-                                        <th className="p-3 pl-5">Elemento</th>
-                                        <th className="p-3 text-center">Cantidad</th>
-                                        <th className="p-3">Seriales</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {dev.details?.map((det: any, idx: number) => (
-                                        <tr key={idx} className="border-b border-slate-100 last:border-b-0">
-                                          <td className="p-3 pl-5 font-bold text-slate-800">{det.elemento_nombre}</td>
-                                          <td className="p-3 text-center font-black text-slate-900">{det.cantidad}</td>
-                                          <td className="p-3">
-                                            {det.es_serializado ? (
-                                              <div className="flex flex-wrap gap-1.5">
-                                                {det.serials?.map((s: string, sIdx: number) => (
-                                                  <span key={sIdx} className="px-2 py-0.5 bg-rose-50 border border-rose-100 text-rose-700 rounded-lg text-[9px] font-black tracking-wider uppercase flex items-center gap-1">
-                                                    <Barcode size={9} /> {s}
-                                                  </span>
-                                                ))}
-                                              </div>
-                                            ) : (
-                                              <span className="text-[10px] text-slate-400 uppercase font-black">N/A (No Serializado)</span>
-                                            )}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  ))
-                )
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {activeTab === 'asignaciones' ? (
+        <DataTable
+          data={canEdit ? asignaciones : asignaciones.filter(a => user.documentNumber && a.personal_documento === user.documentNumber)}
+          columns={asignacionesColumns}
+          searchPlaceholder="Buscar en asignaciones..."
+          excelFileName={`GH_Asignaciones_${new Date().toISOString().split('T')[0]}.xlsx`}
+          excelSheetName="Asignaciones"
+        />
+      ) : (
+        <DataTable
+          data={devoluciones}
+          columns={devolucionesColumns}
+          searchPlaceholder="Buscar en devoluciones..."
+          excelFileName={`GH_Devoluciones_${new Date().toISOString().split('T')[0]}.xlsx`}
+          excelSheetName="Devoluciones"
+        />
+      )}
 
       {/* Main Creation Modal */}
       {showModal && (
@@ -1401,6 +1324,74 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Details Modal */}
+      {viewDetail && (
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden flex flex-col my-8 animate-in fade-in zoom-in-95 duration-200">
+            <div className={`px-8 py-6 text-white flex justify-between items-center shrink-0 ${activeTab === 'asignaciones' ? 'bg-indigo-600' : 'bg-rose-500'}`}>
+              <div className="flex items-center gap-3">
+                <FileText size={24} />
+                <div>
+                  <h3 className="font-black text-lg tracking-tight uppercase">
+                    Detalle de {activeTab === 'asignaciones' ? 'Asignación' : 'Devolución'}
+                  </h3>
+                  <p className="text-[11px] text-white/80 font-bold uppercase mt-0.5">#{viewDetail.id} - {viewDetail.numero_asignacion || viewDetail.numero_devolucion}</p>
+                </div>
+              </div>
+              <button onClick={() => setViewDetail(null)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/30 text-white font-black text-sm transition-all">
+                ×
+              </button>
+            </div>
+            <div className="p-8 overflow-y-auto space-y-6 max-h-[70vh] custom-scrollbar">
+              <div>
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Elementos:</h4>
+                <div className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden shadow-sm">
+                  <table className="w-full text-left text-xs font-semibold text-slate-600">
+                    <thead>
+                      <tr className="bg-slate-100 text-slate-500 font-black text-[9px] uppercase tracking-widest border-b border-slate-200">
+                        <th className="p-3 pl-5">Elemento</th>
+                        <th className="p-3 text-center">Cantidad</th>
+                        <th className="p-3">Seriales</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewDetail.details?.map((det: any, idx: number) => (
+                        <tr key={idx} className="border-b border-slate-100 last:border-b-0">
+                          <td className="p-3 pl-5 font-bold text-slate-800">{det.elemento_nombre}</td>
+                          <td className="p-3 text-center font-black text-slate-900">{det.cantidad}</td>
+                          <td className="p-3">
+                            {det.es_serializado ? (
+                              <div className="flex flex-wrap gap-1.5">
+                                {det.serials?.map((s: string, sIdx: number) => (
+                                  <span key={sIdx} className={`px-2 py-0.5 border rounded-lg text-[9px] font-black tracking-wider uppercase flex items-center gap-1 ${activeTab === 'asignaciones' ? 'bg-indigo-50 border-indigo-100 text-indigo-700' : 'bg-rose-50 border-rose-100 text-rose-700'}`}>
+                                    <Barcode size={9} /> {s}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 uppercase font-black">N/A (No Serializado)</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {viewDetail.observaciones && (
+                <div className="bg-white p-3.5 rounded-xl border border-slate-200/60 flex items-start gap-2 shadow-sm">
+                  <MessageSquare size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Observaciones:</div>
+                    <p className="text-xs text-slate-700 font-medium mt-0.5">{viewDetail.observaciones}</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
