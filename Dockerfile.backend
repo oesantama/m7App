@@ -9,13 +9,15 @@ COPY package*.json ./
 RUN --mount=type=cache,target=/root/.npm \
     rm -f package-lock.json && \
     node -e "const fs=require('fs'); const pkg=JSON.parse(fs.readFileSync('./package.json')); const toDelete=['leaflet','lucide-react','recharts','pdfjs-dist','qrcode.react','@tailwindcss/vite','autoprefixer','postcss','tailwindcss','vite','vite-plugin-pwa','react','react-dom','zustand','sonner']; toDelete.forEach(d => { if(pkg.dependencies[d]) delete pkg.dependencies[d]; if(pkg.devDependencies[d]) delete pkg.devDependencies[d]; }); fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2))" && \
+    cp package.json package.json.modified && \
     npm install --no-package-lock --legacy-peer-deps --no-audit --ignore-scripts --prefer-offline
 
 COPY . .
-# Compilamos el servidor con límite de RAM ajustado
+# Compilamos el servidor con límite de RAM ajustado y podamos dependencias usando el package.json optimizado
 ENV NODE_OPTIONS="--max-old-space-size=1024"
-RUN npm run build:server && \
-    npm prune --production
+RUN mv package.json.modified package.json && \
+    npm run build:server && \
+    npm prune --omit=dev --legacy-peer-deps
 
 # Stage 2: Production (Minimal Alpine)
 FROM node:20-alpine
