@@ -326,6 +326,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const [auditModal, setAuditModal] = useState<{ isOpen: boolean; action: any; data: any } | null>(null);
   const [auditComment, setAuditComment] = useState('');
   const [addInvoiceModal, setAddInvoiceModal] = useState<{ isOpen: boolean; routeIndex: number | null; tab: 'plan' | 'repice' }>({ isOpen: false, routeIndex: null, tab: 'plan' });
+  const [repiceSearch, setRepiceSearch] = useState<{ term: string; loading: boolean; result: any | null; error: string | null; confirmOpen: boolean }>({ term: '', loading: false, result: null, error: null, confirmOpen: false });
   const [isSaving, setIsSaving] = useState(false);
   const [selectedInvoiceDetail, setSelectedInvoiceDetail] = useState<Invoice | null>(null);
   const [manualRouteModal, setManualRouteModal] = useState(false);
@@ -2320,6 +2321,40 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     setAuditComment('');
   };
 
+  const handleRepiceSearch = async () => {
+    const term = repiceSearch.term.trim();
+    if (!term) return;
+    setRepiceSearch(s => ({ ...s, loading: true, result: null, error: null, confirmOpen: false }));
+    try {
+      const res = await api.searchRepiceInvoice(term);
+      if (res.success) {
+        setRepiceSearch(s => ({ ...s, loading: false, result: res.data }));
+      } else {
+        setRepiceSearch(s => ({ ...s, loading: false, error: res.error || 'Factura no encontrada en estado REPICE' }));
+      }
+    } catch (err: any) {
+      setRepiceSearch(s => ({ ...s, loading: false, error: err.message || 'Error al buscar' }));
+    }
+  };
+
+  const handleRepiceConfirm = () => {
+    if (!repiceSearch.result || addInvoiceModal.routeIndex === null) return;
+    const r = repiceSearch.result;
+    const invoiceObj = {
+      id: r.invoice_id,
+      invoiceNumber: r.invoice || r.order_number,
+      customerName: r.customer_name,
+      address: r.address,
+      city: r.city,
+      volumeM3: 0,
+      isRepice: true,
+      item_status: 'EST-15',
+    } as any;
+    handleAddInvoiceToRoute(invoiceObj);
+    setRepiceSearch({ term: '', loading: false, result: null, error: null, confirmOpen: false });
+    setAddInvoiceModal(m => ({ ...m, isOpen: false }));
+  };
+
   const handleAddInvoiceToRoute = (invoice: Invoice) => {
     if (addInvoiceModal.routeIndex === null) return;
     const newSuggestions = [...suggestedRoutes];
@@ -2432,6 +2467,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         driverId: link?.driverId || 'S/A',
         clientId: selectedClient,
         invoiceIds: route.assignedInvoices.map(i => i.id),
+        repiceInvoiceIds: route.assignedInvoices.filter(i => (i as any).isRepice).map(i => i.id),
         createdBy: user.name,
         totalVolume: route.totalVolume,
         utilization: route.utilization,
@@ -2775,6 +2811,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           driverId: link?.driverId || 'S/A',
           clientId: selectedClient,
           invoiceIds: route.assignedInvoices.map(i => i.id || i.invoiceNumber),
+          repiceInvoiceIds: route.assignedInvoices.filter(i => (i as any).isRepice).map(i => i.id || i.invoiceNumber),
           createdBy: user.name || 'SISTEMA',
           totalVolume: route.totalVolume,
           utilization: route.utilization,
@@ -3863,119 +3900,167 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                     📋 Del Plan
                   </button>
                   <button
-                    onClick={() => setAddInvoiceModal(m => ({ ...m, tab: 'repice' }))}
+                    onClick={() => { setAddInvoiceModal(m => ({ ...m, tab: 'repice' })); setRepiceSearch({ term: '', loading: false, result: null, error: null, confirmOpen: false }); }}
                     className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${addInvoiceModal.tab === 'repice' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
                   >
                     ⚡ Repice
                   </button>
                 </div>
 
-                <div className="relative">
-                  <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
-                  <input
-                    ref={addInvoiceInputRef}
-                    autoFocus
-                    type="text"
-                    placeholder={addInvoiceModal.tab === 'plan' ? 'Buscar por factura, cliente o pedido...' : 'Buscar factura de repice por número...'}
-                    value={modalSearchTerm}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      const clearAll = () => {
-                        setModalSearchTerm('');
-                        if (addInvoiceInputRef.current) {
-                          addInvoiceInputRef.current.value = '';
-                          addInvoiceInputRef.current.focus();
+                {addInvoiceModal.tab === 'plan' ? (
+                  <div className="relative">
+                    <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
+                    <input
+                      ref={addInvoiceInputRef}
+                      autoFocus
+                      type="text"
+                      placeholder="Buscar por factura, cliente o pedido..."
+                      value={modalSearchTerm}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        if (scanSuppressRef.current) {
+                          clearTimeout(scanSuppressRef.current);
+                          scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
+                          setModalSearchTerm('');
+                          return;
                         }
-                      };
-
-                      // ── SUPRIMIR chars residuales post-scan ──
-                      // Usamos React state (no DOM) para que el input controlado quede realmente vacío
-                      if (scanSuppressRef.current) {
-                        clearTimeout(scanSuppressRef.current);
-                        scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
-                        setModalSearchTerm('');
-                        return;
-                      }
-
-                      // ── DETECCIÓN DE SCAN (pistola/QR) ──
-                      // Solo dispara si contiene prefijo DIAN "NumFac" O si el texto llega muy largo
-                      // de golpe (> 50 chars). Evita falsos positivos al escribir manualmente.
-                      const isScan = raw.length > 50 || /NumFac/i.test(raw);
-
-                      if (isScan) {
-                        // Estrategia 1: formato DIAN PDF417/QR → NumFac:XXXXXXX
-                        let invoiceNum: string | null = null;
-                        const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+)/i);
-                        if (numFacMatch) invoiceNum = numFacMatch[1].toUpperCase();
-
-                        // Estrategia 2: buscar patrón alfanumérico en lista de facturas
-                        if (!invoiceNum) {
-                          const candidates = raw.toUpperCase().match(/[A-Z]{1,5}[0-9]{4,12}/g) || [];
-                          for (const c of candidates) {
-                            if (unassignedInvoices.some(inv => (inv.invoiceNumber || '').toUpperCase() === c)) {
-                              invoiceNum = c; break;
+                        const isScan = raw.length > 50 || /NumFac/i.test(raw);
+                        if (isScan) {
+                          let invoiceNum: string | null = null;
+                          const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+)/i);
+                          if (numFacMatch) invoiceNum = numFacMatch[1].toUpperCase();
+                          if (!invoiceNum) {
+                            const candidates = raw.toUpperCase().match(/[A-Z]{1,5}[0-9]{4,12}/g) || [];
+                            for (const c of candidates) {
+                              if (unassignedInvoices.some(inv => (inv.invoiceNumber || '').toUpperCase() === c)) {
+                                invoiceNum = c; break;
+                              }
                             }
+                            if (!invoiceNum && candidates.length > 0) invoiceNum = candidates[0];
                           }
-                          // Estrategia 3: primer candidato como filtro
-                          if (!invoiceNum && candidates.length > 0) invoiceNum = candidates[0];
+                          setModalSearchTerm('');
+                          if (scanSuppressRef.current) clearTimeout(scanSuppressRef.current);
+                          scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
+                          if (invoiceNum) {
+                            const match = unassignedInvoices.find(
+                              inv => (inv.invoiceNumber || '').toUpperCase() === invoiceNum
+                                || (inv.id || '').toUpperCase().includes(invoiceNum!)
+                            );
+                            if (match) { handleAddInvoiceToRoute(match); } else { setModalSearchTerm(invoiceNum); }
+                          }
+                          return;
                         }
-
-                        // Limpiar estado React y activar supresión
-                        setModalSearchTerm('');
-                        if (scanSuppressRef.current) clearTimeout(scanSuppressRef.current);
-                        scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
-
-                        if (invoiceNum) {
-                          const match = unassignedInvoices.find(
-                            inv => (inv.invoiceNumber || '').toUpperCase() === invoiceNum
-                              || (inv.id || '').toUpperCase().includes(invoiceNum)
+                        setModalSearchTerm(raw.toUpperCase());
+                        if (raw.length >= 4) {
+                          const term = raw.toLowerCase();
+                          const matches = unassignedInvoices.filter(inv =>
+                            (inv.invoiceNumber || '').toLowerCase().includes(term) ||
+                            (inv.orderNumber || '').toLowerCase().includes(term)
                           );
-                          if (match) {
-                            handleAddInvoiceToRoute(match);
-                          } else {
-                            setModalSearchTerm(invoiceNum); // mostrar número en buscador si no está en lista
-                          }
+                          if (matches.length === 1) { handleAddInvoiceToRoute(matches[0]); setModalSearchTerm(''); }
                         }
-                        return;
-                      }
-
-                      // ── ESCRITURA MANUAL ──
-                      setModalSearchTerm(raw.toUpperCase());
-                      if (raw.length >= 4) {
-                        const term = raw.toLowerCase();
-                        const matches = unassignedInvoices.filter(inv =>
-                          (inv.invoiceNumber || '').toLowerCase().includes(term) ||
-                          (inv.orderNumber || '').toLowerCase().includes(term)
-                        );
-                        if (matches.length === 1) { handleAddInvoiceToRoute(matches[0]); setModalSearchTerm(''); }
-                      }
-                    }}
-                    className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"
-                  />
-                </div>
+                      }}
+                      className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-amber-400 w-4 h-4" />
+                      <input
+                        autoFocus
+                        type="text"
+                        placeholder="Número de factura REPICE..."
+                        value={repiceSearch.term}
+                        onChange={e => setRepiceSearch(s => ({ ...s, term: e.target.value.toUpperCase(), result: null, error: null }))}
+                        onKeyDown={e => { if (e.key === 'Enter') handleRepiceSearch(); }}
+                        className="w-full pl-12 pr-4 py-4 bg-white border-2 border-amber-200 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-amber-500 transition-all shadow-sm"
+                      />
+                    </div>
+                    <button
+                      onClick={handleRepiceSearch}
+                      disabled={repiceSearch.loading || !repiceSearch.term.trim()}
+                      className="px-5 py-4 bg-amber-500 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-amber-600 transition-all shadow-sm disabled:opacity-40 shrink-0"
+                    >
+                      {repiceSearch.loading ? '...' : 'Buscar'}
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="p-8 overflow-y-auto custom-scrollbar flex-1 space-y-3">
-                {(() => {
-                  // Para repice: solo facturas en estado EST-15 que NO estén ya en otra ruta activa
-                  const pool = addInvoiceModal.tab === 'repice'
-                    ? invoices.filter(inv => {
-                      const status = String((inv as any).status || (inv as any).item_status || '').toUpperCase();
-                      if (status !== 'EST-15' && status !== 'REPICE') return false;
-                      
-                      // EXCLUSIÓN CRÍTICA: No mostrar si ya está en una ruta activa confirmada
-                      const activeConfirmedIds = new Set(activeRoutes.flatMap(r => r.invoiceIds || (r as any).invoice_ids || []));
-                      if (activeConfirmedIds.has(inv.id)) return false;
-
-                      const term = modalSearchTerm.toLowerCase().trim();
-                      if (!term || term.length < 2) return true;
-                      return (inv.invoiceNumber || '').toLowerCase().includes(term) ||
-                        (inv.customerName || '').toLowerCase().includes(term) ||
-                        (inv.orderNumber || '').toLowerCase().includes(term);
-                    })
-                    : unassignedInvoices;
-
-                  const filtered = addInvoiceModal.tab === 'repice' ? pool : pool.filter(inv => {
+                {addInvoiceModal.tab === 'repice' ? (
+                  <>
+                    {!repiceSearch.result && !repiceSearch.error && !repiceSearch.loading && (
+                      <div className="text-center py-20 bg-amber-50 rounded-3xl border-2 border-dashed border-amber-100">
+                        <p className="text-3xl mb-3">⚡</p>
+                        <p className="text-xs font-black text-amber-400 uppercase tracking-widest">Ingresa el número de factura y presiona Buscar</p>
+                        <p className="text-[10px] text-slate-400 mt-2 font-medium">Solo facturas en estado REPICE (EST-15)</p>
+                      </div>
+                    )}
+                    {repiceSearch.loading && (
+                      <div className="text-center py-16">
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest animate-pulse">Buscando factura...</p>
+                      </div>
+                    )}
+                    {repiceSearch.error && (
+                      <div className="p-5 bg-red-50 border-2 border-red-100 rounded-2xl text-center">
+                        <p className="text-xs font-black text-red-500 uppercase">❌ {repiceSearch.error}</p>
+                        <p className="text-[10px] text-slate-400 mt-1">Verifica que la factura exista y esté en estado REPICE</p>
+                      </div>
+                    )}
+                    {repiceSearch.result && !repiceSearch.confirmOpen && (
+                      <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-5 space-y-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="px-2 py-0.5 bg-amber-500 text-white rounded text-[9px] font-black uppercase">⚡ REPICE</span>
+                          <span className="text-xs font-black text-slate-900 uppercase">{repiceSearch.result.invoice || repiceSearch.result.order_number}</span>
+                        </div>
+                        <p className="text-[11px] font-bold text-slate-700">{repiceSearch.result.customer_name}</p>
+                        <p className="text-[10px] text-slate-500">{repiceSearch.result.address} • {repiceSearch.result.city}</p>
+                        <div className="pt-2 border-t border-amber-100 flex items-center justify-between">
+                          <div>
+                            <p className="text-[9px] text-slate-400 uppercase font-bold">Vehículo actual</p>
+                            <p className="text-sm font-black text-slate-800">{repiceSearch.result.plate || 'Sin asignar'}</p>
+                            {repiceSearch.result.route_date && (
+                              <p className="text-[9px] text-slate-400">{new Date(repiceSearch.result.route_date).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => setRepiceSearch(s => ({ ...s, confirmOpen: true }))}
+                            className="px-5 py-3 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-amber-600 transition-all shadow-sm"
+                          >
+                            Asignar a esta ruta
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {repiceSearch.result && repiceSearch.confirmOpen && (
+                      <div className="bg-white border-2 border-amber-400 rounded-2xl p-6 shadow-lg space-y-4">
+                        <p className="text-sm font-black text-slate-900 text-center">¿Confirmar asignación REPICE?</p>
+                        <p className="text-[11px] text-slate-600 text-center">
+                          La factura <span className="font-black text-amber-600">{repiceSearch.result.invoice || repiceSearch.result.order_number}</span>
+                          {' '}será asignada a la ruta de <span className="font-black">{activeRoute?.vehicle?.plate}</span>
+                          {repiceSearch.result.plate ? ` (actualmente en ${repiceSearch.result.plate})` : ''}.
+                        </p>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => setRepiceSearch(s => ({ ...s, confirmOpen: false }))}
+                            className="flex-1 py-3 bg-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase hover:bg-slate-200 transition-all"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={handleRepiceConfirm}
+                            className="flex-1 py-3 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-amber-600 transition-all shadow-sm"
+                          >
+                            ✓ Confirmar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : (() => {
+                  const filtered = unassignedInvoices.filter(inv => {
                     const term = modalSearchTerm.toLowerCase();
                     return (inv.invoiceNumber || '').toLowerCase().includes(term) ||
                       (inv.customerName || '').toLowerCase().includes(term) ||
@@ -3988,11 +4073,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                         <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 scale-150 opacity-20">
                           <Icons.Plus className="w-8 h-8" />
                         </div>
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
-                          {addInvoiceModal.tab === 'repice'
-                            ? 'No hay facturas en estado Repice (EST-15)'
-                            : 'Sin resultados para tu búsqueda'}
-                        </p>
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Sin resultados para tu búsqueda</p>
                       </div>
                     );
                   }
@@ -4018,11 +4099,6 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                             {inv.externalDocId && (
                               <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold uppercase border border-slate-200">
                                 DOC: {inv.externalDocId}
-                              </span>
-                            )}
-                            {addInvoiceModal.tab === 'repice' && (
-                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[9px] font-black uppercase border border-amber-300 animate-pulse">
-                                ⚡ REPICE
                               </span>
                             )}
                             <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${String(documents.find(d => d.id === inv.docLId)?.planType || '').toUpperCase().includes('PLAN R') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
@@ -4065,7 +4141,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                         </p>
                       )}
                     </div>
-                  ))
+                  ));
                 })()}
               </div>
             </div>

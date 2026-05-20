@@ -119,7 +119,7 @@ export const getDeliveryPatterns = async (_req: Request, res: Response) => {
 };
 
 export const saveRoute = async (req: Request, res: Response) => {
-  const { id, vehicleId, driverId, clientId, invoiceIds, createdBy, totalVolume, utilization, capacityM3, shift } = req.body;
+  const { id, vehicleId, driverId, clientId, invoiceIds, repiceInvoiceIds, createdBy, totalVolume, utilization, capacityM3, shift } = req.body;
   const client = await pool.connect();
 
   try {
@@ -149,14 +149,24 @@ export const saveRoute = async (req: Request, res: Response) => {
 
     // 2. Vincular Facturas y actualizar estado de las mismas (Deduplicating inputs)
     const uniqueInvoiceIds = [...new Set(invoiceIds as string[])];
+    const uniqueRepiceIds = [...new Set((repiceInvoiceIds || []) as string[])];
+
+    // Para facturas REPICE: desasignar de rutas anteriores antes de vincular a la nueva
+    if (uniqueRepiceIds.length > 0) {
+      await client.query(
+        `DELETE FROM route_invoices WHERE invoice_id = ANY($1)`,
+        [uniqueRepiceIds]
+      );
+    }
 
     for (const invId of uniqueInvoiceIds) {
       await client.query('INSERT INTO route_invoices (route_id, invoice_id, created_at) VALUES ($1, $2, CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING', [finalRouteId, invId]);
     }
 
-    // 4. Actualización Masiva de Estado en Document Items (con Fallback)
-    if (uniqueInvoiceIds.length > 0) {
-      console.log('[DEBUG] Attempting to update status for IDs:', uniqueInvoiceIds);
+    // 4. Actualización Masiva de Estado en Document Items — excluir REPICE (se mantienen en EST-15)
+    const nonRepiceIds = uniqueInvoiceIds.filter(id => !uniqueRepiceIds.includes(id));
+    if (nonRepiceIds.length > 0) {
+      console.log('[DEBUG] Attempting to update status for IDs:', nonRepiceIds);
 
       const updateResult = await client.query(`
          UPDATE document_items
@@ -164,7 +174,7 @@ export const saveRoute = async (req: Request, res: Response) => {
          WHERE TRIM(COALESCE(NULLIF(invoice, ''), order_number)) = ANY($1)
             OR CONCAT(document_id, '_', TRIM(COALESCE(NULLIF(invoice, ''), order_number))) = ANY($1)
          RETURNING id
-       `, [uniqueInvoiceIds]);
+       `, [nonRepiceIds]);
 
       console.log(`[DEBUG] Updated ${updateResult.rowCount} document_items to EST-10`);
     }
@@ -1196,8 +1206,54 @@ export const resolveCustomerCoords = async (req: Request, res: Response) => {
   }
 };
 
+export const searchRepiceInvoice = async (req: Request, res: Response) => {
+    const { invoiceNumber } = req.query;
+    if (!invoiceNumber) {
+        return res.status(400).json({ success: false, error: 'invoiceNumber es requerido' });
+    }
+
+    try {
+        const result = await pool.query(
+            `SELECT
+                di.invoice,
+                di.order_number,
+                di.item_status,
+                di.document_id,
+                CONCAT(di.document_id::text, '_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number))) AS invoice_id,
+                di.customer_name,
+                di.address,
+                di.city,
+                r.id AS route_id,
+                r.created_at AS route_date,
+                v.plate,
+                v.id AS vehicle_id
+             FROM document_items di
+             LEFT JOIN route_invoices ri ON ri.invoice_id = CONCAT(di.document_id::text, '_', TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)))
+             LEFT JOIN routes r ON r.id::text = ri.route_id::text
+             LEFT JOIN vehicles v ON v.id = r.vehicle_id
+             WHERE di.item_status = 'EST-15'
+               AND (
+                 TRIM(UPPER(di.invoice)) = TRIM(UPPER($1))
+                 OR TRIM(UPPER(di.order_number)) = TRIM(UPPER($1))
+               )
+             ORDER BY r.created_at DESC
+             LIMIT 1`,
+            [invoiceNumber as string]
+        );
+
+        if (!result.rowCount || result.rowCount === 0) {
+            return res.status(404).json({ success: false, error: 'Factura no encontrada en estado REPICE (EST-15)' });
+        }
+
+        res.json({ success: true, data: result.rows[0] });
+    } catch (err: any) {
+        console.error('[M7-SEARCH-REPICE-ERR]', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
 export const assignRouteInvoice = async (req: Request, res: Response) => {
-    const { routeId, invoiceId, userId } = req.body;
+    const { routeId, invoiceId, userId, isRepice } = req.body;
     if (!routeId || !invoiceId) {
         return res.status(400).json({ success: false, error: 'routeId e invoiceId son requeridos' });
     }
@@ -1206,17 +1262,25 @@ export const assignRouteInvoice = async (req: Request, res: Response) => {
     try {
         await client.query('BEGIN');
 
-        // 1. Verificar si la factura ya está asignada a alguna otra ruta activa
-        const checkActive = await client.query(
-            `SELECT r.id, v.plate 
-             FROM route_invoices ri
-             JOIN routes r ON r.id = ri.route_id
-             LEFT JOIN vehicles v ON v.id = r.vehicle_id
-             WHERE ri.invoice_id = $1 AND r.status_id NOT IN ('EST-16', 'anulada')`,
-            [invoiceId]
-        );
-        if (checkActive.rowCount && checkActive.rowCount > 0) {
-            throw new Error(`La factura ya está asignada a la ruta activa del vehículo ${checkActive.rows[0].plate}`);
+        if (isRepice) {
+            // Para REPICE: eliminar de cualquier ruta anterior y reasignar sin cambiar item_status
+            await client.query(
+                `DELETE FROM route_invoices WHERE invoice_id = $1`,
+                [invoiceId]
+            );
+        } else {
+            // 1. Verificar si la factura ya está asignada a alguna otra ruta activa
+            const checkActive = await client.query(
+                `SELECT r.id, v.plate
+                 FROM route_invoices ri
+                 JOIN routes r ON r.id::text = ri.route_id::text
+                 LEFT JOIN vehicles v ON v.id = r.vehicle_id
+                 WHERE ri.invoice_id = $1 AND r.status_id NOT IN ('EST-16', 'anulada')`,
+                [invoiceId]
+            );
+            if (checkActive.rowCount && checkActive.rowCount > 0) {
+                throw new Error(`La factura ya está asignada a la ruta activa del vehículo ${checkActive.rows[0].plate}`);
+            }
         }
 
         // 2. Obtener el volumen de la factura
@@ -1237,13 +1301,15 @@ export const assignRouteInvoice = async (req: Request, res: Response) => {
             [routeId, invoiceId]
         );
 
-        // 4. Actualizar item_status a EST-10 (En Ruta)
-        await client.query(
-            `UPDATE document_items SET item_status = 'EST-10'
-             WHERE CONCAT(document_id::text, '_', TRIM(COALESCE(NULLIF(invoice,''), order_number))) = $1
-                OR TRIM(COALESCE(NULLIF(invoice,''), order_number)) = $1`,
-            [invoiceId]
-        );
+        // 4. Actualizar item_status: EST-10 para asignación normal, EST-15 se mantiene para REPICE
+        if (!isRepice) {
+            await client.query(
+                `UPDATE document_items SET item_status = 'EST-10'
+                 WHERE CONCAT(document_id::text, '_', TRIM(COALESCE(NULLIF(invoice,''), order_number))) = $1
+                    OR TRIM(COALESCE(NULLIF(invoice,''), order_number)) = $1`,
+                [invoiceId]
+            );
+        }
 
         // 5. Actualizar volumen de la ruta
         await client.query(

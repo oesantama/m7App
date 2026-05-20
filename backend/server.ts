@@ -146,6 +146,14 @@ app.use('/api', (req, res, next) => {
   ];
   
   if (publicPaths.some(p => p === '/' ? req.path === '/' : req.path.startsWith(p))) {
+    const readOnlyPaths = [
+      '/cfg-ciudades/departamentos',
+      '/cfg-ciudades/ciudades',
+      '/gh-miscelaneos'
+    ];
+    if (readOnlyPaths.some(p => req.path.startsWith(p)) && req.method !== 'GET') {
+      return authenticateToken(req, res, next);
+    }
     return next();
   }
   return authenticateToken(req, res, next);

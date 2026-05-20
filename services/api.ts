@@ -869,12 +869,14 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
-  assignRouteInvoice: (data: { routeId: string; invoiceId: string; userId?: string }) =>
+  assignRouteInvoice: (data: { routeId: string; invoiceId: string; userId?: string; isRepice?: boolean }) =>
     fetchJson(`${API_URL}/routes/assign-invoice`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
+  searchRepiceInvoice: (invoiceNumber: string) =>
+    fetchJson(`${API_URL}/routes/search-repice?invoiceNumber=${encodeURIComponent(invoiceNumber)}`),
 
   repiceRouteInvoice: (data: { routeId: string; invoiceId: string; observations?: string; userId?: string; newVehicleId?: string }) =>
     fetchJson(`${API_URL}/routes/repice-invoice`, {
