@@ -36,7 +36,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'routes': ['name', 'description', 'vehicle_id', 'driver_id', 'client_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at', 'total_volume_m3', 'vehicle_capacity_m3', 'utilization_pct', 'shift'],
   'picking_assignments': ['invoice_id', 'leader_id', 'helper_ids', 'status', 'created_by', 'started_at', 'completed_at', 'updated_at'],
   'picking_signatures': ['picking_id', 'user_id', 'signed', 'signed_at'],
-  'route_invoices': ['route_id', 'invoice_id', 'created_at'],
+  'route_invoices': ['route_id', 'invoice_id', 'created_at', 'assigned_at'],
   'route_modifications_log': ['route_id', 'invoice_id', 'action', 'user_id', 'previous_plate', 'new_plate', 'details', 'timestamp'],
   'dispatch_assignments': ['invoice_id', 'driver_id', 'helper_ids', 'scanned_items', 'is_accompanied', 'helper_count', 'status', 'created_by', 'started_at', 'completed_at', 'updated_at', 'created_at'],
   'dispatch_signatures_pending': ['dispatch_id', 'user_id', 'role_type', 'signed', 'signed_at'],
