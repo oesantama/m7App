@@ -3,6 +3,7 @@ import { User } from '../../types';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
 import { DataTable, ColumnDef } from '../shared/DataTable';
+import { hasPermission } from '../../utils/permissions';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -177,9 +178,9 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
   const [showFirmaClave, setShowFirmaClave] = useState(false);
 
   // Derived permissions
-  const isAdmin = user.roleId === 'ROL-01' || (user as any).role_id === 'ROL-01' || user.email === 'admin@millasiete.com';
-  const canCreate = isAdmin || user.permissions?.some((p: any) => p.module === 'MASTER_INVENTARIO_GH' && p.actions.includes('create'));
-  const canEdit = canCreate || user.permissions?.some((p: any) => p.module === 'MASTER_INVENTARIO_GH' && p.actions.includes('edit'));
+  const canViewAll = hasPermission(user, 'ASIGNACION_DEVOLUCION_GH', 'view');
+  const canCreate = hasPermission(user, 'ASIGNACION_DEVOLUCION_GH', 'create');
+  const canEdit = hasPermission(user, 'ASIGNACION_DEVOLUCION_GH', 'edit');
 
   const asignacionesColumns = React.useMemo<ColumnDef<any>[]>(() => [
     {
@@ -858,7 +859,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       {/* Main Records List */}
       {activeTab === 'asignaciones' ? (
         <DataTable
-          data={canEdit ? asignaciones : asignaciones.filter(a => user.documentNumber && a.personal_documento === user.documentNumber)}
+          data={canViewAll ? asignaciones : asignaciones.filter(a => user.documentNumber && a.personal_documento === user.documentNumber)}
           columns={asignacionesColumns}
           searchPlaceholder="Buscar en asignaciones..."
           excelFileName={`GH_Asignaciones_${new Date().toISOString().split('T')[0]}.xlsx`}
@@ -866,7 +867,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
         />
       ) : (
         <DataTable
-          data={devoluciones}
+          data={canViewAll ? devoluciones : devoluciones.filter(d => user.documentNumber && d.personal_documento === user.documentNumber)}
           columns={devolucionesColumns}
           searchPlaceholder="Buscar en devoluciones..."
           excelFileName={`GH_Devoluciones_${new Date().toISOString().split('T')[0]}.xlsx`}

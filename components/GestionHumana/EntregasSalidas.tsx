@@ -3,6 +3,7 @@ import { User } from '../../types';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
 import { DataTable, ColumnDef } from '../shared/DataTable';
+import { hasPermission } from '../../utils/permissions';
 import { 
   Plus, Trash2, Save, Search, Calendar, X, FileText, 
   Package, RefreshCw, AlertCircle, Eye, ShoppingCart, 
@@ -99,6 +100,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({ options, value, onC
 };
 
 const EntregasSalidas: React.FC<Props> = ({ user }) => {
+  const canCreate = hasPermission(user, 'ENTREGAS_SALIDAS_GH', 'create');
   const [activeTab, setActiveTab] = useState<'ordenes' | 'entradas' | 'salidas'>('ordenes');
   const [isLoading, setIsLoading] = useState(false);
   
@@ -712,12 +714,14 @@ const EntregasSalidas: React.FC<Props> = ({ user }) => {
           <p className="text-slate-500 font-bold mt-1 uppercase text-xs tracking-widest">Órdenes de Compra, Entradas a Bodega y Devoluciones a Proveedor</p>
         </div>
         
-        <button 
-          onClick={handleOpenNewModal} 
-          className="flex items-center gap-2 px-6 py-3.5 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-all shadow-lg text-xs uppercase"
-        >
-          <Plus size={16} /> Nuevo Registro
-        </button>
+        {canCreate && (
+          <button 
+            onClick={handleOpenNewModal} 
+            className="flex items-center gap-2 px-6 py-3.5 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-all shadow-lg text-xs uppercase"
+          >
+            <Plus size={16} /> Nuevo Registro
+          </button>
+        )}
       </div>
 
       {/* Tabs */}

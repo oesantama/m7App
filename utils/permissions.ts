@@ -24,6 +24,7 @@ export const ID_MAP: Record<string, string> = {
   'MATRIZ_ROLES': 'PAG-23',
   'MATRIZ_PERMISOS': 'PAG-24',
   'PERSONAL_GH': 'PAG-43',
+  'VISITAS_GH': 'PAG-44',
   'MISCELANEOS_GH': 'PAG-41',
   'ENTREGAS_SALIDAS_GH': 'PAG-52',
   'ASIGNACION_DEVOLUCION_GH': 'PAG-53',

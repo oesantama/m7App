@@ -19,26 +19,27 @@ import {
   getPublicCapacitacion,
   submitCapacitacionResult
 } from '../controllers/gh-personal.controller.js';
+import { requirePermission } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
-router.get('/', getPersonal);
-router.post('/', savePersonal);
-router.delete('/:id', deletePersonal);
+router.get('/', requirePermission(['PERSONAL_GH', 'MASTER_INVENTARIO_GH', 'ENTREGAS_SALIDAS_GH', 'ASIGNACION_DEVOLUCION_GH', 'CONSULTA_INVENTARIO_GH', 'VISITAS_GH'], 'view'), getPersonal);
+router.post('/', requirePermission('PERSONAL_GH', 'create'), savePersonal);
+router.delete('/:id', requirePermission('PERSONAL_GH', 'edit'), deletePersonal);
 
-router.get('/encuestas', getPersonalEncuestas);
-router.post('/encuestas/activate', activateEncuesta);
-router.put('/encuestas/deactivate/:id', deactivateEncuesta);
-router.get('/resultados/excel', exportEncuestasExcel);
-router.get('/resultados', getEncuestasResultados);
-router.get('/resultados/:id', getEncuestaDetail);
-router.get('/pdf/:id', generateEncuestaPDF);
+router.get('/encuestas', requirePermission('PERSONAL_GH', 'view'), getPersonalEncuestas);
+router.post('/encuestas/activate', requirePermission('PERSONAL_GH', 'edit'), activateEncuesta);
+router.put('/encuestas/deactivate/:id', requirePermission('PERSONAL_GH', 'edit'), deactivateEncuesta);
+router.get('/resultados/excel', requirePermission('PERSONAL_GH', 'view'), exportEncuestasExcel);
+router.get('/resultados', requirePermission('PERSONAL_GH', 'view'), getEncuestasResultados);
+router.get('/resultados/:id', requirePermission('PERSONAL_GH', 'view'), getEncuestaDetail);
+router.get('/pdf/:id', requirePermission('PERSONAL_GH', 'view'), generateEncuestaPDF);
 
 // LMS Routes
-router.get('/capacitaciones', getCapacitaciones);
-router.post('/capacitaciones', saveCapacitacion);
-router.get('/capacitaciones/asignaciones/:capId', getAsignacionesCapacitacion);
-router.post('/capacitaciones/asignar', asignarCapacitacion);
+router.get('/capacitaciones', requirePermission(['CAPACITACIONES', 'PERSONAL_GH'], 'view'), getCapacitaciones);
+router.post('/capacitaciones', requirePermission(['CAPACITACIONES', 'PERSONAL_GH'], 'create'), saveCapacitacion);
+router.get('/capacitaciones/asignaciones/:capId', requirePermission(['CAPACITACIONES', 'PERSONAL_GH'], 'view'), getAsignacionesCapacitacion);
+router.post('/capacitaciones/asignar', requirePermission(['CAPACITACIONES', 'PERSONAL_GH'], 'create'), asignarCapacitacion);
 router.get('/capacitaciones/publica', getPublicCapacitacion);
 router.post('/capacitaciones/submit', submitCapacitacionResult);
 

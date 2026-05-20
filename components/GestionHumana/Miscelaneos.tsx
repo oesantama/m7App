@@ -4,6 +4,7 @@ import { api } from '../../services/api';
 import { User } from '../../types';
 import { Icons } from '../../constants';
 import * as XLSX from 'xlsx';
+import { hasPermission } from '../../utils/permissions';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -81,6 +82,9 @@ interface CrudTabProps {
 }
 
 const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
+  const canCreate = hasPermission(user, 'MISCELANEOS_GH', 'create');
+  const canEdit = hasPermission(user, 'MISCELANEOS_GH', 'edit');
+
   const [records, setRecords]   = useState<MiscRecord[]>([]);
   const [loading, setLoading]   = useState(false);
   const [search, setSearch]     = useState('');
@@ -249,7 +253,7 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
           />
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          {(tabla === 'eps' || tabla === 'afp') && (
+          {canCreate && (tabla === 'eps' || tabla === 'afp') && (
             <>
               <input 
                 type="file" 
@@ -267,13 +271,15 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
               </button>
             </>
           )}
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 h-10 px-6 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 shrink-0"
-          >
-            <Icons.Plus className="w-3.5 h-3.5" />
-            Nuevo Registro
-          </button>
+          {canCreate && (
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 h-10 px-6 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 shrink-0"
+            >
+              <Icons.Plus className="w-3.5 h-3.5" />
+              Nuevo Registro
+            </button>
+          )}
         </div>
       </div>
 
@@ -327,26 +333,28 @@ const CrudTab: React.FC<CrudTabProps> = ({ tabla, user, estados }) => {
                     {r.fecha_control ? new Date(r.fecha_control).toLocaleDateString('es-CO') : '—'}
                   </td>
                   <td className="px-5 py-3.5">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => openEdit(r)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
-                        title="Editar"
-                      >
-                        <Icons.Edit className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(r.id)}
-                        disabled={deleting === r.id}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-40"
-                        title="Eliminar"
-                      >
-                        {deleting === r.id
-                          ? <div className="w-3 h-3 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-                          : <Icons.Trash className="w-3.5 h-3.5" />
-                        }
-                      </button>
-                    </div>
+                    {canEdit && (
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openEdit(r)}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                          title="Editar"
+                        >
+                          <Icons.Edit className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(r.id)}
+                          disabled={deleting === r.id}
+                          className="w-8 h-8 flex items-center justify-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors disabled:opacity-40"
+                          title="Eliminar"
+                        >
+                          {deleting === r.id
+                            ? <div className="w-3 h-3 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                            : <Icons.Trash className="w-3.5 h-3.5" />
+                          }
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

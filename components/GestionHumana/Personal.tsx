@@ -6,6 +6,7 @@ import { User } from '../../types';
 import { Icons } from '../../constants';
 import SearchableSelect from '../common/SearchableSelect';
 import { DataTable, ColumnDef } from '../shared/DataTable';
+import { hasPermission } from '../../utils/permissions';
 
 interface PersonalRecord {
   id: number;
@@ -49,6 +50,9 @@ interface Props {
 type TabKey = 'personal' | 'encuestas' | 'consultar';
 
 const Personal: React.FC<Props> = ({ user }) => {
+  const canCreate = hasPermission(user, 'PERSONAL_GH', 'create');
+  const canEdit = hasPermission(user, 'PERSONAL_GH', 'edit');
+
   const [activeTab, setActiveTab] = useState<TabKey>('personal');
   const [personal, setPersonal] = useState<PersonalRecord[]>([]);
   const [encuestas, setEncuestas] = useState<EncuestaRecord[]>([]);
@@ -218,13 +222,15 @@ const Personal: React.FC<Props> = ({ user }) => {
       sortable: false,
       render: (p) => (
         <div className="flex items-center justify-end gap-1.5">
-          <button onClick={() => openEdit(p)} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100">
-            <Icons.Edit className="w-3.5 h-3.5" />
-          </button>
+          {canEdit && (
+            <button onClick={() => openEdit(p)} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100">
+              <Icons.Edit className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       )
     }
-  ], [estados]);
+  ], [estados, canEdit]);
 
   const encuestasColumns = useMemo<ColumnDef<EncuestaRecord>[]>(() => [
     {
@@ -279,7 +285,7 @@ const Personal: React.FC<Props> = ({ user }) => {
               <Icons.Copy className="w-3.5 h-3.5" />
             </button>
           )}
-          {e.estado === 'EST-01' && (
+          {e.estado === 'EST-01' && canEdit && (
             confirmDeactivate === e.id ? (
               <div className="flex items-center gap-1.5 animate-in slide-in-from-right-3">
                 <span className="text-[9px] text-rose-500 font-black uppercase tracking-tighter">¿Inactivar?</span>
@@ -295,7 +301,7 @@ const Personal: React.FC<Props> = ({ user }) => {
         </div>
       )
     }
-  ], [personal, estados, confirmDeactivate]);
+  ], [personal, estados, confirmDeactivate, canEdit]);
 
   const resultadosColumns = useMemo<ColumnDef<any>[]>(() => [
     {
@@ -455,7 +461,7 @@ const Personal: React.FC<Props> = ({ user }) => {
             </button>
           </div>
           
-          {activeTab !== 'consultar' && (
+          {activeTab !== 'consultar' && canCreate && (
             <button onClick={openCreate} className="h-9 px-4 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center gap-2">
               <Icons.Plus className="w-3.5 h-3.5" /> {activeTab === 'personal' ? 'Agregar Personal' : 'Activar Encuesta'}
             </button>

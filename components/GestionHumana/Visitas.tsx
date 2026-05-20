@@ -5,6 +5,7 @@ import { Icons } from '../../constants';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
 import { formatDate } from '../../utils/formatting';
+import { hasPermission } from '../../utils/permissions';
 
 const fmtDate = (d: string | undefined) => {
     if (!d) return '—';
@@ -36,10 +37,13 @@ interface Visita {
     registrado_por_id?: string;
     registrado_por_nombre?: string;
     fecha_registro?: string;
+    area_id?: number | string;
 }
 
 const Visitas: React.FC<{ user: any }> = ({ user }) => {
-    const [activeTab, setActiveTab] = useState<'registro' | 'consulta'>('registro');
+    const canCreate = hasPermission(user, 'VISITAS_GH', 'create');
+    const canEdit = hasPermission(user, 'VISITAS_GH', 'edit');
+    const [activeTab, setActiveTab] = useState<'registro' | 'consulta'>(canCreate ? 'registro' : 'consulta');
     const [showQR, setShowQR] = useState(false);
     const PUBLIC_URL = `${window.location.origin}/publico/visitas`;
     const [editingSalidaId, setEditingSalidaId] = useState<number | null>(null);
@@ -212,20 +216,24 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => setShowQR(true)}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-900 rounded-2xl font-black text-[9px] uppercase tracking-widest transition-all shadow-lg"
-                    >
-                        <Icons.Grid className="w-4 h-4" />
-                        QR Público
-                    </button>
-                    <div className="flex bg-white p-1 rounded-2xl shadow-sm border border-slate-200">
+                    {canCreate && (
                         <button
-                            onClick={() => setActiveTab('registro')}
-                            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'registro' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
+                            onClick={() => setShowQR(true)}
+                            className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-slate-900 rounded-2xl font-black text-[9px] uppercase tracking-widest transition-all shadow-lg"
                         >
-                            Registrar
+                            <Icons.Grid className="w-4 h-4" />
+                            QR Público
                         </button>
+                    )}
+                    <div className="flex bg-white p-1 rounded-2xl shadow-sm border border-slate-200">
+                        {canCreate && (
+                            <button
+                                onClick={() => setActiveTab('registro')}
+                                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'registro' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
+                            >
+                                Registrar
+                            </button>
+                        )}
                         <button
                             onClick={() => setActiveTab('consulta')}
                             className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'consulta' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}
@@ -617,20 +625,26 @@ const Visitas: React.FC<{ user: any }> = ({ user }) => {
                                                 ) : v.hora_salida ? (
                                                     <div className="flex items-center gap-1 justify-center group">
                                                         <span className="text-[10px] font-black text-slate-500">{fmtTime(v.hora_salida)}</span>
-                                                        <button
-                                                            onClick={() => { setEditingSalidaId(v.id!); setEditingSalidaHora(new Date(v.hora_salida!).toTimeString().slice(0,5)); }}
-                                                            className="opacity-0 group-hover:opacity-100 w-5 h-5 bg-slate-100 rounded flex items-center justify-center transition-all"
-                                                        >
-                                                            <Icons.Edit className="w-2.5 h-2.5 text-slate-400" />
-                                                        </button>
+                                                        {canEdit && (
+                                                            <button
+                                                                onClick={() => { setEditingSalidaId(v.id!); setEditingSalidaHora(new Date(v.hora_salida!).toTimeString().slice(0,5)); }}
+                                                                className="opacity-0 group-hover:opacity-100 w-5 h-5 bg-slate-100 rounded flex items-center justify-center transition-all"
+                                                            >
+                                                                <Icons.Edit className="w-2.5 h-2.5 text-slate-400" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 ) : (
-                                                    <button
-                                                        onClick={() => { setEditingSalidaId(v.id!); setEditingSalidaHora(''); }}
-                                                        className="text-[10px] font-black text-emerald-600 animate-pulse uppercase hover:animate-none hover:bg-emerald-50 px-2 py-1 rounded-lg transition-all"
-                                                    >
-                                                        En Planta
-                                                    </button>
+                                                    canEdit ? (
+                                                        <button
+                                                            onClick={() => { setEditingSalidaId(v.id!); setEditingSalidaHora(''); }}
+                                                            className="text-[10px] font-black text-emerald-600 animate-pulse uppercase hover:animate-none hover:bg-emerald-50 px-2 py-1 rounded-lg transition-all"
+                                                        >
+                                                            En Planta
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-[10px] font-black text-slate-400 uppercase">En Planta</span>
+                                                    )
                                                 )}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-[10px] font-bold text-slate-400 uppercase">

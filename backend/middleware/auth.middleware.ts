@@ -55,7 +55,7 @@ const ID_MAP: Record<string, string> = {
 // Módulos que usuarios con permiso RUTAS (PAG-15) pueden leer (solo view)
 const RUTAS_READ_ALLOWED = new Set(['VEHICULOS', 'ASIGNACIONES', 'UBICACIONES', 'CONDUCTORES']);
 
-export const requirePermission = (moduleName: string, action: string) => {
+export const requirePermission = (moduleName: string | string[], action: string) => {
     return (req: AuthRequest, res: Response, next: NextFunction) => {
         const user = req.user;
         
@@ -65,7 +65,6 @@ export const requirePermission = (moduleName: string, action: string) => {
         }
 
         // El rol de ADMIN (ROL-01) tiene acceso total por defecto
-        // Robustecido para comparar de forma segura y insensible a mayúsculas
         const isAdminRole = user.roleId === 'ROL-01' || user.role_id === 'ROL-01';
         const isAdminEmail = user.email?.toLowerCase() === 'admin@millasiete.com';
 
@@ -73,29 +72,35 @@ export const requirePermission = (moduleName: string, action: string) => {
             return next();
         }
 
-        const pageId = ID_MAP[moduleName];
+        const modulesToCheck = Array.isArray(moduleName) ? moduleName : [moduleName];
 
-        const hasPermission = user.permissions?.some((p: any) =>
-            (p.module === moduleName || (pageId && p.module === pageId)) &&
-            p.actions.includes(action)
-        );
+        const hasPermission = modulesToCheck.some(modName => {
+            const pageId = ID_MAP[modName];
+            return user.permissions?.some((p: any) =>
+                (p.module === modName || (pageId && p.module === pageId)) &&
+                p.actions.includes(action)
+            );
+        });
 
         if (hasPermission) return next();
 
         // Usuarios con permiso RUTAS pueden leer datos de vehículos, asignaciones y ubicaciones
-        if (action === 'view' && RUTAS_READ_ALLOWED.has(moduleName)) {
-            const rutasPageId = ID_MAP['RUTAS'];
-            const hasRutas = user.permissions?.some((p: any) =>
-                (p.module === 'RUTAS' || (rutasPageId && p.module === rutasPageId)) &&
-                p.actions.includes('view')
-            );
-            if (hasRutas) return next();
+        if (action === 'view') {
+            const allowedByRutas = modulesToCheck.some(modName => RUTAS_READ_ALLOWED.has(modName));
+            if (allowedByRutas) {
+                const rutasPageId = ID_MAP['RUTAS'];
+                const hasRutas = user.permissions?.some((p: any) =>
+                    (p.module === 'RUTAS' || (rutasPageId && p.module === rutasPageId)) &&
+                    p.actions.includes('view')
+                );
+                if (hasRutas) return next();
+            }
         }
 
         console.warn(`[AUTH-403] Usuario ${user.email} intentó acceder a ${moduleName}:${action} sin permiso.`);
         return res.status(403).json({
             success: false,
-            error: `Permiso insuficiente para ${moduleName}`
+            error: `Permiso insuficiente para ${Array.isArray(moduleName) ? moduleName.join(', ') : moduleName}`
         });
     };
 };
