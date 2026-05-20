@@ -178,9 +178,9 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
   const [showFirmaClave, setShowFirmaClave] = useState(false);
 
   // Derived permissions
-  const canViewAll = hasPermission(user, 'ASIGNACION_DEVOLUCION_GH', 'view');
-  const canCreate = hasPermission(user, 'ASIGNACION_DEVOLUCION_GH', 'create');
-  const canEdit = hasPermission(user, 'ASIGNACION_DEVOLUCION_GH', 'edit');
+  const canViewAll = hasPermission(user, 'ASIGNACION_DEVOLUCION_GH', 'view') || hasPermission(user, 'MASTER_INVENTARIO_GH', 'view');
+  const canCreate = hasPermission(user, 'ASIGNACION_DEVOLUCION_GH', 'create') || hasPermission(user, 'MASTER_INVENTARIO_GH', 'create');
+  const canEdit = hasPermission(user, 'ASIGNACION_DEVOLUCION_GH', 'edit') || hasPermission(user, 'MASTER_INVENTARIO_GH', 'edit');
 
   const asignacionesColumns = React.useMemo<ColumnDef<any>[]>(() => [
     {
@@ -237,7 +237,8 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
             </div>
           ) : (
             (() => {
-              const isOwnRecord = user.documentNumber && asig.personal_documento === user.documentNumber;
+              const userDoc = user.document_number || user.documentNumber;
+              const isOwnRecord = userDoc && asig.personal_documento === userDoc;
               const canSign = canEdit || isOwnRecord;
               return canSign ? (
                 <button
@@ -336,7 +337,8 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
             </div>
           ) : (
             (() => {
-              const isOwnRecord = user.documentNumber && dev.personal_documento === user.documentNumber;
+              const userDoc = user.document_number || user.documentNumber;
+              const isOwnRecord = userDoc && dev.personal_documento === userDoc;
               const canSign = canEdit || isOwnRecord;
               return canSign ? (
                 <button
@@ -859,7 +861,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       {/* Main Records List */}
       {activeTab === 'asignaciones' ? (
         <DataTable
-          data={canViewAll ? asignaciones : asignaciones.filter(a => user.documentNumber && a.personal_documento === user.documentNumber)}
+          data={canViewAll ? asignaciones : asignaciones.filter(a => (user.document_number || user.documentNumber) && a.personal_documento === (user.document_number || user.documentNumber))}
           columns={asignacionesColumns}
           searchPlaceholder="Buscar en asignaciones..."
           excelFileName={`GH_Asignaciones_${new Date().toISOString().split('T')[0]}.xlsx`}
@@ -867,7 +869,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
         />
       ) : (
         <DataTable
-          data={canViewAll ? devoluciones : devoluciones.filter(d => user.documentNumber && d.personal_documento === user.documentNumber)}
+          data={canViewAll ? devoluciones : devoluciones.filter(d => (user.document_number || user.documentNumber) && d.personal_documento === (user.document_number || user.documentNumber))}
           columns={devolucionesColumns}
           searchPlaceholder="Buscar en devoluciones..."
           excelFileName={`GH_Devoluciones_${new Date().toISOString().split('T')[0]}.xlsx`}

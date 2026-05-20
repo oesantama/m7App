@@ -1056,6 +1056,53 @@ const healSchema = async (client: any) => {
   }
 };
 
+
+const executeSqlFileInBatches = async (client: any, filePath: string) => {
+  const sqlContent = fs.readFileSync(filePath, 'utf8');
+  // Split by semicolon followed by a newline
+  const statements = sqlContent
+    .split(/;\r?\n/)
+    .map(stmt => stmt.trim())
+    .filter(stmt => {
+      if (!stmt) return false;
+      if (stmt.startsWith('--')) return false;
+      const upper = stmt.toUpperCase();
+      if (upper === 'BEGIN' || upper === 'COMMIT' || upper === 'ROLLBACK') return false;
+      return true;
+    });
+
+  console.log(`[M7-DB-MIGRATION] Total de sentencias detectadas en ${path.basename(filePath)}: ${statements.length}`);
+  
+  const batchSize = 100;
+  let successCount = 0;
+  
+  for (let i = 0; i < statements.length; i += batchSize) {
+    const batch = statements.slice(i, i + batchSize);
+    await client.query('BEGIN');
+    try {
+      for (const statement of batch) {
+        await client.query(statement);
+        successCount++;
+      }
+      await client.query('COMMIT');
+      
+      if (successCount % 1000 === 0 || successCount === statements.length) {
+        console.log(`[M7-DB-MIGRATION] Progreso: ${successCount}/${statements.length} sentencias ejecutadas.`);
+      }
+      
+      // Pequeña pausa para liberar CPU y permitir otras operaciones en la base de datos
+      await new Promise(resolve => setTimeout(resolve, 5));
+    } catch (error: any) {
+      await client.query('ROLLBACK');
+      console.error(`[M7-DB-MIGRATION-BATCH-ERROR] Error en lote iniciando en índice ${i}:`, error.message);
+      const failedStmt = batch.find(stmt => stmt.includes(error.message)) || batch[0];
+      console.error('[M7-DB-MIGRATION-BATCH-ERROR] Sentencia fallida aproximada:', failedStmt);
+      throw error;
+    }
+  }
+  console.log(`[M7-DB-MIGRATION] Ejecución por lotes completada. ${successCount} sentencias ejecutadas con éxito.`);
+};
+
 export const restoreSystem = async () => {
   const start = Date.now();
   console.log('[M7-SYSTEM] Checking Consistency... (Nuclear Mode)');
@@ -1070,11 +1117,10 @@ export const restoreSystem = async () => {
       const checkMig = await client.query("SELECT COUNT(*) FROM gh_asignaciones_personal WHERE usuario_control = 'Migración'");
       const count = Number(checkMig.rows[0].count);
       if (count === 0) {
-        console.log('[M7-DB-MIGRATION] Detectada base de datos limpia de datos históricos. Ejecutando MIGRACION_DOTACIONES_PROD.sql...');
+        console.log('[M7-DB-MIGRATION] Detectada base de datos limpia de datos históricos. Ejecutando MIGRACION_DOTACIONES_PROD.sql por lotes...');
         const sqlPath = path.join(__dirname, '../scripts/MIGRACION_DOTACIONES_PROD.sql');
         if (fs.existsSync(sqlPath)) {
-          const sql = fs.readFileSync(sqlPath, 'utf8');
-          await client.query(sql);
+          await executeSqlFileInBatches(client, sqlPath);
           console.log('[M7-DB-MIGRATION] Datos históricos de dotaciones migrados con éxito.');
         } else {
           console.warn('[M7-DB-MIGRATION] Archivo de migración no encontrado en:', sqlPath);
