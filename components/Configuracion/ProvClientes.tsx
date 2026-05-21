@@ -59,6 +59,7 @@ const ProvClientes: React.FC<Props> = ({ user }) => {
   const [estados, setEstados] = useState<Estado[]>([]);
   const [clientOptions, setClientOptions] = useState<ClientOption[]>([]);
   const [clientSearch, setClientSearch] = useState('');
+  const [viewClientsFor, setViewClientsFor] = useState<ProvCliente | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -387,9 +388,9 @@ const ProvClientes: React.FC<Props> = ({ user }) => {
                     <td className="px-5 py-3.5 text-[11px] text-slate-500 uppercase font-bold">{r.representante || '—'}</td>
                     <td className="px-5 py-3.5">
                       {Array.isArray(r.client_mappings) && r.client_mappings.length > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-100">
+                        <button onClick={() => setViewClientsFor(r)} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-100 hover:bg-blue-100 transition-colors">
                           {r.client_mappings.length} cliente{r.client_mappings.length !== 1 ? 's' : ''}
-                        </span>
+                        </button>
                       ) : (
                         <span className="text-[10px] text-slate-300 font-medium">—</span>
                       )}
@@ -446,6 +447,34 @@ const ProvClientes: React.FC<Props> = ({ user }) => {
           )}
         </div>
       </div>
+
+      {/* View Clients Modal */}
+      {viewClientsFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-slate-100">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600 mb-0.5">Clientes Vinculados</p>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">{viewClientsFor.nombre}</h3>
+              </div>
+              <button onClick={() => setViewClientsFor(null)} className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors text-slate-500">
+                <Icons.X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-6 max-h-[60vh] overflow-y-auto space-y-3">
+              {viewClientsFor.client_mappings?.map((m: any, i: number) => (
+                <div key={i} className="p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                  <p className="text-xs font-black text-slate-800 uppercase mb-2">{m.clientName}</p>
+                  <div className="grid grid-cols-2 gap-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                    <div>Manifiestos: <span className="text-slate-600">{m.managementName}</span></div>
+                    <div>Bodega: <span className="text-slate-600">{m.bodega || '—'}</span></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Save Modal */}
       {isOpen && (

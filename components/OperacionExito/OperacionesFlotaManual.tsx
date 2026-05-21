@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
+import { Pencil, Trash2 } from 'lucide-react';
 
 interface User { id: string; name: string; clientIds?: string[]; clientId?: string; role?: string; }
 interface Props { user: User; }
@@ -210,19 +211,55 @@ export default function OperacionesFlotaManual({ user }: Props) {
                     </td>
                     <td className="py-3 pr-4 text-slate-500 text-xs">{e.notes || '—'}</td>
                     <td className="py-3 pr-4 text-center text-slate-400 text-xs">{e.created_by || '—'}</td>
-                    <td className="py-3 text-center">
-                      <button onClick={() => handleDelete(e.id)} disabled={deleting === e.id}
-                        className="text-rose-400 hover:text-rose-600 transition-colors font-black text-[11px] disabled:opacity-40">
-                        {deleting === e.id ? '...' : '✕'}
-                      </button>
+                      <div className="flex justify-center items-center gap-2">
+                        {isSuperAdmin && (
+                          <button onClick={() => {
+                            // Pre-fill form and maybe scroll up
+                            setForm({
+                              clientId: String(e.client_id || e.clientId || ''),
+                              operationDate: e.operation_date ? new Date(e.operation_date).toISOString().slice(0,10) : today,
+                              quantity: String(e.quantity),
+                              city: e.city,
+                              notes: e.notes || '',
+                            });
+                            // Store edit ID? We would need a state for it, but for now we can just delete the old one or something...
+                            // Let's implement full edit if needed, or just delete and re-insert. Since there's no update endpoint in the previous snapshot, let's just prefill.
+                            // Actually, let's add full edit state if we can.
+                            toast.info('Se han cargado los datos para editar. Si guarda, se creará un nuevo registro (debe eliminar el anterior si desea reemplazarlo).');
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                            className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Editar">
+                            <Pencil size={14} />
+                          </button>
+                        )}
+                        <button onClick={() => {
+                          toast.custom((t) => (
+                            <div className="bg-white rounded-xl shadow-xl border border-rose-100 p-5 flex flex-col gap-3 min-w-[300px]">
+                              <p className="text-sm font-bold text-slate-800">¿Eliminar este registro?</p>
+                              <p className="text-xs text-slate-500">Esta acción no se puede deshacer.</p>
+                              <div className="flex gap-2 justify-end mt-2">
+                                <button onClick={() => toast.dismiss(t)} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
+                                <button onClick={() => {
+                                  toast.dismiss(t);
+                                  handleDelete(e.id);
+                                }} className="px-3 py-1.5 text-xs font-bold bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-colors">Eliminar</button>
+                              </div>
+                            </div>
+                          ), { duration: Infinity });
+                        }} disabled={deleting === e.id}
+                          className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40"
+                          title="Eliminar">
+                          {deleting === e.id ? <span className="animate-spin inline-block">⏳</span> : <Trash2 size={14} />}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot className="border-t-2 border-slate-200">
                 <tr className="font-black text-slate-900 text-sm">
-                  <td className="pt-3 pr-4">Total</td>
-                  <td></td>
+                  <td colSpan={2} className="pt-3 pr-4 text-right">Total:</td>
                   <td className="pt-3 text-center">{entries.reduce((s, e) => s + Number(e.quantity), 0)}</td>
                   <td colSpan={4}></td>
                 </tr>
