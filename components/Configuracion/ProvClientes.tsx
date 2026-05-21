@@ -5,6 +5,13 @@ import { User } from '../../types';
 import { Icons } from '../../constants';
 import * as XLSX from 'xlsx';
 
+interface ClientMapping {
+  clientId: string;
+  clientName: string;
+  managementName: string;
+  bodega: string;
+}
+
 interface ProvCliente {
   documento: string;
   nombre: string;
@@ -14,6 +21,12 @@ interface ProvCliente {
   estado: string;
   usuario_creacion: string;
   fecha_creacion: string;
+  client_mappings?: ClientMapping[];
+}
+
+interface ClientOption {
+  id: string;
+  name: string;
 }
 
 interface Estado {
@@ -40,9 +53,12 @@ const ProvClientes: React.FC<Props> = ({ user }) => {
   const [formEmail, setFormEmail] = useState('');
   const [formRepresentante, setFormRepresentante] = useState('');
   const [formEstado, setFormEstado] = useState('EST-01');
+  const [formMappings, setFormMappings] = useState<ClientMapping[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [estados, setEstados] = useState<Estado[]>([]);
+  const [clientOptions, setClientOptions] = useState<ClientOption[]>([]);
+  const [clientSearch, setClientSearch] = useState('');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -60,6 +76,9 @@ const ProvClientes: React.FC<Props> = ({ user }) => {
     fetchData();
     api.getEstados()
       .then((data: any[]) => setEstados(Array.isArray(data) ? data : []))
+      .catch(() => {});
+    api.getClients()
+      .then((data: any[]) => setClientOptions(Array.isArray(data) ? data.map((c: any) => ({ id: c.id, name: c.name })) : []))
       .catch(() => {});
   }, [fetchData]);
 
@@ -84,6 +103,8 @@ const ProvClientes: React.FC<Props> = ({ user }) => {
     setFormEmail('');
     setFormRepresentante('');
     setFormEstado('EST-01');
+    setFormMappings([]);
+    setClientSearch('');
     setIsOpen(true);
   };
 
@@ -95,7 +116,23 @@ const ProvClientes: React.FC<Props> = ({ user }) => {
     setFormEmail(r.email || '');
     setFormRepresentante(r.representante || '');
     setFormEstado(r.estado || 'EST-01');
+    setFormMappings(Array.isArray(r.client_mappings) ? r.client_mappings : []);
+    setClientSearch('');
     setIsOpen(true);
+  };
+
+  const addClientMapping = (opt: ClientOption) => {
+    if (formMappings.some(m => m.clientId === opt.id)) return;
+    setFormMappings(prev => [...prev, { clientId: opt.id, clientName: opt.name, managementName: opt.name, bodega: '' }]);
+    setClientSearch('');
+  };
+
+  const removeClientMapping = (clientId: string) => {
+    setFormMappings(prev => prev.filter(m => m.clientId !== clientId));
+  };
+
+  const updateMapping = (clientId: string, field: keyof ClientMapping, value: string) => {
+    setFormMappings(prev => prev.map(m => m.clientId === clientId ? { ...m, [field]: value } : m));
   };
 
   const handleSave = async () => {
@@ -116,7 +153,8 @@ const ProvClientes: React.FC<Props> = ({ user }) => {
         email: formEmail.trim() || null,
         representante: formRepresentante.trim() || null,
         estado: formEstado,
-        usuarioControl: user.name
+        usuarioControl: user.name,
+        client_mappings: formMappings
       });
       toast.success(editing ? 'Proveedor actualizado' : 'Proveedor creado');
       setIsOpen(false);
@@ -318,7 +356,7 @@ const ProvClientes: React.FC<Props> = ({ user }) => {
             <table className="w-full">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  {['Documento', 'Nombre', 'Contacto', 'Email', 'Representante', 'Estado', 'Creador', 'Acciones'].map(h => (
+                  {['Documento', 'Nombre', 'Contacto', 'Email', 'Representante', 'Clientes', 'Estado', 'Creador', 'Acciones'].map(h => (
                     <th key={h} className={`${h === 'Acciones' ? 'text-right' : 'text-left'} px-5 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400`}>
                       {h}
                     </th>
@@ -328,14 +366,14 @@ const ProvClientes: React.FC<Props> = ({ user }) => {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="py-16 text-center">
+                    <td colSpan={9} className="py-16 text-center">
                       <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
                       <p className="text-[10px] font-black uppercase text-slate-300 tracking-widest">Cargando proveedores...</p>
                     </td>
                   </tr>
                 ) : paginated.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-16 text-center">
+                    <td colSpan={9} className="py-16 text-center">
                       <Icons.Alert className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                       <p className="text-[10px] font-black uppercase text-slate-300 tracking-widest">Sin proveedores registrados</p>
                     </td>
@@ -347,6 +385,15 @@ const ProvClientes: React.FC<Props> = ({ user }) => {
                     <td className="px-5 py-3.5 text-[11px] text-slate-500">{r.contacto || '—'}</td>
                     <td className="px-5 py-3.5 text-[11px] text-slate-500 font-medium">{r.email || '—'}</td>
                     <td className="px-5 py-3.5 text-[11px] text-slate-500 uppercase font-bold">{r.representante || '—'}</td>
+                    <td className="px-5 py-3.5">
+                      {Array.isArray(r.client_mappings) && r.client_mappings.length > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-blue-50 text-blue-600 border border-blue-100">
+                          {r.client_mappings.length} cliente{r.client_mappings.length !== 1 ? 's' : ''}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-300 font-medium">—</span>
+                      )}
+                    </td>
                     <td className="px-5 py-3.5">
                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${r.estado === 'EST-01' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-500 border border-slate-200'}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${r.estado === 'EST-01' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
@@ -403,7 +450,7 @@ const ProvClientes: React.FC<Props> = ({ user }) => {
       {/* Save Modal */}
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-6 border-b border-slate-100">
               <div>
                 <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600 mb-0.5">
@@ -477,6 +524,91 @@ const ProvClientes: React.FC<Props> = ({ user }) => {
                 >
                   {estados.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </select>
+              </div>
+
+              {/* Client Mappings */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 h-px bg-slate-100" />
+                  <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Clientes que Maneja</span>
+                  <div className="flex-1 h-px bg-slate-100" />
+                </div>
+                <p className="text-[9px] text-slate-400 font-medium leading-relaxed">
+                  Vincula cada cliente de Drive con su nombre exacto en los manifiestos para calcular cobertura correctamente.
+                </p>
+
+                {/* Search to add client */}
+                <div className="relative">
+                  <div className="bg-slate-50 h-9 px-3 rounded-xl flex items-center gap-2 border border-slate-200 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/10">
+                    <Icons.Search className="w-3 h-3 text-slate-400 shrink-0" />
+                    <input
+                      value={clientSearch}
+                      onChange={e => setClientSearch(e.target.value)}
+                      placeholder="Buscar y agregar cliente..."
+                      className="bg-transparent border-none outline-none font-bold text-[10px] uppercase text-slate-700 placeholder:text-slate-300 w-full"
+                    />
+                  </div>
+                  {clientSearch.trim().length > 1 && (
+                    <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
+                      {clientOptions
+                        .filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()) && !formMappings.some(m => m.clientId === c.id))
+                        .slice(0, 8)
+                        .map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => addClientMapping(c)}
+                            className="w-full text-left px-3 py-2 text-[10px] font-bold uppercase text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors border-b border-slate-50 last:border-0"
+                          >
+                            {c.name}
+                          </button>
+                        ))}
+                      {clientOptions.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()) && !formMappings.some(m => m.clientId === c.id)).length === 0 && (
+                        <div className="px-3 py-2 text-[10px] text-slate-400 font-medium">Sin resultados</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Mappings list */}
+                {formMappings.length === 0 ? (
+                  <div className="py-4 text-center text-[9px] font-black uppercase text-slate-300 tracking-widest bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                    Sin clientes asignados
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {formMappings.map(m => (
+                      <div key={m.clientId} className="bg-slate-50 rounded-xl border border-slate-200 p-3 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[10px] font-black text-emerald-700 uppercase truncate flex-1">{m.clientName}</span>
+                          <button type="button" onClick={() => removeClientMapping(m.clientId)} className="w-5 h-5 flex items-center justify-center rounded-md bg-red-50 text-red-400 hover:bg-red-100 transition-colors shrink-0">
+                            <Icons.X className="w-3 h-3" />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black uppercase tracking-widest text-slate-400">Nombre en Manifiestos</label>
+                            <input
+                              value={m.managementName}
+                              onChange={e => updateMapping(m.clientId, 'managementName', e.target.value)}
+                              placeholder="Nombre exacto en manifiestos..."
+                              className="w-full h-8 px-2 rounded-lg bg-white border border-slate-200 text-[9px] font-bold uppercase text-slate-700 outline-none focus:border-emerald-500 transition-all"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[8px] font-black uppercase tracking-widest text-slate-400">Bodega</label>
+                            <input
+                              value={m.bodega}
+                              onChange={e => updateMapping(m.clientId, 'bodega', e.target.value)}
+                              placeholder="Ej: GIRARDOTA..."
+                              className="w-full h-8 px-2 rounded-lg bg-white border border-slate-200 text-[9px] font-bold uppercase text-slate-700 outline-none focus:border-emerald-500 transition-all"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

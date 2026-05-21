@@ -266,8 +266,8 @@ const ValidacionConciliaciones: React.FC<{ user: User }> = ({ user }) => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[9px] font-black text-emerald-500 uppercase tracking-[0.3em] mb-1">Operación Éxito — MOD-11</p>
-          <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Validación Conciliaciones</h1>
+       
+          <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Conciliaciones Linea blanca exito</h1>
         </div>
       </div>
 

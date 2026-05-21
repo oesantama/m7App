@@ -275,6 +275,7 @@ const healSchema = async (client: any) => {
         fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       )
     `);
+    await client.query(`ALTER TABLE prov_cliente ADD COLUMN IF NOT EXISTS client_mappings JSONB DEFAULT '[]'`);
   } catch (err) {
     console.error('[M7-DB] Error al crear la tabla prov_cliente:', err);
   }

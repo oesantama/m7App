@@ -19,7 +19,8 @@ export const saveProvCliente = async (req: Request, res: Response) => {
     email,
     representante,
     estado,
-    usuarioControl
+    usuarioControl,
+    client_mappings
   } = req.body;
 
   if (!documento || String(documento).trim() === '') {
@@ -30,16 +31,18 @@ export const saveProvCliente = async (req: Request, res: Response) => {
   }
 
   try {
+    const mappingsJson = JSON.stringify(Array.isArray(client_mappings) ? client_mappings : []);
     const result = await pool.query(`
-      INSERT INTO prov_cliente (documento, nombre, contacto, email, representante, estado, usuario_creacion, fecha_creacion)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
+      INSERT INTO prov_cliente (documento, nombre, contacto, email, representante, estado, usuario_creacion, fecha_creacion, client_mappings)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP, $8)
       ON CONFLICT (documento) DO UPDATE SET
         nombre = $2,
         contacto = $3,
         email = $4,
         representante = $5,
         estado = $6,
-        usuario_creacion = $7
+        usuario_creacion = $7,
+        client_mappings = $8
       RETURNING *
     `, [
       String(documento).trim().toUpperCase(),
@@ -48,7 +51,8 @@ export const saveProvCliente = async (req: Request, res: Response) => {
       email ? String(email).trim().toLowerCase() : null,
       representante ? String(representante).trim().toUpperCase() : null,
       estado || 'EST-01',
-      usuarioControl || 'System'
+      usuarioControl || 'System',
+      mappingsJson
     ]);
 
     res.json({ success: true, message: 'Proveedor guardado correctamente', record: result.rows[0] });

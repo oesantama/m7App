@@ -2854,7 +2854,7 @@ export const getDriveCoverage = async (req: Request, res: Response) => {
   const dateTo   = (to   as string) || '2099-12-31';
 
   try {
-    const [manifestsRes, uploadsRes] = await Promise.all([
+    const [manifestsRes, uploadsRes, provRes] = await Promise.all([
       pool.query(
         `SELECT UPPER(TRIM(client_name)) AS client_name, COUNT(*)::int AS manifest_count
          FROM management_orders
@@ -2865,7 +2865,8 @@ export const getDriveCoverage = async (req: Request, res: Response) => {
         [dateFrom, dateTo]
       ),
       pool.query(
-        `SELECT UPPER(TRIM(COALESCE(c.name, d.client_id))) AS client_name,
+        `SELECT d.client_id,
+                UPPER(TRIM(COALESCE(c.name, d.client_id))) AS client_name,
                 COUNT(d.id)::int AS upload_count,
                 COUNT(CASE WHEN d.status = 'SUCCESS' THEN 1 END)::int AS success_count,
                 COUNT(CASE WHEN d.status = 'ERROR'   THEN 1 END)::int AS error_count,
@@ -2878,31 +2879,83 @@ export const getDriveCoverage = async (req: Request, res: Response) => {
          LEFT JOIN clients c ON d.client_id = c.id
          WHERE (d.folder_date::date BETWEEN $1 AND $2 OR d.upload_date::date BETWEEN $1 AND $2)
            AND COALESCE(d.is_deleted, false) = false
-         GROUP BY UPPER(TRIM(COALESCE(c.name, d.client_id)))`,
+         GROUP BY d.client_id, UPPER(TRIM(COALESCE(c.name, d.client_id)))`,
         [dateFrom, dateTo]
       ),
+      pool.query(`SELECT documento, nombre, client_mappings FROM prov_cliente WHERE client_mappings IS NOT NULL AND client_mappings != '[]'::jsonb`),
     ]);
+
+    // Build mapping: managementName (from manifests) → { clientIds for uploads, displayName }
+    // Each prov_cliente entry has client_mappings: [{clientId, clientName, managementName, bodega}]
+    // managementName matches management_orders.client_name
+    // clientId matches document_drive_logs.client_id
+    const mgmtNameToClientIds = new Map<string, Set<string>>();
+    const mgmtNameToDisplay = new Map<string, string>();
+
+    for (const prov of provRes.rows) {
+      const mappings: Array<{clientId: string; clientName: string; managementName: string; bodega?: string}> = prov.client_mappings || [];
+      for (const m of mappings) {
+        if (!m.managementName || !m.clientId) continue;
+        const key = m.managementName.trim().toUpperCase();
+        if (!mgmtNameToClientIds.has(key)) mgmtNameToClientIds.set(key, new Set());
+        mgmtNameToClientIds.get(key)!.add(m.clientId);
+        mgmtNameToDisplay.set(key, m.clientName || key);
+      }
+    }
+
+    // uploadMap by client_id for fast lookup
+    const uploadByClientId = new Map<string, any>(
+      uploadsRes.rows.map((r: any) => [r.client_id, r])
+    );
+    // uploadMap by client_name for fallback (no mapping configured)
+    const uploadByName = new Map<string, any>(
+      uploadsRes.rows.map((r: any) => [r.client_name, r])
+    );
 
     const manifestMap = new Map<string, number>(
       manifestsRes.rows.map((r: any) => [r.client_name, r.manifest_count])
     );
-    const uploadMap = new Map<string, any>(
-      uploadsRes.rows.map((r: any) => [r.client_name, r])
-    );
 
-    const allClients = new Set([...manifestMap.keys(), ...uploadMap.keys()]);
-    const coverage = Array.from(allClients).map(client => {
-      const manifests   = manifestMap.get(client) ?? 0;
-      const up          = uploadMap.get(client);
-      const uploads     = up?.upload_count ?? 0;
-      const successes   = up?.success_count ?? 0;
-      const errors      = up?.error_count ?? 0;
-      const avgDelay    = up?.avg_delay_hours ?? null;
-      const status      = manifests > 0 && uploads > 0 ? 'CUBIERTO'
-                        : manifests > 0 && uploads === 0 ? 'FALTANTE'
-                        : 'EXCEDENTE';
+    // Aggregate uploads for a manifest client_name using mappings when available
+    const getUploadsForManifestClient = (clientName: string) => {
+      const clientIds = mgmtNameToClientIds.get(clientName);
+      if (clientIds && clientIds.size > 0) {
+        let upload_count = 0, success_count = 0, error_count = 0, delaySum = 0, delayCount = 0;
+        for (const cid of clientIds) {
+          const u = uploadByClientId.get(cid);
+          if (!u) continue;
+          upload_count  += u.upload_count  ?? 0;
+          success_count += u.success_count ?? 0;
+          error_count   += u.error_count   ?? 0;
+          if (u.avg_delay_hours != null) { delaySum += u.avg_delay_hours * (u.upload_count ?? 1); delayCount += u.upload_count ?? 1; }
+        }
+        return { upload_count, success_count, error_count, avg_delay_hours: delayCount > 0 ? Math.round((delaySum / delayCount) * 10) / 10 : null };
+      }
+      // Fallback: direct name match
+      const u = uploadByName.get(clientName);
+      return u ? { upload_count: u.upload_count, success_count: u.success_count, error_count: u.error_count, avg_delay_hours: u.avg_delay_hours } : null;
+    };
+
+    // Collect upload client names that are NOT covered by any mapping (to surface as EXCEDENTE)
+    const mappedClientIds = new Set<string>();
+    for (const ids of mgmtNameToClientIds.values()) ids.forEach(id => mappedClientIds.add(id));
+    const unmappedUploadNames = uploadsRes.rows
+      .filter((r: any) => !mappedClientIds.has(r.client_id) && !manifestMap.has(r.client_name))
+      .map((r: any) => r.client_name);
+
+    const allKeys = new Set([...manifestMap.keys(), ...unmappedUploadNames]);
+    const coverage = Array.from(allKeys).map(client => {
+      const manifests = manifestMap.get(client) ?? 0;
+      const up        = getUploadsForManifestClient(client);
+      const uploads   = up?.upload_count   ?? 0;
+      const successes = up?.success_count  ?? 0;
+      const errors    = up?.error_count    ?? 0;
+      const avgDelay  = up?.avg_delay_hours ?? null;
+      const status    = manifests > 0 && uploads > 0 ? 'CUBIERTO'
+                      : manifests > 0 && uploads === 0 ? 'FALTANTE'
+                      : 'EXCEDENTE';
       const coveragePct = manifests > 0 ? Math.min(100, Math.round((uploads / manifests) * 100)) : null;
-      return { clientName: client, manifestCount: manifests, uploadCount: uploads, successCount: successes, errorCount: errors, avgDelayHours: avgDelay, coveragePct, status };
+      return { clientName: mgmtNameToDisplay.get(client) || client, manifestCount: manifests, uploadCount: uploads, successCount: successes, errorCount: errors, avgDelayHours: avgDelay, coveragePct, status };
     }).sort((a, b) => b.manifestCount - a.manifestCount);
 
     const cubiertos  = coverage.filter(c => c.status === 'CUBIERTO').length;

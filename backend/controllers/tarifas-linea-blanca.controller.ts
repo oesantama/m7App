@@ -1,8 +1,23 @@
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
 
+const initTable = async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tarifas_linea_blanca (
+      id SERIAL PRIMARY KEY,
+      destino TEXT NOT NULL,
+      articulo TEXT NOT NULL,
+      precio NUMERIC(15,2) NOT NULL,
+      usuario_creacion TEXT,
+      fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(destino, articulo)
+    )
+  `);
+};
+
 export const getTarifas = async (req: Request, res: Response) => {
   try {
+    await initTable();
     const result = await pool.query('SELECT * FROM tarifas_linea_blanca ORDER BY destino ASC, articulo ASC');
     res.json(result.rows);
   } catch (err: any) {
@@ -25,6 +40,7 @@ export const saveTarifa = async (req: Request, res: Response) => {
   }
 
   try {
+    await initTable();
     const p = parseFloat(precio);
     let result;
 
@@ -75,6 +91,7 @@ export const deleteTarifa = async (req: Request, res: Response) => {
   }
 
   try {
+    await initTable();
     const result = await pool.query('DELETE FROM tarifas_linea_blanca WHERE id = $1 RETURNING id', [id]);
     if (result.rowCount === 0) {
       return res.status(404).json({ error: 'Tarifa no encontrada' });
@@ -95,6 +112,7 @@ export const bulkSaveTarifas = async (req: Request, res: Response) => {
 
   const client = await pool.connect();
   try {
+    await initTable();
     await client.query('BEGIN');
 
     for (const item of items) {
