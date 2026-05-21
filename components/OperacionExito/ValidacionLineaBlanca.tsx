@@ -288,8 +288,8 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
       const coincidencias = res.filter(r => r.estado === VALIDATION_STATES.OK).length;
       const discrepancias = res.filter(r => r.estado === VALIDATION_STATES.DISCREPANCY).length + res.filter(r => r.estado === VALIDATION_STATES.NOT_FOUND).length;
       const novedades = res.filter(r => r.estado === VALIDATION_STATES.NOVELTY).length;
-      const porcentajeCoincidencia = (totalRegistros - fallidasTransporte) > 0 ?
-        Math.round((coincidencias / (totalRegistros - fallidasTransporte)) * 100) : 0;
+      const porcentajeCoincidencia = totalRegistros > 0 ?
+        Math.round((coincidencias / totalRegistros) * 100) : 0;
       
       const totalMilla7 = res.reduce((sum, r) => sum + (r.totalMilla7 || 0), 0);
       const valorAdicionalTotal = res.reduce((sum, r) => sum + (r.valorAdicional || 0), 0);
@@ -307,12 +307,16 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
       const totalPagado = res.reduce((sum, r) => sum + (r.precioArchivo2 || 0), 0);
       const totalDebido = res.reduce((sum, r) => {
         let montoDebido = 0;
-        if (r.tipoValidacion === VALIDATION_TYPES.FAILED_70) {
-          montoDebido = r.precio70Base || 0;
-        } else if (r.tipoValidacion === VALIDATION_TYPES.FAILED_TRANSPORT) {
-          montoDebido = 0;
+        if (r.estado === VALIDATION_STATES.OK) {
+          montoDebido = r.precioArchivo2 || 0;
         } else {
-          montoDebido = r.precioArchivo1 || 0;
+          if (r.tipoValidacion === VALIDATION_TYPES.FAILED_70) {
+            montoDebido = r.precio70Base || 0;
+          } else if (r.tipoValidacion === VALIDATION_TYPES.FAILED_TRANSPORT) {
+            montoDebido = 0;
+          } else {
+            montoDebido = r.precioArchivo1 || 0;
+          }
         }
         return sum + montoDebido;
       }, 0);
