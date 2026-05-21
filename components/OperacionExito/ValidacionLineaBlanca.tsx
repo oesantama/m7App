@@ -131,11 +131,24 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
 
       let res: any[] = [];
       let barbosaMap = new Map();
+      let seenKeys = new Set();
+      let duplicateKeys = new Set();
 
-      // Pass 1: Count Barbosa trips per truck
+      // Pass 1: Count Barbosa trips per truck and find duplicates
       millaRows.forEach(row => {
         const c1 = (row['columna1'] || '').toString().trim().toLowerCase();
         const placa = (row['placa'] || '').toString().trim().toUpperCase();
+        const sys = (row['systram'] || '').toString().trim();
+        const viaje = (row['#viaje - pedido'] || '').toString().trim();
+        
+        if (sys && viaje && c1) {
+          const key = `${sys}-${viaje}-${c1}`;
+          if (seenKeys.has(key)) {
+            duplicateKeys.add(key);
+          }
+          seenKeys.add(key);
+        }
+
         if (c1.includes('barbosa')) {
           const current = barbosaMap.get(placa) || { viajes: 0 };
           barbosaMap.set(placa, { viajes: current.viajes + 1 });
@@ -170,6 +183,11 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
         let tipo = VALIDATION_TYPES.NO_MARKER;
         let notasValidacion = '';
         let diff = precioArchivo2;
+
+        const sys = (row['systram'] || '').toString().trim();
+        const viaje = (row['#viaje - pedido'] || '').toString().trim();
+        const c1Raw = (row['columna1'] || '').toString().trim().toLowerCase();
+        const isDuplicate = sys && viaje && c1Raw && duplicateKeys.has(`${sys}-${viaje}-${c1Raw}`);
 
         if (matchingBase) {
           const entregadasText = (row['entregadas'] || '').toString().toLowerCase().trim();
@@ -242,6 +260,11 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
           tipo = VALIDATION_TYPES.NO_MATCH;
           diff = precioArchivo2;
           notasValidacion = 'No se encontró en base';
+        }
+
+        if (isDuplicate) {
+          estado = VALIDATION_STATES.ERROR;
+          notasValidacion = (notasValidacion ? notasValidacion + ' | ' : '') + 'DUPLICADO: Systram y Pedido repetido en archivo';
         }
 
         const valorAdicional = Math.round(parseFloat(row['valor adicional operador auxiliar'] || row['VALOR ADICIONAL OPERADOR AUXILIAR'] || '0') || 0);

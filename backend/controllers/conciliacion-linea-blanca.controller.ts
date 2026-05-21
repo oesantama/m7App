@@ -42,12 +42,14 @@ export const saveConciliacion = async (req: Request, res: Response) => {
       // Validar si es repetido basado en systram y viaje_pedido
       const sys = detalle.systram ? detalle.systram.toString().trim() : '';
       const viaje = detalle.viajePedido ? detalle.viajePedido.toString().trim() : '';
+      const dest = detalle.destino ? detalle.destino.toString().trim() : '';
+      const art = detalle.articulo ? detalle.articulo.toString().trim() : '';
       
       let existingId = null;
       if (sys && viaje) {
         const check = await client.query(
-          `SELECT id FROM conciliacion_lb_detalles WHERE systram = $1 AND viaje_pedido = $2`,
-          [sys, viaje]
+          `SELECT id FROM conciliacion_lb_detalles WHERE systram = $1 AND viaje_pedido = $2 AND destino = $3 AND articulo = $4`,
+          [sys, viaje, dest, art]
         );
         if (check.rows.length > 0) {
           existingId = check.rows[0].id;
