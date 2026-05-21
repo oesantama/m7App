@@ -2847,3 +2847,73 @@ export const correctDocumentItems = async (req: Request, res: Response) => {
     client.release();
   }
 };
+
+export const getDriveCoverage = async (req: Request, res: Response) => {
+  const { from, to } = req.query;
+  const dateFrom = (from as string) || '2000-01-01';
+  const dateTo   = (to   as string) || '2099-12-31';
+
+  try {
+    const [manifestsRes, uploadsRes] = await Promise.all([
+      pool.query(
+        `SELECT UPPER(TRIM(client_name)) AS client_name, COUNT(*)::int AS manifest_count
+         FROM management_orders
+         WHERE manifest_date::date BETWEEN $1 AND $2
+           AND manifest_status NOT IN ('ANULADO','CANCELADO','ANULADA')
+           AND manifest_date IS NOT NULL
+         GROUP BY UPPER(TRIM(client_name))`,
+        [dateFrom, dateTo]
+      ),
+      pool.query(
+        `SELECT UPPER(TRIM(COALESCE(c.name, d.client_id))) AS client_name,
+                COUNT(d.id)::int AS upload_count,
+                COUNT(CASE WHEN d.status = 'SUCCESS' THEN 1 END)::int AS success_count,
+                COUNT(CASE WHEN d.status = 'ERROR'   THEN 1 END)::int AS error_count,
+                ROUND(AVG(
+                  CASE WHEN d.upload_date IS NOT NULL AND d.folder_date IS NOT NULL
+                    THEN EXTRACT(EPOCH FROM (d.upload_date - d.folder_date)) / 3600.0
+                  END
+                )::numeric, 1)::float AS avg_delay_hours
+         FROM document_drive_logs d
+         LEFT JOIN clients c ON d.client_id = c.id
+         WHERE (d.folder_date::date BETWEEN $1 AND $2 OR d.upload_date::date BETWEEN $1 AND $2)
+           AND COALESCE(d.is_deleted, false) = false
+         GROUP BY UPPER(TRIM(COALESCE(c.name, d.client_id)))`,
+        [dateFrom, dateTo]
+      ),
+    ]);
+
+    const manifestMap = new Map<string, number>(
+      manifestsRes.rows.map((r: any) => [r.client_name, r.manifest_count])
+    );
+    const uploadMap = new Map<string, any>(
+      uploadsRes.rows.map((r: any) => [r.client_name, r])
+    );
+
+    const allClients = new Set([...manifestMap.keys(), ...uploadMap.keys()]);
+    const coverage = Array.from(allClients).map(client => {
+      const manifests   = manifestMap.get(client) ?? 0;
+      const up          = uploadMap.get(client);
+      const uploads     = up?.upload_count ?? 0;
+      const successes   = up?.success_count ?? 0;
+      const errors      = up?.error_count ?? 0;
+      const avgDelay    = up?.avg_delay_hours ?? null;
+      const status      = manifests > 0 && uploads > 0 ? 'CUBIERTO'
+                        : manifests > 0 && uploads === 0 ? 'FALTANTE'
+                        : 'EXCEDENTE';
+      const coveragePct = manifests > 0 ? Math.min(100, Math.round((uploads / manifests) * 100)) : null;
+      return { clientName: client, manifestCount: manifests, uploadCount: uploads, successCount: successes, errorCount: errors, avgDelayHours: avgDelay, coveragePct, status };
+    }).sort((a, b) => b.manifestCount - a.manifestCount);
+
+    const cubiertos  = coverage.filter(c => c.status === 'CUBIERTO').length;
+    const faltantes  = coverage.filter(c => c.status === 'FALTANTE').length;
+    const excedentes = coverage.filter(c => c.status === 'EXCEDENTE').length;
+    const withManifest = cubiertos + faltantes;
+    const coveragePct = withManifest > 0 ? Math.round((cubiertos / withManifest) * 100) : 0;
+
+    res.json({ success: true, summary: { cubiertos, faltantes, excedentes, coveragePct }, data: coverage });
+  } catch (err: any) {
+    console.error('[M7-DRIVE-COVERAGE-ERR]', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};

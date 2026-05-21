@@ -123,3 +123,68 @@ export const getDetallesConciliacion = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: 'Error interno obteniendo detalles' });
   }
 };
+
+export const searchDetalles = async (req: Request, res: Response) => {
+  const { fecha_desde, fecha_hasta, placa, systram, pedido } = req.query;
+  
+  let query = `SELECT * FROM conciliacion_lb_detalles WHERE 1=1`;
+  const params: any[] = [];
+  let paramCount = 1;
+
+  if (fecha_desde) {
+    const excelSerialDesde = (new Date(fecha_desde as string).getTime() / 86400000) + 25569;
+    query += ` AND (fecha >= $${paramCount} OR (fecha ~ '^[0-9]+$' AND fecha::numeric >= $${paramCount + 1}))`;
+    params.push(fecha_desde, excelSerialDesde);
+    paramCount += 2;
+  }
+  if (fecha_hasta) {
+    const excelSerialHasta = (new Date(fecha_hasta as string).getTime() / 86400000) + 25569;
+    query += ` AND (fecha <= $${paramCount} OR (fecha ~ '^[0-9]+$' AND fecha::numeric <= $${paramCount + 1}))`;
+    params.push(fecha_hasta, excelSerialHasta);
+    paramCount += 2;
+  }
+  if (placa) {
+    query += ` AND placa ILIKE $${paramCount++}`;
+    params.push(`%${placa}%`);
+  }
+  if (systram) {
+    query += ` AND systram ILIKE $${paramCount++}`;
+    params.push(`%${systram}%`);
+  }
+  if (pedido) {
+    query += ` AND viaje_pedido ILIKE $${paramCount++}`;
+    params.push(`%${pedido}%`);
+  }
+
+  query += ` ORDER BY id ASC`;
+
+  try {
+    const result = await pool.query(query, params);
+    
+    // Map snake_case to camelCase just as it was in the frontend validation object
+    const mapped = result.rows.map(row => ({
+      index: row.id, // For UI purposes
+      fecha: row.fecha,
+      placa: row.placa,
+      systram: row.systram,
+      viajePedido: row.viaje_pedido,
+      destino: row.destino,
+      articulo: row.articulo,
+      precioArchivo1: row.precio_archivo_base,
+      precio70Base: row.precio_70_base,
+      precioArchivo2: row.precio_conciliacion,
+      diferencia: row.diferencia,
+      valorAdicional: row.valor_adicional,
+      totalMilla7: row.total_milla7,
+      estado: row.estado,
+      tipoValidacion: row.tipo_validacion,
+      notasValidacion: row.notas_validacion,
+      notas2: row.notas2
+    }));
+
+    res.json(mapped);
+  } catch (err) {
+    console.error('Error buscando detalles conciliacion LB:', err);
+    res.status(500).json({ success: false, message: 'Error interno buscando detalles' });
+  }
+};

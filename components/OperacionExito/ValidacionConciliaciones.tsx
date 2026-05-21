@@ -3,7 +3,7 @@ import { CheckSquare, History, FileSpreadsheet, Search, Download, RefreshCw, Fil
 import { User } from '../../types';
 import ValidacionLineaBlanca from './ValidacionLineaBlanca';
 import TarifasLineaBlancaCRUD from './TarifasLineaBlancaCRUD';
-import * as api from '../../services/api';
+import { api } from '../../services/api';
 
 type Tab = 'linea-blanca' | 'historico' | 'planillas';
 
@@ -80,134 +80,145 @@ const TabLineaBlanca: React.FC<{ user: User }> = () => {
   );
 };
 
+import DashboardResultadosLB from './DashboardResultadosLB';
+
 // ─── Tab: Histórico Conciliación ──────────────────────────────────────────────
 const TabHistorico: React.FC<{ user: User }> = () => {
   const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo]     = useState('');
-  const [historico, setHistorico] = useState<any[]>([]);
+  const [dateTo, setDateTo] = useState('');
+  const [placa, setPlaca] = useState('');
+  const [systram, setSystram] = useState('');
+  const [pedido, setPedido] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resultados, setResultados] = useState<any[]>([]);
 
-  React.useEffect(() => {
-    fetchHistorico();
-  }, []);
-
-  const fetchHistorico = async () => {
+  const handleConsultar = async () => {
     setLoading(true);
     try {
-      const data = await api.getHistorialConciliacionesLB();
-      setHistorico(data);
+      const data = await api.searchConciliacionLB({
+        fecha_desde: dateFrom,
+        fecha_hasta: dateTo,
+        placa,
+        systram,
+        pedido
+      });
+      setResultados(data);
     } catch (e) {
-      console.error('Error fetching historico', e);
+      console.error('Error fetching search results', e);
     } finally {
       setLoading(false);
     }
   };
 
-  const filtered = historico.filter(h => {
-    if (dateFrom && new Date(h.fecha_creacion) < new Date(dateFrom)) return false;
-    if (dateTo && new Date(h.fecha_creacion) > new Date(dateTo)) return false;
-    return true;
-  });
-
-  const totalConciliado = filtered.reduce((acc, h) => acc + (parseFloat(h.total_milla7) || 0), 0);
-  const totalDiferenciaNeta = filtered.reduce((acc, h) => acc + (parseFloat(h.diferencia_neta) || 0), 0);
-  const totalDiscrepancias = filtered.reduce((acc, h) => acc + (parseInt(h.discrepancias) || 0), 0);
-  const totalRegistros = filtered.reduce((acc, h) => acc + (parseInt(h.total_registros) || 0), 0);
+  const handleLimpiar = () => {
+    setDateFrom('');
+    setDateTo('');
+    setPlaca('');
+    setSystram('');
+    setPedido('');
+    setResultados([]);
+  };
 
   return (
     <div className="space-y-4">
-      {/* Filtros de fecha */}
-      <div className="flex flex-wrap items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
-        <div className="flex items-center gap-2">
-          <Filter size={13} className="text-slate-400" />
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Filtrar por período</span>
+      {/* Filtros */}
+      <div className="flex flex-col gap-3 p-6 bg-slate-50 rounded-3xl border border-slate-200">
+        <div className="flex items-center gap-2 mb-2">
+          <Filter size={16} className="text-slate-400" />
+          <span className="text-[12px] font-black uppercase tracking-widest text-slate-500">Opciones de Búsqueda</span>
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-[10px] font-black text-slate-500 uppercase">Desde</label>
-          <input
-            type="date"
-            value={dateFrom}
-            onChange={e => setDateFrom(e.target.value)}
-            className="px-3 py-2 border border-slate-200 rounded-xl text-[11px] font-medium focus:outline-none focus:border-emerald-400 bg-white"
-          />
+        
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase">Desde</label>
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              className="px-3 py-2 border border-slate-200 rounded-xl text-[12px] font-medium focus:outline-none focus:border-emerald-400 bg-white"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase">Hasta</label>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              className="px-3 py-2 border border-slate-200 rounded-xl text-[12px] font-medium focus:outline-none focus:border-emerald-400 bg-white"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase">Placa</label>
+            <input
+              type="text"
+              placeholder="Ej. ABC123"
+              value={placa}
+              onChange={e => setPlaca(e.target.value)}
+              className="px-3 py-2 border border-slate-200 rounded-xl text-[12px] font-medium focus:outline-none focus:border-emerald-400 bg-white uppercase"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase">Systram</label>
+            <input
+              type="text"
+              placeholder="# Systram"
+              value={systram}
+              onChange={e => setSystram(e.target.value)}
+              className="px-3 py-2 border border-slate-200 rounded-xl text-[12px] font-medium focus:outline-none focus:border-emerald-400 bg-white"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-slate-500 uppercase">Pedido / Viaje</label>
+            <input
+              type="text"
+              placeholder="# Pedido"
+              value={pedido}
+              onChange={e => setPedido(e.target.value)}
+              className="px-3 py-2 border border-slate-200 rounded-xl text-[12px] font-medium focus:outline-none focus:border-emerald-400 bg-white"
+            />
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-[10px] font-black text-slate-500 uppercase">Hasta</label>
-          <input
-            type="date"
-            value={dateTo}
-            onChange={e => setDateTo(e.target.value)}
-            className="px-3 py-2 border border-slate-200 rounded-xl text-[11px] font-medium focus:outline-none focus:border-emerald-400 bg-white"
-          />
+
+        <div className="flex items-center gap-3 mt-2">
+          <button 
+            onClick={handleLimpiar} 
+            className="px-6 py-2 border border-slate-200 text-slate-500 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-200 hover:text-slate-700 transition-all"
+          >
+            Limpiar
+          </button>
+          <button 
+            onClick={handleConsultar} 
+            disabled={loading}
+            className="flex items-center gap-2 px-8 py-2 bg-emerald-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+          >
+            <Search size={14} />
+            {loading ? 'Buscando...' : 'Consultar'}
+          </button>
         </div>
-        <button onClick={fetchHistorico} className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all">
-          <RefreshCw size={12} />
-          Actualizar
-        </button>
       </div>
 
-      {/* Cards resumen */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="p-4 rounded-2xl border bg-emerald-50 border-emerald-200 text-emerald-700">
-          <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Total Milla 7</p>
-          <p className="text-2xl font-black">${Math.round(totalConciliado).toLocaleString()}</p>
+      {/* Resultados (Dashboard exacto al de la carga) */}
+      {!loading && resultados.length === 0 && (
+        <div className="text-center py-20 bg-white rounded-[2rem] border border-slate-100 shadow-xl mt-6">
+          <div className="flex flex-col items-center gap-4">
+            <History size={48} className="text-slate-200" />
+            <div>
+              <p className="text-lg font-black text-slate-600">No hay datos para mostrar</p>
+              <p className="text-sm text-slate-400 font-medium mt-1">Ajusta los filtros y presiona Consultar para ver el dashboard.</p>
+            </div>
+          </div>
         </div>
-        <div className="p-4 rounded-2xl border bg-amber-50 border-amber-200 text-amber-700">
-          <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Diferencia Neta</p>
-          <p className="text-2xl font-black">${Math.round(totalDiferenciaNeta).toLocaleString()}</p>
-        </div>
-        <div className="p-4 rounded-2xl border bg-rose-50 border-rose-200 text-rose-700">
-          <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Discrepancias</p>
-          <p className="text-2xl font-black">{totalDiscrepancias}</p>
-        </div>
-        <div className="p-4 rounded-2xl border bg-slate-50 border-slate-200 text-slate-700">
-          <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Total Servicios</p>
-          <p className="text-2xl font-black">{totalRegistros}</p>
-        </div>
-      </div>
+      )}
 
-      {/* Tabla histórico */}
-      <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
-        <table className="w-full text-[11px]">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              {['Fecha', 'Archivo', 'Mes/Año', 'Servicios', 'Coincidencias', 'Discrepancias', 'Total Milla 7', 'Diferencia Neta'].map(h => (
-                <th key={h} className="px-4 py-3 text-left font-black uppercase tracking-wider text-slate-500">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Cargando histórico...</td></tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="px-4 py-16 text-center">
-                  <div className="flex flex-col items-center gap-3">
-                    <History size={32} className="text-slate-300" />
-                    <p className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Sin histórico disponible</p>
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              filtered.map((h: any) => (
-                <tr key={h.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-700">{new Date(h.fecha_creacion).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 font-medium text-slate-700">{h.nombre_archivo}</td>
-                  <td className="px-4 py-3 text-slate-600">{h.mes_anio}</td>
-                  <td className="px-4 py-3 text-slate-600">{h.total_registros}</td>
-                  <td className="px-4 py-3 text-green-600 font-medium">{h.coincidencias}</td>
-                  <td className="px-4 py-3 text-red-600 font-medium">{h.discrepancias}</td>
-                  <td className="px-4 py-3 font-black text-slate-800">${parseFloat(h.total_milla7 || 0).toLocaleString()}</td>
-                  <td className={`px-4 py-3 font-black ${parseFloat(h.diferencia_neta) < 0 ? 'text-red-500' : 'text-green-500'}`}>${parseFloat(h.diferencia_neta || 0).toLocaleString()}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      {resultados.length > 0 && (
+        <div className="mt-8">
+          <DashboardResultadosLB resultados={resultados} />
+        </div>
+      )}
     </div>
   );
 };
+
 
 // ─── Tab: Planillas Operativas ────────────────────────────────────────────────
 const TabPlanillas: React.FC<{ user: User }> = () => {

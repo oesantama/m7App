@@ -939,6 +939,7 @@ const healSchema = async (client: any) => {
       );
     `);
 
+    await client.query(`ALTER TABLE document_drive_logs ADD COLUMN IF NOT EXISTS folder_date DATE`).catch(() => {});
     // Fix user_id type mismatch
     await client.query(`ALTER TABLE document_drive_logs ALTER COLUMN user_id TYPE TEXT;`).catch(() => {});
 

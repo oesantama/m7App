@@ -1478,6 +1478,10 @@ export const api = {
   }),
   saveConciliacionLB: async (data: any) => fetchJson(`${API_URL}/conciliacion-linea-blanca`, { method: 'POST', body: JSON.stringify(data) }),
   getHistorialConciliacionesLB: async () => fetchJson(`${API_URL}/conciliacion-linea-blanca`),
+  searchConciliacionLB: async (params: any) => {
+    const qs = new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([_, v]) => v != null && v !== '')) as any).toString();
+    return fetchJson(`${API_URL}/conciliacion-linea-blanca/search?${qs}`);
+  },
   getDetallesConciliacionLB: async (id: string | number) => fetchJson(`${API_URL}/conciliacion-linea-blanca/${id}`),
 
   // --- INFORMES FLOTA ---

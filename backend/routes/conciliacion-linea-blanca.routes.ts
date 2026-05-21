@@ -8,6 +8,7 @@ router.use(authenticateToken);
 
 router.post('/', ConciliacionLBCtrl.saveConciliacion);
 router.get('/', ConciliacionLBCtrl.getHistorialConciliaciones);
+router.get('/search', ConciliacionLBCtrl.searchDetalles);
 router.get('/:id', ConciliacionLBCtrl.getDetallesConciliacion);
 
 export default router;

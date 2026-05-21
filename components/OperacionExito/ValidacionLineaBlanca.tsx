@@ -13,11 +13,11 @@ const VALIDATION_TYPES = { DELIVERED: 'Entregado', FAILED_70: 'Fallida 70%', FAI
 const extractMonth = (fecha: any) => {
   if (!fecha) return 'Sin mes';
   if (typeof fecha === 'number' && fecha > 1) {
-    const excelEpoch = new Date(1900, 0, 1);
-    const date = new Date(excelEpoch.getTime() + (fecha - 2) * 24 * 60 * 60 * 1000);
-    return date.toLocaleString('es-CO', { month: 'long', year: 'numeric' });
+    // Usa matemática UTC directa para evitar cambios de día por zona horaria
+    const date = new Date((fecha - 25569) * 86400 * 1000);
+    return date.toLocaleString('es-CO', { month: 'long', year: 'numeric', timeZone: 'UTC' });
   }
-  return fecha.toString().trim().substring(0, 7); // Very naive fallback
+  return fecha.toString().trim().substring(0, 7);
 };
 
 export default function ValidacionLineaBlanca({ user }: { user: any }) {
@@ -27,6 +27,9 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
   const [conciliacionFile, setConciliacionFile] = useState<File | null>(null);
   const [validando, setValidando] = useState(false);
   const [resultados, setResultados] = useState<any[]>([]);
+  const [resumenTipos, setResumenTipos] = useState<any[]>([]);
+  const [resumenPlacas, setResumenPlacas] = useState<any[]>([]);
+  const [resumenMensual, setResumenMensual] = useState<any[]>([]);
   const [reporteBarbosa, setReporteBarbosa] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({});
   const [guardando, setGuardando] = useState(false);
@@ -328,6 +331,87 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
         pagadoOK, totalDebido, totalPagado
       });
 
+      // Calculate resumenTipos
+      const typeCounts: Record<string, any> = {};
+      res.forEach(r => {
+        const tipo = r.tipoValidacion || 'Sin tipo';
+        if (!typeCounts[tipo]) typeCounts[tipo] = { cantidad: 0, valorTotal: 0 };
+        typeCounts[tipo].cantidad++;
+        typeCounts[tipo].valorTotal += r.precioArchivo2 || 0;
+      });
+      setResumenTipos(Object.entries(typeCounts).map(([tipo, data]) => ({
+        tipoValidacion: tipo,
+        cantidad: data.cantidad,
+        porcentaje: totalRegistros > 0 ? (data.cantidad / totalRegistros) * 100 : 0,
+        valorTotal: data.valorTotal
+      })).sort((a, b) => b.cantidad - a.cantidad));
+
+      // Calculate resumenPlacas
+      const placasData: Record<string, any> = {};
+      res.forEach(r => {
+        const placa = r.placa.toUpperCase().trim();
+        if (!placasData[placa]) {
+          placasData[placa] = { placa, totalViajes: 0, debePagar: 0, pago: 0, valorAdicional: 0, totalMilla7: 0 };
+        }
+        placasData[placa].totalViajes++;
+        
+        let montoDebido = 0;
+        if (r.estado === VALIDATION_STATES.OK) {
+          montoDebido = r.precioArchivo2 || 0;
+        } else {
+          if (r.tipoValidacion === VALIDATION_TYPES.FAILED_70) {
+            montoDebido = r.precio70Base || 0;
+          } else if (r.tipoValidacion === VALIDATION_TYPES.FAILED_TRANSPORT) {
+            montoDebido = 0;
+          } else {
+            montoDebido = r.precioArchivo1 || 0;
+          }
+        }
+
+        placasData[placa].debePagar += montoDebido;
+        placasData[placa].pago += r.precioArchivo2 || 0;
+        placasData[placa].valorAdicional += r.valorAdicional || 0;
+        placasData[placa].totalMilla7 += r.totalMilla7 || 0;
+      });
+      setResumenPlacas(Object.values(placasData).map(item => {
+        const diferencia = item.pago - item.debePagar;
+        const ochentaYTres = item.totalMilla7 * 0.83;
+        const d_83 = item.pago - ochentaYTres;
+        return { ...item, diferenciaNeta: diferencia, ochentaYTres, d_83 };
+      }).sort((a, b) => b.totalViajes - a.totalViajes));
+
+      // Calculate resumenMensual
+      const monthlyData: Record<string, any> = {};
+      res.forEach(r => {
+        const mes = r.mes || (r.fecha ? extractMonth(r.fecha) : 'Sin mes');
+        if (!monthlyData[mes]) {
+          monthlyData[mes] = { mes, totalRegistros: 0, totalMilla7: 0, totalDebido: 0, totalPagado: 0, valorAdicionalTotal: 0 };
+        }
+        monthlyData[mes].totalRegistros++;
+        monthlyData[mes].totalMilla7 += r.totalMilla7 || 0;
+        monthlyData[mes].valorAdicionalTotal += r.valorAdicional || 0;
+        
+        let montoDebido = 0;
+        if (r.estado === VALIDATION_STATES.OK) {
+          montoDebido = r.precioArchivo2 || 0;
+        } else {
+          if (r.tipoValidacion === VALIDATION_TYPES.FAILED_70) {
+            montoDebido = r.precio70Base || 0;
+          } else if (r.tipoValidacion === VALIDATION_TYPES.FAILED_TRANSPORT) {
+            montoDebido = 0;
+          } else {
+            montoDebido = r.precioArchivo1 || 0;
+          }
+        }
+        
+        monthlyData[mes].totalDebido += montoDebido;
+        monthlyData[mes].totalPagado += r.precioArchivo2 || 0;
+      });
+      setResumenMensual(Object.values(monthlyData).map(item => ({
+        ...item,
+        diferenciaNeta: item.totalPagado - item.totalDebido
+      })));
+
       toast.success('Archivo validado correctamente');
     } catch (e: any) {
       toast.error(e.message || 'Error validando archivo');
@@ -359,20 +443,29 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
 
   const tableColumns = [
     { header: '#', key: 'index' },
-    { header: 'Fecha', key: 'fecha' },
+    { header: 'Fecha', key: 'fecha', render: (r: any) => {
+        if (!r.fecha) return '';
+        // Si es un número serial de excel:
+        if (!isNaN(Number(r.fecha))) return new Date((Number(r.fecha) - 25569) * 86400 * 1000).toLocaleDateString('es-CO', { timeZone: 'UTC' });
+        // Fallback
+        const d = new Date(r.fecha);
+        return isNaN(d.getTime()) ? r.fecha : d.toLocaleDateString('es-CO', { timeZone: 'UTC' });
+    }},
     { header: 'Placa', key: 'placa' },
     { header: 'SYSTRAM', key: 'systram' },
     { header: '# Viaje', key: 'viajePedido' },
     { header: 'Destino', key: 'destino' },
     { header: 'Artículo', key: 'articulo' },
-    { header: 'Precio Base', key: 'precioArchivo1', render: (r: any) => `$${r.precioArchivo1.toLocaleString()}` },
-    { header: 'Precio 70%', key: 'precio70Base', render: (r: any) => `$${r.precio70Base.toLocaleString()}` },
-    { header: 'Pagado', key: 'precioArchivo2', render: (r: any) => `$${r.precioArchivo2.toLocaleString()}` },
+    { header: 'Precio Base', key: 'precioArchivo1', render: (r: any) => `$${Number(r.precioArchivo1).toLocaleString()}` },
+    { header: 'Precio 70%', key: 'precio70Base', render: (r: any) => `$${Number(r.precio70Base).toLocaleString()}` },
+    { header: 'Pagado', key: 'precioArchivo2', render: (r: any) => `$${Number(r.precioArchivo2).toLocaleString()}` },
     { header: 'Diferencia', key: 'diferencia', render: (r: any) => (
       <span className={r.diferencia < 0 ? 'text-red-500 font-bold' : r.diferencia > 0 ? 'text-green-500 font-bold' : ''}>
-        ${r.diferencia.toLocaleString()}
+        ${Number(r.diferencia).toLocaleString()}
       </span>
     )},
+    { header: 'Valor Adicional', key: 'valorAdicional', render: (r: any) => `$${Number(r.valorAdicional).toLocaleString()}` },
+    { header: 'Total Milla 7', key: 'totalMilla7', render: (r: any) => `$${Number(r.totalMilla7).toLocaleString()}` },
     { header: 'Estado', key: 'estado', render: (r: any) => (
       <span className={`px-2 py-1 rounded-full text-xs font-bold ${
         r.estado === 'OK' ? 'bg-green-100 text-green-700' :
@@ -533,12 +626,82 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
             </div>
           </div>
 
-          <DataTable
-            data={resultados}
-            columns={tableColumns}
-            searchPlaceholder="Buscar por placa, viaje o destino..."
-            excelFileName="Resultados_Validacion_LB.xlsx"
-          />
+          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl mt-8">
+            <h3 className="text-xl font-black text-slate-800 mb-6">Resultados de Validación</h3>
+            <DataTable
+              data={resultados}
+              columns={tableColumns}
+              searchPlaceholder="Buscar por placa, viaje o destino..."
+              excelFileName="Resultados_Validacion_LB.xlsx"
+            />
+          </div>
+
+          {/* TABLAS ADICIONALES */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+            <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl">
+              <h3 className="text-xl font-black text-slate-800 mb-6">Resumen por Tipo de Validación</h3>
+              <DataTable
+                data={resumenTipos}
+                columns={[
+                  { header: 'Tipo de Validación', key: 'tipoValidacion' },
+                  { header: 'Cantidad', key: 'cantidad' },
+                  { header: 'Porcentaje', key: 'porcentaje', render: (r: any) => `${Math.round(r.porcentaje)}%` },
+                  { header: 'Valor Total', key: 'valorTotal', render: (r: any) => `$${Number(r.valorTotal).toLocaleString()}` },
+                ]}
+                searchPlaceholder="Buscar tipo..."
+                excelFileName="Resumen_Tipos_LB.xlsx"
+              />
+            </div>
+            
+            <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl">
+              <h3 className="text-xl font-black text-slate-800 mb-6">Resumen Mensual</h3>
+              <DataTable
+                data={resumenMensual}
+                columns={[
+                  { header: 'Mes', key: 'mes' },
+                  { header: 'Servicios', key: 'totalRegistros' },
+                  { header: 'Total Milla 7', key: 'totalMilla7', render: (r: any) => `$${Number(r.totalMilla7).toLocaleString()}` },
+                  { header: 'Total Debido', key: 'totalDebido', render: (r: any) => `$${Number(r.totalDebido).toLocaleString()}` },
+                  { header: 'Total Pagado', key: 'totalPagado', render: (r: any) => `$${Number(r.totalPagado).toLocaleString()}` },
+                  { header: 'Dif. Neta', key: 'diferenciaNeta', render: (r: any) => (
+                    <span className={r.diferenciaNeta < 0 ? 'text-red-500 font-bold' : r.diferenciaNeta > 0 ? 'text-green-500 font-bold' : ''}>
+                      ${Number(r.diferenciaNeta).toLocaleString()}
+                    </span>
+                  )},
+                ]}
+                searchPlaceholder="Buscar mes..."
+                excelFileName="Resumen_Mensual_LB.xlsx"
+              />
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl mt-8">
+            <h3 className="text-xl font-black text-slate-800 mb-6">Discriminado por Placa</h3>
+            <DataTable
+              data={resumenPlacas}
+              columns={[
+                { header: 'Placa', key: 'placa', render: (r: any) => <span className="font-bold">{r.placa}</span> },
+                { header: 'Viajes', key: 'totalViajes' },
+                { header: 'Debe Pagar', key: 'debePagar', render: (r: any) => `$${Number(r.debePagar).toLocaleString()}` },
+                { header: 'Pago', key: 'pago', render: (r: any) => `$${Number(r.pago).toLocaleString()}` },
+                { header: 'Diferencia', key: 'diferenciaNeta', render: (r: any) => (
+                  <span className={r.diferenciaNeta < 0 ? 'text-red-500 font-bold' : r.diferenciaNeta > 0 ? 'text-green-500 font-bold' : ''}>
+                    ${Number(r.diferenciaNeta).toLocaleString()}
+                  </span>
+                )},
+                { header: 'Total Milla 7', key: 'totalMilla7', render: (r: any) => `$${Number(r.totalMilla7).toLocaleString()}` },
+                { header: 'Auxiliar', key: 'valorAdicional', render: (r: any) => `$${Number(r.valorAdicional).toLocaleString()}` },
+                { header: '83% Milla 7', key: 'ochentaYTres', render: (r: any) => `$${Number(Math.round(r.ochentaYTres)).toLocaleString()}` },
+                { header: 'Dif 83%', key: 'd_83', render: (r: any) => (
+                  <span className={r.d_83 < 0 ? 'text-red-500 font-bold' : r.d_83 > 0 ? 'text-green-500 font-bold' : ''}>
+                    ${Number(Math.round(r.d_83)).toLocaleString()}
+                  </span>
+                )},
+              ]}
+              searchPlaceholder="Buscar placa..."
+              excelFileName="Resumen_Placas_LB.xlsx"
+            />
+          </div>
         </div>
       )}
 
