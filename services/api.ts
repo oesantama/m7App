@@ -1459,9 +1459,40 @@ export const api = {
     }
   },
   getFormatosTransportes: () => fetchJson(`${API_URL}/admin-center/formatos`),
+  getTarifasLineaBlanca: () => fetchJson(`${API_URL}/tarifas-linea-blanca`),
+  saveTarifaLineaBlanca: (data: any) => fetchJson(`${API_URL}/tarifas-linea-blanca`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
+  deleteTarifaLineaBlanca: (id: string) => fetchJson(`${API_URL}/tarifas-linea-blanca/${id}`, { method: 'DELETE' }),
+  bulkSaveTarifasLineaBlanca: (data: any) => fetchJson(`${API_URL}/tarifas-linea-blanca/bulk`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
   updateFormatoTransporte: (oldId: string, data: { newId: string, nombre: string, orden: number }) => fetchJson(`${API_URL}/admin-center/formatos/${encodeURIComponent(oldId)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }),
+  saveConciliacionLB: async (data: any) => fetchJson(`${API_URL}/conciliacion-linea-blanca`, { method: 'POST', body: JSON.stringify(data) }),
+  getHistorialConciliacionesLB: async () => fetchJson(`${API_URL}/conciliacion-linea-blanca`),
+  getDetallesConciliacionLB: async (id: string | number) => fetchJson(`${API_URL}/conciliacion-linea-blanca/${id}`),
+
+  // --- INFORMES FLOTA ---
+  getFlotaReport: (params: { from: string; to: string }) =>
+    fetchJson(`${API_URL}/flota/report?from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`),
+  getFlotaManualEntries: (params?: { from?: string; to?: string; clientId?: string }) => {
+    const qs = params ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null) as [string, string][])).toString() : '';
+    return fetchJson(`${API_URL}/flota/manual-entries${qs}`);
+  },
+  saveFlotaManualEntry: (data: { clientId: string; clientName: string; operationDate: string; quantity: number; city: string; notes?: string; createdBy?: string }) =>
+    fetchJson(`${API_URL}/flota/manual-entries`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  deleteFlotaManualEntry: (id: number) =>
+    fetchJson(`${API_URL}/flota/manual-entries/${id}`, { method: 'DELETE' }),
 };

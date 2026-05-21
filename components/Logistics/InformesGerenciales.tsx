@@ -169,6 +169,7 @@ export const InformesGerenciales: React.FC = () => {
   const [vehiclesSortDirection, setVehiclesSortDirection] = useState<'asc' | 'desc'>('desc');
   const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [showColumns, setShowColumns] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Hierarchical Reports state
@@ -3361,36 +3362,69 @@ Clientes General</h3>
           </div>
 
           {excelData.length === 0 ? (
-            <div 
-              onDragEnter={handleDrag}
-              onDragOver={handleDrag}
-              onDragLeave={handleDrag}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`flex flex-col items-center justify-center p-24 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${
-                dragActive 
-                  ? 'border-indigo-500 bg-indigo-50/40' 
-                  : 'border-slate-300 hover:border-indigo-400 bg-white hover:bg-slate-50/50'
-              }`}
-            >
-              <div className="p-5 rounded-full bg-indigo-50 text-indigo-600 mb-4 shadow-sm">
-                <Upload size={28} className="animate-bounce" />
+            <>
+              <div
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`flex flex-col items-center justify-center p-24 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${
+                  dragActive
+                    ? 'border-indigo-500 bg-indigo-50/40'
+                    : 'border-slate-300 hover:border-indigo-400 bg-white hover:bg-slate-50/50'
+                }`}
+              >
+                <div className="p-5 rounded-full bg-indigo-50 text-indigo-600 mb-4 shadow-sm">
+                  <Upload size={28} className="animate-bounce" />
+                </div>
+                <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide text-center">
+                  {uploadType === 'general' && 'Arrastra tu archivo formatoinforme.xlsx aquí'}
+                  {uploadType === 'recibo' && 'Arrastra tu archivo de Recibidos aquí'}
+                  {uploadType === 'egreso' && 'Arrastra tu archivo de Egresos aquí'}
+                </h4>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm text-center">O haz clic para explorar tus archivos locales (.xlsx, .xls).</p>
+                <div className="flex items-center gap-2 mt-4 bg-slate-100/60 text-slate-500 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase">
+                  <FileSpreadsheet size={12} />
+                  <span>
+                    {uploadType === 'general' && '25 Columnas del archivo'}
+                    {uploadType === 'recibo' && 'Columnas requeridas: Consecutivo, Fecha'}
+                    {uploadType === 'egreso' && 'Columnas requeridas: Consecutivo, Fecha'}
+                  </span>
+                </div>
               </div>
-              <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide text-center">
-                {uploadType === 'general' && 'Arrastra tu archivo formatoinforme.xlsx aquí'}
-                {uploadType === 'recibo' && 'Arrastra tu archivo de Recibidos aquí'}
-                {uploadType === 'egreso' && 'Arrastra tu archivo de Egresos aquí'}
-              </h4>
-              <p className="text-xs text-slate-400 mt-1 max-w-sm text-center">O haz clic para explorar tus archivos locales (.xlsx, .xls).</p>
-              <div className="flex items-center gap-2 mt-4 bg-slate-100/60 text-slate-500 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase">
-                <FileSpreadsheet size={12} />
-                <span>
-                  {uploadType === 'general' && 'Formato requerido de 23 columnas'}
-                  {uploadType === 'recibo' && 'Columnas requeridas: Consecutivo, Fecha'}
-                  {uploadType === 'egreso' && 'Columnas requeridas: Consecutivo, Fecha'}
-                </span>
-              </div>
-            </div>
+
+              {uploadType === 'general' && (
+                <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+                  <button
+                    onClick={() => setShowColumns(v => !v)}
+                    className="w-full flex items-center justify-between px-5 py-3 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:bg-slate-50 transition-all"
+                  >
+                    <span className="flex items-center gap-2">
+                      <FileSpreadsheet size={12} />
+                      Columnas requeridas en el archivo (25)
+                    </span>
+                    <span className="text-slate-400">{showColumns ? '▲' : '▼'}</span>
+                  </button>
+                  {showColumns && (
+                    <div className="px-5 pb-4 pt-1 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                      {[
+                        'Número OC','Estado OC','Fecha OC','Número Remesa','Remisión',
+                        'Estado Remesa','Fecha Remesa','Número Manifiesto','Orden Cliente','Observaciones Manifiesto',
+                        'Estado Manifiesto','Fecha Manifiesto','Placa','Nombre Cliente','Valor Total CXC final',
+                        'Valor Tot CXP final','Factura CXC','Recibo','Fecha Factura','Total CXC',
+                        'Egreso','Fecha CXP','Total CXP','Documento Cliente','Origen',
+                      ].map((col, i) => (
+                        <div key={col} className="flex items-center gap-1.5 bg-slate-50 rounded-xl px-3 py-2">
+                          <span className="text-[9px] font-black text-slate-300 w-4 shrink-0">{i + 1}</span>
+                          <span className="text-[10px] font-bold text-slate-600 leading-tight">{col}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           ) : (
             <div className="bg-white border border-slate-200/80 rounded-3xl shadow-sm overflow-hidden flex flex-col animate-in fade-in duration-350">
               {/* Previsualization Table Header */}
@@ -3406,7 +3440,7 @@ Clientes General</h3>
                       {uploadType === 'egreso' && `Previsualización de Carga de Egresos (${excelData.length} registros)`}
                     </h2>
                     <p className="text-[10px] text-slate-400">
-                      {uploadType === 'general' && 'Verifique detenidamente las 23 columnas cargadas antes de consolidar la información.'}
+                      {uploadType === 'general' && 'Verifique detenidamente las 25 columnas cargadas antes de consolidar la información.'}
                       {(uploadType === 'recibo' || uploadType === 'egreso') && 'Verifique las columnas cargadas. Se actualizará la fecha correspondiente según el Consecutivo.'}
                     </p>
                   </div>

@@ -67,13 +67,13 @@ export const uploadReports = async (req: Request, res: Response) => {
 
     const insertQuery = `
       INSERT INTO management_orders (
-        oc_number, oc_status, oc_date, remesa_number, remission, 
-        remission_status, remission_date, manifest_number, client_order, 
-        manifest_observations, manifest_status, manifest_date, plate, 
-        client_name, total_value_cxc_final, total_value_cxp_final, 
-        invoice_cxc, receipt, invoice_date, total_cxc, egress, 
-        cxp_date, total_cxp, created_by, updated_at, client_document
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, CURRENT_TIMESTAMP, $25)
+        oc_number, oc_status, oc_date, remesa_number, remission,
+        remission_status, remission_date, manifest_number, client_order,
+        manifest_observations, manifest_status, manifest_date, plate,
+        client_name, total_value_cxc_final, total_value_cxp_final,
+        invoice_cxc, receipt, invoice_date, total_cxc, egress,
+        cxp_date, total_cxp, created_by, updated_at, client_document, city
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, CURRENT_TIMESTAMP, $25, $26)
       ON CONFLICT (oc_number) DO UPDATE SET
         oc_status = EXCLUDED.oc_status,
         oc_date = EXCLUDED.oc_date,
@@ -98,6 +98,7 @@ export const uploadReports = async (req: Request, res: Response) => {
         cxp_date = EXCLUDED.cxp_date,
         total_cxp = EXCLUDED.total_cxp,
         client_document = EXCLUDED.client_document,
+        city = EXCLUDED.city,
         updated_at = CURRENT_TIMESTAMP;
     `;
 
@@ -131,7 +132,8 @@ export const uploadReports = async (req: Request, res: Response) => {
         parseDate(row.cxpDate || row['Fecha CXP']),
         parseNum(row.totalCxp || row['Total CXP']),
         user,
-        cleanStr(row.clientDocument || row['Documento Cliente'] || row['NIT Cliente'] || row['Nit Cliente'] || row['NIT cliente'] || row['Documento cliente'])
+        cleanStr(row.clientDocument || row['Documento Cliente'] || row['NIT Cliente'] || row['Nit Cliente'] || row['NIT cliente'] || row['Documento cliente']),
+        cleanStr(row.city || row['Origen'] || row['origen'] || row['ORIGEN'] || '').toUpperCase() || null
       ];
 
       await client.query(insertQuery, values);

@@ -972,29 +972,6 @@ const ConciliacionRouteModal: React.FC<Props> = ({
             return;
         }
 
-        // Verificar referencias duplicadas en nuevos pagos
-        for (let idx = 0; idx < allToSave.length; idx++) {
-            const c = allToSave[idx];
-            const ref = c.nroAprobacion?.trim();
-            if (!ref) continue;
-            const confirmedKey = ref.toUpperCase();
-            if (confirmedRefsRef.current.has(confirmedKey)) continue;
-            try {
-                const checkRes = await api.checkReferenceExists(ref);
-                if (checkRes.success && checkRes.exists) {
-                    const originalIdx = consignaciones.findIndex(x => x.id === c.id);
-                    setDuplicateAlert({
-                        reference: ref,
-                        sourceType: 'grupal',
-                        groupIndex: originalIdx >= 0 ? originalIdx : idx,
-                        details: checkRes.data
-                    });
-                    return;
-                }
-            } catch {
-                // Si la verificación falla, permitir continuar
-            }
-        }
 
         setSavingGrupal(true);
         try {

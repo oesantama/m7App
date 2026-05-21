@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { CheckSquare, History, FileSpreadsheet, Search, Download, RefreshCw, Filter } from 'lucide-react';
 import { User } from '../../types';
+import ValidacionLineaBlanca from './ValidacionLineaBlanca';
+import TarifasLineaBlancaCRUD from './TarifasLineaBlancaCRUD';
+import * as api from '../../services/api';
 
 type Tab = 'linea-blanca' | 'historico' | 'planillas';
 
@@ -81,6 +84,35 @@ const TabLineaBlanca: React.FC<{ user: User }> = () => {
 const TabHistorico: React.FC<{ user: User }> = () => {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo]     = useState('');
+  const [historico, setHistorico] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    fetchHistorico();
+  }, []);
+
+  const fetchHistorico = async () => {
+    setLoading(true);
+    try {
+      const data = await api.getHistorialConciliacionesLB();
+      setHistorico(data);
+    } catch (e) {
+      console.error('Error fetching historico', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filtered = historico.filter(h => {
+    if (dateFrom && new Date(h.fecha_creacion) < new Date(dateFrom)) return false;
+    if (dateTo && new Date(h.fecha_creacion) > new Date(dateTo)) return false;
+    return true;
+  });
+
+  const totalConciliado = filtered.reduce((acc, h) => acc + (parseFloat(h.total_milla7) || 0), 0);
+  const totalDiferenciaNeta = filtered.reduce((acc, h) => acc + (parseFloat(h.diferencia_neta) || 0), 0);
+  const totalDiscrepancias = filtered.reduce((acc, h) => acc + (parseInt(h.discrepancias) || 0), 0);
+  const totalRegistros = filtered.reduce((acc, h) => acc + (parseInt(h.total_registros) || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -108,29 +140,30 @@ const TabHistorico: React.FC<{ user: User }> = () => {
             className="px-3 py-2 border border-slate-200 rounded-xl text-[11px] font-medium focus:outline-none focus:border-emerald-400 bg-white"
           />
         </div>
-        <button className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all">
-          <Search size={12} />
-          Consultar
-        </button>
-        <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all ml-auto">
-          <Download size={12} />
-          Exportar
+        <button onClick={fetchHistorico} className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all">
+          <RefreshCw size={12} />
+          Actualizar
         </button>
       </div>
 
       {/* Cards resumen */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: 'Total Conciliado',  value: '$0',  color: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
-          { label: 'En Diferencia',     value: '0',   color: 'bg-amber-50 border-amber-200 text-amber-700' },
-          { label: 'Sin Conciliar',     value: '0',   color: 'bg-rose-50 border-rose-200 text-rose-700' },
-          { label: 'Total Facturas',    value: '0',   color: 'bg-slate-50 border-slate-200 text-slate-700' },
-        ].map(card => (
-          <div key={card.label} className={`p-4 rounded-2xl border ${card.color}`}>
-            <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">{card.label}</p>
-            <p className="text-2xl font-black">{card.value}</p>
-          </div>
-        ))}
+        <div className="p-4 rounded-2xl border bg-emerald-50 border-emerald-200 text-emerald-700">
+          <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Total Milla 7</p>
+          <p className="text-2xl font-black">${Math.round(totalConciliado).toLocaleString()}</p>
+        </div>
+        <div className="p-4 rounded-2xl border bg-amber-50 border-amber-200 text-amber-700">
+          <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Diferencia Neta</p>
+          <p className="text-2xl font-black">${Math.round(totalDiferenciaNeta).toLocaleString()}</p>
+        </div>
+        <div className="p-4 rounded-2xl border bg-rose-50 border-rose-200 text-rose-700">
+          <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Discrepancias</p>
+          <p className="text-2xl font-black">{totalDiscrepancias}</p>
+        </div>
+        <div className="p-4 rounded-2xl border bg-slate-50 border-slate-200 text-slate-700">
+          <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Total Servicios</p>
+          <p className="text-2xl font-black">{totalRegistros}</p>
+        </div>
       </div>
 
       {/* Tabla histórico */}
@@ -138,21 +171,37 @@ const TabHistorico: React.FC<{ user: User }> = () => {
         <table className="w-full text-[11px]">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              {['Fecha Conciliación', 'Documento', 'Facturas', 'Conductor', 'Placa', 'Valor Total', 'Estado', 'Concilió'].map(h => (
+              {['Fecha', 'Archivo', 'Mes/Año', 'Servicios', 'Coincidencias', 'Discrepancias', 'Total Milla 7', 'Diferencia Neta'].map(h => (
                 <th key={h} className="px-4 py-3 text-left font-black uppercase tracking-wider text-slate-500">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td colSpan={8} className="px-4 py-16 text-center">
-                <div className="flex flex-col items-center gap-3">
-                  <History size={32} className="text-slate-300" />
-                  <p className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Sin histórico disponible</p>
-                  <p className="text-[10px] text-slate-300 font-medium">Seleccione un rango de fechas para consultar</p>
-                </div>
-              </td>
-            </tr>
+            {loading ? (
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Cargando histórico...</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-4 py-16 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <History size={32} className="text-slate-300" />
+                    <p className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Sin histórico disponible</p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              filtered.map((h: any) => (
+                <tr key={h.id} className="border-b border-slate-100 hover:bg-slate-50">
+                  <td className="px-4 py-3 font-medium text-slate-700">{new Date(h.fecha_creacion).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 font-medium text-slate-700">{h.nombre_archivo}</td>
+                  <td className="px-4 py-3 text-slate-600">{h.mes_anio}</td>
+                  <td className="px-4 py-3 text-slate-600">{h.total_registros}</td>
+                  <td className="px-4 py-3 text-green-600 font-medium">{h.coincidencias}</td>
+                  <td className="px-4 py-3 text-red-600 font-medium">{h.discrepancias}</td>
+                  <td className="px-4 py-3 font-black text-slate-800">${parseFloat(h.total_milla7 || 0).toLocaleString()}</td>
+                  <td className={`px-4 py-3 font-black ${parseFloat(h.diferencia_neta) < 0 ? 'text-red-500' : 'text-green-500'}`}>${parseFloat(h.diferencia_neta || 0).toLocaleString()}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -199,7 +248,7 @@ const TabPlanillas: React.FC<{ user: User }> = () => {
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 const ValidacionConciliaciones: React.FC<{ user: User }> = ({ user }) => {
-  const [activeTab, setActiveTab] = useState<Tab>('linea-blanca');
+  const [activeTab, setActiveTab] = useState<Tab | 'archivo-base'>('linea-blanca');
 
   return (
     <div className="p-6 space-y-5">
@@ -213,10 +262,10 @@ const ValidacionConciliaciones: React.FC<{ user: User }> = ({ user }) => {
 
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-2xl w-fit">
-        {TABS.map(tab => (
+        {[...TABS, { key: 'archivo-base', label: 'Archivo Base (Tarifas)', icon: <CheckSquare size={14} /> }].map(tab => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => setActiveTab(tab.key as any)}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${
               activeTab === tab.key
                 ? 'bg-white text-slate-900 shadow-sm'
@@ -231,7 +280,8 @@ const ValidacionConciliaciones: React.FC<{ user: User }> = ({ user }) => {
 
       {/* Contenido del tab activo */}
       <div>
-        {activeTab === 'linea-blanca' && <TabLineaBlanca user={user} />}
+        {activeTab === 'linea-blanca' && <ValidacionLineaBlanca user={user} />}
+        {activeTab === 'archivo-base' && <TarifasLineaBlancaCRUD user={user} />}
         {activeTab === 'historico'    && <TabHistorico user={user} />}
         {activeTab === 'planillas'    && <TabPlanillas user={user} />}
       </div>

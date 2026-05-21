@@ -62,6 +62,8 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'invoice_conciliations': ['document_id', 'invoice_number', 'banco', 'valor', 'comprobante', 'fecha_pago', 'forma_pago', 'numero_cheque', 'es_devolucion', 'conciliado_por', 'vehicle_plate', 'conductor_id', 'conductor_name', 'created_at', 'updated_at'],
   'invoice_conciliation_reversal_logs': ['document_id', 'invoice_number', 'banco', 'valor', 'comprobante', 'fecha_pago', 'forma_pago', 'numero_cheque', 'es_devolucion', 'conciliado_por', 'vehicle_plate', 'conductor_id', 'conductor_name', 'original_created_at', 'original_updated_at', 'reversed_by', 'reversed_at', 'observations'],
   'invoice_status_history': ['document_id', 'invoice_number', 'evento', 'estado_anterior', 'estado_nuevo', 'valor_factura', 'valor_entregado', 'valor_devuelto', 'banco', 'comprobante', 'usuario_id', 'usuario_nombre', 'created_at'],
+  'conciliacion_lb_archivos': ['nombre_archivo', 'mes_anio', 'total_registros', 'coincidencias', 'discrepancias', 'novedades', 'total_milla7', 'diferencia_neta', 'usuario_creacion', 'fecha_creacion'],
+  'conciliacion_lb_detalles': ['archivo_id', 'fecha', 'placa', 'systram', 'viaje_pedido', 'destino', 'articulo', 'precio_archivo_base', 'precio_70_base', 'precio_conciliacion', 'diferencia', 'valor_adicional', 'total_milla7', 'estado', 'tipo_validacion', 'notas_validacion', 'notas2'],
 
   // ─── INVENTARIO DE VEHÍCULO ────────────────────────────────────────────────
   // Stock actual por vehículo/conductor tras despacho. Se suma al cargar y se resta al entregar/devolver.
@@ -236,6 +238,29 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
   
+  // Flota: tabla de operaciones manuales TDM
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS flota_manual_entries (
+        id SERIAL PRIMARY KEY,
+        client_id VARCHAR(50),
+        client_name VARCHAR(255) NOT NULL,
+        operation_date DATE NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 1,
+        city VARCHAR(100) DEFAULT 'SIN CIUDAD',
+        notes TEXT,
+        created_by VARCHAR(100),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_flota_manual_date ON flota_manual_entries (operation_date)`);
+    await client.query(`ALTER TABLE management_orders ADD COLUMN IF NOT EXISTS city VARCHAR(100)`);
+    await client.query(`ALTER TABLE management_orders ADD COLUMN IF NOT EXISTS fecha_recibo TIMESTAMP WITH TIME ZONE`);
+    await client.query(`ALTER TABLE management_orders ADD COLUMN IF NOT EXISTS fecha_egreso TIMESTAMP WITH TIME ZONE`);
+  } catch (err) {
+    console.error('[M7-DB] Error al crear flota_manual_entries:', err);
+  }
+
   // M7: Crear tabla prov_cliente de forma explícita si no existe
   try {
     await client.query(`
@@ -254,7 +279,7 @@ const healSchema = async (client: any) => {
     console.error('[M7-DB] Error al crear la tabla prov_cliente:', err);
   }
 
-  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'invoice_conciliation_reversal_logs', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions', 'routing_patterns', 'gh_horarios_laborales', 'gh_eps', 'gh_afp', 'gh_tipos_vivienda', 'gh_tipos_contrato', 'gh_ingresos_mensuales', 'gh_cargos', 'gh_tipos_sangre', 'gh_estados_civiles', 'gh_niveles_educativos', 'cfg_departamentos', 'cfg_ciudades', 'gh_visitas', 'management_orders', 'return_approval_batches', 'return_approval_batch_items'];
+  const serialTables = ['assignments', 'dispatch_assignments', 'picking_assignments', 'routes', 'route_modifications_log', 'delivery_confirmations', 'delivery_returns', 'delivery_return_items', 'vehicle_locations', 'deletion_logs', 'user_training_progress', 'digital_signatures', 'document_consolidated_items', 'document_items', 'inventario_clientes', 'grupo_inter_pedidos', 'document_l_payments', 'grupo_inter_novedades', 'grupo_inter_reajustes', 'training_attendance', 'payment_vouchers', 'invoice_conciliations', 'invoice_conciliation_reversal_logs', 'vehicle_inventory', 'route_assignment_items', 'supplier_returns', 'supplier_return_items', 'conciliation_headers', 'conciliation_transactions', 'routing_patterns', 'gh_horarios_laborales', 'gh_eps', 'gh_afp', 'gh_tipos_vivienda', 'gh_tipos_contrato', 'gh_ingresos_mensuales', 'gh_cargos', 'gh_tipos_sangre', 'gh_estados_civiles', 'gh_niveles_educativos', 'cfg_departamentos', 'cfg_ciudades', 'gh_visitas', 'management_orders', 'return_approval_batches', 'return_approval_batch_items', 'conciliacion_lb_archivos', 'conciliacion_lb_detalles'];
   const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
   for (const table of nuclearTables) {
     try {
@@ -1306,8 +1331,12 @@ export const restoreSystem = async () => {
       ('PAG-46', 'VALIDACIÓN CONCILIACIONES', 'validacion-conciliaciones', 'MOD-11', 'MOD-11', 'EST-01'),
       ('PAG-47', 'FLETES DE CONCILIACIÓN',    'fletes-conciliacion',        'MOD-11', 'MOD-11', 'EST-01'),
 
+      -- Gestión Documentos Drive (MOD-10) — operaciones manuales flota
+      ('PAG-62', 'OPERACIONES FLOTA MANUAL',  'operaciones-flota-manual',   'MOD-10', 'MOD-10', 'EST-01'),
+
       -- Gerencia (MOD-12)
-      ('PAG-50', 'INFORMES GERENCIALES',      'informes-gerenciales',       'MOD-12', 'MOD-12', 'EST-01')
+      ('PAG-50', 'INFORMES GERENCIALES',      'informes-gerenciales',       'MOD-12', 'MOD-12', 'EST-01'),
+      ('PAG-61', 'INFORMES FLOTA',            'informes-flota',             'MOD-12', 'MOD-12', 'EST-01')
 
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name, 

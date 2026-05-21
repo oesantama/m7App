@@ -133,6 +133,8 @@ export function DataTable<T extends Record<string, any>>({
           exportRow[col.header] = '—';
         } else if (typeof value === 'boolean') {
           exportRow[col.header] = value ? 'Sí' : 'No';
+        } else if (typeof value === 'number') {
+          exportRow[col.header] = value;
         } else {
           exportRow[col.header] = String(value);
         }

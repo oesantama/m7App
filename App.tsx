@@ -82,6 +82,8 @@ const FletesConciliacion = lazyWithRetry(() => import('./components/OperacionExi
 const InformeDashboardDrive = lazyWithRetry(() => import('./components/documents/InformeDashboardDrive'));
 const AuditoriaFactura = lazyWithRetry(() => import('./components/Logistics/AuditoriaFactura'));
 const InformesGerenciales = lazyWithRetry(() => import('./components/Logistics/InformesGerenciales'));
+const InformesFlota = lazyWithRetry(() => import('./components/Logistics/InformesFlota'));
+const OperacionesFlotaManual = lazyWithRetry(() => import('./components/OperacionExito/OperacionesFlotaManual'));
 const FormatosTransportes = lazyWithRetry(() => import('./components/AdminCenter/FormatosTransportes'));
 
 // Import Admin Module
@@ -999,6 +1001,18 @@ const App: React.FC = () => {
         return (
           <React.Suspense fallback={<div className="p-10">Cargando Informes Gerenciales...</div>}>
             <InformesGerenciales />
+          </React.Suspense>
+        );
+      case 'informes-flota':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Informes Flota...</div>}>
+            <InformesFlota user={user!} />
+          </React.Suspense>
+        );
+      case 'operaciones-flota-manual':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Operaciones Flota...</div>}>
+            <OperacionesFlotaManual user={user!} />
           </React.Suspense>
         );
       case 'validacion-conciliaciones':
