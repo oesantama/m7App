@@ -211,6 +211,7 @@ export default function OperacionesFlotaManual({ user }: Props) {
                     </td>
                     <td className="py-3 pr-4 text-slate-500 text-xs">{e.notes || '—'}</td>
                     <td className="py-3 pr-4 text-center text-slate-400 text-xs">{e.created_by || '—'}</td>
+                    <td className="py-3 text-center">
                       <div className="flex justify-center items-center gap-2">
                         {isSuperAdmin && (
                           <button onClick={() => {
@@ -222,9 +223,6 @@ export default function OperacionesFlotaManual({ user }: Props) {
                               city: e.city,
                               notes: e.notes || '',
                             });
-                            // Store edit ID? We would need a state for it, but for now we can just delete the old one or something...
-                            // Let's implement full edit if needed, or just delete and re-insert. Since there's no update endpoint in the previous snapshot, let's just prefill.
-                            // Actually, let's add full edit state if we can.
                             toast.info('Se han cargado los datos para editar. Si guarda, se creará un nuevo registro (debe eliminar el anterior si desea reemplazarlo).');
                             window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
