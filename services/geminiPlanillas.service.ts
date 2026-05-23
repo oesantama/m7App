@@ -116,7 +116,8 @@ class GeminiPlanillasService {
                 
                 if (!text) throw new Error("Respuesta vacía de Gemini");
 
-                const parsed = JSON.parse(text);
+                let cleanText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                const parsed = JSON.parse(cleanText);
                 return parsed.matches || [];
 
             } catch (error: any) {

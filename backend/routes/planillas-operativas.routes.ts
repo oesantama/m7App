@@ -10,6 +10,6 @@ router.post('/check-files', checkFiles);
 router.post('/check-history', checkHistory);
 router.delete('/', clearRecords);
 router.delete('/:id', removeRecord);
-router.post('/force-sync', forceSync);
+router.all('/force-sync', forceSync);
 
 export default router;
