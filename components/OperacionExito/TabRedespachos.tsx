@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import DataTable from '../Common/DataTable';
 import api from '../../services/api';
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export default function TabRedespachos() {
   const [data, setData] = useState<any[]>([]);
