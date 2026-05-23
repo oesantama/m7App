@@ -1,11 +1,12 @@
 import express from 'express';
-import { getRecords, saveRecords, removeRecord, clearRecords, checkFiles } from '../controllers/planillas-operativas.controller.js';
+import { getRecords, saveRecords, removeRecord, clearRecords, checkFiles, checkHistory } from '../controllers/planillas-operativas.controller.js';
 
 const router = express.Router();
 
 router.get('/', getRecords);
 router.post('/', saveRecords);
-router.post('/check-files', checkFiles);   // ← Verifica existencia en BD
+router.post('/check-files', checkFiles);
+router.post('/check-history', checkHistory);
 router.delete('/', clearRecords);
 router.delete('/:id', removeRecord);
 

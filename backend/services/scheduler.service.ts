@@ -55,21 +55,21 @@ export const initScheduler = () => {
     console.log('[M7-SCHEDULER] Tarea "Limpieza Novedades" programada: Diariamente 01:00 AM | Retención: 5 días hábiles (L-V)');
 
     // Sincronización Automática de Drive a Planillas (Exito Línea Blanca CLI-09)
-    // Cron normal: de Lunes a Sábado (1-6) a las 13:15 hora Colombia (Domingos excluidos)
-    cron.schedule('15 13 * * 1-6', async () => {
+    // Cron normal: de Lunes a Sábado (1-6) a las 09:00 hora Colombia (Domingos excluidos)
+    cron.schedule('0 9 * * 1-6', async () => {
         console.log('[M7-SCHEDULER] Ejecutando sincronización de Drive vs Planillas...');
         await syncDriveCumplidos();
     }, {
         timezone: 'America/Bogota'
     });
 
-    // Cron temporal: solo por hoy (23 de mayo) a las 14:40
-    cron.schedule('40 14 23 5 *', async () => {
-        console.log('[M7-SCHEDULER] Ejecutando sincronización temporal (Solo por hoy a las 14:40)...');
+    // Cron temporal: solo por hoy (23 de mayo) a las 14:50
+    cron.schedule('50 14 23 5 *', async () => {
+        console.log('[M7-SCHEDULER] Ejecutando sincronización temporal (Solo por hoy a las 14:50)...');
         await syncDriveCumplidos();
     }, {
         timezone: 'America/Bogota'
     });
 
-    console.log('[M7-SCHEDULER] Tarea "Sync Drive a Planillas" programada: Lunes a Sábado 13:15 PM y (Temporalmente) hoy a las 14:40 PM | Cliente: CLI-09');
+    console.log('[M7-SCHEDULER] Tarea "Sync Drive a Planillas" programada: Lunes a Sábado 09:00 AM y (Temporalmente) hoy a las 14:50 PM | Cliente: CLI-09');
 };

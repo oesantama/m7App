@@ -98,9 +98,18 @@ export default function DashboardResultadosLB({ resultados, onSave, guardando }:
     resultados.forEach(r => {
       const placa = r.placa?.toString().toUpperCase().trim() || 'SIN PLACA';
       if (!placasData[placa]) {
-        placasData[placa] = { placa, totalViajes: 0, debePagar: 0, pago: 0, valorAdicional: 0, totalMilla7: 0 };
+        placasData[placa] = { 
+          placa, totalViajes: 0, debePagar: 0, pago: 0, valorAdicional: 0, totalMilla7: 0,
+          entregadas: 0, fallida70: 0, fallida100: 0, fallidaTransporte: 0
+        };
       }
       placasData[placa].totalViajes++;
+      
+      const tv = r.tipoValidacion;
+      if (tv === VALIDATION_TYPES.DELIVERED || tv === 'Entregado') placasData[placa].entregadas++;
+      if (tv === VALIDATION_TYPES.FAILED_70 || tv === 'Fallida 70%') placasData[placa].fallida70++;
+      if (tv === VALIDATION_TYPES.FAILED_100 || tv === 'Fallida 100%') placasData[placa].fallida100++;
+      if (tv === VALIDATION_TYPES.FAILED_TRANSPORT || tv === 'Fallida Transporte') placasData[placa].fallidaTransporte++;
       
       let montoDebido = 0;
       if (r.estado === VALIDATION_STATES.OK) {
@@ -335,6 +344,10 @@ export default function DashboardResultadosLB({ resultados, onSave, guardando }:
           columns={[
             { header: 'Placa', key: 'placa', render: (r: any) => <span className="font-bold">{r.placa}</span> },
             { header: 'Viajes', key: 'totalViajes' },
+            { header: 'Entregadas', key: 'entregadas' },
+            { header: 'Fallida 70%', key: 'fallida70' },
+            { header: 'Fallida 100%', key: 'fallida100' },
+            { header: 'Fallida Transporte', key: 'fallidaTransporte' },
             { header: 'Debe Pagar', key: 'debePagar', render: (r: any) => `$${Number(r.debePagar).toLocaleString()}` },
             { header: 'Pago', key: 'pago', render: (r: any) => `$${Number(r.pago).toLocaleString()}` },
             { header: 'Diferencia', key: 'diferenciaNeta', render: (r: any) => (

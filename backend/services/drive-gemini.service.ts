@@ -31,7 +31,7 @@ export const syncDriveCumplidos = async () => {
             FROM document_drive_logs d
             WHERE d.category = 'CUMPLIDOS' 
               AND d.client_id = 'CLI-09'
-              AND d.created_at >= CURRENT_DATE - INTERVAL '5 days'
+              AND d.upload_date >= CURRENT_DATE - INTERVAL '5 days'
               AND NOT EXISTS (
                   SELECT 1 FROM registros_logistica rl 
                   WHERE rl.archivo = d.file_name

@@ -237,17 +237,46 @@ export const saveRecords = async (req: Request, res: Response) => {
                 r.articulo, r.direccion, r.fecha1, r.fecha2,
                 r.ciudad_barrio, r.placa, r.notas
             ]);
-            if (result.rowCount && result.rowCount > 0) savedCount++;
-            else skippedCount++;
+            if (result.rowCount && result.rowCount > 0) {
+                savedCount++;
+            } else {
+                skippedCount++;
+            }
         }
         await client.query('COMMIT');
-        res.json({ success: true, saved: savedCount, skipped: skippedCount });
+        res.json({ message: 'Records processed', saved: savedCount, skipped: skippedCount });
     } catch (error: any) {
         await client.query('ROLLBACK');
         console.error('Error saving planillas records:', error);
         res.status(500).json({ error: 'Error del servidor al guardar' });
     } finally {
         client.release();
+    }
+};
+
+// ─── POST: Check History (for warnings before upload) ────────────────────────
+export const checkHistory = async (req: Request, res: Response) => {
+    const { pedidos } = req.body;
+    if (!Array.isArray(pedidos) || pedidos.length === 0) {
+        return res.json([]);
+    }
+
+    try {
+        const query = `
+            SELECT 
+                rl.pedido, 
+                COUNT(rl.id) as salidas,
+                (SELECT tipo_validacion FROM conciliacion_lb_detalles WHERE viaje_pedido = rl.pedido ORDER BY id DESC LIMIT 1) as estado_entrega
+            FROM registros_logistica rl
+            WHERE rl.pedido = ANY($1) AND rl.pedido != 'N/A'
+            GROUP BY rl.pedido
+            HAVING COUNT(rl.id) >= 1
+        `;
+        const { rows } = await pool.query(query, [pedidos]);
+        res.json(rows);
+    } catch (error: any) {
+        console.error('Error checking history:', error);
+        res.status(500).json({ error: 'Error del servidor' });
     }
 };
 

@@ -346,6 +346,11 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ files })
   }),
+  checkPlanillasHistory: (pedidos: string[]) => fetchJson(`${API_URL}/planillas-operativas/check-history`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pedidos })
+  }),
 
   // --- MESSAGES / WHATSAPP ---
   // Maestros - CACHE BUSTING FORZADO
