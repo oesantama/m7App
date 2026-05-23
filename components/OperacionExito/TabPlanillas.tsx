@@ -201,7 +201,12 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
               placa:         analysis.placa         || 'N/A',
               notas:         analysis.notas         || '',
             }));
+            // Guardar inmediatamente este lote
+            await api.savePlanillasRecords(batch);
             newRecordsBatch.push(...batch);
+            
+            // Recargar vista en vivo
+            await loadRecords();
           }
         } catch (error: any) {
           console.error(`Error procesando ${fileObj.name}:`, error);
@@ -220,9 +225,6 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
       }
 
       if (newRecordsBatch.length > 0) {
-        await api.savePlanillasRecords(newRecordsBatch);
-        await loadRecords(); // recargar desde BD
-        
         // Verificar historial para alertar de salidas repetidas o ya entregadas
         try {
           const pedidosUnicos = Array.from(new Set(newRecordsBatch.map(r => r.pedido).filter(p => p && p !== 'N/A')));

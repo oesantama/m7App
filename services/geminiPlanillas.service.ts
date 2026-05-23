@@ -48,8 +48,8 @@ class GeminiPlanillasService {
       
       REGLAS CRÍTICAS DE EXTRACCIÓN:
       - CADA FILA en la tabla del PDF debe ser un objeto independiente en el arreglo.
-      - IMPORTANTE: Si la imagen está rotada o de lado, léela con mucho cuidado. Los números como 1, 7, 8 y 3 pueden confundirse.
-      - Lee la fila horizontalmente (o verticalmente según la rotación de la tabla). NUNCA inventes números.
+      - IMPORTANTE: La imagen puede estar rotada 90 o 180 grados (hacia la derecha, hacia la izquierda o de cabeza). ANTES de leer, identifica la orientación real del texto para no mezclar columnas con filas. Los números como 1, 7, 8 y 3 pueden confundirse si se leen de lado.
+      - Lee la fila según la orientación real de la tabla. NUNCA inventes números.
       - Los números de "Pedido" suelen estar en la primera columna (ej. 265793870, 163303...). Extrae exactamente los dígitos que ves, sin saltarte ninguno.
       - Revisa doblemente la columna de Cédula (suelen ser números de 8 a 10 dígitos).
       

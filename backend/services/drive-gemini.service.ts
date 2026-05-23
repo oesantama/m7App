@@ -80,7 +80,7 @@ Analiza este DOCUMENTO LOGÍSTICO (planilla de despacho/entrega) y extrae TODOS 
 
 REGLAS CRÍTICAS DE EXTRACCIÓN:
 1. CADA FILA en la tabla del PDF debe ser un objeto independiente en el arreglo.
-2. IMPORTANTE: La imagen puede estar rotada 90 grados. Si es así, debes leer las columnas y filas cuidadosamente de acuerdo a la orientación real del texto.
+2. IMPORTANTE: La imagen puede estar rotada 90 o 180 grados (hacia la derecha, hacia la izquierda o de cabeza). ANTES de leer, identifica la orientación real del texto para no mezclar columnas con filas.
 3. Los números de Pedido y Cédula suelen ser largos (de 8 a 13 dígitos). Extrae TODOS los dígitos con cuidado, sin saltarte ninguno (ej. 1, 7, 3 y 8 se confunden). NUNCA inventes números ni arrastres los de la fila anterior.
 
 Formato de salida esperado (Devolver un array de objetos):
