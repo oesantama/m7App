@@ -77,7 +77,10 @@ class GeminiPlanillasService {
     const base64Data = await this._arrayBufferToBase64(fileBuffer);
     
     const configurations = [
-        { model: "gemini-2.0-flash", version: "v1beta" }
+        { model: "gemini-2.5-flash", version: "v1beta" },
+        { model: "gemini-2.0-flash", version: "v1beta" },
+        { model: "gemini-1.5-pro", version: "v1beta" },
+        { model: "gemini-1.5-flash", version: "v1beta" }
     ];
 
     let retries = 10;
