@@ -147,6 +147,16 @@ const AdminDBManager: React.FC = () => {
     }
   };
 
+  const triggerManualCron = async () => {
+    try {
+      toast.info('Iniciando sincronización manual...');
+      await fetch('/api/planillas-operativas/force-sync');
+      toast.success('CRON disparado. Revisa la tabla cron_logs.');
+    } catch (e) {
+      toast.error('Error al disparar el CRON');
+    }
+  };
+
   const fetchSchemaColumns = async (tableName: string) => {
     try {
         const result = await api.getAdminSchema(tableName);
@@ -421,6 +431,14 @@ const AdminDBManager: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
             <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Gestor de Base de Datos</h2>
+            <button 
+                onClick={triggerManualCron}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-3 rounded shadow-md text-sm transition-colors flex items-center gap-2"
+                title="Provisional: Disparar CRON de Planillas Drive"
+            >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                FORZAR CRON DRIVE
+            </button>
         </div>
         
         <div className="flex gap-2">
