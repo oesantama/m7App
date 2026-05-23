@@ -63,13 +63,13 @@ export const initScheduler = () => {
         timezone: 'America/Bogota'
     });
 
-    // Cron temporal: solo por hoy (23 de mayo) a las 14:50
-    cron.schedule('50 14 23 5 *', async () => {
-        console.log('[M7-SCHEDULER] Ejecutando sincronización temporal (Solo por hoy a las 14:50)...');
+    // Cron temporal: solo por hoy (23 de mayo) a las 15:05
+    cron.schedule('5 15 23 5 *', async () => {
+        console.log('[M7-SCHEDULER] Ejecutando sincronización temporal (Solo por hoy a las 15:05)...');
         await syncDriveCumplidos();
     }, {
         timezone: 'America/Bogota'
     });
 
-    console.log('[M7-SCHEDULER] Tarea "Sync Drive a Planillas" programada: Lunes a Sábado 09:00 AM y (Temporalmente) hoy a las 14:50 PM | Cliente: CLI-09');
+    console.log('[M7-SCHEDULER] Tarea "Sync Drive a Planillas" programada: Lunes a Sábado 09:00 AM y (Temporalmente) hoy a las 15:05 PM | Cliente: CLI-09');
 };

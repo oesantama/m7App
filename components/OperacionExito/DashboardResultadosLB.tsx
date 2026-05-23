@@ -345,6 +345,7 @@ export default function DashboardResultadosLB({ resultados, onSave, guardando }:
             { header: 'Placa', key: 'placa', render: (r: any) => <span className="font-bold">{r.placa}</span> },
             { header: 'Viajes', key: 'totalViajes' },
             { header: 'Entregadas', key: 'entregadas' },
+            { header: '% Efectt', key: 'efectividad', render: (r: any) => `${Math.round((r.entregadas / r.totalViajes) * 100)}%` },
             { header: 'Fallida 70%', key: 'fallida70' },
             { header: 'Fallida 100%', key: 'fallida100' },
             { header: 'Fallida Transporte', key: 'fallidaTransporte' },
