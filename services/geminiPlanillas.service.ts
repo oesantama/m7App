@@ -48,8 +48,10 @@ class GeminiPlanillasService {
       
       REGLAS CRÍTICAS DE EXTRACCIÓN:
       - CADA FILA en la tabla del PDF debe ser un objeto independiente en el arreglo.
-      - Lee la fila horizontalmente. NUNCA repitas el "pedido" o "cedula" de la fila superior en la fila inferior a menos que el texto sea exactamente igual.
-      - Los números de "Pedido" suelen estar al inicio (ej. 265793870, 163303...). Extrae exactamente lo que dice cada línea.
+      - IMPORTANTE: Si la imagen está rotada o de lado, léela con mucho cuidado. Los números como 1, 7, 8 y 3 pueden confundirse.
+      - Lee la fila horizontalmente (o verticalmente según la rotación de la tabla). NUNCA inventes números.
+      - Los números de "Pedido" suelen estar en la primera columna (ej. 265793870, 163303...). Extrae exactamente los dígitos que ves, sin saltarte ninguno.
+      - Revisa doblemente la columna de Cédula (suelen ser números de 8 a 10 dígitos).
       
       Formato OBLIGATORIO: { "matches": [ {objeto} ] }
       
@@ -70,11 +72,7 @@ class GeminiPlanillasService {
     const base64Data = await this._arrayBufferToBase64(fileBuffer);
     
     const configurations = [
-        { model: "gemini-flash-latest", version: "v1beta" },
-        { model: "gemini-pro-latest", version: "v1beta" },
-        { model: "gemini-2.0-flash", version: "v1beta" },
-        { model: "gemini-2.5-flash", version: "v1beta" },
-        { model: "models/gemini-1.5-flash", version: "v1beta" }
+        { model: "gemini-2.0-flash", version: "v1beta" }
     ];
 
     let retries = 10;
