@@ -26,6 +26,19 @@ const initDB = async () => {
             );
         `);
 
+        // Tabla para registrar las ejecuciones del CRON
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS cron_logs (
+                id BIGSERIAL PRIMARY KEY,
+                task_name VARCHAR(255) NOT NULL,
+                status VARCHAR(50) NOT NULL,
+                details TEXT,
+                error_message TEXT,
+                duration_ms INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+
         // 2. Migrar columna id VARCHAR -> BIGSERIAL si sigue siendo VARCHAR
         //    (por compatibilidad con registros existentes)
         const colCheck = await client.query(`

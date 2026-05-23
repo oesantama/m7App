@@ -14,6 +14,15 @@ const getAPIKeysPool = (): string[] => {
 
 export const syncDriveCumplidos = async () => {
     console.log('[M7-CRON] Iniciando sincronización de Drive vs Planillas para CLI-09...');
+    
+    const startTime = Date.now();
+    let status = 'SUCCESS';
+    let details = 'No hubo archivos nuevos por procesar.';
+    let errorMessage = '';
+    let processedCount = 0;
+    let savedCount = 0;
+    let failedCount = 0;
+
     try {
         // 1. Obtener los documentos de Drive (CUMPLIDOS) del cliente CLI-09 de los últimos 5 días
         // Que NO existan ya en la tabla registros_logistica (verificando si el pedido está en el file_name)
@@ -128,6 +137,7 @@ Formato de salida (Devolver un array de objetos):
                             ]);
                         }
                         await client.query('COMMIT');
+                        savedCount += matches.length;
                         console.log(`[M7-CRON] Guardado en DB: ${doc.file_name}`);
                     } catch (dbErr) {
                         await client.query('ROLLBACK');
@@ -138,11 +148,13 @@ Formato de salida (Devolver un array de objetos):
                 }
 
             } catch (err: any) {
+                failedCount++;
                 console.error(`[M7-CRON] Error procesando ${doc.file_name}:`, err.message);
                 if (err.message.includes('429')) {
                     keyIndex++; // Rotar llave si hay límite de cuota
                 }
             } finally {
+                processedCount++;
                 // Borrar archivo temporal
                 if (fs.existsSync(localPath)) {
                     fs.unlinkSync(localPath);
@@ -152,9 +164,23 @@ Formato de salida (Devolver un array de objetos):
             }
         }
 
+        details = `Procesados: ${processedCount}/${missingDocs.length}. Errores individuales: ${failedCount}. Registros extraídos: ${savedCount}`;
         console.log('[M7-CRON] Sincronización finalizada.');
 
-    } catch (globalErr) {
+    } catch (globalErr: any) {
+        status = 'ERROR';
+        errorMessage = globalErr.message || 'Error desconocido';
         console.error('[M7-CRON] Error global en sincronización:', globalErr);
+    } finally {
+        const durationMs = Date.now() - startTime;
+        
+        try {
+            await pool.query(
+                `INSERT INTO cron_logs (task_name, status, details, error_message, duration_ms) VALUES ($1, $2, $3, $4, $5)`,
+                ['Sync_Drive_Planillas_CLI09', status, details, errorMessage, durationMs]
+            );
+        } catch (logErr: any) {
+            console.error('[M7-CRON] Error crítico al intentar guardar el log del cron:', logErr.message);
+        }
     }
 };
