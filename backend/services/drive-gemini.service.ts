@@ -75,28 +75,34 @@ export const syncDriveCumplidos = async () => {
 
                 // IA Prompt (El mismo del frontend)
                 const systemPrompt = `
-Estrae en el siguiente json la informacion de la planilla por favor.
-Recuerda que si es del exito es una planilla y extrae como json. Unicamente devuelve el objeto json sin texto.
-Formato de salida (Devolver un array de objetos):
+Eres un asistente experto en extracción de datos tabulares a JSON.
+Analiza este DOCUMENTO LOGÍSTICO (planilla de despacho/entrega) y extrae TODOS y CADA UNO de los registros individuales como un JSON.
+
+REGLAS CRÍTICAS DE EXTRACCIÓN:
+1. CADA FILA en la tabla del PDF debe ser un objeto independiente en el arreglo.
+2. Lee la fila horizontalmente. NUNCA repitas el "pedido" o "cedula" de la fila superior en la fila inferior a menos que el texto sea exactamente igual. Los números suelen ser diferentes por fila.
+3. Extrae exactamente lo que dice cada línea. Unicamente devuelve el objeto json sin texto.
+
+Formato de salida esperado (Devolver un array de objetos):
 [
   {
-    "pedido": "extraer numero de pedido si existe (en planillas exito puede decir PEDIDO O FACTURA o ORDEN DE COMPRA)",
-    "cedula": "extraer cc del cliente si existe",
-    "cliente": "extraer nombre del cliente",
-    "plu": "extraer material o plu (es un numero que identifica el producto por lo general en el exito es PLU o EAN O MATERIAL)",
-    "articulo": "extraer descripcion del articulo",
-    "direccion": "extraer direccion",
-    "fecha1": "extraer primera fecha si existe",
-    "fecha2": "extraer segunda fecha si existe",
-    "ciudad_barrio": "extraer ciudad y/o barrio si existe",
-    "placa": "extraer placa del vehiculo si existe",
-    "notas": "extraer observaciones adicionales si existen"
+    "pedido": "Extraer estrictamente el número de pedido, factura u orden de ESTA FILA.",
+    "cedula": "Extraer estrictamente la CC o NIT del cliente de ESTA FILA.",
+    "cliente": "Extraer nombre del cliente de ESTA FILA.",
+    "plu": "Extraer material o PLU/EAN de ESTA FILA.",
+    "articulo": "Extraer descripción del artículo de ESTA FILA.",
+    "direccion": "Extraer dirección.",
+    "fecha1": "Extraer fecha de despacho.",
+    "fecha2": "Extraer otra fecha si existe.",
+    "ciudad_barrio": "Extraer ciudad/barrio.",
+    "placa": "Extraer placa del vehículo asignado a la planilla.",
+    "notas": "Extraer observaciones adicionales."
   }
 ]
 `;
 
                 const genAI = new GoogleGenerativeAI(keys[keyIndex % keys.length]);
-                const modelIA = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                const modelIA = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
                 console.log(`[M7-CRON] Analizando ${doc.file_name} con IA...`);
                 const result = await modelIA.generateContent([

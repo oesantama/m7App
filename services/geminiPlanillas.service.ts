@@ -44,20 +44,27 @@ class GeminiPlanillasService {
     if (!this.genAI) this._initClient();
     
     const prompt = `
-      Analiza este DOCUMENTO LOGÍSTICO y extrae TODOS los registros de entregas o facturas en un JSON.
-      Formato: { "matches": [ {objeto} ] }
-      Campos exactos (usa "N/A" si falta):
-      - pedido (Número/Factura)
-      - cedula (ID cliente)
-      - cliente (Nombre)
-      - plu (Código producto)
-      - articulo (Descripción)
-      - direccion (Entrega)
-      - fecha1 (Facturación)
-      - fecha2 (Entrega)
-      - ciudad_barrio
-      - placa (Vehículo)
-      - notas
+      Analiza este DOCUMENTO LOGÍSTICO (planilla de despacho/entrega) y extrae TODOS y CADA UNO de los registros individuales como un JSON.
+      
+      REGLAS CRÍTICAS DE EXTRACCIÓN:
+      - CADA FILA en la tabla del PDF debe ser un objeto independiente en el arreglo.
+      - Lee la fila horizontalmente. NUNCA repitas el "pedido" o "cedula" de la fila superior en la fila inferior a menos que el texto sea exactamente igual.
+      - Los números de "Pedido" suelen estar al inicio (ej. 265793870, 163303...). Extrae exactamente lo que dice cada línea.
+      
+      Formato OBLIGATORIO: { "matches": [ {objeto} ] }
+      
+      Campos exactos por cada fila (usa "N/A" si falta):
+      - pedido (Número de Factura, Pedido u Orden de Compra específico de ESA FILA)
+      - cedula (Documento o NIT del cliente específico de ESA FILA)
+      - cliente (Nombre completo del cliente de ESA FILA)
+      - plu (Código del producto, PLU, EAN o Material de ESA FILA)
+      - articulo (Descripción del artículo de ESA FILA)
+      - direccion (Dirección de entrega de ESA FILA)
+      - fecha1 (Primera fecha que aparezca en la cabecera o fila)
+      - fecha2 (Segunda fecha si existe)
+      - ciudad_barrio (Ciudad o barrio)
+      - placa (Placa del vehículo asignado a toda la planilla)
+      - notas (Observaciones)
     `;
 
     const base64Data = await this._arrayBufferToBase64(fileBuffer);
