@@ -19,15 +19,13 @@ export const syncDriveCumplidos = async () => {
         // Que NO existan ya en la tabla registros_logistica (verificando si el pedido está en el file_name)
         const query = `
             SELECT d.id, d.file_name, d.drive_path 
-            FROM documents d
-            WHERE d.doc_type = 'CUMPLIDOS' 
+            FROM document_drive_logs d
+            WHERE d.category = 'CUMPLIDOS' 
               AND d.client_id = 'CLI-09'
               AND d.created_at >= CURRENT_DATE - INTERVAL '5 days'
               AND NOT EXISTS (
                   SELECT 1 FROM registros_logistica rl 
-                  WHERE rl.pedido != 'N/A' 
-                    AND rl.pedido != '' 
-                    AND d.file_name LIKE '%' || rl.pedido || '%'
+                  WHERE rl.archivo = d.file_name
               )
         `;
         const { rows: missingDocs } = await pool.query(query);

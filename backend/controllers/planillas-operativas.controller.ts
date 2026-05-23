@@ -158,18 +158,19 @@ export const getRecords = async (req: Request, res: Response) => {
 
         const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-        // Verificar si la tabla 'documents' existe antes de intentar el JOIN
+        // Verificar si la tabla 'document_drive_logs' existe antes de intentar el JOIN
         const docTableCheck = await pool.query(`
             SELECT 1 FROM information_schema.tables
-            WHERE table_schema = 'public' AND table_name = 'documents' LIMIT 1
+            WHERE table_schema = 'public' AND table_name = 'document_drive_logs' LIMIT 1
         `);
         const hasDocuments = docTableCheck.rows.length > 0;
 
+        // Validar directamente usando el nombre del archivo (rl.archivo = d.file_name)
+        // Ya no usamos el pedido porque el nombre del pdf en BD es exactamente rl.archivo
         const driveSubquery = hasDocuments
-            ? `(SELECT drive_link FROM documents d
-               WHERE d.doc_type = 'CUMPLIDOS'
-                 AND rl.pedido != 'N/A' AND rl.pedido != ''
-                 AND d.file_name LIKE '%' || rl.pedido || '%'
+            ? `(SELECT drive_link FROM document_drive_logs d
+               WHERE d.category = 'CUMPLIDOS'
+                 AND d.file_name = rl.archivo
                LIMIT 1) as drive_link`
             : `NULL as drive_link`;
 
