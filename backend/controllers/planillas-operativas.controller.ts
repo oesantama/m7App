@@ -270,7 +270,7 @@ export const checkHistory = async (req: Request, res: Response) => {
             FROM registros_logistica rl
             WHERE rl.pedido = ANY($1) AND rl.pedido != 'N/A'
             GROUP BY rl.pedido
-            HAVING COUNT(rl.id) >= 1
+            HAVING COUNT(rl.id) > 1
         `;
         const { rows } = await pool.query(query, [pedidos]);
         res.json(rows);

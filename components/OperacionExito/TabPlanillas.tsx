@@ -228,13 +228,13 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
           const pedidosUnicos = Array.from(new Set(newRecordsBatch.map(r => r.pedido).filter(p => p && p !== 'N/A')));
           if (pedidosUnicos.length > 0) {
             const hist = await api.checkPlanillasHistory(pedidosUnicos);
-            const warnings = hist.filter((h: any) => Number(h.salidas) >= 1).map((h: any) => {
+            const warnings = hist.filter((h: any) => Number(h.salidas) > 1).map((h: any) => {
               const fullRecord = newRecordsBatch.find(r => r.pedido === h.pedido) || {};
               return {
                 ...fullRecord,
                 pedido: h.pedido,
-                salidas_previas: Number(h.salidas),
-                total_salidas: Number(h.salidas) + 1,
+                salidas_previas: Number(h.salidas) - 1,
+                total_salidas: Number(h.salidas),
                 estado_entrega: h.estado_entrega || 'No Conciliado Aún'
               };
             });
