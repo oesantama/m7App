@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import DataTable from '../Common/DataTable';
-import api from '../../services/api';
+import { DataTable } from '../shared/DataTable';
+import { api } from '../../services/api';
 import { AlertTriangle, RefreshCcw } from 'lucide-react';
 import { toast } from 'sonner';
 
