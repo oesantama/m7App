@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
+import { syncDriveCumplidos } from '../services/drive-gemini.service.js';
 
 // ─── Inicialización y Migración de Esquema ──────────────────────────────────
 const initDB = async () => {
@@ -332,4 +333,11 @@ export const clearRecords = async (req: Request, res: Response) => {
         console.error('Error clearing records:', error);
         res.status(500).json({ error: 'Error del servidor' });
     }
+};
+
+// ─── POST: Forzar sincronización manual del CRON ────────────────────────────
+export const forceSync = async (req: Request, res: Response) => {
+    // Se ejecuta de fondo para no bloquear la petición
+    syncDriveCumplidos().catch(err => console.error("Error en forceSync:", err));
+    res.json({ message: "Sincronización de Drive iniciada en segundo plano. Revisa los logs del cron en unos minutos." });
 };

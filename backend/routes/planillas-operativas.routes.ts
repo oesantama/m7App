@@ -1,5 +1,5 @@
 import express from 'express';
-import { getRecords, saveRecords, removeRecord, clearRecords, checkFiles, checkHistory, getRedespachos } from '../controllers/planillas-operativas.controller.js';
+import { getRecords, saveRecords, removeRecord, clearRecords, checkFiles, checkHistory, getRedespachos, forceSync } from '../controllers/planillas-operativas.controller.js';
 
 const router = express.Router();
 
@@ -10,5 +10,6 @@ router.post('/check-files', checkFiles);
 router.post('/check-history', checkHistory);
 router.delete('/', clearRecords);
 router.delete('/:id', removeRecord);
+router.post('/force-sync', forceSync);
 
 export default router;
