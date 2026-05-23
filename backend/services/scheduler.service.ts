@@ -55,13 +55,13 @@ export const initScheduler = () => {
     console.log('[M7-SCHEDULER] Tarea "Limpieza Novedades" programada: Diariamente 01:00 AM | Retención: 5 días hábiles (L-V)');
 
     // Sincronización Automática de Drive a Planillas (Exito Línea Blanca CLI-09)
-    // Corre diariamente a la 1:00 PM (13:00) hora Colombia.
-    cron.schedule('0 13 * * *', async () => {
+    // Corre diariamente a las 2:00 PM (14:00) hora Colombia.
+    cron.schedule('0 14 * * *', async () => {
         console.log('[M7-SCHEDULER] Ejecutando sincronización de Drive vs Planillas...');
         await syncDriveCumplidos();
     }, {
         timezone: 'America/Bogota'
     });
 
-    console.log('[M7-SCHEDULER] Tarea "Sync Drive a Planillas" programada: Diariamente 13:00 PM | Cliente: CLI-09');
+    console.log('[M7-SCHEDULER] Tarea "Sync Drive a Planillas" programada: Diariamente 14:00 PM | Cliente: CLI-09');
 };
