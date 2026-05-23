@@ -123,7 +123,7 @@ export default function DashboardResultadosLB({ resultados, onSave, guardando }:
     const cResumenPlacas = Object.values(placasData).map(item => {
       const diferencia = item.pago - item.debePagar;
       const ochentaYTres = item.totalMilla7 * 0.83;
-      const d_83 = item.pago - ochentaYTres;
+      const d_83 = item.totalMilla7 - ochentaYTres;
       return { ...item, diferenciaNeta: diferencia, ochentaYTres, d_83 };
     }).sort((a, b) => b.totalViajes - a.totalViajes);
 
