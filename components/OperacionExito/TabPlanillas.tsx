@@ -36,7 +36,8 @@ interface SkippedInfo {
 
 // ─── Componente ───────────────────────────────────────────────────────────────
 export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
-  const [apiKey]  = useState(process.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY || '');
+  const [apiKey, setApiKey] = useState('');
+  const [apiKeyLoaded, setApiKeyLoaded] = useState(false);
   const [results, setResults] = useState<any[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [progressInfo, setProgressInfo]  = useState('');
@@ -90,7 +91,36 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
     }
   };
 
+  // Cargar API key desde el backend (que sí tiene acceso al .env del servidor)
+  useEffect(() => {
+    const loadApiKey = async () => {
+      try {
+        // Primero intenta desde el env del frontend (compilado por Vite)
+        const frontendKey = process.env.GEMINI_API_KEY || '';
+        if (frontendKey) {
+          setApiKey(frontendKey);
+          setApiKeyLoaded(true);
+          return;
+        }
+        // Si no, pide la key al backend de forma segura
+        const res = await fetch(`${(window as any).__API_URL__ || '/api'}/config/gemini-key`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.hasKey && data.key) setApiKey(data.key);
+        }
+      } catch (e) {
+        console.warn('[TabPlanillas] No se pudo obtener API key del servidor');
+      } finally {
+        setApiKeyLoaded(true);
+      }
+    };
+    loadApiKey();
+  }, []);
+
   useEffect(() => { loadRecords(); }, []);
+
 
   // ─── Análisis con validación real en BD ──────────────────────────────────────
   const runAnalysis = async (files: { file: File; name: string }[]) => {
@@ -303,8 +333,11 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
           <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
             <BookOpen size={16} className="text-indigo-600" /> Base de Datos Logística
           </h2>
-          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${apiKey ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-            {apiKey ? 'IA Online' : 'Sin API Key'}
+          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+            !apiKeyLoaded ? 'bg-slate-100 text-slate-400' :
+            apiKey ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+          }`}>
+            {!apiKeyLoaded ? 'Cargando...' : apiKey ? 'IA Online' : 'Sin API Key'}
           </span>
         </div>
 

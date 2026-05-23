@@ -24,6 +24,8 @@ const pool = new Pool({
   min: 2,
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
+  query_timeout: 45_000, // Matar queries después de 45s en lugar de colgar el servidor
+  statement_timeout: 45_000,
   // SSL off: PostgreSQL corre en red Docker interna
   ssl: false,
   // Keepalive evita que el firewall de DO corte conexiones inactivas

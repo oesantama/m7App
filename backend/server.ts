@@ -197,7 +197,6 @@ app.listen(PORT, () => {
   console.log(`[ORBIT-SYSTEM] Worker: ${cluster.worker?.id ?? 'standalone'}`);
   console.log(`[ORBIT-SYSTEM] Entorno Módulo Nativo ESM activo`);
   console.log('--------------------------------------------------');
-  initScheduler();
 
   console.log('[ORBIT-SYSTEM] Evolution API Integration Active');
 
@@ -207,6 +206,9 @@ app.listen(PORT, () => {
     console.log('[ORBIT-BOOT] Worker secundario listo (migraciones delegadas al Worker 1).');
     return;
   }
+
+  // Inicializar scheduler SÓLO en el leader worker
+  initScheduler();
 
   // FLUJO DE ARRANQUE CRÍTICO M7 — solo Worker 1 (o modo standalone en dev)
   console.log('[ORBIT-BOOT] Iniciando secuencia de servicios...');

@@ -122,5 +122,12 @@ router.use('/conciliacion-linea-blanca', conciliacionLBRoutes);
 router.use('/flota', flotaRoutes);
 router.use('/planillas-operativas', planillasOperativasRoutes);
 
-export default router;
+// Endpoint seguro: devuelve la API key de Gemini del backend al frontend autenticado
+router.get('/config/gemini-key', (req: any, res) => {
+  if (!req.user) return res.status(401).json({ error: 'No autorizado' });
+  const key = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
+  if (!key) return res.status(404).json({ hasKey: false, key: '' });
+  res.json({ hasKey: true, key });
+});
 
+export default router;

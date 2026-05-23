@@ -28,12 +28,12 @@ services:
       resources:
         limits:
           memory: 800M
-    # Healthcheck: espera 60s para que migraciones terminen antes de recibir tráfico
+    # Healthcheck: usamos /health porque siempre responde 200 si Node está vivo
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ready || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
       interval: 10s
       timeout: 8s
-      retries: 8
+      retries: 5
       start_period: 90s
     depends_on:
       postgres:
