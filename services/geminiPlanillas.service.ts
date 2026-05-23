@@ -46,12 +46,17 @@ class GeminiPlanillasService {
     const prompt = `
       Analiza este DOCUMENTO LOGÍSTICO (planilla de despacho/entrega) y extrae TODOS y CADA UNO de los registros individuales como un JSON.
       
-      REGLAS CRÍTICAS DE EXTRACCIÓN:
-      - CADA FILA en la tabla del PDF debe ser un objeto independiente en el arreglo.
-      - IMPORTANTE: La imagen puede estar rotada 90 o 180 grados (hacia la derecha, hacia la izquierda o de cabeza). ANTES de leer, identifica la orientación real del texto para no mezclar columnas con filas. Los números como 1, 7, 8 y 3 pueden confundirse si se leen de lado.
-      - Lee la fila según la orientación real de la tabla. NUNCA inventes números.
-      - Los números de "Pedido" suelen estar en la primera columna (ej. 265793870, 163303...). Extrae exactamente los dígitos que ves, sin saltarte ninguno.
-      - Revisa doblemente la columna de Cédula (suelen ser números de 8 a 10 dígitos).
+      REGLAS CRÍTICAS DE EXTRACCIÓN (LEER CON CUIDADO):
+      1. CADA FILA en la tabla del PDF debe ser un objeto independiente en el arreglo.
+      2. IMPORTANTE: La imagen puede estar rotada 90 o 180 grados. Identifica la orientación real del texto para no mezclar columnas con filas.
+      3. PROHIBIDO REPETIR VALORES: Cada fila tiene su propio número de Pedido y Cédula. NUNCA copies el pedido o la cédula de la fila anterior a menos que en la imagen sean visualmente idénticos.
+      4. Los números de "Pedido" en el Éxito suelen empezar por 16 o 26 (ej. 265793870, 16330320...). Lee dígito por dígito con extrema precisión.
+      
+      EJEMPLO DE LECTURA (Fíjate cómo cambia cada fila):
+      Fila 1: Pedido 1633032041116, Cédula 39268715, Cliente ALBA TERESA
+      Fila 2: Pedido 265793871, Cédula 8373907, Cliente ROBERTO BENAVIDES
+      Fila 3: Pedido 265793870, Cédula 1045142382, Cliente ORIANA MARIA
+      Fila 4: Pedido 265793778, Cédula 1038102053, Cliente Nilton Cesar
       
       Formato OBLIGATORIO: { "matches": [ {objeto} ] }
       
