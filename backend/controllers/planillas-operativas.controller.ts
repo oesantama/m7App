@@ -44,7 +44,18 @@ const initDB = async () => {
             console.log('[M7-DB] Migración de id completada.');
         }
 
-        // 3. Crear unique constraint para evitar duplicados exactos
+        // 3. Limpiar duplicados existentes en la base de datos para que no falle la creación del index
+        console.log('[M7-DB] Limpiando duplicados de registros_logistica...');
+        await client.query(`
+            DELETE FROM registros_logistica
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM registros_logistica
+                GROUP BY archivo, pedido, cedula, plu
+            );
+        `);
+
+        // 4. Crear unique constraint para evitar duplicados exactos
         //    (mismo pdf + mismo pedido + misma cedula + mismo plu)
         await client.query(`DROP INDEX IF EXISTS idx_rl_unique_record;`);
         await client.query(`
