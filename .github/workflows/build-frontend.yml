@@ -50,6 +50,8 @@ jobs:
       - name: Extraer metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |

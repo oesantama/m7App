@@ -46,10 +46,10 @@ const initDB = async () => {
 
         // 3. Crear unique constraint para evitar duplicados exactos
         //    (mismo pdf + mismo pedido + misma cedula + mismo plu)
+        await client.query(`DROP INDEX IF EXISTS idx_rl_unique_record;`);
         await client.query(`
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_rl_unique_record
-            ON registros_logistica (archivo, pedido, cedula, plu)
-            WHERE pedido != 'N/A' AND cedula != 'N/A';
+            CREATE UNIQUE INDEX idx_rl_unique_record
+            ON registros_logistica (archivo, pedido, cedula, plu);
         `);
 
         console.log('[M7-DB] Tabla registros_logistica inicializada correctamente.');
@@ -206,9 +206,7 @@ export const saveRecords = async (req: Request, res: Response) => {
                 INSERT INTO registros_logistica
                 (archivo, pedido, cedula, cliente, plu, articulo, direccion, fecha1, fecha2, ciudad_barrio, placa, notas)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-                ON CONFLICT (archivo, pedido, cedula, plu)
-                WHERE pedido != 'N/A' AND cedula != 'N/A'
-                DO NOTHING
+                ON CONFLICT (archivo, pedido, cedula, plu) DO NOTHING
             `;
             const result = await client.query(insQuery, [
                 r.archivo, r.pedido, r.cedula, r.cliente, r.plu,

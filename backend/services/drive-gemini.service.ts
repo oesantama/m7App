@@ -106,16 +106,13 @@ Formato de salida (Devolver un array de objetos):
                         await client.query('BEGIN');
                         for (let mIdx = 0; mIdx < matches.length; mIdx++) {
                             const analysis = matches[mIdx];
-                            const recordId = `${Date.now()}-${i}-${mIdx}`;
-                            
                             const insQuery = `
                                 INSERT INTO registros_logistica 
-                                (id, archivo, pedido, cedula, cliente, plu, articulo, direccion, fecha1, fecha2, ciudad_barrio, placa, notas)
-                                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-                                ON CONFLICT (id) DO NOTHING
+                                (archivo, pedido, cedula, cliente, plu, articulo, direccion, fecha1, fecha2, ciudad_barrio, placa, notas)
+                                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                                ON CONFLICT (archivo, pedido, cedula, plu) DO NOTHING
                             `;
                             await client.query(insQuery, [
-                                recordId,
                                 doc.file_name,
                                 analysis.pedido || 'N/A',
                                 analysis.cedula || 'N/A',
