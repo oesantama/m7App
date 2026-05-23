@@ -177,7 +177,7 @@ export const api = {
     return fetchJson(`${API_URL}/conciliation/pending-normal${qs}`);
   },
   getConciliationHistory: (params: { from?: string; to?: string; doc_id?: string; invoice?: string; plate?: string }) => {
-    const qs = '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v) as [string, string][])).toString();
+    const qs = '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString();
     return fetchJson(`${API_URL}/conciliation/history${qs}`);
   },
   getPlateMovementHistory: (plate: string) =>
@@ -325,6 +325,27 @@ export const api = {
   },
   searchConciliationRoutes: (clientId: string, date: string) =>
     fetchJson(`${API_URL}/conciliation/search-routes?clientId=${encodeURIComponent(clientId)}&date=${date}`),
+
+  // --- PLANILLAS OPERATIVAS (Logística) ---
+  getPlanillasRecords: (params?: {
+    placa?: string; plu?: string; pedido?: string; articulo?: string; cliente?: string;
+    search?: string; fechaDesde?: string; fechaHasta?: string; onlyCurrentMonth?: string;
+  }) => {
+    const qs = params ? '?' + new URLSearchParams(params as any).toString() : '';
+    return fetchJson(`${API_URL}/planillas-operativas${qs}`);
+  },
+  savePlanillasRecords: (records: any[]) => fetchJson(`${API_URL}/planillas-operativas`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(records)
+  }),
+  deletePlanillaRecord: (id: string) => fetchJson(`${API_URL}/planillas-operativas/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  clearPlanillasRecords: () => fetchJson(`${API_URL}/planillas-operativas`, { method: 'DELETE' }),
+  checkPlanillasFiles: (files: string[]) => fetchJson(`${API_URL}/planillas-operativas/check-files`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ files })
+  }),
 
   // --- MESSAGES / WHATSAPP ---
   // Maestros - CACHE BUSTING FORZADO
@@ -1293,7 +1314,8 @@ export const api = {
     limit?: number, 
     search?: string, 
     sortBy?: string, 
-    sortOrder?: string 
+    sortOrder?: string,
+    conditions?: any[]
   }) => fetchJson(`${API_URL}/admin/data`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

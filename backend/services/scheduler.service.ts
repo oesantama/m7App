@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import pool from '../config/database.js';
+import { syncDriveCumplidos } from './drive-gemini.service.js';
 
 /**
  * Retrocede N días hábiles (lunes-viernes) desde una fecha dada.
@@ -52,4 +53,15 @@ export const initScheduler = () => {
     });
 
     console.log('[M7-SCHEDULER] Tarea "Limpieza Novedades" programada: Diariamente 01:00 AM | Retención: 5 días hábiles (L-V)');
+
+    // Sincronización Automática de Drive a Planillas (Exito Línea Blanca CLI-09)
+    // Corre diariamente a la 1:00 PM (13:00) hora Colombia.
+    cron.schedule('0 13 * * *', async () => {
+        console.log('[M7-SCHEDULER] Ejecutando sincronización de Drive vs Planillas...');
+        await syncDriveCumplidos();
+    }, {
+        timezone: 'America/Bogota'
+    });
+
+    console.log('[M7-SCHEDULER] Tarea "Sync Drive a Planillas" programada: Diariamente 13:00 PM | Cliente: CLI-09');
 };

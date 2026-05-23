@@ -4,6 +4,7 @@ import { User } from '../../types';
 import ValidacionLineaBlanca from './ValidacionLineaBlanca';
 import TarifasLineaBlancaCRUD from './TarifasLineaBlancaCRUD';
 import { api } from '../../services/api';
+import TabPlanillas from './TabPlanillas';
 
 type Tab = 'linea-blanca' | 'historico' | 'planillas';
 
@@ -220,42 +221,7 @@ const TabHistorico: React.FC<{ user: User }> = () => {
 };
 
 
-// ─── Tab: Planillas Operativas ────────────────────────────────────────────────
-const TabPlanillas: React.FC<{ user: User }> = () => {
-  return (
-    <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Buscar planilla por placa, conductor o fecha..."
-            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-[12px] font-medium focus:outline-none focus:border-emerald-400 bg-white"
-          />
-        </div>
-        <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all">
-          <RefreshCw size={12} />
-          Actualizar
-        </button>
-        <button className="flex items-center gap-2 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">
-          <Download size={12} />
-          Exportar Todo
-        </button>
-      </div>
-
-      {/* Grid de planillas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Placeholder card */}
-        <div className="border-2 border-dashed border-slate-200 rounded-2xl p-8 flex flex-col items-center gap-3 text-center">
-          <FileSpreadsheet size={28} className="text-slate-300" />
-          <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Sin planillas</p>
-          <p className="text-[10px] text-slate-300">Las planillas operativas aparecerán aquí</p>
-        </div>
-      </div>
-    </div>
-  );
-};
+// TabPlanillas was moved to TabPlanillas.tsx
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 const ValidacionConciliaciones: React.FC<{ user: User }> = ({ user }) => {

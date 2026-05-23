@@ -46,6 +46,9 @@ const AdminDBManager: React.FC = () => {
   const [sqlPage, setSqlPage] = useState(1);
   const [sqlLimit, setSqlLimit] = useState(5);
 
+  // Query Builder State
+  const [conditions, setConditions] = useState<any[]>([]);
+
   // Schema Info State
   const [isSchemaModalOpen, setIsSchemaModalOpen] = useState(false);
   const [schemaInfo, setSchemaInfo] = useState<{description: string, columns: any[]} | null>(null);
@@ -124,9 +127,13 @@ const AdminDBManager: React.FC = () => {
 
   useEffect(() => {
     if (selectedTable && mode === 'TABLE' && user && user.token) {
+        // Limpiar TODOS los filtros al cambiar de tabla para evitar errores de tipo
         setPage(1);
         setSortBy('');
         setSortOrder('ASC');
+        setSearchTerm('');
+        setConditions([]);
+        setSelectedIds(new Set());
         loadData(1);
     }
   }, [selectedTable, user]);
@@ -168,7 +175,8 @@ const AdminDBManager: React.FC = () => {
             limit: currentLimit,
             search: searchTerm,
             sortBy: currentSortBy,
-            sortOrder: currentSortOrder
+            sortOrder: currentSortOrder,
+            conditions: conditions
       });
       
       if (Array.isArray(response)) {
@@ -367,12 +375,28 @@ const AdminDBManager: React.FC = () => {
                       <table className="w-full text-xs text-left text-slate-600">
                           <thead className="bg-slate-50 font-bold uppercase">
                               <tr>
+                                  <th className="px-4 py-2 border-b w-10 text-center">Acciones</th>
                                   {Object.keys(rowsToDisplay[0]).map(k => <th key={k} className="px-4 py-2 border-b">{k}</th>)}
                               </tr>
                           </thead>
                           <tbody>
                               {rowsToDisplay.map((r: any, i: number) => (
                                   <tr key={i} className="hover:bg-slate-50">
+                                      <td className="px-4 py-2 border-b text-center">
+                                          <button 
+                                              onClick={() => {
+                                                  if (!selectedTable) {
+                                                      toast.error("Seleccione la tabla en el panel superior antes de editar un registro SQL.");
+                                                      return;
+                                                  }
+                                                  openModal(r);
+                                              }} 
+                                              className="text-blue-600 hover:text-blue-800 p-1"
+                                              title="Editar Registro (Requiere tener la tabla seleccionada arriba)"
+                                          >
+                                              ✏️
+                                          </button>
+                                      </td>
                                       {Object.values(r).map((v: any, j: number) => (
                                           <td key={j} className="px-4 py-2 border-b whitespace-nowrap max-w-[200px] truncate">
                                               {v === null ? 'NULL' : String(v)}
@@ -397,30 +421,9 @@ const AdminDBManager: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
             <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Gestor de Base de Datos</h2>
-            <span className="px-3 py-1 bg-blue-600 text-white rounded-full text-[10px] font-black animate-pulse">V2.0 - ACTIVE</span>
-            <span className="px-3 py-1 bg-red-500 text-white rounded-full text-[10px] font-black">ADMIN</span>
         </div>
         
         <div className="flex gap-2">
-            <button 
-                onClick={async () => {
-                   if(confirm("¿Deseas restaurar el sistema? Esto sincronizará todos los menús, rutas y catálogos base.")) {
-                       try {
-                           const res = await fetch('/api/system/restore', { 
-                               method: 'POST',
-                               headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-                           });
-                           if (res.ok) {
-                               toast.success("Sistema Restaurado", { description: "Refresque la página para ver los cambios." });
-                               loadTables();
-                           }
-                       } catch (e) { toast.error("Error en restauración"); }
-                   }
-                }}
-                className="px-4 py-1 bg-slate-800 text-white rounded text-xs font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-lg flex items-center gap-2"
-            >
-                <Icons.History className="w-3 h-3" /> Restaurar Menús
-            </button>
             <div className="flex bg-slate-200 rounded p-1">
                 <button 
                     onClick={() => setMode('TABLE')}
@@ -529,6 +532,110 @@ const AdminDBManager: React.FC = () => {
                     + Nuevo
                 </button>
             </div>
+
+            {selectedTable && (
+                <div className="bg-white p-4 rounded-lg shadow border border-slate-200 mb-4 flex flex-col gap-3 transition-all">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                        <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                            <span>🔍</span> Filtros Avanzados (AND / OR)
+                        </h3>
+                        <button 
+                            onClick={() => setConditions([...conditions, { logical: conditions.length === 0 ? '' : 'AND', column: columns[0] || '', operator: '=', value: '' }])}
+                            className="text-[10px] uppercase bg-blue-50 text-blue-600 font-black px-3 py-1.5 rounded-md hover:bg-blue-100 transition-colors border border-blue-100"
+                        >
+                            + Añadir Condición
+                        </button>
+                    </div>
+                    {conditions.map((cond, idx) => (
+                        <div key={idx} className="flex gap-2 items-center flex-wrap animate-in fade-in duration-200">
+                            {idx > 0 ? (
+                                <select 
+                                    className="border border-slate-200 bg-slate-50 rounded px-2 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-400"
+                                    value={cond.logical}
+                                    onChange={(e) => {
+                                        const newC = [...conditions];
+                                        newC[idx].logical = e.target.value;
+                                        setConditions(newC);
+                                    }}
+                                >
+                                    <option value="AND">AND</option>
+                                    <option value="OR">OR</option>
+                                </select>
+                            ) : (
+                                <span className="text-[10px] font-black text-slate-400 w-12 text-center uppercase tracking-widest bg-slate-50 py-1.5 rounded border border-slate-100">WHERE</span>
+                            )}
+                            
+                            <select 
+                                className="border border-slate-200 rounded px-3 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 min-w-[150px]"
+                                value={cond.column}
+                                onChange={(e) => {
+                                    const newC = [...conditions];
+                                    newC[idx].column = e.target.value;
+                                    setConditions(newC);
+                                }}
+                            >
+                                <option value="" disabled>- Columna -</option>
+                                {columns.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+
+                            <select 
+                                className="border border-slate-200 bg-slate-50 rounded px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-400"
+                                value={cond.operator}
+                                onChange={(e) => {
+                                    const newC = [...conditions];
+                                    newC[idx].operator = e.target.value;
+                                    setConditions(newC);
+                                }}
+                            >
+                                <option value="=">=</option>
+                                <option value="!=">!=</option>
+                                <option value=">">&gt;</option>
+                                <option value="<">&lt;</option>
+                                <option value=">=">&gt;=</option>
+                                <option value="<=">&lt;=</option>
+                                <option value="LIKE">LIKE (Contiene)</option>
+                                <option value="IS NULL">ES NULO</option>
+                                <option value="IS NOT NULL">NO ES NULO</option>
+                            </select>
+
+                            {cond.operator !== 'IS NULL' && cond.operator !== 'IS NOT NULL' && (
+                                <input 
+                                    className="border border-slate-200 rounded px-3 py-1.5 text-xs outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400 flex-1 min-w-[200px]"
+                                    placeholder="Valor a buscar..."
+                                    value={cond.value}
+                                    onChange={(e) => {
+                                        const newC = [...conditions];
+                                        newC[idx].value = e.target.value;
+                                        setConditions(newC);
+                                    }}
+                                    onKeyDown={(e) => e.key === 'Enter' && loadData(1)}
+                                />
+                            )}
+
+                            <button 
+                                onClick={() => {
+                                    const newC = conditions.filter((_, i) => i !== idx);
+                                    setConditions(newC);
+                                }}
+                                className="text-red-400 hover:text-red-600 hover:bg-red-50 p-1.5 rounded transition-colors"
+                                title="Eliminar condición"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    ))}
+                    {conditions.length > 0 && (
+                        <div className="flex justify-end mt-2 pt-2 border-t border-slate-100">
+                             <button 
+                                onClick={() => loadData(1)}
+                                className="bg-slate-800 hover:bg-slate-700 text-white px-5 py-2 rounded-lg text-xs font-bold shadow-md transition-colors flex items-center gap-2"
+                             >
+                                Aplicar Filtros <span>▶</span>
+                             </button>
+                        </div>
+                    )}
+                </div>
+            )}
 
             <div className="bg-white rounded-lg shadow border border-slate-200 overflow-hidden mb-4">
                 <div className="overflow-x-auto">

@@ -45,6 +45,17 @@ export const saveConciliacion = async (req: Request, res: Response) => {
       const dest = detalle.destino ? detalle.destino.toString().trim() : '';
       const art = detalle.articulo ? detalle.articulo.toString().trim() : '';
       
+      let finalFecha = detalle.fecha ? detalle.fecha.toString().trim() : '';
+      if (finalFecha && !isNaN(Number(finalFecha))) {
+        const dateObj = new Date((Number(finalFecha) - 25569) * 86400 * 1000);
+        finalFecha = dateObj.toISOString().split('T')[0];
+      } else if (finalFecha) {
+        const d = new Date(finalFecha);
+        if (!isNaN(d.getTime())) {
+          finalFecha = d.toISOString().split('T')[0];
+        }
+      }
+      
       let existingId = null;
       if (sys && viaje) {
         const check = await client.query(
@@ -64,7 +75,7 @@ export const saveConciliacion = async (req: Request, res: Response) => {
             valor_adicional = $10, total_milla7 = $11, estado = $12, tipo_validacion = $13, notas_validacion = $14, notas2 = $15
            WHERE id = $16`,
           [
-            archivoId, detalle.fecha || '', detalle.placa || '', detalle.destino || '', detalle.articulo || '',
+            archivoId, finalFecha, detalle.placa || '', detalle.destino || '', detalle.articulo || '',
             detalle.precioArchivo1 || 0, detalle.precio70Base || 0, detalle.precioArchivo2 || 0, detalle.diferencia || 0,
             detalle.valorAdicional || 0, detalle.totalMilla7 || 0, detalle.estado || '', detalle.tipoValidacion || '',
             detalle.notasValidacion || '', detalle.notas2 || '', existingId
@@ -79,7 +90,7 @@ export const saveConciliacion = async (req: Request, res: Response) => {
             valor_adicional, total_milla7, estado, tipo_validacion, notas_validacion, notas2
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)`,
           [
-            archivoId, detalle.fecha || '', detalle.placa || '', sys, viaje, detalle.destino || '', detalle.articulo || '',
+            archivoId, finalFecha, detalle.placa || '', sys, viaje, detalle.destino || '', detalle.articulo || '',
             detalle.precioArchivo1 || 0, detalle.precio70Base || 0, detalle.precioArchivo2 || 0, detalle.diferencia || 0,
             detalle.valorAdicional || 0, detalle.totalMilla7 || 0, detalle.estado || '', detalle.tipoValidacion || '',
             detalle.notasValidacion || '', detalle.notas2 || ''
@@ -135,13 +146,21 @@ export const searchDetalles = async (req: Request, res: Response) => {
 
   if (fecha_desde) {
     const excelSerialDesde = (new Date(fecha_desde as string).getTime() / 86400000) + 25569;
-    query += ` AND (fecha >= $${paramCount} OR (fecha ~ '^[0-9]+$' AND fecha::numeric >= $${paramCount + 1}))`;
+    query += ` AND (
+      (fecha ~ '^[0-9]+(\\.[0-9]+)?$' AND fecha::numeric >= $${paramCount + 1})
+      OR 
+      (fecha !~ '^[0-9]+(\\.[0-9]+)?$' AND fecha >= $${paramCount})
+    )`;
     params.push(fecha_desde, excelSerialDesde);
     paramCount += 2;
   }
   if (fecha_hasta) {
     const excelSerialHasta = (new Date(fecha_hasta as string).getTime() / 86400000) + 25569;
-    query += ` AND (fecha <= $${paramCount} OR (fecha ~ '^[0-9]+$' AND fecha::numeric <= $${paramCount + 1}))`;
+    query += ` AND (
+      (fecha ~ '^[0-9]+(\\.[0-9]+)?$' AND fecha::numeric <= $${paramCount + 1})
+      OR 
+      (fecha !~ '^[0-9]+(\\.[0-9]+)?$' AND fecha <= $${paramCount})
+    )`;
     params.push(fecha_hasta, excelSerialHasta);
     paramCount += 2;
   }

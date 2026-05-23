@@ -58,6 +58,7 @@ import adminCenterRoutes from './admin-center.routes.js';
 import tarifasLineaBlancaRoutes from './tarifas-linea-blanca.routes.js';
 import conciliacionLBRoutes from './conciliacion-linea-blanca.routes.js';
 import flotaRoutes from './flota.routes.js';
+import planillasOperativasRoutes from './planillas-operativas.routes.js';
 
 const router = Router();
 
@@ -119,6 +120,7 @@ router.use('/admin-center', adminCenterRoutes);
 router.use('/tarifas-linea-blanca', tarifasLineaBlancaRoutes);
 router.use('/conciliacion-linea-blanca', conciliacionLBRoutes);
 router.use('/flota', flotaRoutes);
+router.use('/planillas-operativas', planillasOperativasRoutes);
 
 export default router;
 

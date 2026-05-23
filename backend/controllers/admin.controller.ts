@@ -31,13 +31,12 @@ export const getTables = async (req: any, res: Response) => {
 };
 
 export const getTableData = async (req: any, res: Response) => {
-  const { tableName, page = 1, limit = 50, search = '', sortBy, sortOrder = 'ASC' } = req.body;
+  const { tableName, page = 1, limit = 50, search = '', sortBy, sortOrder = 'ASC', conditions = [] } = req.body;
   const user = req.user;
   try {
     if (!isUserAdmin(user)) return res.status(403).json({ error: "Acceso denegado." });
     if (!tableName) return res.status(400).json({ error: "Nombre de tabla requerido" });
 
-    // Partial cleanup
     if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
       return res.status(400).json({ error: "Nombre de tabla inválido" });
     }
@@ -46,24 +45,41 @@ export const getTableData = async (req: any, res: Response) => {
     let query = `SELECT * FROM ${tableName} t`;
     let countQuery = `SELECT COUNT(*) as total FROM ${tableName} t`;
     const params: any[] = [];
+    let whereClauses: string[] = [];
 
-    // Simple textual search across all text columns? 
-    // For now, let's keep it simple: if search is present, try to find it in ID or Name if they exist, 
-    // or just return all if no columns match.
-    // BETTER: Get columns first to know where to search.
-    
-    // Quick approach: Just LIMIT/OFFSET for now. 
-    // To support generic search we need to know column types. 
-    // Let's implement basic LIMIT/OFFSET first, and if search is provided, try to CAST all to text? 
-    // Too risky for performance.
-    // Alternative: Filter by ID if search looks like ID.
-    
     if (search) {
-       // Búsqueda robusta: convierte la fila a JSONB y busca el término en cualquier valor de campo
-       query += ` WHERE EXISTS (SELECT 1 FROM jsonb_each_text(to_jsonb(t)) WHERE value ILIKE $1)`;
-       countQuery += ` WHERE EXISTS (SELECT 1 FROM jsonb_each_text(to_jsonb(t)) WHERE value ILIKE $1)`;
+       whereClauses.push(`EXISTS (SELECT 1 FROM jsonb_each_text(to_jsonb(t)) WHERE value ILIKE $${params.length + 1})`);
        params.push(`%${search}%`);
     }
+
+    if (Array.isArray(conditions) && conditions.length > 0) {
+        let conditionStr = '';
+        conditions.forEach((c, index) => {
+            if (!/^[a-zA-Z0-9_]+$/.test(c.column)) return;
+            const validOperators = ['=', '!=', '>', '<', '>=', '<=', 'LIKE', 'ILIKE', 'IS NULL', 'IS NOT NULL'];
+            const op = validOperators.includes(c.operator?.toUpperCase()) ? c.operator.toUpperCase() : '=';
+            
+            const logical = (index === 0) ? '' : (c.logical?.toUpperCase() === 'OR' ? ' OR ' : ' AND ');
+            
+            if (op === 'IS NULL' || op === 'IS NOT NULL') {
+                conditionStr += `${logical} t.${c.column} ${op}`;
+            } else {
+                params.push(op === 'LIKE' || op === 'ILIKE' ? `%${c.value}%` : c.value);
+                conditionStr += `${logical} t.${c.column} ${op} $${params.length}`;
+            }
+        });
+        if (conditionStr) {
+            whereClauses.push(`(${conditionStr})`);
+        }
+    }
+
+    let whereSql = '';
+    if (whereClauses.length > 0) {
+        whereSql = ` WHERE ` + whereClauses.join(' AND ');
+    }
+
+    query += whereSql;
+    countQuery += whereSql;
 
     // Add Sorting
     if (sortBy) {
@@ -73,6 +89,9 @@ export const getTableData = async (req: any, res: Response) => {
         }
     }
 
+    // Copy params for countQuery before adding limit/offset
+    const countParams = [...params];
+
     // Add Pagination
     // Handle "Show All" by passing -1 or very large limit? 
     // If limit is very large, just use it. If frontend sends 1000000 it works.
@@ -80,7 +99,7 @@ export const getTableData = async (req: any, res: Response) => {
     params.push(limit, offset);
 
     const result = await pool.query(query, params);
-    const countResult = await pool.query(countQuery);
+    const countResult = await pool.query(countQuery, countParams);
     
     res.json({
         data: result.rows,
