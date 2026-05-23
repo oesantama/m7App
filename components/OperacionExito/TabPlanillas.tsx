@@ -228,7 +228,16 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
           const pedidosUnicos = Array.from(new Set(newRecordsBatch.map(r => r.pedido).filter(p => p && p !== 'N/A')));
           if (pedidosUnicos.length > 0) {
             const hist = await api.checkPlanillasHistory(pedidosUnicos);
-            const warnings = hist.filter((h: any) => Number(h.salidas) >= 1);
+            const warnings = hist.filter((h: any) => Number(h.salidas) >= 1).map((h: any) => {
+              const fullRecord = newRecordsBatch.find(r => r.pedido === h.pedido) || {};
+              return {
+                ...fullRecord,
+                pedido: h.pedido,
+                salidas_previas: Number(h.salidas),
+                total_salidas: Number(h.salidas) + 1,
+                estado_entrega: h.estado_entrega || 'No Conciliado Aún'
+              };
+            });
             if (warnings.length > 0) {
               setHistoryWarnings(warnings);
               setShowHistoryDialog(true);
@@ -612,42 +621,33 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
             </div>
             
             <div className="flex-1 overflow-auto p-6 bg-slate-50">
-              <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
-                <table className="w-full text-left text-[12px]">
-                  <thead className="bg-slate-100 border-b border-slate-200 text-slate-500 font-black uppercase tracking-wider">
-                    <tr>
-                      <th className="px-4 py-3">Pedido</th>
-                      <th className="px-4 py-3 text-center">Salidas Previas en BD</th>
-                      <th className="px-4 py-3">Total Salidas Actuales</th>
-                      <th className="px-4 py-3">Último Estado de Conciliación</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {historyWarnings.map((w, idx) => {
-                      const previas = Number(w.salidas);
-                      const actual = previas + 1;
-                      const entregado = w.estado_entrega === 'Entregado';
-                      return (
-                        <tr key={idx} className="hover:bg-slate-50">
-                          <td className="px-4 py-3 font-bold text-slate-700">{w.pedido}</td>
-                          <td className="px-4 py-3 text-center text-slate-500 font-medium">{previas}</td>
-                          <td className="px-4 py-3 text-center font-black text-orange-600 bg-orange-50/50">{actual}</td>
-                          <td className="px-4 py-3">
-                            {w.estado_entrega ? (
-                              <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                                entregado ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                              }`}>
-                                {w.estado_entrega}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 italic">No Conciliado Aún</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white p-2">
+                <DataTable 
+                  data={historyWarnings}
+                  columns={[
+                    { header: 'Pedido', key: 'pedido', render: (r: any) => <span className="font-bold text-slate-700">{r.pedido}</span> },
+                    { header: 'Cédula', key: 'cedula' },
+                    { header: 'Cliente', key: 'cliente' },
+                    { header: 'PLU', key: 'plu' },
+                    { header: 'Artículo', key: 'articulo' },
+                    { header: 'Dirección', key: 'direccion' },
+                    { header: 'Placa', key: 'placa' },
+                    { header: 'Fecha', key: 'fecha1' },
+                    { header: 'Salidas Previas', key: 'salidas_previas', render: (r: any) => <span className="text-center block">{r.salidas_previas}</span> },
+                    { header: 'Total Salidas', key: 'total_salidas', render: (r: any) => <span className="text-center font-black text-orange-600 block">{r.total_salidas}</span> },
+                    { header: 'Último Estado', key: 'estado_entrega', render: (r: any) => {
+                        const estado = r.estado_entrega;
+                        const color = estado === 'Entregado' ? 'bg-green-100 text-green-700' :
+                                      estado === 'No Conciliado Aún' ? 'text-slate-400 italic' :
+                                      'bg-red-100 text-red-700';
+                        return estado === 'No Conciliado Aún' ? 
+                          <span className={color}>{estado}</span> :
+                          <span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${color}`}>{estado}</span>;
+                    }}
+                  ]}
+                  searchPlaceholder="Buscar pedido, placa, cliente..."
+                  excelFileName="Alertas_Redespachos.xlsx"
+                />
               </div>
             </div>
             <div className="p-4 border-t border-slate-100 flex justify-end bg-white">

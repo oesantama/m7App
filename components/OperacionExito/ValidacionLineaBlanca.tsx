@@ -406,10 +406,21 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
         placasData[placa].totalMilla7 += r.totalMilla7 || 0;
       });
       setResumenPlacas(Object.values(placasData).map(item => {
-        const diferencia = item.pago - item.debePagar;
-        const ochentaYTres = item.totalMilla7 * 0.83;
-        const d_83 = item.totalMilla7 - ochentaYTres;
-        return { ...item, diferenciaNeta: diferencia, ochentaYTres, d_83 };
+        const diferencia = Math.round(item.pago - item.debePagar);
+        const ochentaYTres = Math.round(item.totalMilla7 * 0.83);
+        const d_83 = Math.round(item.totalMilla7 - ochentaYTres);
+        const efectividad = item.totalViajes > 0 ? Math.round((item.entregadas / item.totalViajes) * 100) : 0;
+        return { 
+          ...item, 
+          pago: Math.round(item.pago),
+          debePagar: Math.round(item.debePagar),
+          valorAdicional: Math.round(item.valorAdicional),
+          totalMilla7: Math.round(item.totalMilla7),
+          diferenciaNeta: diferencia, 
+          ochentaYTres, 
+          d_83, 
+          efectividad 
+        };
       }).sort((a, b) => b.totalViajes - a.totalViajes));
 
       // Calculate resumenMensual
@@ -715,7 +726,7 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
                 { header: 'Placa', key: 'placa', render: (r: any) => <span className="font-bold">{r.placa}</span> },
                 { header: 'Viajes', key: 'totalViajes' },
                 { header: 'Entregadas', key: 'entregadas' },
-                { header: '% Efectt', key: 'efectividad', render: (r: any) => `${Math.round((r.entregadas / r.totalViajes) * 100)}%` },
+                { header: '% Efectt', key: 'efectividad', render: (r: any) => `${r.efectividad}%` },
                 { header: 'Fallida 70%', key: 'fallida70' },
                 { header: 'Fallida 100%', key: 'fallida100' },
                 { header: 'Fallida Transporte', key: 'fallidaTransporte' },
@@ -728,10 +739,10 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
                 )},
                 { header: 'Total Milla 7', key: 'totalMilla7', render: (r: any) => `$${Number(r.totalMilla7).toLocaleString()}` },
                 { header: 'Auxiliar', key: 'valorAdicional', render: (r: any) => `$${Number(r.valorAdicional).toLocaleString()}` },
-                { header: '83% Milla 7', key: 'ochentaYTres', render: (r: any) => `$${Number(Math.round(r.ochentaYTres)).toLocaleString()}` },
+                { header: '83% Milla 7', key: 'ochentaYTres', render: (r: any) => `$${Number(r.ochentaYTres).toLocaleString()}` },
                 { header: 'Dif 83%', key: 'd_83', render: (r: any) => (
                   <span className={r.d_83 < 0 ? 'text-red-500 font-bold' : r.d_83 > 0 ? 'text-green-500 font-bold' : ''}>
-                    ${Number(Math.round(r.d_83)).toLocaleString()}
+                    ${Number(r.d_83).toLocaleString()}
                   </span>
                 )},
               ]}

@@ -5,13 +5,16 @@ import ValidacionLineaBlanca from './ValidacionLineaBlanca';
 import TarifasLineaBlancaCRUD from './TarifasLineaBlancaCRUD';
 import { api } from '../../services/api';
 import TabPlanillas from './TabPlanillas';
+import TabRedespachos from './TabRedespachos';
+import { AlertTriangle } from 'lucide-react';
 
-type Tab = 'linea-blanca' | 'historico' | 'planillas';
+type Tab = 'linea-blanca' | 'historico' | 'planillas' | 'redespachos';
 
 const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
   { key: 'linea-blanca', label: 'Conciliación Línea Blanca', icon: <CheckSquare size={14} /> },
   { key: 'historico',    label: 'Histórico Conciliación',    icon: <History size={14} /> },
   { key: 'planillas',    label: 'Planillas Operativas',      icon: <FileSpreadsheet size={14} /> },
+  { key: 'redespachos',  label: 'Historial Re-Despachos',    icon: <AlertTriangle size={14} /> },
 ];
 
 // ─── Tab: Conciliación Línea Blanca ──────────────────────────────────────────
@@ -261,6 +264,7 @@ const ValidacionConciliaciones: React.FC<{ user: User }> = ({ user }) => {
         {activeTab === 'archivo-base' && <TarifasLineaBlancaCRUD user={user} />}
         {activeTab === 'historico'    && <TabHistorico user={user} />}
         {activeTab === 'planillas'    && <TabPlanillas user={user} />}
+        {activeTab === 'redespachos'  && <TabRedespachos />}
       </div>
     </div>
   );

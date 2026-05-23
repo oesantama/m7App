@@ -22,6 +22,7 @@ export const syncDriveCumplidos = async () => {
     let processedCount = 0;
     let savedCount = 0;
     let failedCount = 0;
+    let lastFileError = '';
 
     try {
         // 1. Obtener los documentos de Drive (CUMPLIDOS) del cliente CLI-09 de los últimos 5 días
@@ -149,8 +150,9 @@ Formato de salida (Devolver un array de objetos):
 
             } catch (err: any) {
                 failedCount++;
-                console.error(`[M7-CRON] Error procesando ${doc.file_name}:`, err.message);
-                if (err.message.includes('429')) {
+                lastFileError = err.message || 'Error desconocido';
+                console.error(`[M7-CRON] Error procesando ${doc.file_name}:`, lastFileError);
+                if (lastFileError.includes('429')) {
                     keyIndex++; // Rotar llave si hay límite de cuota
                 }
             } finally {
@@ -165,6 +167,10 @@ Formato de salida (Devolver un array de objetos):
         }
 
         details = `Procesados: ${processedCount}/${missingDocs.length}. Errores individuales: ${failedCount}. Registros extraídos: ${savedCount}`;
+        if (failedCount > 0 && !errorMessage) {
+            errorMessage = `Último error de archivo: ${lastFileError}`;
+            if (savedCount === 0) status = 'ERROR';
+        }
         console.log('[M7-CRON] Sincronización finalizada.');
 
     } catch (globalErr: any) {

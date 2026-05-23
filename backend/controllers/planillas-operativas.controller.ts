@@ -280,6 +280,35 @@ export const checkHistory = async (req: Request, res: Response) => {
     }
 };
 
+// ─── GET: Historial General de Re-despachos ──────────────────────────────────
+export const getRedespachos = async (req: Request, res: Response) => {
+    try {
+        const query = `
+            SELECT 
+                rl.pedido, 
+                MAX(rl.cedula) as cedula,
+                MAX(rl.cliente) as cliente,
+                MAX(rl.plu) as plu,
+                MAX(rl.articulo) as articulo,
+                MAX(rl.direccion) as direccion,
+                MAX(rl.placa) as placa,
+                MAX(rl.fecha1) as fecha1,
+                COUNT(rl.id) as salidas,
+                (SELECT tipo_validacion FROM conciliacion_lb_detalles WHERE viaje_pedido = rl.pedido ORDER BY id DESC LIMIT 1) as estado_entrega
+            FROM registros_logistica rl
+            WHERE rl.pedido != 'N/A' AND rl.pedido != ''
+            GROUP BY rl.pedido
+            HAVING COUNT(rl.id) > 1
+            ORDER BY salidas DESC
+        `;
+        const { rows } = await pool.query(query);
+        res.json(rows);
+    } catch (error: any) {
+        console.error('Error getting redespachos:', error);
+        res.status(500).json({ error: 'Error del servidor' });
+    }
+};
+
 // ─── DELETE: Eliminar un registro ────────────────────────────────────────────
 export const removeRecord = async (req: Request, res: Response) => {
     const { id } = req.params;

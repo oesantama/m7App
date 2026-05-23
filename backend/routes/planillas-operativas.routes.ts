@@ -1,9 +1,10 @@
 import express from 'express';
-import { getRecords, saveRecords, removeRecord, clearRecords, checkFiles, checkHistory } from '../controllers/planillas-operativas.controller.js';
+import { getRecords, saveRecords, removeRecord, clearRecords, checkFiles, checkHistory, getRedespachos } from '../controllers/planillas-operativas.controller.js';
 
 const router = express.Router();
 
 router.get('/', getRecords);
+router.get('/redespachos', getRedespachos);
 router.post('/', saveRecords);
 router.post('/check-files', checkFiles);
 router.post('/check-history', checkHistory);

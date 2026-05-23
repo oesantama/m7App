@@ -351,6 +351,7 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pedidos })
   }),
+  getPlanillasRedespachos: () => fetchJson(`${API_URL}/planillas-operativas/redespachos`),
 
   // --- MESSAGES / WHATSAPP ---
   // Maestros - CACHE BUSTING FORZADO
