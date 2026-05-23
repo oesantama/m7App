@@ -277,8 +277,9 @@ export const getRedespachos = async (req: Request, res: Response) => {
                 MAX(rl.plu) as plu,
                 MAX(rl.articulo) as articulo,
                 MAX(rl.direccion) as direccion,
-                MAX(rl.placa) as placa,
-                MAX(rl.fecha1) as fecha1,
+                STRING_AGG(DISTINCT rl.placa, ' | ') as placa,
+                STRING_AGG(DISTINCT rl.fecha1, ' | ') as fecha1,
+                STRING_AGG(rl.fecha1 || ' (' || rl.placa || ')', ' ➔ ') as historial_salidas,
                 COUNT(rl.id) as salidas,
                 (SELECT tipo_validacion FROM conciliacion_lb_detalles WHERE viaje_pedido = rl.pedido ORDER BY id DESC LIMIT 1) as estado_entrega
             FROM registros_logistica rl

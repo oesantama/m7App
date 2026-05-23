@@ -32,8 +32,15 @@ export default function TabRedespachos() {
     { header: 'PLU', key: 'plu' },
     { header: 'Artículo', key: 'articulo' },
     { header: 'Dirección', key: 'direccion' },
-    { header: 'Placa', key: 'placa' },
-    { header: 'Última Fecha', key: 'fecha1' },
+    { header: 'Salidas (Planilla → Placa)', key: 'historial_salidas', render: (r: any) => (
+        <div className="flex flex-col gap-1 text-xs">
+            {r.historial_salidas?.split(' ➔ ').map((salida: string, idx: number) => (
+                <span key={idx} className="bg-slate-100 text-slate-700 px-2 py-1 rounded border border-slate-200">
+                    {salida}
+                </span>
+            ))}
+        </div>
+    )},
     { header: 'Total Salidas', key: 'salidas', render: (r: any) => <span className="text-center font-black text-orange-600 block bg-orange-50 py-1 rounded-lg">{r.salidas}</span> },
     { header: 'Último Estado Conciliación', key: 'estado_entrega', render: (r: any) => {
         const estado = r.estado_entrega;
