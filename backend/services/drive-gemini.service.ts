@@ -64,6 +64,12 @@ export const syncDriveCumplidos = async () => {
             const localPath = path.join(tmpDir, doc.file_name);
             const remotePath = `gdrive_cumplidos:${doc.drive_path}/${doc.file_name}`;
 
+            // Retraso de 4.5 segundos para no saturar la cuota gratuita de Gemini (15 RPM)
+            if (i > 0) {
+                console.log(`[M7-CRON] Esperando 4.5s para no exceder cuota de Gemini...`);
+                await new Promise(resolve => setTimeout(resolve, 4500));
+            }
+
             try {
                 // Descargar archivo de Drive vía rclone
                 console.log(`[M7-CRON] Descargando ${doc.file_name}...`);
