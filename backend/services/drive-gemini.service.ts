@@ -110,8 +110,10 @@ Analiza este DOCUMENTO LOGÍSTICO (planilla de despacho/entrega) y extrae TODOS 
 REGLAS CRÍTICAS DE EXTRACCIÓN (LEER CON CUIDADO):
 1. CADA FILA en la tabla del PDF debe ser un objeto independiente en el arreglo.
 2. IMPORTANTE: La imagen puede estar rotada 90 o 180 grados. Identifica la orientación real del texto para no mezclar columnas con filas.
-3. LECTURA HORIZONTAL ESTRICTA Y ALINEACIÓN VISUAL: Dibuja mentalmente una línea recta desde el Pedido hacia la derecha. Si al seguir la línea horizontal exacta del Pedido la celda del PLU está vacía, pon "N/A" obligatoriamente. ¡JAMÁS tomes el PLU de la fila de abajo para rellenar un hueco! Es común que haya más Pedidos que PLUs (ej. 13 Pedidos y 11 PLUs). Los huecos DEBEN llenarse con "N/A" para no desajustar el orden.
-4. PROHIBIDO REPETIR VALORES: Cada fila tiene su propio número de Pedido y Cédula. NUNCA copies el pedido o la cédula de la fila anterior a menos que en la imagen sean visualmente idénticos (ej. un mismo cliente compró 2 cosas y ocupa 2 filas).
+3. ASIGNACIÓN SECUENCIAL LÓGICA: Los PDFs pueden tener las columnas desalineadas verticalmente. Extrae la lista de Pedidos/Clientes y la lista de PLUs/Artículos. Empareja de forma estrictamente secuencial de arriba a abajo (Pedido #1 con PLU #1, Pedido #2 con PLU #2). Si hay MÁS Pedidos que PLUs, solo los ÚLTIMOS Pedidos deben llevar "N/A" en PLU. JAMÁS pongas "N/A" a un pedido intermedio si aún hay PLUs debajo en la columna. ¡Cuenta bien los elementos!
+4. SEPARACIÓN DE PEDIDO Y CÉDULA PEGADOS: Si ves un Pedido extremadamente largo (ej. "163352206107970043502"), es porque el Pedido y la Cédula se imprimieron sin espacio. Debes separarlos inteligentemente: los primeros ~13 dígitos son el Pedido ("1633522061079") y los últimos dígitos son la Cédula ("70043502"). ¡NO dejes la cédula como N/A!
+5. DESCRIPCIONES DE ARTÍCULOS: Copia el texto exacto. Si ves texto parcial o abreviado al lado del PLU, pon lo que veas. Solo pon "N/A" si está totalmente en blanco.
+6. PROHIBIDO REPETIR VALORES: Cada fila tiene su propio número de Pedido y Cédula. NUNCA copies el pedido o la cédula de la fila anterior a menos que en la imagen sean visualmente idénticos (ej. un mismo cliente compró 2 cosas y ocupa 2 filas seguidas).
 5. Los números de "Pedido" en el Éxito suelen empezar por 16 o 26.
 6. LIMPIEZA OBLIGATORIA DEL PEDIDO: Si ves letras o guiones antes del pedido (ej. "E-com 163287...", "E-con163...", "D 391..."), IGNÓRALOS. Extrae ÚNICAMENTE LOS NÚMEROS (ej. "163287...", "391..."). No devuelvas letras ni símbolos en el campo pedido.
 7. PLU ESTRICTAMENTE POSITIVO: Los números de PLU NUNCA son negativos. Si ves un guion antes del PLU (ej. "-3698640"), es un guion separador o mancha. Escribe solo "3698640".
@@ -149,7 +151,8 @@ Campos exactos por cada fila:
                 
                 // Extraer JSON de la respuesta
                 const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-                const matches = JSON.parse(cleanJsonStr);
+                const parsed = JSON.parse(cleanJsonStr);
+                const matches = parsed.matches || (Array.isArray(parsed) ? parsed : []);
 
                 if (Array.isArray(matches) && matches.length > 0) {
                     const client = await pool.connect();
