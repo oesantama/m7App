@@ -64,8 +64,8 @@ const initDB = async () => {
             WHERE conrelid = 'registros_logistica'::regclass AND contype = 'u';
         `);
         for (const row of uniqueConstraints.rows) {
-            console.log(\`[M7-DB] Eliminando restricción única: \${row.conname}\`);
-            await client.query(\`ALTER TABLE registros_logistica DROP CONSTRAINT "\${row.conname}"\`);
+            console.log(`[M7-DB] Eliminando restricción única: ${row.conname}`);
+            await client.query(`ALTER TABLE registros_logistica DROP CONSTRAINT "${row.conname}"`);
         }
 
         // 3. (MIGRACIÓN COMPLETADA) Las sentencias de limpiar duplicados y crear
