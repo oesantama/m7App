@@ -215,7 +215,8 @@ export default function DashboardResultadosLB({ resultados, onSave, guardando }:
       }`}>{r.estado}</span>
     )},
     { header: 'Tipo', key: 'tipoValidacion' },
-    { header: 'Notas', key: 'notasValidacion' },
+    { header: 'Notas Sistram', key: 'notasExcel' },
+    { header: 'Notas Sistema', key: 'notasValidacion' },
   ];
 
   if (!resultados || resultados.length === 0) return null;

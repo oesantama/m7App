@@ -244,7 +244,7 @@ export const saveRecords = async (req: Request, res: Response) => {
     } catch (error: any) {
         await client.query('ROLLBACK');
         console.error('Error saving planillas records:', error);
-        res.status(500).json({ error: 'Error del servidor al guardar' });
+        res.status(500).json({ error: 'Error del servidor al guardar', detalle: error.message });
     } finally {
         client.release();
     }

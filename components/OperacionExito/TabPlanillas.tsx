@@ -184,8 +184,23 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
           setProgressInfo(`[${i + 1}/${totalFiles}] Preparando: ${fileObj.name}`);
           const buffer = await fileObj.file.arrayBuffer();
 
-          setProgressInfo(`[${i + 1}/${totalFiles}] IA Analizando: ${fileObj.name}`);
-          const matches = await geminiService.analyzeDocument(buffer, 'application/pdf');
+          setProgressInfo(`[${i + 1}/${totalFiles}] IA Analizando: ${fileObj.name} (Tarda ~30s)...`);
+          
+          let simProgress = 0;
+          const progressInterval = setInterval(() => {
+            simProgress += 2;
+            if (simProgress > 95) simProgress = 95;
+            const baseProgress = (processedCount / totalFiles) * 100;
+            const currentFileProgress = (simProgress / 100) * (100 / totalFiles);
+            setProgressValue(Math.round(baseProgress + currentFileProgress));
+          }, 600);
+
+          let matches;
+          try {
+            matches = await geminiService.analyzeDocument(buffer, 'application/pdf');
+          } finally {
+            clearInterval(progressInterval);
+          }
 
           if (Array.isArray(matches) && matches.length > 0) {
             const batch = matches.map((analysis: any) => ({

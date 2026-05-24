@@ -269,6 +269,7 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
 
         const valorAdicional = Math.round(parseFloat(row['valor adicional operador auxiliar'] || row['VALOR ADICIONAL OPERADOR AUXILIAR'] || '0') || 0);
         const totalMilla7 = Math.round(parseFloat(row['total milla 7'] || row['TOTAL MILLA 7'] || '0') || 0);
+        const notasExcel = (row['notas'] || row['observaciones'] || row['observacion'] || row['novedades'] || row['novedad'] || '').toString();
 
         res.push({
           index: index + 1,
@@ -286,8 +287,8 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
           totalMilla7,
           estado,
           tipoValidacion: tipo,
-          notasValidacion: matchingBase ? '' : 'No se encontró en base',
-          notas2: ''
+          notasValidacion: notasValidacion,
+          notasExcel: notasExcel
         });
       });
 
