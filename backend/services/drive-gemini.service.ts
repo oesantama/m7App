@@ -87,31 +87,30 @@ Analiza este DOCUMENTO LOGÍSTICO (planilla de despacho/entrega) y extrae TODOS 
 REGLAS CRÍTICAS DE EXTRACCIÓN (LEER CON CUIDADO):
 1. CADA FILA en la tabla del PDF debe ser un objeto independiente en el arreglo.
 2. IMPORTANTE: La imagen puede estar rotada 90 o 180 grados. Identifica la orientación real del texto para no mezclar columnas con filas.
-3. PROHIBIDO REPETIR VALORES: Cada fila tiene su propio número de Pedido y Cédula. NUNCA copies el pedido o la cédula de la fila anterior a menos que en la imagen sean visualmente idénticos.
-4. Los números de Pedido y Cédula en el Éxito suelen empezar por 16 o 26 (ej. 265793870, 16330320...). Lee dígito por dígito con extrema precisión.
+3. LECTURA HORIZONTAL ESTRICTA: Lee la tabla estrictamente FILA POR FILA (de izquierda a derecha). Si una celda en una fila está en blanco o ilegible, pon "N/A" solo para ese campo en ESA fila. NUNCA desplaces los datos de una columna hacia arriba o hacia abajo. Si la fila 5 no tiene pedido, pon "N/A" en su pedido, pero el PLU de la fila 5 debe quedarse en la fila 5.
+4. PROHIBIDO REPETIR VALORES: Cada fila tiene su propio número de Pedido y Cédula. NUNCA copies el pedido o la cédula de la fila anterior a menos que en la imagen sean visualmente idénticos.
+5. Los números de "Pedido" en el Éxito suelen empezar por 16 o 26.
+6. LIMPIEZA OBLIGATORIA DEL PEDIDO: Si ves letras o guiones antes del pedido (ej. "E-com 163287...", "E-con163...", "D 391..."), IGNÓRALOS. Extrae ÚNICAMENTE LOS NÚMEROS (ej. "163287...", "391..."). No devuelvas letras ni símbolos en el campo pedido.
+7. PLU ESTRICTAMENTE POSITIVO: Los números de PLU NUNCA son negativos. Si ves un guion antes del PLU (ej. "-3698640"), es un guion separador o mancha. Escribe solo "3698640".
 
-EJEMPLO DE LECTURA (Fíjate cómo cambia cada fila):
-Fila 1: Pedido 1633032041116, Cédula 39268715, Cliente ALBA TERESA
-Fila 2: Pedido 265793871, Cédula 8373907, Cliente ROBERTO BENAVIDES
-Fila 3: Pedido 265793870, Cédula 1045142382, Cliente ORIANA MARIA
-Fila 4: Pedido 265793778, Cédula 1038102053, Cliente Nilton Cesar
+EJEMPLO DE LECTURA (Fíjate cómo se limpian los pedidos):
+Fila 1 (E-com 1633032041116): Pedido 1633032041116, Cédula 39268715, Cliente ALBA TERESA
+Fila 2 (D 39107413): Pedido 39107413, Cédula 187311634, Cliente JUNEYLIS CONTRERAS
 
-Formato de salida esperado (Devolver un array de objetos):
-[
-  {
-    "pedido": "Extraer estrictamente el número de pedido, factura u orden de ESTA FILA.",
-    "cedula": "Extraer estrictamente la CC o NIT del cliente de ESTA FILA.",
-    "cliente": "Extraer nombre del cliente de ESTA FILA.",
-    "plu": "Extraer material o PLU/EAN de ESTA FILA.",
-    "articulo": "Extraer descripción del artículo de ESTA FILA.",
-    "direccion": "Extraer dirección.",
-    "fecha1": "Extraer fecha de despacho.",
-    "fecha2": "Extraer otra fecha si existe.",
-    "ciudad_barrio": "Extraer ciudad/barrio.",
-    "placa": "Extraer placa del vehículo asignado a la planilla.",
-    "notas": "Extraer observaciones adicionales."
-  }
-]
+Formato OBLIGATORIO de salida: { "matches": [ {objeto} ] }
+
+Campos exactos por cada fila:
+- pedido (SOLO NÚMEROS, sin letras "E-com" ni guiones)
+- cedula (Extraer estrictamente la CC o NIT del cliente de ESTA FILA)
+- cliente (Extraer nombre del cliente de ESTA FILA)
+- plu (SOLO NÚMERO POSITIVO, sin signos negativos)
+- articulo (Extraer descripción del artículo de ESTA FILA)
+- direccion (Extraer dirección)
+- fecha1 (Extraer fecha de despacho)
+- fecha2 (Extraer otra fecha si existe)
+- ciudad_barrio (Extraer ciudad/barrio)
+- placa (Extraer placa)
+- notas (Extraer observaciones)
 `;
 
                 const genAI = new GoogleGenerativeAI(keys[keyIndex % keys.length]);

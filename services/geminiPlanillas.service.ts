@@ -49,9 +49,11 @@ class GeminiPlanillasService {
       REGLAS CRÍTICAS DE EXTRACCIÓN (LEER CON CUIDADO):
       1. CADA FILA en la tabla del PDF debe ser un objeto independiente en el arreglo.
       2. IMPORTANTE: La imagen puede estar rotada 90 o 180 grados. Identifica la orientación real del texto para no mezclar columnas con filas.
-      3. PROHIBIDO REPETIR VALORES: Cada fila tiene su propio número de Pedido y Cédula. NUNCA copies el pedido o la cédula de la fila anterior a menos que en la imagen sean visualmente idénticos.
-      4. Los números de "Pedido" en el Éxito suelen empezar por 16 o 26 (ej. 265793870, 16330320...). Lee dígito por dígito con extrema precisión.
-      5. LIMPIEZA OBLIGATORIA DEL PEDIDO: Si ves letras o guiones antes del pedido (ej. "E-com 163287...", "E-con163...", "D 391..."), IGNÓRALOS. Extrae ÚNICAMENTE LOS NÚMEROS (ej. "163287...", "391..."). No devuelvas letras ni símbolos en el campo pedido.
+      3. LECTURA HORIZONTAL ESTRICTA: Lee la tabla estrictamente FILA POR FILA (de izquierda a derecha). Si una celda en una fila está en blanco o ilegible, pon "N/A" solo para ese campo en ESA fila. NUNCA desplaces los datos de una columna hacia arriba o hacia abajo. Si la fila 5 no tiene pedido, pon "N/A" en su pedido, pero el PLU de la fila 5 debe quedarse en la fila 5.
+      4. PROHIBIDO REPETIR VALORES: Cada fila tiene su propio número de Pedido y Cédula. NUNCA copies el pedido o la cédula de la fila anterior a menos que en la imagen sean visualmente idénticos.
+      5. Los números de "Pedido" en el Éxito suelen empezar por 16 o 26. Lee dígito por dígito con extrema precisión.
+      6. LIMPIEZA OBLIGATORIA DEL PEDIDO: Si ves letras o guiones antes del pedido (ej. "E-com 163287...", "E-con163...", "D 391..."), IGNÓRALOS. Extrae ÚNICAMENTE LOS NÚMEROS (ej. "163287...", "391..."). No devuelvas letras ni símbolos en el campo pedido.
+      7. PLU ESTRICTAMENTE POSITIVO: Los números de PLU NUNCA son negativos. Si ves un guion antes del PLU (ej. "-3698640"), es un guion separador o mancha. Escribe solo "3698640".
       
       EJEMPLO DE LECTURA (Fíjate cómo cambia cada fila y cómo se limpian los pedidos):
       Fila 1 (E-com 1633032041116): Pedido 1633032041116, Cédula 39268715, Cliente ALBA TERESA
@@ -64,7 +66,7 @@ class GeminiPlanillasService {
       - pedido (SOLO NÚMEROS, sin letras "E-com" ni guiones)
       - cedula (Documento o NIT del cliente específico de ESA FILA)
       - cliente (Nombre completo del cliente de ESA FILA)
-      - plu (Código del producto, PLU, EAN o Material de ESA FILA)
+      - plu (SOLO NÚMERO POSITIVO, sin signos negativos)
       - articulo (Descripción del artículo de ESA FILA)
       - direccion (Dirección de entrega de ESA FILA)
       - fecha1 (Primera fecha que aparezca en la cabecera o fila)
