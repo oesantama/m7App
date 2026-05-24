@@ -111,15 +111,14 @@ REGLAS CRÍTICAS DE EXTRACCIÓN (LEER CON CUIDADO):
 1. CADA FILA en la tabla del PDF debe ser un objeto independiente en el arreglo.
 2. PROHIBIDO OMITIR REGISTROS: Si la hoja tiene 13 Pedidos impresos, DEBES devolver exactamente 13 objetos JSON. No puedes omitir al último cliente (ej. Carolina Montoya) solo porque no tenga un PLU al lado.
 3. ORIENTACIÓN Y ENCABEZADOS: La imagen puede estar rotada (de lado o de cabeza). Antes de extraer, busca los encabezados "Pedido", "Cédula", "Cliente", "PLU", "Descripción". Estos definen el orden de las columnas y la orientación real.
-4. ERROR DE IMPRESIÓN (COLUMNA CONDENSADA): La columna de PLUs y Descripciones se imprimió más pequeña que la de Pedidos, por lo que el texto se va subiendo y cruza las líneas divisorias. ¡IGNORA LAS LÍNEAS HORIZONTALES PARA LOS PLUS! 
-5. EMPAREJAMIENTO SECUENCIAL ESTRICTO (1 A 1): Como las líneas no coinciden, debes extraer la lista completa de Pedidos (izquierda) y la lista completa de PLUs (derecha). Empareja ESTRICTAMENTE en orden: el Pedido #1 con el PLU #1, el Pedido #2 con el PLU #2, el Pedido #3 con el PLU #3, y así sucesivamente.
-6. HUECOS AL FINAL: Si hay más Pedidos que PLUs (ej. 13 Pedidos y 12 PLUs), el ÚLTIMO Pedido (y solo el último) debe quedar con el PLU y Artículo como un string vacío (""). JAMÁS dejes en blanco a un cliente en el medio de la lista. Todos los del medio DEBEN tener su PLU asignado en orden secuencial.
+4. RESPETA LA CUADRÍCULA ESTRICTAMENTE: La tabla tiene líneas horizontales claras que separan a cada cliente. Sigue estas líneas visuales.
+5. CELDAS VACÍAS: Si en el renglón de un cliente (ej. Isolina o Carolina) la celda de PLU o Descripción está FÍSICAMENTE VACÍA en el papel, extrae obligatoriamente un string vacío (""). NO asocies el PLU del cliente de abajo (ej. Ricardo) al cliente de arriba que tiene la celda vacía.
+6. JAMÁS uses la palabra "N/A" ni "#¿NOMBRE?". Si no hay dato, pon "".
 7. SEPARACIÓN DE PEDIDO Y CÉDULA PEGADOS: Si ves un número extremadamente largo (ej. "163352206107970043502"), es porque el Pedido y la Cédula se imprimieron pegados. Sepáralos por lógica: los primeros ~13 dígitos son el Pedido ("1633522061079") y los últimos dígitos la Cédula ("70043502").
-7. DESCRIPCIONES DE ARTÍCULOS: Copia el texto exacto. Si ves texto parcial o cortado, pon lo que alcances a leer. Si no hay nada, pon un string vacío ("").
-8. PROHIBIDO REPETIR VALORES CREADOS: Cada fila tiene su propio Pedido. Nunca inventes o dupliques el pedido de la fila de arriba a menos que sea visualmente idéntico. IGNORA cualquier texto borroso o "fantasma" que esté montado sobre las líneas divisoras.
-5. Los números de "Pedido" en el Éxito suelen empezar por 16 o 26.
-6. LIMPIEZA OBLIGATORIA DEL PEDIDO: Si ves letras o guiones antes del pedido (ej. "E-com 163287...", "E-con163...", "D 391..."), IGNÓRALOS. Extrae ÚNICAMENTE LOS NÚMEROS (ej. "163287...", "391..."). No devuelvas letras ni símbolos en el campo pedido.
-7. PLU ESTRICTAMENTE POSITIVO: Los números de PLU NUNCA son negativos. Si ves un guion antes del PLU (ej. "-3698640"), es un guion separador o mancha. Escribe solo "3698640".
+8. DESCRIPCIONES DE ARTÍCULOS: Copia el texto exacto. Si ves texto parcial o cortado, pon lo que alcances a leer. Si no hay nada, pon un string vacío ("").
+9. Los números de "Pedido" en el Éxito suelen empezar por 16 o 26. Lee dígito por dígito.
+10. LIMPIEZA OBLIGATORIA DEL PEDIDO: Si ves letras o guiones antes del pedido (ej. "E-com 163287..."), IGNÓRALOS. Extrae ÚNICAMENTE LOS NÚMEROS. No devuelvas letras ni símbolos en el campo pedido.
+11. PLU ESTRICTAMENTE POSITIVO: Los números de PLU NUNCA son negativos. Si ves un guion antes del PLU (ej. "-3698640"), es un guion separador o mancha. Escribe solo "3698640".
 
 EJEMPLO DE LECTURA (Fíjate cómo se limpian los pedidos):
 Fila 1 (E-com 1633032041116): Pedido 1633032041116, Cédula 39268715, Cliente ALBA TERESA
