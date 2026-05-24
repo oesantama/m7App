@@ -68,6 +68,10 @@ const initDB = async () => {
             await client.query(`ALTER TABLE registros_logistica DROP CONSTRAINT "${row.conname}"`);
         }
 
+        // Eliminar también índices únicos creados manualmente
+        console.log('[M7-DB] Eliminando índices únicos problemáticos...');
+        await client.query(`DROP INDEX IF EXISTS idx_rl_unique_record;`);
+
         // 3. (MIGRACIÓN COMPLETADA) Las sentencias de limpiar duplicados y crear
         // el índice único ya se ejecutaron. Dejamos comentado para no bloquear la BD 
         // en cada reinicio del contenedor.
