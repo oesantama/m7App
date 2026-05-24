@@ -78,7 +78,7 @@ export const saveConciliacion = async (req: Request, res: Response) => {
             archivoId, finalFecha, detalle.placa || '', detalle.destino || '', detalle.articulo || '',
             detalle.precioArchivo1 || 0, detalle.precio70Base || 0, detalle.precioArchivo2 || 0, detalle.diferencia || 0,
             detalle.valorAdicional || 0, detalle.totalMilla7 || 0, detalle.estado || '', detalle.tipoValidacion || '',
-            detalle.notasValidacion || '', detalle.notas2 || '', existingId
+            detalle.notasValidacion || '', detalle.notasExcel || '', existingId
           ]
         );
         actualizados++;
@@ -93,7 +93,7 @@ export const saveConciliacion = async (req: Request, res: Response) => {
             archivoId, finalFecha, detalle.placa || '', sys, viaje, detalle.destino || '', detalle.articulo || '',
             detalle.precioArchivo1 || 0, detalle.precio70Base || 0, detalle.precioArchivo2 || 0, detalle.diferencia || 0,
             detalle.valorAdicional || 0, detalle.totalMilla7 || 0, detalle.estado || '', detalle.tipoValidacion || '',
-            detalle.notasValidacion || '', detalle.notas2 || ''
+            detalle.notasValidacion || '', detalle.notasExcel || ''
           ]
         );
         guardados++;
@@ -200,7 +200,7 @@ export const searchDetalles = async (req: Request, res: Response) => {
       estado: row.estado,
       tipoValidacion: row.tipo_validacion,
       notasValidacion: row.notas_validacion,
-      notas2: row.notas2
+      notasExcel: row.notas2
     }));
 
     res.json(mapped);

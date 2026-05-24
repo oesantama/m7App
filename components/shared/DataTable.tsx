@@ -32,7 +32,7 @@ export function DataTable<T extends Record<string, any>>({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Paginación
-  const [pageSize, setPageSize] = useState<number | 'all'>(10);
+  const [pageSize, setPageSize] = useState<number | 'all'>(5);
   const [currentPage, setCurrentPage] = useState(1);
 
   // 1. Filtrar los datos basados en la búsqueda

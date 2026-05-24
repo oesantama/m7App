@@ -59,6 +59,10 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
   const [skippedFiles,     setSkippedFiles]      = useState<SkippedInfo[]>([]);
   const [showingDuplicates, setShowingDuplicates] = useState(false);
 
+  // Edit Modal
+  const [editingRecord, setEditingRecord] = useState<any | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+
   // Historial de salidas y entregas
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [historyWarnings, setHistoryWarnings] = useState<any[]>([]);
@@ -308,17 +312,23 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
     }
   };
 
-  const editRow = async (id: string, currentPedido: string) => {
+  const editRow = (record: any) => {
     if (!canDelete) return toast.error('No tienes permisos para editar registros.');
-    const newPedido = window.prompt('Corregir número de Pedido (solo números):', currentPedido);
-    if (!newPedido || newPedido.trim() === currentPedido) return;
-    
+    setEditingRecord({ ...record });
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingRecord) return;
     try {
-      const updated = await api.updatePlanillaRecord(id, { pedido: newPedido.trim() });
-      setResults(prev => prev.map(r => r.id === id ? { ...r, pedido: updated.pedido } : r));
-      toast.success('Pedido actualizado con éxito.');
+      const { id, drive_link, created_at, ...updateData } = editingRecord;
+      const updated = await api.updatePlanillaRecord(id, updateData);
+      setResults(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r));
+      toast.success('Registro actualizado con éxito.');
+      setShowEditModal(false);
+      setEditingRecord(null);
     } catch (e: any) {
-      toast.error(e.message || 'Error al actualizar el pedido');
+      toast.error(e.message || 'Error al actualizar el registro');
     }
   };
 
@@ -378,7 +388,7 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
       header: 'Acciones', key: 'actions', sortable: false,
       render: row => (
         <div className="flex items-center gap-1">
-          <button onClick={() => editRow(row.id, row.pedido)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Editar Pedido">
+          <button onClick={() => editRow(row)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Editar Registro">
             <Edit2 size={12} />
           </button>
           <button onClick={() => deleteRow(row.id)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg" title="Eliminar">
@@ -693,6 +703,73 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
                 className="px-6 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-colors"
               >
                 Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal Edición ── */}
+      {showEditModal && editingRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white w-[600px] max-w-[90vw] rounded-[2rem] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-blue-50">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
+                  <Edit2 size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-blue-900">Editar Registro Logístico</h3>
+                  <p className="text-sm text-blue-700 font-medium mt-1">
+                    Modifica los campos que fueron leídos incorrectamente.
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowEditModal(false)} className="p-2 text-blue-400 hover:bg-blue-100 rounded-xl transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-auto p-6 bg-white space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { key: 'pedido', label: 'Pedido' },
+                  { key: 'cedula', label: 'Cédula' },
+                  { key: 'cliente', label: 'Cliente' },
+                  { key: 'plu', label: 'PLU' },
+                  { key: 'articulo', label: 'Artículo' },
+                  { key: 'placa', label: 'Placa' },
+                  { key: 'fecha1', label: 'Fecha 1' },
+                  { key: 'fecha2', label: 'Fecha 2' },
+                  { key: 'direccion', label: 'Dirección' },
+                  { key: 'ciudad_barrio', label: 'Ciudad / Barrio' },
+                  { key: 'notas', label: 'Notas' },
+                ].map((field) => (
+                  <div key={field.key} className={['cliente', 'articulo', 'direccion'].includes(field.key) ? 'col-span-2' : 'col-span-1'}>
+                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{field.label}</label>
+                    <input
+                      type="text"
+                      value={editingRecord[field.key] || ''}
+                      onChange={(e) => setEditingRecord({ ...editingRecord, [field.key]: e.target.value })}
+                      className="w-full mt-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+              <button 
+                onClick={() => setShowEditModal(false)}
+                className="px-6 py-2 border border-slate-200 text-slate-500 rounded-xl text-sm font-black uppercase tracking-widest hover:bg-slate-200 hover:text-slate-700 transition-all"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={handleSaveEdit}
+                className="px-6 py-2 bg-blue-600 text-white rounded-xl text-sm font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-600/20"
+              >
+                Guardar Cambios
               </button>
             </div>
           </div>

@@ -76,6 +76,14 @@ export const syncDriveCumplidos = async () => {
 
         for (let i = 0; i < missingDocs.length; i++) {
             const doc = missingDocs[i];
+            
+            if (cronLogId) {
+                await pool.query(
+                    `UPDATE cron_logs SET details = $1 WHERE id = $2`,
+                    [`[${i + 1}/${missingDocs.length}] Procesando ${doc.file_name}...`, cronLogId]
+                );
+            }
+
             const localPath = path.join(tmpDir, doc.file_name);
             const remotePath = `gdrive_cumplidos:${doc.drive_path}/${doc.file_name}`;
 
@@ -102,8 +110,8 @@ Analiza este DOCUMENTO LOGÍSTICO (planilla de despacho/entrega) y extrae TODOS 
 REGLAS CRÍTICAS DE EXTRACCIÓN (LEER CON CUIDADO):
 1. CADA FILA en la tabla del PDF debe ser un objeto independiente en el arreglo.
 2. IMPORTANTE: La imagen puede estar rotada 90 o 180 grados. Identifica la orientación real del texto para no mezclar columnas con filas.
-3. LECTURA HORIZONTAL ESTRICTA: Lee la tabla estrictamente FILA POR FILA (de izquierda a derecha). Si una celda en una fila está en blanco o ilegible, pon "N/A" solo para ese campo en ESA fila. NUNCA desplaces los datos de una columna hacia arriba o hacia abajo. Si la fila 5 no tiene pedido, pon "N/A" en su pedido, pero el PLU de la fila 5 debe quedarse en la fila 5.
-4. PROHIBIDO REPETIR VALORES: Cada fila tiene su propio número de Pedido y Cédula. NUNCA copies el pedido o la cédula de la fila anterior a menos que en la imagen sean visualmente idénticos.
+3. LECTURA HORIZONTAL ESTRICTA Y ALINEACIÓN VISUAL: Dibuja mentalmente una línea recta desde el Pedido hacia la derecha. Si al seguir la línea horizontal exacta del Pedido la celda del PLU está vacía, pon "N/A" obligatoriamente. ¡JAMÁS tomes el PLU de la fila de abajo para rellenar un hueco! Es común que haya más Pedidos que PLUs (ej. 13 Pedidos y 11 PLUs). Los huecos DEBEN llenarse con "N/A" para no desajustar el orden.
+4. PROHIBIDO REPETIR VALORES: Cada fila tiene su propio número de Pedido y Cédula. NUNCA copies el pedido o la cédula de la fila anterior a menos que en la imagen sean visualmente idénticos (ej. un mismo cliente compró 2 cosas y ocupa 2 filas).
 5. Los números de "Pedido" en el Éxito suelen empezar por 16 o 26.
 6. LIMPIEZA OBLIGATORIA DEL PEDIDO: Si ves letras o guiones antes del pedido (ej. "E-com 163287...", "E-con163...", "D 391..."), IGNÓRALOS. Extrae ÚNICAMENTE LOS NÚMEROS (ej. "163287...", "391..."). No devuelvas letras ni símbolos en el campo pedido.
 7. PLU ESTRICTAMENTE POSITIVO: Los números de PLU NUNCA son negativos. Si ves un guion antes del PLU (ej. "-3698640"), es un guion separador o mancha. Escribe solo "3698640".

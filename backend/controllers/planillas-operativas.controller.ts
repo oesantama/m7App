@@ -321,32 +321,40 @@ export const removeRecord = async (req: Request, res: Response) => {
 // ─── PUT: Actualizar un registro ────────────────────────────────────────────
 export const updateRecord = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { pedido } = req.body;
+    const updateFields = req.body; // { pedido, cedula, cliente, plu, articulo, placa, notas... }
     
     try {
-        // Validar si ya existe este pedido con los mismos datos (para evitar duplicados al editar)
-        const checkQuery = `
-            SELECT id FROM registros_logistica 
-            WHERE pedido = $1 
-            AND id != $2
-            AND cedula = (SELECT cedula FROM registros_logistica WHERE id = $2 LIMIT 1)
-            AND plu = (SELECT plu FROM registros_logistica WHERE id = $2 LIMIT 1)
-            AND archivo != (SELECT archivo FROM registros_logistica WHERE id = $2 LIMIT 1)
-            LIMIT 1
-        `;
-        const { rowCount } = await pool.query(checkQuery, [pedido, id]);
-        
-        if (rowCount && rowCount > 0) {
-            return res.status(400).json({ error: 'Este Pedido ya existe para este cliente y artículo en OTRA planilla.' });
+        // Validar si ya existe este pedido con los mismos datos en otra planilla
+        if (updateFields.pedido) {
+            const checkQuery = `
+                SELECT id FROM registros_logistica 
+                WHERE pedido = $1 
+                AND id != $2
+                AND cedula = (SELECT cedula FROM registros_logistica WHERE id = $2 LIMIT 1)
+                AND plu = (SELECT plu FROM registros_logistica WHERE id = $2 LIMIT 1)
+                AND archivo != (SELECT archivo FROM registros_logistica WHERE id = $2 LIMIT 1)
+                LIMIT 1
+            `;
+            const { rowCount } = await pool.query(checkQuery, [updateFields.pedido, id]);
+            
+            if (rowCount && rowCount > 0) {
+                return res.status(400).json({ error: 'Este Pedido ya existe para este cliente y artículo en OTRA planilla.' });
+            }
         }
 
+        const keys = Object.keys(updateFields);
+        if (keys.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+        const setString = keys.map((key, i) => `${key} = $${i + 1}`).join(', ');
+        const values = Object.values(updateFields);
+        
         const updateQuery = `
             UPDATE registros_logistica
-            SET pedido = $1
-            WHERE id = $2
+            SET ${setString}
+            WHERE id = $${keys.length + 1}
             RETURNING *
         `;
-        const { rows } = await pool.query(updateQuery, [pedido, id]);
+        const { rows } = await pool.query(updateQuery, [...values, id]);
 
         if (rows.length === 0) {
             return res.status(404).json({ error: 'Registro no encontrado' });
