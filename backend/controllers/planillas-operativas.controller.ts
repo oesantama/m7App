@@ -118,7 +118,7 @@ export const checkFiles = async (req: Request, res: Response) => {
 export const getRecords = async (req: Request, res: Response) => {
     try {
         const {
-            placa = '', plu = '', pedido = '', articulo = '', cliente = '',
+            archivo = '', placa = '', plu = '', pedido = '', articulo = '', cliente = '',
             search = '', fechaDesde = '', fechaHasta = '',
             onlyCurrentMonth = 'true'
         } = req.query as any;
@@ -152,6 +152,7 @@ export const getRecords = async (req: Request, res: Response) => {
             conditions.push(`(${safeDate}) BETWEEN $${params.length - 1} AND $${params.length}`);
         }
 
+        if (archivo)  { params.push(`%${archivo}%`);  conditions.push(`rl.archivo  ILIKE $${params.length}`); }
         if (placa)    { params.push(`%${placa}%`);    conditions.push(`rl.placa    ILIKE $${params.length}`); }
         if (plu)      { params.push(`%${plu}%`);      conditions.push(`rl.plu      ILIKE $${params.length}`); }
         if (pedido)   { params.push(`%${pedido}%`);   conditions.push(`rl.pedido   ILIKE $${params.length}`); }
@@ -274,18 +275,18 @@ export const getRedespachos = async (req: Request, res: Response) => {
                 rl.pedido, 
                 MAX(rl.cedula) as cedula,
                 MAX(rl.cliente) as cliente,
-                MAX(rl.plu) as plu,
-                MAX(rl.articulo) as articulo,
+                STRING_AGG(DISTINCT rl.plu, ' | ') as plu,
+                STRING_AGG(DISTINCT rl.articulo, ' | ') as articulo,
                 MAX(rl.direccion) as direccion,
                 STRING_AGG(DISTINCT rl.placa, ' | ') as placa,
                 STRING_AGG(DISTINCT rl.fecha1, ' | ') as fecha1,
-                STRING_AGG(rl.fecha1 || ' (' || rl.placa || ')', ' ➔ ') as historial_salidas,
-                COUNT(rl.id) as salidas,
+                STRING_AGG(DISTINCT rl.fecha1 || ' (' || rl.placa || ')', ' ➔ ') as historial_salidas,
+                COUNT(DISTINCT rl.fecha1 || rl.placa) as salidas,
                 (SELECT tipo_validacion FROM conciliacion_lb_detalles WHERE viaje_pedido = rl.pedido ORDER BY id DESC LIMIT 1) as estado_entrega
             FROM registros_logistica rl
             WHERE rl.pedido != 'N/A' AND rl.pedido != ''
             GROUP BY rl.pedido
-            HAVING COUNT(rl.id) > 1
+            HAVING COUNT(DISTINCT rl.fecha1 || rl.placa) > 1
             ORDER BY salidas DESC
         `;
         const { rows } = await pool.query(query);

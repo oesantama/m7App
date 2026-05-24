@@ -45,7 +45,7 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
   const [loadingMode, setLoadingMode]    = useState<string | null>(null);
 
   // Filtros
-  const [filterFields, setFilterFields] = useState({ placa: '', plu: '', pedido: '', articulo: '', cliente: '' });
+  const [filterFields, setFilterFields] = useState({ archivo: '', placa: '', plu: '', pedido: '', articulo: '', cliente: '' });
   const [searchGlobal, setSearchGlobal] = useState('');
   const { desde, hasta } = currentMonthRange();
   const [fechaDesde, setFechaDesde] = useState(desde);
@@ -75,6 +75,7 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
     try {
       const f = overrides ? { ...filterFields, ...overrides } : filterFields;
       const params: any = {
+        archivo:  f.archivo  || '',
         placa:    f.placa    || '',
         plu:      f.plu      || '',
         pedido:   f.pedido   || '',
@@ -409,8 +410,8 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
       {/* ── Barra de Filtros (estilo imagen 3) ── */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
         {/* Fila 1: filtros por campo */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
-          {(['placa','plu','pedido','articulo','cliente'] as const).map(field => (
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-2">
+          {(['archivo','placa','plu','pedido','articulo','cliente'] as const).map(field => (
             <input key={field} type="text"
               placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
               value={filterFields[field]}
