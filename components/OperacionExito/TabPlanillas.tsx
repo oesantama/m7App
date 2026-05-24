@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Folder, Upload, BookOpen, Trash2, Download, AlertTriangle, Calendar, Filter, X, CheckCircle } from 'lucide-react';
+import { Search, Folder, Upload, BookOpen, Trash2, Download, AlertTriangle, Calendar, Filter, X, CheckCircle, Edit2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import geminiService from '../../services/geminiPlanillas.service';
 import { api } from '../../services/api';
@@ -293,6 +293,20 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
     }
   };
 
+  const editRow = async (id: string, currentPedido: string) => {
+    if (!canDelete) return toast.error('No tienes permisos para editar registros.');
+    const newPedido = window.prompt('Corregir número de Pedido (solo números):', currentPedido);
+    if (!newPedido || newPedido.trim() === currentPedido) return;
+    
+    try {
+      const updated = await api.updatePlanillaRecord(id, { pedido: newPedido.trim() });
+      setResults(prev => prev.map(r => r.id === id ? { ...r, pedido: updated.pedido } : r));
+      toast.success('Pedido actualizado con éxito.');
+    } catch (e: any) {
+      toast.error(e.message || 'Error al actualizar el pedido');
+    }
+  };
+
   const confirmClear = async () => {
     if (!canDelete) return toast.error('Sin permisos de eliminación.');
     if (window.confirm('¿Borrar todo el historial? Esta acción quedará en el log de auditoría y no se puede deshacer.')) {
@@ -346,11 +360,16 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
 
   if (canDelete) {
     columns.push({
-      header: 'Eliminar', key: 'actions', sortable: false,
+      header: 'Acciones', key: 'actions', sortable: false,
       render: row => (
-        <button onClick={() => deleteRow(row.id)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg">
-          <Trash2 size={12} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={() => editRow(row.id, row.pedido)} className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg" title="Editar Pedido">
+            <Edit2 size={12} />
+          </button>
+          <button onClick={() => deleteRow(row.id)} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg" title="Eliminar">
+            <Trash2 size={12} />
+          </button>
+        </div>
       )
     });
   }

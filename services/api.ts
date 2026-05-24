@@ -339,7 +339,21 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(records)
   }),
-  deletePlanillaRecord: (id: string) => fetchJson(`${API_URL}/planillas-operativas/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  deletePlanillaRecord: async (id: string) => {
+    const res = await apiFetch(`/planillas-operativas/${id}`, { method: 'DELETE' });
+    return res.json();
+  },
+  updatePlanillaRecord: async (id: string, data: { pedido: string }) => {
+    const res = await apiFetch(`/planillas-operativas/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Error al actualizar registro');
+    }
+    return res.json();
+  },
   clearPlanillasRecords: () => fetchJson(`${API_URL}/planillas-operativas`, { method: 'DELETE' }),
   checkPlanillasFiles: (files: string[]) => fetchJson(`${API_URL}/planillas-operativas/check-files`, {
     method: 'POST',

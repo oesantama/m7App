@@ -302,7 +302,6 @@ export const removeRecord = async (req: Request, res: Response) => {
     const { id } = req.params;
     try {
         await pool.query('DELETE FROM registros_logistica WHERE id = $1', [id]);
-        console.log(`[AUDITORIA M7] Eliminación de registro logístico. ID: ${id}. TS: ${new Date().toISOString()}`);
         res.json({ success: true });
     } catch (error: any) {
         console.error('Error deleting record:', error);
@@ -310,6 +309,46 @@ export const removeRecord = async (req: Request, res: Response) => {
     }
 };
 
+// ─── PUT: Actualizar un registro ────────────────────────────────────────────
+export const updateRecord = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { pedido } = req.body;
+    
+    try {
+        // Validar si ya existe este pedido con los mismos datos (para evitar duplicados al editar)
+        const checkQuery = `
+            SELECT id FROM registros_logistica 
+            WHERE pedido = $1 
+            AND id != $2
+            AND cedula = (SELECT cedula FROM registros_logistica WHERE id = $2 LIMIT 1)
+            AND plu = (SELECT plu FROM registros_logistica WHERE id = $2 LIMIT 1)
+            AND archivo != (SELECT archivo FROM registros_logistica WHERE id = $2 LIMIT 1)
+            LIMIT 1
+        `;
+        const { rowCount } = await pool.query(checkQuery, [pedido, id]);
+        
+        if (rowCount && rowCount > 0) {
+            return res.status(400).json({ error: 'Este Pedido ya existe para este cliente y artículo en OTRA planilla.' });
+        }
+
+        const updateQuery = `
+            UPDATE registros_logistica
+            SET pedido = $1
+            WHERE id = $2
+            RETURNING *
+        `;
+        const { rows } = await pool.query(updateQuery, [pedido, id]);
+
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Registro no encontrado' });
+        }
+
+        res.json(rows[0]);
+    } catch (error: any) {
+        console.error('Error updating record:', error);
+        res.status(500).json({ error: 'Error del servidor' });
+    }
+};
 // ─── DELETE ALL: Limpiar tabla ────────────────────────────────────────────────
 export const clearRecords = async (req: Request, res: Response) => {
     try {

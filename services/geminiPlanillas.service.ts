@@ -51,17 +51,17 @@ class GeminiPlanillasService {
       2. IMPORTANTE: La imagen puede estar rotada 90 o 180 grados. Identifica la orientación real del texto para no mezclar columnas con filas.
       3. PROHIBIDO REPETIR VALORES: Cada fila tiene su propio número de Pedido y Cédula. NUNCA copies el pedido o la cédula de la fila anterior a menos que en la imagen sean visualmente idénticos.
       4. Los números de "Pedido" en el Éxito suelen empezar por 16 o 26 (ej. 265793870, 16330320...). Lee dígito por dígito con extrema precisión.
+      5. LIMPIEZA OBLIGATORIA DEL PEDIDO: Si ves letras o guiones antes del pedido (ej. "E-com 163287...", "E-con163...", "D 391..."), IGNÓRALOS. Extrae ÚNICAMENTE LOS NÚMEROS (ej. "163287...", "391..."). No devuelvas letras ni símbolos en el campo pedido.
       
-      EJEMPLO DE LECTURA (Fíjate cómo cambia cada fila):
-      Fila 1: Pedido 1633032041116, Cédula 39268715, Cliente ALBA TERESA
-      Fila 2: Pedido 265793871, Cédula 8373907, Cliente ROBERTO BENAVIDES
-      Fila 3: Pedido 265793870, Cédula 1045142382, Cliente ORIANA MARIA
-      Fila 4: Pedido 265793778, Cédula 1038102053, Cliente Nilton Cesar
+      EJEMPLO DE LECTURA (Fíjate cómo cambia cada fila y cómo se limpian los pedidos):
+      Fila 1 (E-com 1633032041116): Pedido 1633032041116, Cédula 39268715, Cliente ALBA TERESA
+      Fila 2 (D 39107413): Pedido 39107413, Cédula 187311634, Cliente JUNEYLIS CONTRERAS
+      Fila 3 (E-con1632842035073): Pedido 1632842035073, Cédula 39411102, Cliente diana piedrahita
       
       Formato OBLIGATORIO: { "matches": [ {objeto} ] }
       
       Campos exactos por cada fila (usa "N/A" si falta):
-      - pedido (Número de Factura, Pedido u Orden de Compra específico de ESA FILA)
+      - pedido (SOLO NÚMEROS, sin letras "E-com" ni guiones)
       - cedula (Documento o NIT del cliente específico de ESA FILA)
       - cliente (Nombre completo del cliente de ESA FILA)
       - plu (Código del producto, PLU, EAN o Material de ESA FILA)

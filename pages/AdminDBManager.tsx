@@ -150,7 +150,10 @@ const AdminDBManager: React.FC = () => {
   const triggerManualCron = async () => {
     try {
       toast.info('Iniciando sincronización manual...');
-      await fetch('/api/planillas-operativas/force-sync');
+      const token = localStorage.getItem('token');
+      await fetch('/api/planillas-operativas/force-sync', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       toast.success('CRON disparado. Revisa la tabla cron_logs.');
     } catch (e) {
       toast.error('Error al disparar el CRON');
