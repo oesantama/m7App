@@ -109,7 +109,7 @@ Analiza este DOCUMENTO LOGÍSTICO (planilla de despacho/entrega) y extrae TODOS 
 
 REGLAS CRÍTICAS DE EXTRACCIÓN (LEER CON CUIDADO):
 1. CADA FILA en la tabla del PDF debe ser un objeto independiente en el arreglo.
-2. IMPORTANTE: La imagen puede estar rotada 90 o 180 grados. Identifica la orientación real del texto para no mezclar columnas con filas.
+2. PROHIBIDO OMITIR REGISTROS: Si la hoja tiene 13 Pedidos impresos, DEBES devolver exactamente 13 objetos JSON. No puedes omitir al último cliente (ej. Carolina Montoya) solo porque no tenga un PLU al lado.
 3. ORIENTACIÓN Y ENCABEZADOS: La imagen puede estar rotada (de lado o de cabeza). Antes de extraer, busca los encabezados "Pedido", "Cédula", "Cliente", "PLU", "Descripción". Estos definen el orden de las columnas y la orientación real.
 4. ERROR DE IMPRESIÓN (COLUMNA CONDENSADA): La columna de PLUs y Descripciones se imprimió más pequeña que la de Pedidos, por lo que el texto se va subiendo y cruza las líneas divisorias. ¡IGNORA LAS LÍNEAS HORIZONTALES PARA LOS PLUS! 
 5. EMPAREJAMIENTO SECUENCIAL ESTRICTO (1 A 1): Como las líneas no coinciden, debes extraer la lista completa de Pedidos (izquierda) y la lista completa de PLUs (derecha). Empareja ESTRICTAMENTE en orden: el Pedido #1 con el PLU #1, el Pedido #2 con el PLU #2, el Pedido #3 con el PLU #3, y así sucesivamente.
@@ -171,16 +171,16 @@ Campos exactos por cada fila:
                             `;
                             await client.query(insQuery, [
                                 doc.file_name,
-                                analysis.pedido || 'N/A',
-                                analysis.cedula || 'N/A',
-                                analysis.cliente || 'N/A',
-                                analysis.plu || 'N/A',
-                                analysis.articulo || 'N/A',
-                                analysis.direccion || 'N/A',
-                                analysis.fecha1 || 'N/A',
-                                analysis.fecha2 || 'N/A',
-                                analysis.ciudad_barrio || 'N/A',
-                                analysis.placa || 'N/A',
+                                analysis.pedido || '',
+                                analysis.cedula || '',
+                                analysis.cliente || '',
+                                analysis.plu || '',
+                                analysis.articulo || '',
+                                analysis.direccion || '',
+                                analysis.fecha1 || '',
+                                analysis.fecha2 || '',
+                                analysis.ciudad_barrio || '',
+                                analysis.placa || '',
                                 analysis.notas || ''
                             ]);
                         }

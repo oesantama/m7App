@@ -209,16 +209,16 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
           if (Array.isArray(matches) && matches.length > 0) {
             const batch = matches.map((analysis: any) => ({
               archivo:       fileObj.name,
-              pedido:        analysis.pedido       || 'N/A',
-              cedula:        analysis.cedula        || 'N/A',
-              cliente:       analysis.cliente       || 'N/A',
-              plu:           analysis.plu           || 'N/A',
-              articulo:      analysis.articulo      || 'N/A',
-              direccion:     analysis.direccion     || 'N/A',
-              fecha1:        analysis.fecha1        || 'N/A',
-              fecha2:        analysis.fecha2        || 'N/A',
-              ciudad_barrio: analysis.ciudad_barrio || 'N/A',
-              placa:         analysis.placa         || 'N/A',
+              pedido:        analysis.pedido       || '',
+              cedula:        analysis.cedula        || '',
+              cliente:       analysis.cliente       || '',
+              plu:           analysis.plu           || '',
+              articulo:      analysis.articulo      || '',
+              direccion:     analysis.direccion     || '',
+              fecha1:        analysis.fecha1        || '',
+              fecha2:        analysis.fecha2        || '',
+              ciudad_barrio: analysis.ciudad_barrio || '',
+              placa:         analysis.placa         || '',
               notas:         analysis.notas         || '',
             }));
             // Guardar inmediatamente este lote
