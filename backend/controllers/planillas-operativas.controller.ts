@@ -58,6 +58,16 @@ const initDB = async () => {
             console.log('[M7-DB] Migración de id completada.');
         }
 
+        // 3. Eliminar constraint unique que impedía guardar artículos repetidos en la misma planilla
+        const uniqueConstraints = await client.query(`
+            SELECT conname FROM pg_constraint
+            WHERE conrelid = 'registros_logistica'::regclass AND contype = 'u';
+        `);
+        for (const row of uniqueConstraints.rows) {
+            console.log(\`[M7-DB] Eliminando restricción única: \${row.conname}\`);
+            await client.query(\`ALTER TABLE registros_logistica DROP CONSTRAINT "\${row.conname}"\`);
+        }
+
         // 3. (MIGRACIÓN COMPLETADA) Las sentencias de limpiar duplicados y crear
         // el índice único ya se ejecutaron. Dejamos comentado para no bloquear la BD 
         // en cada reinicio del contenedor.
@@ -217,7 +227,6 @@ export const saveRecords = async (req: Request, res: Response) => {
                 INSERT INTO registros_logistica
                 (archivo, pedido, cedula, cliente, plu, articulo, direccion, fecha1, fecha2, ciudad_barrio, placa, notas)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-                ON CONFLICT (archivo, pedido, cedula, plu) DO NOTHING
             `;
             const result = await client.query(insQuery, [
                 r.archivo, r.pedido, r.cedula, r.cliente, r.plu,

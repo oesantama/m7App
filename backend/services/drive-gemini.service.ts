@@ -23,6 +23,17 @@ export const syncDriveCumplidos = async () => {
     let savedCount = 0;
     let failedCount = 0;
     let lastFileError = '';
+    let cronLogId: number | null = null;
+
+    try {
+        const initLog = await pool.query(
+            `INSERT INTO cron_logs (task_name, status, details, error_message, duration_ms) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+            ['Sync_Drive_Planillas_CLI09', 'RUNNING', 'Iniciando sincronización. Analizando PDFs pendientes...', null, 0]
+        );
+        cronLogId = initLog.rows[0]?.id || null;
+    } catch(e) {
+        console.error('[M7-CRON] Error insertando log inicial:', e);
+    }
 
     try {
         // 1. Obtener los documentos de Drive (CUMPLIDOS) del cliente CLI-09 de los últimos 5 días
@@ -42,6 +53,10 @@ export const syncDriveCumplidos = async () => {
 
         if (missingDocs.length === 0) {
             console.log('[M7-CRON] No hay cumplidos pendientes por procesar para CLI-09.');
+            if (cronLogId) {
+                await pool.query(`UPDATE cron_logs SET status='SUCCESS', details='No hay PDFs nuevos por procesar' WHERE id=$1`, [cronLogId]);
+                cronLogId = null; // Para no actualizarlo de nuevo en el finally
+            }
             return;
         }
 
@@ -199,10 +214,17 @@ Campos exactos por cada fila:
         const durationMs = Date.now() - startTime;
         
         try {
-            await pool.query(
-                `INSERT INTO cron_logs (task_name, status, details, error_message, duration_ms) VALUES ($1, $2, $3, $4, $5)`,
-                ['Sync_Drive_Planillas_CLI09', status, details, errorMessage, durationMs]
-            );
+            if (cronLogId) {
+                await pool.query(
+                    `UPDATE cron_logs SET status=$1, details=$2, error_message=$3, duration_ms=$4 WHERE id=$5`,
+                    [status, details, errorMessage, durationMs, cronLogId]
+                );
+            } else {
+                await pool.query(
+                    `INSERT INTO cron_logs (task_name, status, details, error_message, duration_ms) VALUES ($1, $2, $3, $4, $5)`,
+                    ['Sync_Drive_Planillas_CLI09', status, details, errorMessage, durationMs]
+                );
+            }
         } catch (logErr: any) {
             console.error('[M7-CRON] Error crítico al intentar guardar el log del cron:', logErr.message);
         }
