@@ -114,7 +114,7 @@ export default function DashboardResultadosLB({ resultados, onSave, guardando }:
       if (tv === VALIDATION_TYPES.FAILED_100 || tv === 'Fallida 100%') placasData[placa].fallida100++;
       if (tv === VALIDATION_TYPES.FAILED_TRANSPORT || tv === 'Fallida Transporte') {
         placasData[placa].fallidaTransporte++;
-        placasData[placa].valorFallidaTransporte += Number(r.precioArchivo2) || 0;
+        placasData[placa].valorFallidaTransporte += Number(r.precioArchivo1) || 0;
       }
       
       let montoDebido = 0;
