@@ -4,10 +4,13 @@ import { Save } from 'lucide-react';
 
 const extractMonth = (fecha: any) => {
   if (!fecha) return 'Sin mes';
-  if (typeof fecha === 'number' && fecha > 1) {
+  const numFecha = Number(fecha);
+  if (!isNaN(numFecha) && numFecha > 10000) {
     // Usa matemática UTC directa para evitar cambios de día por zona horaria
-    const date = new Date((fecha - 25569) * 86400 * 1000);
-    return date.toLocaleString('es-CO', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    const date = new Date((numFecha - 25569) * 86400 * 1000);
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
   }
   return fecha.toString().trim().substring(0, 7);
 };
@@ -100,7 +103,7 @@ export default function DashboardResultadosLB({ resultados, onSave, guardando }:
       if (!placasData[placa]) {
         placasData[placa] = { 
           placa, totalViajes: 0, debePagar: 0, pago: 0, valorAdicional: 0, totalMilla7: 0,
-          entregadas: 0, fallida70: 0, fallida100: 0, fallidaTransporte: 0
+          entregadas: 0, fallida70: 0, fallida100: 0, fallidaTransporte: 0, valorFallidaTransporte: 0
         };
       }
       placasData[placa].totalViajes++;
@@ -109,7 +112,10 @@ export default function DashboardResultadosLB({ resultados, onSave, guardando }:
       if (tv === VALIDATION_TYPES.DELIVERED || tv === 'Entregado') placasData[placa].entregadas++;
       if (tv === VALIDATION_TYPES.FAILED_70 || tv === 'Fallida 70%') placasData[placa].fallida70++;
       if (tv === VALIDATION_TYPES.FAILED_100 || tv === 'Fallida 100%') placasData[placa].fallida100++;
-      if (tv === VALIDATION_TYPES.FAILED_TRANSPORT || tv === 'Fallida Transporte') placasData[placa].fallidaTransporte++;
+      if (tv === VALIDATION_TYPES.FAILED_TRANSPORT || tv === 'Fallida Transporte') {
+        placasData[placa].fallidaTransporte++;
+        placasData[placa].valorFallidaTransporte += Number(r.precioArchivo2) || 0;
+      }
       
       let montoDebido = 0;
       if (r.estado === VALIDATION_STATES.OK) {
@@ -134,16 +140,23 @@ export default function DashboardResultadosLB({ resultados, onSave, guardando }:
       const ochentaYTres = Math.round(item.totalMilla7 * 0.83);
       const d_83 = Math.round(item.totalMilla7 - ochentaYTres);
       const efectividad = item.totalViajes > 0 ? Math.round((item.entregadas / item.totalViajes) * 100) : 0;
+      const porcFallida70 = item.totalViajes > 0 ? Math.round((item.fallida70 / item.totalViajes) * 100) : 0;
+      const porcFallida100 = item.totalViajes > 0 ? Math.round((item.fallida100 / item.totalViajes) * 100) : 0;
+      const porcFallidaTransporte = item.totalViajes > 0 ? Math.round((item.fallidaTransporte / item.totalViajes) * 100) : 0;
       return { 
         ...item, 
         pago: Math.round(item.pago),
         debePagar: Math.round(item.debePagar),
         valorAdicional: Math.round(item.valorAdicional),
         totalMilla7: Math.round(item.totalMilla7),
+        valorFallidaTransporte: Math.round(item.valorFallidaTransporte),
         diferenciaNeta: diferencia, 
         ochentaYTres, 
         d_83, 
-        efectividad 
+        efectividad,
+        porcFallida70,
+        porcFallida100,
+        porcFallidaTransporte
       };
     }).sort((a, b) => b.totalViajes - a.totalViajes);
 
@@ -359,8 +372,12 @@ export default function DashboardResultadosLB({ resultados, onSave, guardando }:
             { header: 'Entregadas', key: 'entregadas' },
             { header: '% Efectt', key: 'efectividad', render: (r: any) => `${r.efectividad}%` },
             { header: 'Fallida 70%', key: 'fallida70' },
+            { header: '% Fall 70', key: 'porcFallida70', render: (r: any) => `${r.porcFallida70}%` },
             { header: 'Fallida 100%', key: 'fallida100' },
+            { header: '% Fall 100', key: 'porcFallida100', render: (r: any) => `${r.porcFallida100}%` },
             { header: 'Fallida Transporte', key: 'fallidaTransporte' },
+            { header: '% Fall Transp', key: 'porcFallidaTransporte', render: (r: any) => `${r.porcFallidaTransporte}%` },
+            { header: 'Valor Fall Transp', key: 'valorFallidaTransporte', render: (r: any) => `$${Number(r.valorFallidaTransporte).toLocaleString()}` },
             { header: 'Debe Pagar', key: 'debePagar', render: (r: any) => `$${Number(r.debePagar).toLocaleString()}` },
             { header: 'Pago', key: 'pago', render: (r: any) => `$${Number(r.pago).toLocaleString()}` },
             { header: 'Diferencia', key: 'diferenciaNeta', render: (r: any) => (
