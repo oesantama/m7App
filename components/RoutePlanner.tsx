@@ -3951,13 +3951,18 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                           return;
                         }
                         setModalSearchTerm(raw.toUpperCase());
-                        if (raw.length >= 4) {
+                        if (raw.length >= 6) {
                           const term = raw.toLowerCase();
-                          const matches = unassignedInvoices.filter(inv =>
-                            (inv.invoiceNumber || '').toLowerCase().includes(term) ||
-                            (inv.orderNumber || '').toLowerCase().includes(term)
+                          // Solo auto-asigna cuando coinciden los últimos N dígitos exactos (sufijo)
+                          // para evitar falsos positivos con búsqueda substring
+                          const exactSuffixMatches = unassignedInvoices.filter(inv =>
+                            (inv.invoiceNumber || '').toLowerCase().endsWith(term) ||
+                            (inv.orderNumber || '').toLowerCase().endsWith(term)
                           );
-                          if (matches.length === 1) { handleAddInvoiceToRoute(matches[0]); setModalSearchTerm(''); }
+                          if (exactSuffixMatches.length === 1) {
+                            handleAddInvoiceToRoute(exactSuffixMatches[0]);
+                            setModalSearchTerm('');
+                          }
                         }
                       }}
                       className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"
