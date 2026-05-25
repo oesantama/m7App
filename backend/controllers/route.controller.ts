@@ -613,9 +613,9 @@ export const getRouteInvoices = async (req: Request, res: Response) => {
         const result = await pool.query(`
             SELECT
                 ri.invoice_id,
-                COALESCE(NULLIF(di.invoice,''), di.order_number) AS invoice_number,
-                di.customer_name,
-                di.city,
+                MAX(COALESCE(NULLIF(di.invoice,''), di.order_number)) AS invoice_number,
+                MAX(di.customer_name)    AS customer_name,
+                MAX(di.city)             AS city,
                 MAX(p.vmetodo)           AS invoice_value,
                 MAX(di.item_status)      AS item_status
             FROM route_invoices ri
@@ -625,7 +625,7 @@ export const getRouteInvoices = async (req: Request, res: Response) => {
             )
             LEFT JOIN document_l_payments p ON TRIM(UPPER(p.invoice)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
             WHERE ri.route_id::text = $1::text
-            GROUP BY ri.invoice_id, di.invoice, di.order_number, di.customer_name, di.city
+            GROUP BY ri.invoice_id
             ORDER BY invoice_number
         `, [routeId]);
         res.json({ success: true, data: result.rows });
