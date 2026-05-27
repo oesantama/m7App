@@ -81,7 +81,7 @@ export const getDocuments = async (req: Request, res: Response) => {
     `;
 
     const queryParams: any[] = [];
-    const { clientId, docL, statuses } = req.query;
+    const { clientId, docL, statuses, plate } = req.query;
     const user = (req as any).user;
     const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
 
@@ -104,6 +104,11 @@ export const getDocuments = async (req: Request, res: Response) => {
             queryParams.push(docIds);
             query += ` AND d.external_doc_id = ANY($${queryParams.length})`;
         }
+    }
+
+    if (plate) {
+        queryParams.push(`%${String(plate).trim().toUpperCase()}%`);
+        query += ` AND UPPER(COALESCE(d.vehicle_plate,'')) LIKE $${queryParams.length}`;
     }
 
     if (!isSuper) {

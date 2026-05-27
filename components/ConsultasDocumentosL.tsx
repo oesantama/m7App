@@ -40,6 +40,8 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
     inventoryDate: ''
   });
   const [hasSearched, setHasSearched] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<DocumentL[] | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<DocumentL | null>(null);
 
   // States for Document L Payment Upload
@@ -362,31 +364,32 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   };
 
   const filteredDocs = useMemo(() => {
-    return documents.filter(doc => {
+    // Si hay resultados de búsqueda directa por API, aplicar solo filtros locales restantes
+    const source = searchResults !== null ? searchResults : documents;
+
+    return source.filter(doc => {
       if (!hasSearched) {
-         // Show only current month by default
+         // Sin búsqueda activa: solo mes actual de los documentos en memoria
          if (!doc.createdAt && !(doc as any).created_at) return false;
          const docDate = new Date(doc.createdAt || (doc as any).created_at);
          const now = new Date();
          return docDate.getMonth() === now.getMonth() && docDate.getFullYear() === now.getFullYear();
       }
 
+      // Si la API ya filtró por docL y plate, estos checks son redundantes pero inofensivos
       const matchPlaca = !appliedFilters.plate || (doc.vehicleData || '').toLowerCase().includes(appliedFilters.plate.toLowerCase());
-      const matchDocL = !appliedFilters.docL || appliedFilters.docL.split(',').some(term => 
+      const matchDocL = !appliedFilters.docL || appliedFilters.docL.split(',').some(term =>
         doc.externalDocId.toLowerCase().includes(term.trim().toLowerCase())
       );
       const matchCodPlan = !appliedFilters.remesaTDM || (doc.remesaTDM || '').toLowerCase().includes(appliedFilters.remesaTDM.toLowerCase());
       const matchStatus = !appliedFilters.status || doc.status === appliedFilters.status;
       const matchPlanType = !appliedFilters.planType || doc.planType === appliedFilters.planType;
       const cargueDate = doc.createdAt && !isNaN(new Date(doc.createdAt).getTime())
-        ? new Date(doc.createdAt).toISOString().split('T')[0]
-        : '';
+        ? new Date(doc.createdAt).toISOString().split('T')[0] : '';
       const matchCargue = !appliedFilters.cargueDate || cargueDate === appliedFilters.cargueDate;
       const matchDelivery = !appliedFilters.deliveryDate || (doc.deliveryDate || '').includes(appliedFilters.deliveryDate.split('-').reverse().join('/'));
-
       const invDate = doc.inventoryDate && !isNaN(new Date(doc.inventoryDate).getTime())
-        ? new Date(doc.inventoryDate).toISOString().split('T')[0]
-        : '';
+        ? new Date(doc.inventoryDate).toISOString().split('T')[0] : '';
       const matchInventory = !appliedFilters.inventoryDate || invDate === appliedFilters.inventoryDate;
 
       return matchPlaca && matchDocL && matchCodPlan && matchStatus && matchPlanType && matchCargue && matchDelivery && matchInventory;
@@ -395,7 +398,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
       const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
       return timeB - timeA;
     });
-  }, [documents, appliedFilters, hasSearched]);
+  }, [documents, searchResults, appliedFilters, hasSearched]);
 
   const clearFilters = () => {
     setFilters({
@@ -407,11 +410,32 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
       planType: '', deliveryDate: '', cargueDate: '', inventoryDate: ''
     });
     setHasSearched(false);
+    setSearchResults(null);
   };
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     setAppliedFilters(filters);
     setHasSearched(true);
+    // Fetch directo a la API para no depender de la carga inicial en memoria
+    if (filters.docL || filters.plate) {
+      setSearching(true);
+      try {
+        const data = await api.getDocuments(
+          undefined,
+          filters.status ? [filters.status] : undefined,
+          filters.docL || undefined,
+          filters.plate || undefined,
+        );
+        setSearchResults(Array.isArray(data) ? data : []);
+      } catch {
+        toast.error('Error al consultar documentos');
+        setSearchResults([]);
+      } finally {
+        setSearching(false);
+      }
+    } else {
+      setSearchResults(null);
+    }
   };
 
   const handlePdfVerification = async (file: File, targetDoc: DocumentL) => {
@@ -641,8 +665,9 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
           </div>
         </div>
         <div className="flex justify-end gap-3 flex-wrap">
-          <button onClick={handleSearch} className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md flex items-center gap-2">
-            <Icons.Search className="w-4 h-4" /> Consultar
+          <button onClick={handleSearch} disabled={searching} className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md flex items-center gap-2 disabled:opacity-60">
+            {searching ? <Icons.RotateCcw className="w-4 h-4 animate-spin" /> : <Icons.Search className="w-4 h-4" />}
+            {searching ? 'Buscando...' : 'Consultar'}
           </button>
           <button onClick={clearFilters} className="px-6 py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-md">Limpiar</button>
         </div>
