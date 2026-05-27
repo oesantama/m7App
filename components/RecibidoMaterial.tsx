@@ -98,9 +98,12 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   // ── Lista filtrada por backend según vista activa ──────────────────────────
   const [localReciboList, setLocalReciboList] = useState<DocumentL[]>([]);
   const [isLoadingRecibo, setIsLoadingRecibo] = useState(false);
+  const [novedadesDocList, setNovedadesDocList] = useState<DocumentL[]>([]);
+  const [isLoadingNovedades, setIsLoadingNovedades] = useState(false);
 
-  const STATUSES_PENDING  = [DocStatus.PENDING, DocStatus.COUNTING];   // EST-03, EST-04
-  const STATUSES_HISTORY  = [DocStatus.INVENTORED];                     // EST-08
+  const STATUSES_PENDING   = [DocStatus.PENDING, DocStatus.COUNTING];                          // EST-03, EST-04
+  const STATUSES_HISTORY   = [DocStatus.INVENTORED];                                           // EST-08
+  const STATUSES_NOVEDADES = [DocStatus.PENDING, DocStatus.COUNTING, DocStatus.INVENTORED];    // EST-03, EST-04, EST-08
 
   const loadReciboList = React.useCallback(async (clientId: string, history: boolean) => {
     setIsLoadingRecibo(true);
@@ -115,10 +118,25 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
     }
   }, []);
 
+  const loadNovedadesList = React.useCallback(async (clientId: string) => {
+    setIsLoadingNovedades(true);
+    try {
+      const data = await api.getDocuments(clientId || undefined, STATUSES_NOVEDADES);
+      setNovedadesDocList(data || []);
+    } catch { /* silencioso */ } finally {
+      setIsLoadingNovedades(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!clientsReady) return;
     loadReciboList(selectedClientId, showHistory);
   }, [clientsReady, selectedClientId, showHistory, loadReciboList]);
+
+  useEffect(() => {
+    if (!clientsReady) return;
+    loadNovedadesList(selectedClientId);
+  }, [clientsReady, selectedClientId, loadNovedadesList]);
 
   const activeList = useMemo(() => {
     if (!searchRecibo.trim()) return localReciboList;
@@ -755,20 +773,20 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
           </div>
         ) : activeTab === 'novedades' ? (
           <div className="p-8 flex-1 overflow-hidden flex flex-col h-full">
+            {isLoadingNovedades ? (
+              <div className="flex items-center justify-center h-40 gap-3 text-slate-400">
+                <div className="w-6 h-6 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                <span className="text-[11px] font-bold uppercase tracking-widest">Cargando documentos…</span>
+              </div>
+            ) : (
             <NovedadesView
-              documents={filteredDocuments}
+              documents={novedadesDocList}
               user={user}
               masterArticulo={masterArticulo}
               masterNotificaciones={masterNotificaciones}
-              onRefresh={async () => {
-                try {
-                  const res = await api.getDocuments();
-                  onUpdateDocuments(res);
-                } catch (e) {
-                  if (import.meta.env.DEV) console.error('[M7-REFRESH]', e);
-                }
-              }}
+              onRefresh={() => loadNovedadesList(selectedClientId)}
             />
+            )}
           </div>
         ) : (
           <div className="p-8 flex-1 overflow-hidden flex flex-col">
