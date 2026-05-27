@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Icons } from '../constants';
 import { toast } from 'sonner';
 import { api } from '../services/api';
@@ -49,11 +49,60 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [mobileTab, setMobileTab] = useState<'form' | 'list'>('form');
 
+    // Modal Guardar en Drive
+    const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
+    const [driveClientName, setDriveClientName] = useState('');
+    const [driveDate, setDriveDate] = useState(new Date().toISOString().slice(0, 10));
+    const [driveClientSearch, setDriveClientSearch] = useState('');
+    const [driveClients, setDriveClients] = useState<{id: string; name: string}[]>([]);
+    const [savingDrive, setSavingDrive] = useState(false);
+
+    useEffect(() => {
+        api.getClients()
+            .then((data: any[]) => {
+                if (!Array.isArray(data)) return setDriveClients([]);
+                const userClientIds: string[] = Array.isArray(user.clientIds) ? user.clientIds : [];
+                const filtered = userClientIds.length > 0
+                    ? data.filter((c: any) => userClientIds.includes(c.id))
+                    : data;
+                setDriveClients(filtered.map((c: any) => ({ id: c.id, name: c.name })));
+            })
+            .catch(() => {});
+    }, []);
+
+    const handleOpenDriveModal = () => {
+        if (!selectedDoc || novedades.length === 0) return;
+        setDriveClientName('');
+        setDriveClientSearch('');
+        setDriveDate(new Date().toISOString().slice(0, 10));
+        setIsDriveModalOpen(true);
+    };
+
+    const handleSaveToDrive = async () => {
+        if (!selectedDoc) return;
+        if (!driveClientName.trim()) return toast.error('Seleccione un cliente');
+        setSavingDrive(true);
+        const t = toast.loading('Guardando en Drive...');
+        try {
+            const res = await api.saveNovedadToDrive({ docId: selectedDoc.id, clientName: driveClientName, driveDate });
+            if (res.success) {
+                toast.success(`Guardado: ${res.drivePath}`, { id: t });
+                setIsDriveModalOpen(false);
+            } else {
+                toast.error(res.error || 'Error al guardar', { id: t });
+            }
+        } catch (e: any) {
+            toast.error(e.message || 'Error al guardar en Drive', { id: t });
+        } finally {
+            setSavingDrive(false);
+        }
+    };
+
     const filteredDocs = useMemo(() => {
         const now = new Date();
         const twoDaysAgo = new Date(now);
-        twoDaysAgo.setDate(now.getDate() - 2);
-        twoDaysAgo.setHours(0, 0, 0, 0); // Inicio del día hace 2 días
+        twoDaysAgo.setDate(now.getDate() - 30);
+        twoDaysAgo.setHours(0, 0, 0, 0);
 
         return documents.filter(d => {
             const s = String(d.status || '').toUpperCase();
@@ -64,8 +113,8 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                 s === DocStatus.INVENTORED.toUpperCase();
             
             const search = searchTerm.toLowerCase();
-            const matchSearch = 
-                d.externalDocId.toLowerCase().includes(search) ||
+            const matchSearch =
+                (d.externalDocId || '').toLowerCase().includes(search) ||
                 (d.vehicleData || '').toLowerCase().includes(search);
 
             // M7 V16.5: Filtro de fecha (Hoy + 2 días atrás)
@@ -99,9 +148,8 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
     }, [masterArticulo, articleSearch]);
 
     const compressImage = (base64Str: string): Promise<string> => {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             const img = new Image();
-            img.src = base64Str;
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 const MAX_WIDTH = 1024;
@@ -126,28 +174,42 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                 ctx?.drawImage(img, 0, 0, width, height);
                 resolve(canvas.toDataURL('image/jpeg', 0.7));
             };
+            img.onerror = () => reject(new Error('Fallo al decodificar la imagen. Verifique que el archivo no esté corrupto.'));
+            img.src = base64Str;
         });
     };
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files;
-        if (!files) return;
+        if (!files || files.length === 0) return;
 
         const loadToast = toast.loading("Procesando imágenes...");
         try {
             for (const file of Array.from(files)) {
-                const base64 = await new Promise<string>((resolve) => {
+                if (!file.type.startsWith('image/')) {
+                    toast.error(`El archivo ${file.name} no es una imagen válida`);
+                    continue;
+                }
+                // Usamos FileReader por mayor compatibilidad con PNGs y distintos formatos
+                const base64 = await new Promise<string>((resolve, reject) => {
                     const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result as string);
+                    reader.onloadend = () => {
+                        if (reader.result) resolve(reader.result as string);
+                        else reject(new Error("Error al leer el archivo"));
+                    };
+                    reader.onerror = (err) => reject(err);
                     reader.readAsDataURL(file);
                 });
+                
                 const compressed = await compressImage(base64);
                 setPhotos(prev => [...prev, compressed]);
             }
+        } catch (err: any) {
+            console.error('[IMAGE_PROCESS_ERROR]', err);
+            toast.error("Error al procesar fotos: " + (err.message || ""));
+        } finally {
             toast.dismiss(loadToast);
-        } catch (err) {
-            toast.error("Error al procesar fotos");
-            toast.dismiss(loadToast);
+            e.target.value = ''; // Reset input so same file can be selected again
         }
     };
 
@@ -368,15 +430,24 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
 
                     {/* Listado Derecha */}
                     <div className={`w-full lg:w-7/12 flex flex-col space-y-4 ${mobileTab === 'form' ? 'hidden lg:flex' : 'flex'}`}>
-                        <div className="flex justify-between items-center border-b border-slate-200 pb-2 gap-2">
+                        <div className="flex justify-between items-center border-b border-slate-200 pb-2 gap-2 flex-wrap">
                             <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-tight truncate">Reporte Actual ({novedades.length})</h3>
-                            <button
-                                onClick={handleOpenReportModal}
-                                disabled={novedades.length === 0 || isLoading}
-                                className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-md hover:bg-blue-700 transition-all flex items-center gap-1.5 sm:gap-2 disabled:opacity-20 shrink-0"
-                            >
-                                <Icons.Send className="w-3 h-3" /> <span className="hidden xs:inline">ENVIAR</span> REPORTE
-                            </button>
+                            <div className="flex gap-2 shrink-0">
+                                <button
+                                    onClick={handleOpenDriveModal}
+                                    disabled={novedades.length === 0 || isLoading}
+                                    className="px-3 sm:px-4 py-2 bg-emerald-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-md hover:bg-emerald-700 transition-all flex items-center gap-1.5 disabled:opacity-20"
+                                >
+                                    <Icons.Upload className="w-3 h-3" /> Drive
+                                </button>
+                                <button
+                                    onClick={handleOpenReportModal}
+                                    disabled={novedades.length === 0 || isLoading}
+                                    className="px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest shadow-md hover:bg-blue-700 transition-all flex items-center gap-1.5 sm:gap-2 disabled:opacity-20"
+                                >
+                                    <Icons.Send className="w-3 h-3" /> <span className="hidden xs:inline">ENVIAR</span> REPORTE
+                                </button>
+                            </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 pr-1 sm:pr-2">
@@ -512,6 +583,110 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
                                 >
                                     {isLoading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Icons.Send className="w-4 h-4" />}
                                     ENVIAR REPORTE
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Modal Guardar en Drive */}
+                {isDriveModalOpen && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+                        <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200">
+                            <div className="bg-emerald-700 p-6 text-white flex justify-between items-center">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                                        <Icons.Upload className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-sm font-black uppercase tracking-tight">Guardar en Drive</h3>
+                                        <p className="text-[10px] text-emerald-200 font-bold uppercase">{selectedDoc?.externalDocId}</p>
+                                    </div>
+                                </div>
+                                <button onClick={() => setIsDriveModalOpen(false)} className="p-2 hover:bg-white/10 rounded-lg transition-all">
+                                    <Icons.X className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            <div className="p-6 space-y-5">
+                                {/* Info de ruta */}
+                                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 space-y-1">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600">Ruta en Drive</p>
+                                    <p className="text-[10px] font-bold text-slate-700 leading-relaxed">
+                                        Novedades Milla 7 / <span className="text-emerald-700">{new Date(driveDate + 'T12:00:00').getFullYear()}</span> / <span className="text-emerald-700">{driveClientName || '[Cliente]'}</span> / <span className="text-emerald-700">{new Date(driveDate + 'T12:00:00').toLocaleString('es-CO', { month: 'long' }).toUpperCase()}</span> / DIA {String(new Date(driveDate + 'T12:00:00').getDate()).padStart(2, '0')}
+                                    </p>
+                                    <p className="text-[9px] text-slate-400 font-medium mt-1">
+                                        Archivo: <span className="font-black">NOV_L_{(selectedDoc?.externalDocId || '').replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf</span>
+                                    </p>
+                                </div>
+
+                                {/* Cliente */}
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Cliente *</label>
+                                    <div className="relative">
+                                        <div className="bg-slate-50 h-11 px-4 rounded-xl flex items-center gap-2 border border-slate-200 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/10">
+                                            <Icons.Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                            <input
+                                                value={driveClientSearch}
+                                                onChange={e => { setDriveClientSearch(e.target.value); if (!e.target.value) setDriveClientName(''); }}
+                                                placeholder={driveClientName || 'Buscar cliente...'}
+                                                className="bg-transparent border-none outline-none font-bold text-[11px] uppercase text-slate-700 placeholder:text-slate-400 w-full"
+                                            />
+                                        </div>
+                                        {driveClientSearch.trim().length > 1 && (
+                                            <div className="absolute top-full left-0 right-0 z-20 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-44 overflow-y-auto">
+                                                {driveClients
+                                                    .filter(c => c.name.toLowerCase().includes(driveClientSearch.toLowerCase()))
+                                                    .slice(0, 8)
+                                                    .map(c => (
+                                                        <button key={c.id} type="button"
+                                                            onClick={() => { setDriveClientName(c.name); setDriveClientSearch(''); }}
+                                                            className="w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors border-b border-slate-50 last:border-0"
+                                                        >{c.name}</button>
+                                                    ))}
+                                                {driveClients.filter(c => c.name.toLowerCase().includes(driveClientSearch.toLowerCase())).length === 0 && (
+                                                    <div className="px-4 py-3 text-[10px] text-slate-400 font-medium">Sin resultados</div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {driveClientName && (
+                                        <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100">
+                                            <span className="text-[9px] font-black uppercase">{driveClientName}</span>
+                                            <button onClick={() => setDriveClientName('')} className="ml-auto text-emerald-400 hover:text-red-500 font-bold transition-colors text-sm leading-none">×</button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Fecha */}
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Fecha de la Novedad</label>
+                                    <input
+                                        type="date"
+                                        value={driveDate}
+                                        onChange={e => setDriveDate(e.target.value)}
+                                        className="w-full h-11 px-4 rounded-xl bg-slate-50 border border-slate-200 text-[11px] font-bold text-slate-700 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 transition-all"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="p-6 border-t border-slate-100 flex gap-3">
+                                <button
+                                    onClick={() => setIsDriveModalOpen(false)}
+                                    className="flex-1 h-11 rounded-xl border border-slate-200 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50 transition-all"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleSaveToDrive}
+                                    disabled={savingDrive || !driveClientName}
+                                    className="flex-1 h-11 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-60 flex items-center justify-center gap-2"
+                                >
+                                    {savingDrive ? (
+                                        <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />Subiendo...</>
+                                    ) : (
+                                        <><Icons.Upload className="w-3.5 h-3.5" />Guardar en Drive</>
+                                    )}
                                 </button>
                             </div>
                         </div>

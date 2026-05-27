@@ -78,6 +78,7 @@ const AjoverDashboard: React.FC<Props> = ({ user }) => {
   const [stats, setStats]           = useState<AjoverStats | null>(null);
   const [loading, setLoading]       = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Client selector
   const [clients, setClients]               = useState<Client[]>([]);
@@ -104,16 +105,21 @@ const AjoverDashboard: React.FC<Props> = ({ user }) => {
   const fetchStats = useCallback(async (clientId: string) => {
     if (!clientId) return;
     setLoading(true);
+    setFetchError(null);
     try {
       const res = await fetch(`/api/dashboard/ajover-stats?clientId=${encodeURIComponent(clientId)}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
-      if (!res.ok) throw new Error('Error al cargar datos');
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error || `Error ${res.status}`);
+      }
       const data = await res.json();
       setStats(data);
       setLastUpdated(new Date());
-    } catch (e) {
+    } catch (e: any) {
       console.error('[AjoverDashboard]', e);
+      setFetchError(e?.message || 'Error al cargar estadísticas');
     } finally {
       setLoading(false);
     }
@@ -183,6 +189,20 @@ const AjoverDashboard: React.FC<Props> = ({ user }) => {
             <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto" />
             <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Cargando datos…</p>
           </div>
+        </div>
+      ) : fetchError ? (
+        <div className="flex flex-col items-center justify-center py-24 gap-4 bg-white rounded-[2rem] border border-red-100 shadow-lg">
+          <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center">
+            <Icons.AlertTriangle className="w-8 h-8 text-red-400" />
+          </div>
+          <p className="text-[13px] font-black text-slate-700 uppercase tracking-widest">Sin datos disponibles</p>
+          <p className="text-[11px] text-slate-400 text-center max-w-xs">{fetchError}</p>
+          <button
+            onClick={() => fetchStats(selectedClientId)}
+            className="mt-2 px-5 py-2 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 transition-all"
+          >
+            Reintentar
+          </button>
         </div>
       ) : stats ? (
         <DashboardContent stats={stats} />

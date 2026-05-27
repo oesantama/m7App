@@ -407,6 +407,9 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       if (elRes.success) {
         setElementosBodegaList(elRes.data);
       }
+
+      const cargosRes = await api.getGhMiscelaneos('cargos');
+      if (Array.isArray(cargosRes)) setCargosOptions(cargosRes);
     } catch (e) {
       console.error(e);
     }
@@ -448,6 +451,44 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
   };
 
   // Triggered when personal is selected inside the modal
+  // Mini-modal para agregar persona rápida
+  const [showQuickPersonModal, setShowQuickPersonModal] = useState(false);
+  const [quickPerson, setQuickPerson] = useState({ nombre: '', cedula: '', operacion: '', cargo: '', placa: '' });
+  const [savingQuickPerson, setSavingQuickPerson] = useState(false);
+  const [cargosOptions, setCargosOptions] = useState<{ nombre: string }[]>([]);
+  const [cargoSearch, setCargoSearch] = useState('');
+
+  const handleSaveQuickPerson = async () => {
+    if (!quickPerson.nombre.trim()) return toast.error('El nombre es requerido');
+    if (!quickPerson.cedula.trim()) return toast.error('La cédula es requerida');
+    setSavingQuickPerson(true);
+    try {
+      await api.savePersonal({
+        nombre: quickPerson.nombre.trim().toUpperCase(),
+        cedula: quickPerson.cedula.trim(),
+        cargo: quickPerson.cargo.trim().toUpperCase() || null,
+        operacion: quickPerson.operacion.trim().toUpperCase() || null,
+        placa: quickPerson.placa.trim().toUpperCase() || null,
+        estado: 'EST-01',
+        usuarioControl: user.name
+      });
+      toast.success('Persona registrada correctamente');
+      // Recargar solo el select de personal y auto-seleccionar el nuevo
+      const pRes = await api.getPersonal();
+      const list = Array.isArray(pRes) ? pRes.filter((p: any) => p.estado === 'EST-01') : [];
+      setPersonalList(list);
+      // Auto-seleccionar el recién creado
+      const nuevo = list.find((p: any) => String(p.cedula).trim() === String(quickPerson.cedula).trim());
+      if (nuevo) handlePersonalChange(String(nuevo.id));
+      setShowQuickPersonModal(false);
+      setQuickPerson({ nombre: '', cedula: '', operacion: '', cargo: '', placa: '' });
+    } catch (e: any) {
+      toast.error(e.message || 'Error al guardar persona');
+    } finally {
+      setSavingQuickPerson(false);
+    }
+  };
+
   const handlePersonalChange = async (personalId: string) => {
     setFormHeader(prev => ({ ...prev, personal_id: personalId }));
     setFormItems([]);
@@ -908,7 +949,16 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
               {/* Header card form */}
               <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Funcionario *</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest">Funcionario *</label>
+                    <button
+                      type="button"
+                      onClick={() => { setQuickPerson({ nombre: '', cedula: '', operacion: '', cargo: '', placa: '' }); setShowQuickPersonModal(true); }}
+                      className="flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-colors border border-indigo-100"
+                    >
+                      <Plus size={10} /> Nueva Persona
+                    </button>
+                  </div>
                   <SearchableSelect
                     placeholder="Seleccione funcionario..."
                     value={formHeader.personal_id}
@@ -1395,6 +1445,120 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Person Modal */}
+      {showQuickPersonModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-indigo-100 rounded-xl flex items-center justify-center">
+                  <Users size={16} className="text-indigo-600" />
+                </div>
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">Nueva Persona</h3>
+              </div>
+              <button
+                onClick={() => setShowQuickPersonModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Nombre *</label>
+                <input
+                  type="text"
+                  value={quickPerson.nombre}
+                  onChange={e => setQuickPerson(p => ({ ...p, nombre: e.target.value }))}
+                  placeholder="Nombre completo"
+                  className="w-full px-3 py-2 text-xs font-medium text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 placeholder:text-slate-400 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Cédula *</label>
+                <input
+                  type="text"
+                  value={quickPerson.cedula}
+                  onChange={e => setQuickPerson(p => ({ ...p, cedula: e.target.value }))}
+                  placeholder="Número de cédula"
+                  className="w-full px-3 py-2 text-xs font-medium text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 placeholder:text-slate-400 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Operación</label>
+                <input
+                  type="text"
+                  value={quickPerson.operacion}
+                  onChange={e => setQuickPerson(p => ({ ...p, operacion: e.target.value }))}
+                  placeholder="Ej: LOGISTICA"
+                  className="w-full px-3 py-2 text-xs font-medium text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 placeholder:text-slate-400 transition-all"
+                />
+              </div>
+              <div className="relative">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Cargo</label>
+                <input
+                  type="text"
+                  value={cargoSearch || quickPerson.cargo}
+                  onChange={e => { setCargoSearch(e.target.value); if (!e.target.value) setQuickPerson(p => ({ ...p, cargo: '' })); }}
+                  onFocus={() => setCargoSearch('')}
+                  placeholder={quickPerson.cargo || 'Buscar cargo...'}
+                  className="w-full px-3 py-2 text-xs font-medium text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 placeholder:text-slate-400 transition-all"
+                />
+                {cargoSearch.length > 0 && (
+                  <div className="absolute z-10 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg mt-1 max-h-44 overflow-y-auto">
+                    {cargosOptions
+                      .filter(c => c.nombre.toLowerCase().includes(cargoSearch.toLowerCase()))
+                      .map((c, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onMouseDown={() => { setQuickPerson(p => ({ ...p, cargo: c.nombre })); setCargoSearch(''); }}
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
+                        >
+                          {c.nombre}
+                        </button>
+                      ))}
+                    {cargosOptions.filter(c => c.nombre.toLowerCase().includes(cargoSearch.toLowerCase())).length === 0 && (
+                      <div className="px-3 py-2 text-xs text-slate-400">Sin resultados</div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Placa</label>
+                <input
+                  type="text"
+                  value={quickPerson.placa}
+                  onChange={e => setQuickPerson(p => ({ ...p, placa: e.target.value }))}
+                  placeholder="Ej: ABC123"
+                  className="w-full px-3 py-2 text-xs font-medium text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 placeholder:text-slate-400 transition-all"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 p-5 pt-0">
+              <button
+                onClick={() => setShowQuickPersonModal(false)}
+                disabled={savingQuickPerson}
+                className="flex-1 py-2.5 px-4 bg-slate-100 text-slate-600 font-black rounded-xl text-xs uppercase tracking-wider hover:bg-slate-200 transition-all disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveQuickPerson}
+                disabled={savingQuickPerson}
+                className="flex-1 py-2.5 px-4 bg-indigo-600 text-white font-black rounded-xl text-xs uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {savingQuickPerson ? (
+                  <><RefreshCw size={12} className="animate-spin" /> Guardando...</>
+                ) : (
+                  <><UserCheck size={12} /> Guardar</>
+                )}
+              </button>
             </div>
           </div>
         </div>

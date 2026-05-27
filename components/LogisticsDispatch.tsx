@@ -8,6 +8,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { LOGO_MILLA_SIETE } from '../utils/logoMillaSiete';
 import html2canvas from 'html2canvas';
 import { Route, Invoice } from '../types';
 import DeliveryHistoryModal from './Logistics/DeliveryHistoryModal';
@@ -457,29 +458,38 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const generateRoutePDF = async (routeData: any) => {
         setIsGeneratingPDF(true);
         try {
-            // 1. Preparar datos (buscar facturas reales)
+            // 1. Construir lista de facturas — datos completos necesarios para el PDF
             const rawIds = routeData.invoice_ids || routeData.invoiceIds || [];
             const targetIds = rawIds.map((id: any) => {
                 const val = typeof id === 'object' && id !== null ? (id.id || id.invoice_id) : id;
                 return cleanId(val);
             });
 
-            // [M7-FIX] Si las facturas no están en la lista local, las descargamos de la API
-            let routeInvList = (invoices || []).filter(inv => {
-                const invId = cleanId(inv.id);
-                const invNum = cleanId(inv.invoiceNumber);
-                return targetIds.includes(invId) || targetIds.includes(invNum);
-            });
+            // 1a. Preferir datos del caché de ruta (contiene todos los campos, incluyendo docLId/unCode)
+            const routeId = routeData.id || routeData.route_id;
+            const cached = routeId ? routeInvoicesCache.current.get(String(routeId)) : undefined;
+            let routeInvList: any[] = [];
 
-            if (routeInvList.length === 0 && targetIds.length > 0) {
-                console.log(`[M7-PDF] Facturas no encontradas localmente. Descargando ${targetIds.length} facturas...`);
-                try {
-                    const freshInvoices = await api.getInvoices(routeData.client_id, targetIds.join(','));
-                    if (Array.isArray(freshInvoices) && freshInvoices.length > 0) {
-                        routeInvList = freshInvoices;
+            if (cached && cached.data.length > 0) {
+                routeInvList = cached.data;
+            } else {
+                // Intentar con lista local pendiente
+                routeInvList = (invoices || []).filter(inv => {
+                    const invId = cleanId(inv.id);
+                    const invNum = cleanId(inv.invoiceNumber);
+                    return targetIds.includes(invId) || targetIds.includes(invNum);
+                });
+
+                // Fallback API: igual que loadRouteInvoicesData (sin clientId para evitar conflictos de filtro)
+                if (routeInvList.length === 0 && targetIds.length > 0) {
+                    try {
+                        const freshInvoices = await api.getInvoices(undefined, targetIds.join(','));
+                        if (Array.isArray(freshInvoices) && freshInvoices.length > 0) {
+                            routeInvList = freshInvoices;
+                        }
+                    } catch (err) {
+                        console.error('[M7-PDF] Error descargando facturas faltantes:', err);
                     }
-                } catch (err) {
-                    console.error('[M7-PDF] Error descargando facturas faltantes:', err);
                 }
             }
 
@@ -487,6 +497,26 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 toast.error("No se encontraron facturas para esta ruta en el servidor");
                 setIsGeneratingPDF(false);
                 return;
+            }
+
+            // 1b. Enriquecer item_status con datos frescos de BD (detectar repices actualizados)
+            if (routeId) {
+                try {
+                    const freshRes = await api.getRouteInvoices(String(routeId));
+                    if (freshRes?.success && Array.isArray(freshRes.data)) {
+                        const statusMap = new Map<string, string>();
+                        freshRes.data.forEach((ri: any) => {
+                            const k = cleanId(ri.invoice_id || ri.invoice_number || ri.invoiceNumber || '');
+                            if (ri.item_status && k) statusMap.set(k, ri.item_status);
+                        });
+                        routeInvList = routeInvList.map(inv => {
+                            const k1 = cleanId((inv as any).id || '');
+                            const k2 = cleanId(inv.invoiceNumber || '');
+                            const freshStatus = statusMap.get(k1) || statusMap.get(k2);
+                            return freshStatus ? { ...inv, item_status: freshStatus } : inv;
+                        });
+                    }
+                } catch (_) { /* continúa sin status fresco */ }
             }
 
             const despachador = user.name || 'SISTEMA ORBIT';
@@ -508,10 +538,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             pdf.setFillColor(255, 255, 255);
             pdf.setDrawColor(0, 0, 0);
             pdf.roundedRect(ML, y, CW, 22, 1, 1, 'FD');
+            // Logo Milla Siete (330x217 → escalar a 30x20mm)
+            try { pdf.addImage(LOGO_MILLA_SIETE, 'PNG', ML + 1, y + 1, 30, 20); } catch (_) {}
             pdf.setFontSize(11); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
-            pdf.text((currentClient?.name || 'OPERACION LOGISTICA').toUpperCase().substring(0, 32), ML + 4, y + 9);
+            pdf.text((currentClient?.name || 'OPERACION LOGISTICA').toUpperCase().substring(0, 32), ML + 34, y + 9);
             pdf.setFontSize(5.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(0, 0, 0);
-            pdf.text('ORBITM7 LOGISTICS INTELLIGENCE', ML + 4, y + 15);
+            pdf.text('ORBITM7 LOGISTICS INTELLIGENCE', ML + 34, y + 15);
 
             const infoItems: [string, string][] = [
                 ['DOC L', String(routeInvList[0]?.docLId || 'S/N')],
@@ -585,14 +617,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             y += 7;
 
             // ── INVOICES TABLE (SPLIT NORMAL / REPICE) ────────────────────────────────
-            const normalInvoices = routeInvList.filter(inv => {
+            const isRepiceStatus = (inv: any) => {
                 const s = String(inv.item_status || inv.status || '').toUpperCase();
-                return s !== 'EST-15' && s !== 'REPICE';
-            });
-            const repiceInvoices = routeInvList.filter(inv => {
-                const s = String(inv.item_status || inv.status || '').toUpperCase();
-                return s === 'EST-15' || s === 'REPICE';
-            });
+                return s === 'EST-15' || s === 'EST-11' || s === 'REPICE';
+            };
+            const normalInvoices = routeInvList.filter(inv => !isRepiceStatus(inv));
+            const repiceInvoices = routeInvList.filter(inv => isRepiceStatus(inv));
 
             const renderInvoiceTable = (list: any[], title?: string) => {
                 if (list.length === 0) return;
@@ -612,12 +642,12 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         .map((inv, idx) => {
                             const firstItem = inv.items?.[0] || {} as any;
                             const method = String(inv.paymentMethod || firstItem.paymentMethod || firstItem.payment_method || '-').toUpperCase();
-                            const isRepice = String(inv.item_status || inv.status || '').toUpperCase() === 'EST-15' || String(inv.item_status || inv.status || '').toUpperCase() === 'REPICE';
+                            const isRepice = isRepiceStatus(inv);
                             return [
                                 String(idx + 1),
                                 String(inv.unCode || firstItem.unCode || firstItem.un_code || '-'),
                                 String(inv.docLId || '-'),
-                                isRepice ? `⚡ ${inv.invoiceNumber}` : inv.invoiceNumber,
+                                isRepice ? `REPICE-${inv.invoiceNumber}` : inv.invoiceNumber,
                                 String(inv.orderNumber || '-'),
                                 String(inv.totalItems || '-'),
                                 String(inv.clientRef || firstItem.clientRef || firstItem.client_ref || '-'),
@@ -2031,12 +2061,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         {/* ── RESUMEN TOTAL DE TODAS LAS RUTAS ── */}
                         {groupedRoutes.length > 0 && (() => {
                             const totalInvoices = groupedRoutes.reduce((s: number, r: any) => s + ((r.invoice_ids?.length) || 0), 0);
-                            const totalVol = groupedRoutes.reduce((s: number, r: any) => {
-                                return s + (r.invoice_ids || []).reduce((sv: number, id: string) => {
-                                    const inv = invoices.find(i => String(i.id).trim() === String(id).trim() || String(i.invoiceNumber).trim() === String(id).trim());
-                                    return sv + Number(inv?.volumeM3 || 0);
-                                }, 0);
-                            }, 0);
+                            const totalVol = groupedRoutes.reduce((s: number, r: any) => s + Number(r.total_volume_m3 || 0), 0);
                             const delivered = invoices.filter(i => {
                                 const key = cleanId((i as any).invoiceNumber || i.id);
                                 return dispatchedIds.has(key) || ['EST-11','EST-12','EST-13','EST-14'].includes(((i as any).itemStatus || i.status) as string);
@@ -2099,11 +2124,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             })
                             .map((route: any) => {
                                 const vehicleData = vehicles.find(v => v.id === route.vehicle_id);
-                                const totalVolume = (route.invoice_ids || []).reduce((acc: number, id: string) => {
-                                    const cleanId = String(id).trim().replace(/[\r\n\t\f\v ]/g, '');
-                                    const inv = invoices.find(i => String(i.id).trim().replace(/[\r\n\t\f\v ]/g, '') === cleanId);
-                                    return acc + Number(inv?.volumeM3 || 0);
-                                }, 0);
+                                const totalVolume = Number(route.total_volume_m3 || 0);
                                 const utilizationPercent = vehicleData ? (totalVolume / vehicleData.capacityM3) * 100 : 0;
 
                                 const routeInvList = invoices.filter(inv => {

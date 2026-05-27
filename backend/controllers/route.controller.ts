@@ -40,9 +40,10 @@ export const getRoutes = async (req: Request, res: Response) => {
         r.id::text, r.vehicle_id::text, r.driver_id::text, r.client_id::text,
         r.created_by::text, r.status_id::text, r.created_at,
         v.plate, d.name AS driver_name, d.document_number AS driver_document,
-        COALESCE(s.invoice_ids, '[]'::json)       AS invoice_ids,
-        COALESCE(s.total_invoices, 0)             AS total_invoices,
-        COALESCE(del.delivered_invoices, 0)       AS delivered_invoices
+        COALESCE(s.invoice_ids, '[]'::json)           AS invoice_ids,
+        COALESCE(s.total_invoices, 0)               AS total_invoices,
+        COALESCE(del.delivered_invoices, 0)         AS delivered_invoices,
+        COALESCE(r.total_volume_m3, 0)::float       AS total_volume_m3
       FROM routes r
       LEFT JOIN vehicles    v   ON v.id::text        = r.vehicle_id::text
       LEFT JOIN drivers     d   ON d.id::text        = r.driver_id::text
@@ -68,7 +69,8 @@ export const getRoutes = async (req: Request, res: Response) => {
         json_build_array(da.invoice_id)      AS invoice_ids,
         1                                    AS total_invoices,
         CASE WHEN da.status IN ('COMPLETED','PENDING_SIGNATURES','EN_RUTA','EST-11','EST-12','ENTREGADO')
-             THEN 1 ELSE 0 END              AS delivered_invoices
+             THEN 1 ELSE 0 END              AS delivered_invoices,
+        0::float                             AS total_volume_m3
       FROM dispatch_assignments da
       LEFT JOIN assignments a ON a.driver_id::text = da.driver_id::text AND a.is_active = true
       LEFT JOIN vehicles    v ON v.id::text        = a.vehicle_id::text

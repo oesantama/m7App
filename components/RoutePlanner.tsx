@@ -42,6 +42,7 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { LOGO_MILLA_SIETE } from '../utils/logoMillaSiete';
 
 // ── Sistema de Corredores Viales M7 ──────────────────────────────────────────
 // Primera capa: macro-región (Oriente/Occidente Antioqueño nunca se mezclan)
@@ -2337,19 +2338,32 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     }
   };
 
-  const handleRepiceConfirm = () => {
+  const handleRepiceConfirm = async () => {
     if (!repiceSearch.result || addInvoiceModal.routeIndex === null) return;
     const r = repiceSearch.result;
-    const invoiceObj = {
+
+    // Enriquecer con datos completos (docLId, unCode, clientRef, etc.) via API
+    let invoiceObj: any = {
       id: r.invoice_id,
       invoiceNumber: r.invoice || r.order_number,
       customerName: r.customer_name,
       address: r.address,
       city: r.city,
       volumeM3: 0,
+      docLId: r.document_id,
       isRepice: true,
       item_status: 'EST-15',
-    } as any;
+    };
+    try {
+      const invNum = (r.invoice || r.order_number || '').trim();
+      if (invNum) {
+        const fullData = await api.getInvoices(undefined, invNum);
+        if (Array.isArray(fullData) && fullData.length > 0) {
+          invoiceObj = { ...fullData[0], id: r.invoice_id, isRepice: true, item_status: 'EST-15' };
+        }
+      }
+    } catch (_) { /* usa datos básicos si falla */ }
+
     handleAddInvoiceToRoute(invoiceObj);
     setRepiceSearch({ term: '', loading: false, result: null, error: null, confirmOpen: false });
     setAddInvoiceModal(m => ({ ...m, isOpen: false }));
@@ -2887,10 +2901,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     pdf.setFillColor(255, 255, 255);
     pdf.setDrawColor(0, 0, 0);
     pdf.roundedRect(ML, y, CW, 22, 1, 1, 'FD');
+    // Logo Milla Siete (330x217 → escalar a 30x20mm)
+    try { pdf.addImage(LOGO_MILLA_SIETE, 'PNG', ML + 1, y + 1, 30, 20); } catch (_) {}
     pdf.setFontSize(11); pdf.setFont('helvetica', 'bold'); pdf.setTextColor(0, 0, 0);
-    pdf.text((currentClient?.name || 'OPERACION LOGISTICA').toUpperCase().substring(0, 32), ML + 4, y + 9);
+    pdf.text((currentClient?.name || 'OPERACION LOGISTICA').toUpperCase().substring(0, 32), ML + 34, y + 9);
     pdf.setFontSize(5.5); pdf.setFont('helvetica', 'normal'); pdf.setTextColor(0, 0, 0);
-    pdf.text('ORBITM7 LOGISTICS INTELLIGENCE', ML + 4, y + 15);
+    pdf.text('ORBITM7 LOGISTICS INTELLIGENCE', ML + 34, y + 15);
 
     const infoItems: [string, string][] = [
       ['DOC L', route.assignedInvoices[0]?.docLId || 'S/N'],
@@ -2963,8 +2979,13 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     y += 7;
 
     // ── INVOICES TABLE (SPLIT NORMAL / REPICE) ────────────────────────────────
-    const normalInvoices = route.assignedInvoices.filter(inv => !(inv as any).isRepice);
-    const repiceInvoices = route.assignedInvoices.filter(inv => (inv as any).isRepice);
+    const isRepiceInv = (inv: any) => {
+      if (inv.isRepice) return true;
+      const s = String(inv.item_status || inv.itemStatus || inv.status || '').toUpperCase();
+      return s === 'EST-15' || s === 'EST-11' || s === 'REPICE';
+    };
+    const normalInvoices = route.assignedInvoices.filter(inv => !isRepiceInv(inv));
+    const repiceInvoices = route.assignedInvoices.filter(inv => isRepiceInv(inv));
 
     const renderInvoiceTable = (list: any[], title?: string) => {
       if (list.length === 0) return;
@@ -2984,12 +3005,12 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
           .map((inv, idx) => {
             const fi = (inv.items?.[0] || {}) as any;
             const method = String((inv as any).paymentMethod || fi.paymentMethod || fi.payment_method || '-').toUpperCase();
-            const isRepice = !!(inv as any).isRepice;
+            const isRepice = isRepiceInv(inv);
             return [
               String(idx + 1),
               String(inv.unCode || fi.unCode || fi.un_code || '-'),
               String(inv.docLId || '-'),
-              isRepice ? `⚡ ${inv.invoiceNumber}` : inv.invoiceNumber,
+              isRepice ? `REPICE-${inv.invoiceNumber}` : inv.invoiceNumber,
               String(inv.orderNumber || '-'),
               String(inv.totalItems || '-'),
               String(inv.clientRef || fi.clientRef || fi.client_ref || '-'),

@@ -290,7 +290,7 @@ export const savePersonal = async (req: Request, res: Response) => {
         await client.query(`
           INSERT INTO users (id, email, name, password, role_id, client_ids, status_id, phone, avatar, document_type, document_number, two_factor_enabled)
           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        `, [userId, email, nombre, hashedPassword, 'ROL-02', ['CLI-01'], 'EST-01', phone, 'avatar_1.png', 'CC', cedula, false]);
+        `, [userId, email, nombre, hashedPassword, 'ROL-02', ['CLI-01'], 'EST-01', phone, 'avatar_1.png', 'CC', cedula, 0]);
 
         // Cargar permisos por defecto de ROL-02
         const rolePermsResult = await client.query("SELECT permissions FROM role_permissions WHERE role_id = 'ROL-02'");

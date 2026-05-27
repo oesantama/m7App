@@ -320,19 +320,31 @@ const App: React.FC = () => {
       try {
         const fetches: Promise<any>[] = [];
 
-        if (hasPerm('DOCUMENTOS_L') || hasPerm('RECIBIDO_MATERIAL')) {
+        if (['documentos', 'recibido', 'recibido-manual', 'cumplidos', 'rutas'].includes(activeTab)) {
           fetches.push(
-            api.getDocuments(clientId).then(d => useAppStore.setState({ documents: d || [] })).catch(() => { }),
+            api.getDocuments(clientId).then(d => useAppStore.setState({ documents: d || [] })).catch(() => { })
+          );
+        }
+
+        if (['documentos', 'recibido', 'recibido-manual', 'cumplidos', 'rutas', 'despacho', 'dashboard-ajover'].includes(activeTab)) {
+          fetches.push(
             api.getInvoices(clientId).then(inv => useAppStore.setState({ invoices: inv || [] })).catch(() => { })
           );
         }
-        if (hasPerm('RUTAS') || hasPerm('ASIGNACIONES') || activeTab === 'despacho') {
+
+        if (['rutas', 'despacho', 'dashboard-ajover'].includes(activeTab)) {
           fetches.push(
-            api.getRoutes().then(r => useAppStore.setState({ routes: r || [] })).catch(() => { }),
+            api.getRoutes().then(r => useAppStore.setState({ routes: r || [] })).catch(() => { })
+          );
+        }
+
+        if (['rutas', 'despacho', 'vinculo', 'dashboard-ajover'].includes(activeTab)) {
+          fetches.push(
             api.getAssignments().then(a => useAppStore.setState({ assignments: a || [] })).catch(() => { })
           );
         }
-        if (hasPerm('VEHICULOS') || hasPerm('RUTAS')) {
+
+        if (['rutas', 'despacho', 'flotas', 'vinculo', 'dashboard-ajover'].includes(activeTab)) {
           fetches.push(
             api.getVehicles().then(v => useAppStore.setState({ vehicles: v || [] })).catch(() => { })
           );

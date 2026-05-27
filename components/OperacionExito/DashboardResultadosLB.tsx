@@ -78,7 +78,8 @@ export default function DashboardResultadosLB({ resultados, onSave, guardando }:
       totalRegistros, fallidasTransporte, coincidencias, discrepancias,
       porcentajeCoincidencia, novedades, valorNovedades: 0, totalMilla7,
       valorAdicionalTotal, diferenciaPositiva, diferenciaNegativa,
-      pagadoOK, totalDebido, totalPagado
+      pagadoOK, totalDebido, totalPagado,
+      diferenciaNeta: totalPagado - totalDebido
     };
 
     // Resumen Tipos

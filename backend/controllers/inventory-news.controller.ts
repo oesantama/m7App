@@ -5,6 +5,9 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import fs from 'fs';
 import path from 'path';
+import { exec } from 'child_process';
+
+const MESES_NOV = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 export const getNovedades = async (req: Request, res: Response) => {
     const { docId } = req.params;
@@ -19,7 +22,7 @@ export const getNovedades = async (req: Request, res: Response) => {
                 TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.sku AS TEXT))) OR
                 TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.barcode AS TEXT)))
             )
-            WHERE n.document_id = $1 AND n.created_at >= NOW() - INTERVAL '30 hours'
+            WHERE n.document_id = $1 AND n.created_at >= NOW() - INTERVAL '30 days'
             ORDER BY n.created_at DESC
         `, [docId]);
         res.json(result.rows);
@@ -82,7 +85,7 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
                 TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.sku AS TEXT))) OR
                 TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.barcode AS TEXT)))
             )
-            WHERE n.document_id = $1 AND n.created_at >= NOW() - INTERVAL '30 hours'
+            WHERE n.document_id = $1 AND n.created_at >= NOW() - INTERVAL '30 days'
             ORDER BY n.created_at ASC
         `, [docId]);
         const news = newsRes.rows;
@@ -110,7 +113,7 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
         doc_pdf.text(`GENERADO: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}`, pageWidth - 14, 35, { align: 'right' });
 
         // Tabla de Contenido
-        const tableBody = news.map(n => [
+        const tableBody = news.map((n: any) => [
             n.article_sku,
             n.article_name,
             n.quantity.toString(),
@@ -217,5 +220,142 @@ export const sendNovedadesReport = async (req: Request, res: Response) => {
     } catch (err: any) {
         console.error('[REPORT-ERROR]', err);
         res.status(500).json({ error: "Error al enviar reporte" });
+    }
+};
+
+// ─── Helper: genera el buffer PDF de novedades ────────────────────────────────
+async function buildNovedadesPdf(doc: any, news: any[]): Promise<Buffer> {
+    const placa = doc.vehicle_plate || doc.vehicleData || doc.vehicle_data || 'SIN PLACA';
+    const doc_pdf = new jsPDF() as any;
+    const pageWidth = doc_pdf.internal.pageSize.width;
+
+    doc_pdf.setFillColor(15, 23, 42);
+    doc_pdf.rect(0, 0, pageWidth, 40, 'F');
+    doc_pdf.setTextColor(255, 255, 255);
+    doc_pdf.setFontSize(22);
+    doc_pdf.setFont("helvetica", "bold");
+    doc_pdf.text("REPORTE DE NOVEDADES", 14, 20);
+    doc_pdf.setFontSize(10);
+    doc_pdf.text(`DOCUMENTO: ${doc.external_doc_id || doc.externalDocId}`, 14, 30);
+    doc_pdf.text(`PLACA: ${placa}`, 14, 35);
+    doc_pdf.setFontSize(8);
+    doc_pdf.text(`GENERADO: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}`, pageWidth - 14, 35, { align: 'right' });
+
+    autoTable(doc_pdf, {
+        startY: 50,
+        head: [['SKU', 'DESCRIPCIÓN', 'CANT', 'OBSERVACIÓN', 'REGISTRÓ']],
+        body: news.map(n => [n.article_sku, n.article_name, n.quantity.toString(), n.observation, n.user_name || 'N/A']),
+        headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        styles: { fontSize: 9, cellPadding: 4 },
+        columnStyles: { 0: { cellWidth: 25, fontStyle: 'bold' }, 2: { cellWidth: 15, halign: 'center' }, 4: { cellWidth: 25 } }
+    });
+
+    let currentY = (doc_pdf as any).lastAutoTable.finalY + 15;
+    doc_pdf.setTextColor(15, 23, 42);
+    doc_pdf.setFontSize(14);
+    doc_pdf.text("ANEXO FOTOGRÁFICO", 14, currentY);
+    currentY += 10;
+    const photoSize = 60;
+    const margin = 10;
+    let xPos = 14;
+    for (const n of news) {
+        if (n.photo_urls && n.photo_urls.length > 0) {
+            if (currentY + 10 > 280) { doc_pdf.addPage(); currentY = 20; }
+            doc_pdf.setFontSize(10);
+            doc_pdf.setTextColor(30, 41, 59);
+            doc_pdf.setFont("helvetica", "bold");
+            doc_pdf.text(`ARTÍCULO: ${n.article_sku}`, xPos, currentY);
+            currentY += 7;
+            for (const url of n.photo_urls) {
+                if (currentY + photoSize > 280) { doc_pdf.addPage(); currentY = 20; }
+                try {
+                    doc_pdf.addImage(url, 'JPEG', xPos, currentY, photoSize, photoSize);
+                    xPos += photoSize + margin;
+                    if (xPos + photoSize > pageWidth) { xPos = 14; currentY += photoSize + margin; }
+                } catch (e) { console.warn("No se pudo añadir imagen al PDF", e); }
+            }
+            if (xPos !== 14) { xPos = 14; currentY += photoSize + margin; } else { currentY += margin; }
+        }
+    }
+    return Buffer.from(doc_pdf.output('arraybuffer'));
+}
+
+// ─── POST /inventory-news/save-to-drive ──────────────────────────────────────
+export const saveNovedadToDrive = async (req: Request, res: Response) => {
+    const { docId, clientName, driveDate } = req.body;
+    if (!docId || !clientName) return res.status(400).json({ error: 'docId y clientName son requeridos' });
+
+    try {
+        const docRes = await pool.query('SELECT * FROM documents_l WHERE id = $1', [docId]);
+        if (docRes.rows.length === 0) return res.status(404).json({ error: 'Documento no encontrado' });
+        const doc = docRes.rows[0];
+
+        const newsRes = await pool.query(`
+            SELECT n.*,
+                   COALESCE(a.sku, n.article_id, 'S/SKU') as article_sku,
+                   COALESCE(a.name, n.observation, 'SIN NOMBRE') as article_name
+            FROM inventory_news n
+            LEFT JOIN articles a ON (
+                TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.id AS TEXT))) OR
+                TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.sku AS TEXT)))
+            )
+            WHERE n.document_id = $1 AND n.created_at >= NOW() - INTERVAL '30 days'
+            ORDER BY n.created_at ASC
+        `, [docId]);
+        const news = newsRes.rows;
+        if (news.length === 0) return res.status(400).json({ error: 'No hay novedades para guardar' });
+
+        const ref = driveDate ? new Date(`${driveDate}T12:00:00`) : new Date();
+        const year  = ref.getFullYear();
+        const month = MESES_NOV[ref.getMonth()].toUpperCase();
+        const day   = `DIA ${String(ref.getDate()).padStart(2, '0')}`;
+        const cleanClient = clientName.replace(/[^a-zA-Z0-9 ()-]/g, '').trim();
+        const externalId  = (doc.external_doc_id || doc.externalDocId || docId).replace(/[^a-zA-Z0-9_-]/g, '_');
+        const fileName    = `NOVEDAD_${externalId}.pdf`;
+        const drivePath   = `NOVEDADES MILLA 7/${year}/${cleanClient}/${month}/${day}`;
+        const remoteFile  = `gdrive_cumplidos:${drivePath}/${fileName}`;
+        const tmpPath     = path.join('/tmp', `novedad_${Date.now()}_${fileName}`);
+
+        const pdfBuffer = await buildNovedadesPdf(doc, news);
+        fs.writeFileSync(tmpPath, pdfBuffer);
+
+        // Crear carpeta en Drive
+        await new Promise<void>(resolve => {
+            exec(`rclone mkdir "gdrive_cumplidos:${drivePath}"`, (err) => {
+                if (err) console.error('[NOV-DRIVE] mkdir error:', err);
+                resolve();
+            });
+        });
+
+        // Si el archivo ya existe lo elimina (actualización)
+        const existsOutput = await new Promise<string>(resolve => {
+            exec(`rclone ls "${remoteFile}"`, (_, stdout) => resolve(stdout || ''));
+        });
+        if (existsOutput.trim()) {
+            await new Promise<void>(resolve => {
+                exec(`rclone deletefile "${remoteFile}"`, () => resolve());
+            });
+            console.log(`[NOV-DRIVE] Archivo existente eliminado: ${remoteFile}`);
+        }
+
+        // Subir PDF
+        await new Promise<void>((resolve, reject) => {
+            exec(`rclone copyto "${tmpPath}" "${remoteFile}"`, (err) => {
+                if (err) { console.error('[NOV-DRIVE] upload error:', err); reject(err); } else resolve();
+            });
+        });
+
+        // Obtener link público
+        const driveLink = await new Promise<string>(resolve => {
+            exec(`rclone link "${remoteFile}"`, (_, stdout) => resolve((stdout || '').trim()));
+        });
+
+        fs.unlink(tmpPath, () => {});
+        console.log(`[NOV-DRIVE] Guardado: ${remoteFile} | Link: ${driveLink}`);
+        res.json({ success: true, message: `Novedad guardada en Drive: ${fileName}`, driveLink, drivePath });
+    } catch (err: any) {
+        console.error('[NOV-DRIVE-ERR]', err.message);
+        res.status(500).json({ error: err.message || 'Error al guardar en Drive' });
     }
 };

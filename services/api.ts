@@ -1385,6 +1385,10 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ docId, targetEmails })
   }),
+  saveNovedadToDrive: (data: { docId: string; clientName: string; driveDate?: string }) =>
+    fetchJson(`${API_URL}/inventory-news/save-to-drive`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
+    }),
   
   // --- GRUPO INTER ---
   getGrupoInterOrders: (params: { search?: string, status?: string, client?: string } = {}) => {

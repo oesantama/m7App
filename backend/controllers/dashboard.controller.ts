@@ -88,6 +88,7 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 };
 
 export const getAjoverStats = async (req: Request, res: Response) => {
+  try {
   const clientId: string = (req.query.clientId as string) || 'CLI-01';
   const p = [clientId]; // Each query has its own .catch() so a single failure never kills the whole response
   const [
@@ -198,40 +199,44 @@ export const getAjoverStats = async (req: Request, res: Response) => {
   ]);
 
   try {
-    const veh  = vehiclesRes.rows[0];
-    const drv  = driversRes.rows[0];
-    const rts  = routesRes.rows[0];
-    const inv  = invoicesRes.rows[0];
-    const conc = concRow.rows[0];
-    const devR = devRow.rows[0];
-    const stk  = stkRow.rows[0];
+    const veh  = vehiclesRes?.rows?.[0] || { total:0, available:0, on_route:0, total_capacity_m3:0, total_capacity_kg:0 };
+    const drv  = driversRes?.rows?.[0] || { total:0, active:0 };
+    const rts  = routesRes?.rows?.[0] || { total:0, active:0, completed:0, pending:0 };
+    const inv  = invoicesRes?.rows?.[0] || { total:0, delivered:0, in_route:0, pending:0, returned:0, delivered_weight:0 };
+    const conc = concRow?.rows?.[0] || { total:0, completadas:0, pendientes:0, devoluciones:0, devoluciones_pendientes_bodega:0 };
+    const devR = devRow?.rows?.[0] || { pendientes_ruta:0 };
+    const stk  = stkRow?.rows?.[0] || { bodega_qty:0, bodega_skus:0 };
 
-    const totalDocs = Number(inv.delivered) + Number(inv.in_route) + Number(inv.pending) + Number(inv.returned);
-    const effectivenessRate = totalDocs > 0 ? Math.round((Number(inv.delivered) / totalDocs) * 100) : 0;
-    const returnRate        = totalDocs > 0 ? Math.round((Number(inv.returned)  / totalDocs) * 100) : 0;
+    const totalDocs = Number(inv.delivered || 0) + Number(inv.in_route || 0) + Number(inv.pending || 0) + Number(inv.returned || 0);
+    const effectivenessRate = totalDocs > 0 ? Math.round((Number(inv.delivered || 0) / totalDocs) * 100) : 0;
+    const returnRate        = totalDocs > 0 ? Math.round((Number(inv.returned || 0)  / totalDocs) * 100) : 0;
 
     res.json({
-      vehicles: { total: Number(veh.total), available: Number(veh.available), onRoute: Number(veh.on_route), totalCapacityM3: Number(veh.total_capacity_m3), totalCapacityKg: Number(veh.total_capacity_kg) },
-      drivers:  { total: Number(drv.total), active: Number(drv.active) },
-      routes:   { total: Number(rts.total), active: Number(rts.active), completed: Number(rts.completed), pending: Number(rts.pending) },
-      invoices: { total: Number(inv.total), delivered: Number(inv.delivered), inRoute: Number(inv.in_route), pending: Number(inv.pending), returned: Number(inv.returned), deliveredWeight: Number(inv.delivered_weight), effectivenessRate, returnRate },
-      topCities: topCitiesRes.rows.map((r: any) => ({
-        city: r.city, total: Number(r.total), delivered: Number(r.delivered), returned: Number(r.returned),
-        effectiveness: Number(r.total) > 0 ? Math.round((Number(r.delivered) / Number(r.total)) * 100) : 0,
+      vehicles: { total: Number(veh.total || 0), available: Number(veh.available || 0), onRoute: Number(veh.on_route || 0), totalCapacityM3: Number(veh.total_capacity_m3 || 0), totalCapacityKg: Number(veh.total_capacity_kg || 0) },
+      drivers:  { total: Number(drv.total || 0), active: Number(drv.active || 0) },
+      routes:   { total: Number(rts.total || 0), active: Number(rts.active || 0), completed: Number(rts.completed || 0), pending: Number(rts.pending || 0) },
+      invoices: { total: Number(inv.total || 0), delivered: Number(inv.delivered || 0), inRoute: Number(inv.in_route || 0), pending: Number(inv.pending || 0), returned: Number(inv.returned || 0), deliveredWeight: Number(inv.delivered_weight || 0), effectivenessRate, returnRate },
+      topCities: (topCitiesRes?.rows || []).map((r: any) => ({
+        city: r.city || 'Desconocida', total: Number(r.total || 0), delivered: Number(r.delivered || 0), returned: Number(r.returned || 0),
+        effectiveness: Number(r.total || 0) > 0 ? Math.round((Number(r.delivered || 0) / Number(r.total || 0)) * 100) : 0,
       })),
-      activeRoutes: activeRoutesRes.rows.map((r: any) => ({ name: r.route_name, status: r.status, plate: r.plate, driver: r.driver_name })),
-      vehicleEfficiency: vehicleEffRes.rows.map((r: any) => ({
-        plate: r.plate, capacityM3: Number(r.capacity_m3), totalRoutes: Number(r.total_routes),
-        avgUtilization: Number(r.avg_utilization), avgVolume: Number(r.avg_volume),
-        maxUtilization: Number(r.max_utilization), totalVolumeDispatched: Number(r.total_volume_dispatched),
+      activeRoutes: (activeRoutesRes?.rows || []).map((r: any) => ({ name: r.route_name || 'Sin ruta', status: r.status || 'Desconocido', plate: r.plate || 'N/A', driver: r.driver_name || 'N/A' })),
+      vehicleEfficiency: (vehicleEffRes?.rows || []).map((r: any) => ({
+        plate: r.plate || 'N/A', capacityM3: Number(r.capacity_m3 || 0), totalRoutes: Number(r.total_routes || 0),
+        avgUtilization: Number(r.avg_utilization || 0), avgVolume: Number(r.avg_volume || 0),
+        maxUtilization: Number(r.max_utilization || 0), totalVolumeDispatched: Number(r.total_volume_dispatched || 0),
       })),
-      conciliation: { total: Number(conc.total), completadas: Number(conc.completadas), pendientes: Number(conc.pendientes), devoluciones: Number(conc.devoluciones), devolucionesPendientesBodega: Number(conc.devoluciones_pendientes_bodega) },
-      devolucionesPendientesRuta: Number(devR.pendientes_ruta),
-      stock: { bodegaQty: Number(stk.bodega_qty), bodegaSkus: Number(stk.bodega_skus) },
+      conciliation: { total: Number(conc.total || 0), completadas: Number(conc.completadas || 0), pendientes: Number(conc.pendientes || 0), devoluciones: Number(conc.devoluciones || 0), devolucionesPendientesBodega: Number(conc.devoluciones_pendientes_bodega || 0) },
+      devolucionesPendientesRuta: Number(devR.pendientes_ruta || 0),
+      stock: { bodegaQty: Number(stk.bodega_qty || 0), bodegaSkus: Number(stk.bodega_skus || 0) },
     });
   } catch (err: any) {
     console.error('[M7-AJOVER-DASHBOARD] Error building response:', err.message);
     res.status(500).json({ error: 'Error al obtener estadísticas Ajover' });
+  }
+  } catch (err: any) {
+    console.error('[M7-AJOVER-DASHBOARD] Error inesperado:', err.message);
+    if (!res.headersSent) res.status(500).json({ error: 'Error interno al obtener estadísticas' });
   }
 };
 

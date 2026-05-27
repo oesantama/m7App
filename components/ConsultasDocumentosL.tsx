@@ -8,6 +8,7 @@ import ProcessPaymentLModal from './ProcessPaymentLModal';
 import * as XLSX from 'xlsx';
 import TableControls from './shared/TableControls';
 import { formatCurrency, formatDate } from '../utils/formatting';
+import { DataTable, ColumnDef } from './shared/DataTable';
 
 interface ConsultasDocumentosLProps {
   documents: DocumentL[];
@@ -28,10 +29,18 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
     cargueDate: '',
     inventoryDate: ''
   });
+  const [appliedFilters, setAppliedFilters] = useState({
+    plate: '',
+    docL: '',
+    remesaTDM: '',
+    status: '',
+    planType: '',
+    deliveryDate: '',
+    cargueDate: '',
+    inventoryDate: ''
+  });
+  const [hasSearched, setHasSearched] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<DocumentL | null>(null);
-  const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(10);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   // States for Document L Payment Upload
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -42,7 +51,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const [detailPage, setDetailPage] = useState(1);
   const [detailPageSize, setDetailPageSize] = useState<number | 'all'>(10);
   const [activeDetailTab, setActiveDetailTab] = useState<'reception' | 'audit' | 'payments'>('reception');
-
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   // Estados para Historial de Conciliación
   const [historyTarget, setHistoryTarget] = useState<any | null>(null);
   const [historyLogs, setHistoryLogs] = useState<any[]>([]);
@@ -354,23 +363,31 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
 
   const filteredDocs = useMemo(() => {
     return documents.filter(doc => {
-      const matchPlaca = !filters.plate || (doc.vehicleData || '').toLowerCase().includes(filters.plate.toLowerCase());
-      const matchDocL = !filters.docL || filters.docL.split(',').some(term => 
+      if (!hasSearched) {
+         // Show only current month by default
+         if (!doc.createdAt && !(doc as any).created_at) return false;
+         const docDate = new Date(doc.createdAt || (doc as any).created_at);
+         const now = new Date();
+         return docDate.getMonth() === now.getMonth() && docDate.getFullYear() === now.getFullYear();
+      }
+
+      const matchPlaca = !appliedFilters.plate || (doc.vehicleData || '').toLowerCase().includes(appliedFilters.plate.toLowerCase());
+      const matchDocL = !appliedFilters.docL || appliedFilters.docL.split(',').some(term => 
         doc.externalDocId.toLowerCase().includes(term.trim().toLowerCase())
       );
-      const matchCodPlan = !filters.remesaTDM || (doc.remesaTDM || '').toLowerCase().includes(filters.remesaTDM.toLowerCase());
-      const matchStatus = !filters.status || doc.status === filters.status;
-      const matchPlanType = !filters.planType || doc.planType === filters.planType;
+      const matchCodPlan = !appliedFilters.remesaTDM || (doc.remesaTDM || '').toLowerCase().includes(appliedFilters.remesaTDM.toLowerCase());
+      const matchStatus = !appliedFilters.status || doc.status === appliedFilters.status;
+      const matchPlanType = !appliedFilters.planType || doc.planType === appliedFilters.planType;
       const cargueDate = doc.createdAt && !isNaN(new Date(doc.createdAt).getTime())
         ? new Date(doc.createdAt).toISOString().split('T')[0]
         : '';
-      const matchCargue = !filters.cargueDate || cargueDate === filters.cargueDate;
-      const matchDelivery = !filters.deliveryDate || (doc.deliveryDate || '').includes(filters.deliveryDate.split('-').reverse().join('/'));
+      const matchCargue = !appliedFilters.cargueDate || cargueDate === appliedFilters.cargueDate;
+      const matchDelivery = !appliedFilters.deliveryDate || (doc.deliveryDate || '').includes(appliedFilters.deliveryDate.split('-').reverse().join('/'));
 
       const invDate = doc.inventoryDate && !isNaN(new Date(doc.inventoryDate).getTime())
         ? new Date(doc.inventoryDate).toISOString().split('T')[0]
         : '';
-      const matchInventory = !filters.inventoryDate || invDate === filters.inventoryDate;
+      const matchInventory = !appliedFilters.inventoryDate || invDate === appliedFilters.inventoryDate;
 
       return matchPlaca && matchDocL && matchCodPlan && matchStatus && matchPlanType && matchCargue && matchDelivery && matchInventory;
     }).sort((a, b) => {
@@ -378,22 +395,23 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
       const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
       return timeB - timeA;
     });
-  }, [documents, filters]);
-
-  const paginatedDocs = useMemo(() => {
-    if (rowsPerPage === 'all') return filteredDocs;
-    const start = (currentPage - 1) * rowsPerPage;
-    return filteredDocs.slice(start, start + rowsPerPage);
-  }, [filteredDocs, currentPage, rowsPerPage]);
-
-  const totalPages = rowsPerPage === 'all' ? 1 : Math.ceil(filteredDocs.length / rowsPerPage);
+  }, [documents, appliedFilters, hasSearched]);
 
   const clearFilters = () => {
     setFilters({
       plate: '', docL: '', remesaTDM: '', status: '',
       planType: '', deliveryDate: '', cargueDate: '', inventoryDate: ''
     });
-    setCurrentPage(1);
+    setAppliedFilters({
+      plate: '', docL: '', remesaTDM: '', status: '',
+      planType: '', deliveryDate: '', cargueDate: '', inventoryDate: ''
+    });
+    setHasSearched(false);
+  };
+
+  const handleSearch = () => {
+    setAppliedFilters(filters);
+    setHasSearched(true);
   };
 
   const handlePdfVerification = async (file: File, targetDoc: DocumentL) => {
@@ -450,6 +468,125 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const inputClass = "w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all placeholder:text-slate-300";
   const labelClass = "text-[9px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-1 block";
 
+  const columnsDocs: ColumnDef<DocumentL>[] = [
+    {
+      header: 'Documento / Placa',
+      key: 'externalDocId',
+      render: (doc) => (
+        <div>
+          <p className="font-black text-slate-900 text-xs uppercase">{doc.externalDocId}</p>
+          <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">PLACA: {doc.vehicleData}</p>
+        </div>
+      )
+    },
+    {
+      header: 'F. Cargue',
+      key: 'createdAt',
+      render: (doc) => (
+        <span className="font-bold text-slate-400 text-[9px] uppercase">
+          {(doc.createdAt || (doc as any).created_at)
+            ? new Date(doc.createdAt || (doc as any).created_at).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
+            : 'S/F'}
+        </span>
+      )
+    },
+    {
+      header: 'Tipo Plan',
+      key: 'planType',
+      render: (doc) => (
+        <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${doc.planType === 'Plan R' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+          {doc.planType || 'NORMAL'}
+        </span>
+      )
+    },
+    {
+      header: 'Cliente',
+      key: 'clientId',
+      render: (doc) => <span className="font-bold text-slate-600 text-[10px] uppercase">{doc.clientId || 'S/C'}</span>
+    },
+    {
+      header: 'Estado',
+      key: 'status',
+      render: (doc) => (
+        <div className="text-center">
+          <span className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border shadow-inner ${
+            (doc.status === DocStatus.INVENTORED || doc.status === 'INVENTARIADO') ? 'bg-emerald-500 text-white border-emerald-400' :
+            (doc.status === DocStatus.IN_ROUTE || doc.status === 'EN RUTA')        ? 'bg-blue-500 text-white border-blue-400' :
+            (doc.status === DocStatus.DELIVERED || doc.status === 'ENTREGADO')     ? 'bg-emerald-600 text-white border-emerald-500' :
+            (doc.status === DocStatus.RETURNED || doc.status === 'DEVUELTO')       ? 'bg-red-500 text-white border-red-400' :
+            (doc.status === DocStatus.ELIMINATED || doc.status === 'ELIMINADO')    ? 'bg-slate-400 text-white border-slate-300' :
+            'bg-amber-50 text-amber-600 border-amber-100'
+          }`}>{getStatusLabel(doc.status || '')}</span>
+        </div>
+      )
+    },
+    {
+      header: 'Acción',
+      key: 'actions',
+      sortable: false,
+      render: (doc) => (
+        <div className="flex items-center justify-end gap-1.5">
+          <button
+            onClick={() => { pdfVerifyTargetRef.current = doc; setPdfVerifyTarget(doc); pdfInputRef.current?.click(); }}
+            disabled={pdfVerifying}
+            className="p-3 bg-violet-50 text-violet-600 rounded-xl hover:bg-violet-600 hover:text-white transition-all disabled:opacity-50"
+            title="Verificar PDF"
+          >
+            <Icons.Upload className="w-4 h-4" />
+          </button>
+          <button onClick={() => setSelectedDoc(doc)} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all" title="Ver Detalle"><Icons.Eye className="w-4 h-4" /></button>
+          
+          {doc.status === DocStatus.INVENTORED && (
+            <button 
+              onClick={() => handleResendClick(doc)}
+              className="p-3 bg-blue-50 text-blue-500 rounded-xl hover:bg-blue-600 hover:text-white transition-all"
+              title="Reenviar Correo"
+            >
+              <Icons.Send className="w-4 h-4" />
+            </button>
+          )}
+
+          {canEditAudit && (doc.status === DocStatus.INVENTORED || doc.status === 'INVENTARIADO' || doc.status === 'EST-08') && (doc.consolidatedItems || []).some((it: any) => Number(it.count_2 || it.count2 || 0) !== Number(it.expected_qty || it.expectedQty || 0)) && (
+            <button 
+              onClick={() => { setSelectedDoc(doc); setActiveDetailTab('audit'); }}
+              className="p-3 bg-amber-50 text-amber-500 rounded-xl hover:bg-amber-600 hover:text-white transition-all"
+              title="Conciliar Inventario"
+            >
+              <Icons.Audit className="w-4 h-4" />
+            </button>
+          )}
+
+          {doc.planType === 'Plan R' && (
+          <button
+            onClick={() => {
+              if ((doc as any).paymentsCount > 0) {
+                setSelectedDoc(doc);
+                setActiveDetailTab('payments');
+              } else {
+                setPaymentTarget(doc);
+                setShowPaymentModal(true);
+              }
+            }} 
+            className={`p-3 rounded-xl transition-all ${(doc as any).paymentsCount > 0 ? 'bg-slate-900 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white'}`}
+            title={(doc as any).paymentsCount > 0 ? `Pagos: ${(doc as any).paymentsCount} Cargados` : 'Cargar Pagos'}
+          >
+            {(doc as any).paymentsCount > 0 ? <Icons.Check className="w-4 h-4" /> : <Icons.Excel className="w-4 h-4" />}
+          </button>
+          )}
+          {isAuthorizedToDelete && (
+            <button 
+              onClick={() => handleDeleteDocument(doc.id)} 
+              className="p-3 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all"
+              title="Eliminar"
+            >
+              <Icons.Trash className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      )
+    }
+  ];
+
   return (
     <div className="space-y-6 animate-in fade-in p-4 md:p-6">
       {/* Input global para verificación PDF — un solo elemento para todas las filas */}
@@ -490,7 +627,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
           <div className="space-y-1">
             <label className={labelClass}>Tipo Plan</label>
             <select value={filters.planType} onChange={e => setFilters({ ...filters, planType: e.target.value })} className={inputClass}>
-              <option value="">TODOS</option>
+              <option value=""></option>
               <option value="Plan Normal">PLAN NORMAL</option>
               <option value="Plan R">PLAN R</option>
             </select>
@@ -498,126 +635,25 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
           <div className="space-y-1">
             <label className={labelClass}>Estado</label>
             <select value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })} className={inputClass}>
-              <option value="">TODOS</option>
+              <option value=""></option>
               {Object.values(DocStatus).map(s => <option key={s} value={s}>{getStatusLabel(s).toUpperCase()}</option>)}
             </select>
           </div>
         </div>
         <div className="flex justify-end gap-3 flex-wrap">
-          <button onClick={() => exportToExcel(filteredDocs, "M7_Historial")} className="px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-md flex items-center gap-2">
-            <Icons.Excel className="w-4 h-4" /> Exportar
+          <button onClick={handleSearch} className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-md flex items-center gap-2">
+            <Icons.Search className="w-4 h-4" /> Consultar
           </button>
           <button onClick={clearFilters} className="px-6 py-3 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-700 transition-all shadow-md">Limpiar</button>
         </div>
       </div>
 
-      <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden flex flex-col min-h-[400px]">
-        <div className="flex-1 overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-slate-900 text-white font-black uppercase tracking-widest text-[9px]">
-              <tr>
-                <th className="px-6 py-5">Documento / Placa</th>
-                <th className="px-6 py-5">F. Cargue</th>
-                <th className="px-6 py-5">Tipo Plan</th>
-                <th className="px-6 py-5">Cliente</th>
-                <th className="px-6 py-5 text-center">Estado</th>
-                <th className="px-6 py-5 text-right">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {paginatedDocs.map(doc => (
-                <tr key={doc.id} className="hover:bg-slate-50 transition-all">
-                  <td className="px-6 py-5">
-                    <p className="font-black text-slate-900 text-xs uppercase">{doc.externalDocId}</p>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase mt-0.5">PLACA: {doc.vehicleData}</p>
-                  </td>
-                  <td className="px-6 py-5 font-bold text-slate-400 text-[9px] uppercase">
-                    {(doc.createdAt || (doc as any).created_at)
-                      ? new Date(doc.createdAt || (doc as any).created_at).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' })
-                      : 'S/F'}
-                  </td>
-                  <td className="px-6 py-5">
-                    <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${doc.planType === 'Plan R' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                      {doc.planType || 'NORMAL'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-5 font-bold text-slate-600 text-[10px] uppercase">{doc.clientId || 'S/C'}</td>
-                  <td className="px-6 py-5 text-center">
-                    <span className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border shadow-inner ${
-                      (doc.status === DocStatus.INVENTORED || doc.status === 'INVENTARIADO') ? 'bg-emerald-500 text-white border-emerald-400' :
-                      (doc.status === DocStatus.IN_ROUTE || doc.status === 'EN RUTA')        ? 'bg-blue-500 text-white border-blue-400' :
-                      (doc.status === DocStatus.DELIVERED || doc.status === 'ENTREGADO')     ? 'bg-emerald-600 text-white border-emerald-500' :
-                      (doc.status === DocStatus.RETURNED || doc.status === 'DEVUELTO')       ? 'bg-red-500 text-white border-red-400' :
-                      (doc.status === DocStatus.ELIMINATED || doc.status === 'ELIMINADO')    ? 'bg-slate-400 text-white border-slate-300' :
-                      'bg-amber-50 text-amber-600 border-amber-100'
-                    }`}>{getStatusLabel(doc.status || '')}</span>
-                  </td>
-                  <td className="px-6 py-5 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        onClick={() => { pdfVerifyTargetRef.current = doc; setPdfVerifyTarget(doc); pdfInputRef.current?.click(); }}
-                        disabled={pdfVerifying}
-                        className="p-3 bg-violet-50 text-violet-600 rounded-xl hover:bg-violet-600 hover:text-white transition-all disabled:opacity-50"
-                        title="Verificar PDF"
-                      >
-                        <Icons.Upload className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => setSelectedDoc(doc)} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all" title="Ver Detalle"><Icons.Eye className="w-4 h-4" /></button>
-                      
-                      {doc.status === DocStatus.INVENTORED && (
-                        <button 
-                          onClick={() => handleResendClick(doc)}
-                          className="p-3 bg-blue-50 text-blue-500 rounded-xl hover:bg-blue-600 hover:text-white transition-all"
-                          title="Reenviar Correo"
-                        >
-                          <Icons.Send className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      {canEditAudit && (doc.status === DocStatus.INVENTORED || doc.status === 'INVENTARIADO' || doc.status === 'EST-08') && (doc.consolidatedItems || []).some((it: any) => Number(it.count_2 || it.count2 || 0) !== Number(it.expected_qty || it.expectedQty || 0)) && (
-                        <button 
-                          onClick={() => { setSelectedDoc(doc); setActiveDetailTab('audit'); }}
-                          className="p-3 bg-amber-50 text-amber-500 rounded-xl hover:bg-amber-600 hover:text-white transition-all"
-                          title="Conciliar Inventario"
-                        >
-                          <Icons.Audit className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      {doc.planType === 'Plan R' && (
-                      <button
-                        onClick={() => {
-                          if ((doc as any).paymentsCount > 0) {
-                            setSelectedDoc(doc);
-                            setActiveDetailTab('payments');
-                          } else {
-                            setPaymentTarget(doc);
-                            setShowPaymentModal(true);
-                          }
-                        }} 
-                        className={`p-3 rounded-xl transition-all ${(doc as any).paymentsCount > 0 ? 'bg-slate-900 text-emerald-400 border border-emerald-500/30' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white'}`}
-                        title={(doc as any).paymentsCount > 0 ? `Pagos: ${(doc as any).paymentsCount} Cargados` : 'Cargar Pagos'}
-                      >
-                        {(doc as any).paymentsCount > 0 ? <Icons.Check className="w-4 h-4" /> : <Icons.Excel className="w-4 h-4" />}
-                      </button>
-                      )}
-                      {isAuthorizedToDelete && (
-                        <button 
-                          onClick={() => handleDeleteDocument(doc.id)} 
-                          className="p-3 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all"
-                          title="Eliminar"
-                        >
-                          <Icons.Trash className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <DataTable
+        data={filteredDocs}
+        columns={columnsDocs}
+        searchPlaceholder="Buscar documento..."
+        excelFileName="M7_Historial.xlsx"
+      />
 
       {selectedDoc && (
         <div className="fixed inset-0 z-[400] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-300">

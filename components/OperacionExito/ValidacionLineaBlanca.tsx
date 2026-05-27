@@ -355,7 +355,8 @@ export default function ValidacionLineaBlanca({ user }: { user: any }) {
         totalRegistros, fallidasTransporte, coincidencias, discrepancias,
         porcentajeCoincidencia, novedades, valorNovedades, totalMilla7,
         valorAdicionalTotal, diferenciaPositiva, diferenciaNegativa,
-        pagadoOK, totalDebido, totalPagado
+        pagadoOK, totalDebido, totalPagado,
+        diferenciaNeta: totalPagado - totalDebido
       });
 
       // Calculate resumenTipos

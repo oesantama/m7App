@@ -571,13 +571,23 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const dataRows = rawData.slice(headerRowIndex + 1);
         const docsMap = new Map<string, { remesaTDM: string | null, placa: string, carga: string, city: string, address: string, deliveryDate: string | null, items: any[], consolidatedItems: any[] }>();
 
+        let lastPlaca = '';
+        let lastCarga = '';
+
         dataRows.forEach((row) => {
           if (!row || row.length === 0 || row.every(c => c === '')) return;
           const val = (idx: number) => idx !== -1 ? String(row[idx] || '').trim() : '';
 
-          const placa = val(iPlaca);
-          const carga = val(iCarga);
+          let placa = val(iPlaca);
+          let carga = val(iCarga);
+
+          if (!placa && lastPlaca) placa = lastPlaca;
+          if (!carga && lastCarga) carga = lastCarga;
+
           if (!placa && !carga) return;
+
+          lastPlaca = placa;
+          lastCarga = carga;
 
           const groupKey = `${placa}-${carga}`; // Sin defaults 'S/A' o 'S/C' para forzar datos reales
 

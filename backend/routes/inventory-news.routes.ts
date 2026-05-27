@@ -8,5 +8,6 @@ const router = Router();
 router.get('/:docId', authenticateToken, newsCtrl.getNovedades);
 router.post('/', authenticateToken, newsCtrl.saveNovedad);
 router.post('/send-report', authenticateToken, newsCtrl.sendNovedadesReport);
+router.post('/save-to-drive', authenticateToken, newsCtrl.saveNovedadToDrive);
 
 export default router;
