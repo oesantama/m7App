@@ -198,7 +198,6 @@ export const getAjoverStats = async (req: Request, res: Response) => {
     `, p).catch(() => ({ rows: [{ bodega_qty:0, bodega_skus:0 }] })),
   ]);
 
-  try {
     const veh  = vehiclesRes?.rows?.[0] || { total:0, available:0, on_route:0, total_capacity_m3:0, total_capacity_kg:0 };
     const drv  = driversRes?.rows?.[0] || { total:0, active:0 };
     const rts  = routesRes?.rows?.[0] || { total:0, active:0, completed:0, pending:0 };
@@ -230,10 +229,6 @@ export const getAjoverStats = async (req: Request, res: Response) => {
       devolucionesPendientesRuta: Number(devR.pendientes_ruta || 0),
       stock: { bodegaQty: Number(stk.bodega_qty || 0), bodegaSkus: Number(stk.bodega_skus || 0) },
     });
-  } catch (err: any) {
-    console.error('[M7-AJOVER-DASHBOARD] Error building response:', err.message);
-    res.status(500).json({ error: 'Error al obtener estadísticas Ajover' });
-  }
   } catch (err: any) {
     console.error('[M7-AJOVER-DASHBOARD] Error inesperado:', err.message);
     if (!res.headersSent) res.status(500).json({ error: 'Error interno al obtener estadísticas' });

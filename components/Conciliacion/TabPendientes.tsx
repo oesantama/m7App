@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import ConciliacionModal from '../Logistics/ConciliacionModal';
 import ConciliacionRouteModal from '../Logistics/ConciliacionRouteModal';
 import AssignmentModal from './AssignmentModal';
+import AddMissingInvoiceModal from './AddMissingInvoiceModal';
 import { exportToExcel } from '../../utils/exportUtils';
 import TableControls from '../shared/TableControls';
 import Pagination from '../shared/Pagination';
@@ -146,6 +147,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const [searchRoute, setSearchRoute]         = useState('');
     const [importingMS, setImportingMS]         = useState(false);
     const [showExportFormatModal, setShowExportFormatModal] = useState(false);
+    const [showAddMissingInvoiceModal, setShowAddMissingInvoiceModal] = useState(false);
     const msFileRef                             = React.useRef<HTMLInputElement>(null);
     const [pendingMsFile, setPendingMsFile]     = useState<File | null>(null);
     const [msPreviewData, setMsPreviewData]     = useState<any[]>([]);
@@ -1393,6 +1395,14 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                                         className="hidden"
                                         onChange={handleImportMasterSuite}
                                     />
+                                    {/* Adicionar Factura Faltante */}
+                                    <button
+                                        onClick={() => setShowAddMissingInvoiceModal(true)}
+                                        title="Adicionar Factura Faltante al Documento"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all shadow-sm bg-blue-500 hover:bg-blue-600 text-white"
+                                    >
+                                        ➕ Adicionar Factura
+                                    </button>
                                     {/* Cerrar Facturación */}
                                     <button
                                         onClick={() => handleCloseCycle()}
@@ -2525,6 +2535,18 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                         </div>
                     </div>
                 </div>
+            )}
+            {showAddMissingInvoiceModal && selectedDoc && (
+                <AddMissingInvoiceModal
+                    isOpen={showAddMissingInvoiceModal}
+                    onClose={() => setShowAddMissingInvoiceModal(false)}
+                    documentId={selectedDoc.id}
+                    routes={routes}
+                    onSuccess={() => {
+                        loadDocDetail(selectedDoc);
+                        // onRefresh is passed via props to TabPendientes if it exists, wait, actually I should just call loadDocDetail and maybe we don't have onRefresh.
+                    }}
+                />
             )}
         </div>
     );

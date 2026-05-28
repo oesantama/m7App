@@ -208,7 +208,7 @@ const Layout: React.FC<LayoutProps> = ({
           {!isCollapsed && (
             <div className="flex flex-col">
               <h1 className="font-black text-lg tracking-tighter text-white">ORBITM7</h1>
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em]">GLOBAL v1.9.55-ULTRA-SLIM</span>
+              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em]">GLOBAL v{(__APP_VERSION__ as any) || '1.0.0'}-ULTRA-SLIM</span>
             </div>
           )}
         </div>

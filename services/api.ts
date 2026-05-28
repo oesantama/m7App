@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 const isDev = import.meta.env.DEV;
-const API_URL = import.meta.env.VITE_API_URL || (isDev ? 'http://localhost:8080/api' : '/api');
+export const API_URL = import.meta.env.VITE_API_URL || (isDev ? 'http://localhost:8080/api' : '/api');
 
 export const fetchJson = async (url: string, options?: any) => {
   const executeFetch = async (retryCount = 0): Promise<any> => {
@@ -228,6 +228,12 @@ export const api = {
     fetchJson(`${API_URL}/conciliation/invoice-value`, { method: 'PATCH', body: JSON.stringify(data) }),
   adjustPayment: (data: { documentId: string; invoiceNumber: string; newValor?: number; newComprobante?: string; userId: string }) =>
     fetchJson(`${API_URL}/conciliation/adjust-payment`, { method: 'POST', body: JSON.stringify(data) }),
+  addMissingInvoice: (data: { 
+    documentId: string; invoiceNumber: string; valor: number; metodoPago: string; targetRouteId?: string; userId: string;
+    customerName?: string; city?: string; address?: string; unCode?: string; clientRef?: string;
+    items?: { articleId: string; expectedQty: number; peso?: number; volume?: number; orderNumber?: string }[];
+  }) =>
+    fetchJson(`${API_URL}/conciliation/add-missing-invoice`, { method: 'POST', body: JSON.stringify(data) }),
 
   // ── Devoluciones Bodega ────────────────────────────────────────────────────
   getPendingRouteReturns: (clientId?: string) =>

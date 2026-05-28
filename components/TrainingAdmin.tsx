@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Icons } from '../constants';
 import * as XLSX from 'xlsx';
+import { fetchJson, API_URL } from '../services/api';
+import { DataTable } from './shared/DataTable';
 
 const TrainingAdmin: React.FC = () => {
     const [sessions, setSessions] = useState<any[]>([]);
@@ -31,12 +33,12 @@ const TrainingAdmin: React.FC = () => {
 
     const fetchSessions = async () => {
         try {
-            const res = await fetch('/api/training/sessions', {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            const res = await fetchJson(`${API_URL}/training/sessions`, {
+                headers: { 'Cache-Control': 'no-cache' }
             });
-            const data = await res.json();
-            setSessions(Array.isArray(data) ? data : []);
-        } catch (err) {
+            setSessions(Array.isArray(res) ? res : []);
+        } catch (err: any) {
+            console.error('Error fetching sessions:', err);
             toast.error("Error al cargar sesiones");
         } finally {
             setLoading(false);
@@ -46,24 +48,19 @@ const TrainingAdmin: React.FC = () => {
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const res = await fetch('/api/training/sessions', {
+            const res = await fetchJson(`${API_URL}/training/sessions`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
                 body: JSON.stringify(form)
             });
-            if (res.ok) {
-                toast.success("Sesión guardada correctamente");
-                setShowModal(false);
-                fetchSessions();
-                setForm({
-                    topic: '', content: '', instructor: '', locationType: 'PRESENCIAL',
-                    scheduledAt: '', durationMinutes: '60', expiresAt: ''
-                });
-            }
-        } catch (err) {
+            toast.success("Sesión guardada correctamente");
+            setShowModal(false);
+            fetchSessions();
+            setForm({
+                topic: '', content: '', instructor: '', locationType: 'PRESENCIAL',
+                scheduledAt: '', durationMinutes: '60', expiresAt: ''
+            });
+        } catch (err: any) {
+            console.error(err);
             toast.error("Error al guardar");
         }
     };
@@ -72,12 +69,12 @@ const TrainingAdmin: React.FC = () => {
         setSelectedSession(session);
         setLoadingAttendance(true);
         try {
-            const res = await fetch(`/api/training/sessions/${session.id}/attendance`, {
-                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            const res = await fetchJson(`${API_URL}/training/sessions/${session.id}/attendance`, {
+                headers: { 'Cache-Control': 'no-cache' }
             });
-            const data = await res.json();
-            setAttendance(data);
-        } catch (err) {
+            setAttendance(res);
+        } catch (err: any) {
+            console.error(err);
             toast.error("Error al cargar asistencias");
         } finally {
             setLoadingAttendance(false);
@@ -85,45 +82,23 @@ const TrainingAdmin: React.FC = () => {
     };
 
     const exportToExcel = () => {
-        if (!attendance.length) return toast.error("No hay datos para exportar");
-        
-        const dataToExport = attendance.map(a => ({
-            'SESIÓN': selectedSession?.topic,
-            'INSTRUCTOR': selectedSession?.instructor,
-            'FECHA': new Date(a.registered_at).toLocaleString(),
-            'NOMBRE COMPLETO': a.full_name,
-            'CÉDULA': a.document_number,
-            'CARGO': a.job_title
-        }));
-
-        const ws = XLSX.utils.json_to_sheet(dataToExport);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Asistencias");
-        XLSX.writeFile(wb, `Asistencias_${selectedSession?.topic}_${new Date().toISOString().split('T')[0]}.xlsx`);
+        // Obsoleto: ahora lo hace DataTable
     };
 
     const handleExtend = async () => {
         if (!extendSession || !newExpiresAt) return;
         try {
-            const res = await fetch(`/api/training/sessions/${extendSession.id}/extend`, {
+            const res = await fetchJson(`${API_URL}/training/sessions/${extendSession.id}/extend`, {
                 method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                },
                 body: JSON.stringify({ newExpiresAt })
             });
-            if (res.ok) {
-                toast.success("Fecha de expiración actualizada");
-                setExtendSession(null);
-                setNewExpiresAt('');
-                fetchSessions();
-            } else {
-                const data = await res.json();
-                toast.error(data.error || "Error al actualizar");
-            }
-        } catch {
-            toast.error("Error al conectar con el servidor");
+            toast.success("Fecha de expiración actualizada");
+            setExtendSession(null);
+            setNewExpiresAt('');
+            fetchSessions();
+        } catch (err: any) {
+            console.error(err);
+            toast.error(err.message || "Error al actualizar");
         }
     };
 
@@ -231,45 +206,25 @@ const TrainingAdmin: React.FC = () => {
                                 <h2 className="text-xl font-black uppercase tracking-tight">{selectedSession.topic}</h2>
                             </div>
                             <div className="flex gap-3">
-                                <button onClick={exportToExcel} className="flex items-center gap-2 px-5 py-3 bg-emerald-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all">
-                                    <Icons.History className="w-4 h-4" /> Exportar
-                                </button>
                                 <button onClick={() => setSelectedSession(null)} className="w-10 h-10 flex items-center justify-center bg-white/10 rounded-xl hover:bg-red-500 transition-all">
                                     <Icons.Plus className="w-5 h-5 rotate-45" />
                                 </button>
                             </div>
                         </div>
-                        
-                        <div className="flex-grow overflow-auto p-6">
-                            <table className="w-full text-left">
-                                <thead className="sticky top-0 bg-white z-10">
-                                    <tr className="border-b border-slate-100">
-                                        <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nombre</th>
-                                        <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cédula</th>
-                                        <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Cargo</th>
-                                        <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Fecha</th>
-                                        <th className="py-4 px-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Firma</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {attendance.map((a, idx) => (
-                                        <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
-                                            <td className="py-4 px-4 font-black text-slate-900 text-xs uppercase">{a.full_name}</td>
-                                            <td className="py-4 px-4 font-bold text-slate-600 text-xs">{a.document_number}</td>
-                                            <td className="py-4 px-4 font-bold text-slate-500 text-[11px] uppercase">{a.job_title}</td>
-                                            <td className="py-4 px-4 font-bold text-slate-400 text-[10px]">{new Date(a.registered_at).toLocaleString()}</td>
-                                            <td className="py-4 px-4 text-center">
-                                                <img src={a.signature_b64} alt="firma" className="h-8 mx-auto" />
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {attendance.length === 0 && (
-                                        <tr>
-                                            <td colSpan={5} className="py-20 text-center text-slate-300 font-black uppercase text-xs tracking-widest">Aún no hay registros de asistencia</td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
+                        <div className="flex-grow p-6 bg-slate-50/50">
+                            <DataTable 
+                                data={attendance}
+                                columns={[
+                                    { header: 'NOMBRE', key: 'full_name', render: (row: any) => <span className="font-black text-slate-900 text-xs uppercase">{row.full_name}</span> },
+                                    { header: 'CÉDULA', key: 'document_number', render: (row: any) => <span className="font-bold text-slate-600 text-xs">{row.document_number}</span> },
+                                    { header: 'CARGO', key: 'job_title', render: (row: any) => <span className="font-bold text-slate-500 text-[11px] uppercase">{row.job_title}</span> },
+                                    { header: 'FECHA', key: 'registered_at', render: (row: any) => <span className="font-bold text-slate-400 text-[10px]">{new Date(row.registered_at).toLocaleString()}</span> },
+                                    { header: 'FIRMA', key: 'signature_b64', render: (row: any) => <img src={row.signature_b64} alt="firma" className="h-8 mx-auto" />, sortable: false }
+                                ]}
+                                searchPlaceholder="Buscar asistente..."
+                                excelFileName={`Asistencias_${selectedSession?.topic}_${new Date().toISOString().split('T')[0]}.xlsx`}
+                                excelSheetName="Asistencias"
+                            />
                         </div>
                     </div>
                 </div>

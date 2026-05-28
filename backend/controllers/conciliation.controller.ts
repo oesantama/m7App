@@ -1868,3 +1868,88 @@ export const adjustPayment = async (req: Request, res: Response) => {
     }
 };
 
+export const addMissingInvoice = async (req: Request, res: Response) => {
+    const { 
+        documentId, invoiceNumber, valor, metodoPago, targetRouteId, userId,
+        customerName, city, address, unCode, clientRef, items
+    } = req.body;
+    
+    if (!documentId || !invoiceNumber || valor === undefined || !metodoPago) {
+        return res.status(400).json({ success: false, error: 'Faltan campos obligatorios' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Verificar si ya existe
+        const checkRes = await client.query(
+            `SELECT 1 FROM document_items WHERE document_id = $1 AND TRIM(UPPER(invoice)) = TRIM(UPPER($2)) LIMIT 1`,
+            [documentId, invoiceNumber]
+        );
+
+        if ((checkRes.rowCount ?? 0) > 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ success: false, error: 'La factura ya existe en este documento' });
+        }
+
+        // Preparar valores opcionales
+        const finalCustomer = customerName ? customerName.trim() : 'SIN NOMBRE';
+        const finalUnCode = unCode ? unCode.trim() : 'AJV21';
+        const finalClientRef = clientRef ? clientRef.trim() : '';
+
+        // Preparar artículos
+        const finalItems = (items && items.length > 0) ? items : [{ articleId: 'GENERICO', expectedQty: 1, peso: null, volume: null, orderNumber: null }];
+
+        // Insertar cada ítem
+        for (const item of finalItems) {
+            await client.query(
+                `INSERT INTO document_items (
+                    document_id, invoice, customer_name, item_status, expected_qty, 
+                    un_code, client_ref, city, address, peso, volume, order_number, article_id
+                 )
+                 VALUES ($1, $2, $3, 'PENDIENTE', $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                [
+                    documentId, 
+                    invoiceNumber, 
+                    finalCustomer, 
+                    Number(item.expectedQty) || 1, 
+                    finalUnCode, 
+                    finalClientRef,
+                    city || null,
+                    address || null,
+                    item.peso ? Number(item.peso) : null,
+                    item.volume ? Number(item.volume) : null,
+                    item.orderNumber || null,
+                    item.articleId || 'GENERICO'
+                ]
+            );
+        }
+
+        // Insertar pago/método
+        await client.query(
+            `INSERT INTO document_l_payments (document_id, invoice, vmetodo, metodo_pago, user_id, client_ref, un_code)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [documentId, invoiceNumber, valor, metodoPago, userId || null, finalClientRef, finalUnCode]
+        );
+
+        // Asignar a ruta si fue solicitada
+        if (targetRouteId) {
+            await client.query(
+                `INSERT INTO route_invoices (route_id, invoice_id, created_at)
+                 VALUES ($1, $2, NOW())`,
+                [targetRouteId, invoiceNumber]
+            );
+        }
+
+        await client.query('COMMIT');
+        res.json({ success: true, message: 'Factura añadida exitosamente' });
+    } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error('[CONCILIATION] addMissingInvoice error:', err.message);
+        res.status(500).json({ success: false, error: err.message });
+    } finally {
+        client.release();
+    }
+};
+

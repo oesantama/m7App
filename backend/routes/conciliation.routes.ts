@@ -22,6 +22,7 @@ import {
     checkReferenceExists,
     updateInvoiceValue,
     adjustPayment,
+    addMissingInvoice,
 } from '../controllers/conciliation.controller.js';
 
 const router = Router();
@@ -51,5 +52,6 @@ router.post('/update-remesa-tdm',         updateRemesaTDM);
 router.post('/reverse',                   reverseConciliation);
 router.patch('/invoice-value',            updateInvoiceValue);
 router.post('/adjust-payment',            adjustPayment);
+router.post('/add-missing-invoice',       addMissingInvoice);
 
 export default router;

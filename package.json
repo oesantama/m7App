@@ -1,7 +1,7 @@
 {
   "name": "milla-siete-m7",
   "private": true,
-  "version": "1.9.55",
+  "version": "1.9.56",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,7 +11,8 @@
     "server": "tsx backend/server.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "deploy": "npm version patch --no-git-tag-version && git add . && git commit -m \"chore: bump version y mejoras de tabla asitencia\" && git push"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

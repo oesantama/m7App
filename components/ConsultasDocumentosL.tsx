@@ -1,10 +1,10 @@
-
 import React, { useState, useMemo, useRef } from 'react';
 import { Icons } from '../constants';
 import { DocumentL, User, DocStatus, MasterRecord, Invoice, getStatusLabel } from '../types';
 import { api } from '../services/api';
 import { toast } from 'sonner';
 import ProcessPaymentLModal from './ProcessPaymentLModal';
+import AddMissingInvoiceModal from './Conciliacion/AddMissingInvoiceModal';
 import * as XLSX from 'xlsx';
 import TableControls from './shared/TableControls';
 import { formatCurrency, formatDate } from '../utils/formatting';
@@ -46,6 +46,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
 
   // States for Document L Payment Upload
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showAddMissingInvoiceModal, setShowAddMissingInvoiceModal] = useState(false);
   const [paymentTarget, setPaymentTarget] = useState<DocumentL | null>(null);
 
   // ESTADOS para el modal de detalle
@@ -691,13 +692,13 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
                   <p className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Milla7 Intelligence System</p>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4">
                 <button
-                  onClick={handleDetailExport}
-                  className="px-5 py-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-900 hover:text-white hover:scale-105 active:scale-95 transition-all shadow-md flex items-center gap-2 font-black text-[9px] uppercase border border-slate-200"
-                  title="Exportar Detalle Actual a Excel"
+                  onClick={() => setShowAddMissingInvoiceModal(true)}
+                  className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 hover:scale-105 active:scale-95 transition-all shadow-md flex items-center gap-2 font-black text-[9px] uppercase border border-blue-500"
+                  title="Adicionar Factura Faltante al Documento"
                 >
-                  <Icons.Excel className="w-4 h-4" /> Exportar Excel
+                  ➕ Adicionar Factura
                 </button>
                 {(!((selectedDoc as any).paymentsCount > 0)) && (
                   <button 
@@ -784,193 +785,97 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
               </div>
 
                <div className="bg-white rounded-[2rem] overflow-hidden shadow-xl border border-slate-100 flex flex-col min-h-[400px]">
-                {/* BARRA DE BÚSQUEDA Y TABS */}
-                <div className="p-4 border-b border-slate-50 flex flex-col xl:flex-row justify-between items-center gap-4">
-                  <div className="flex-1 w-full max-w-2xl">
-                    <TableControls
-                      searchValue={detailSearch}
-                      onSearchChange={(val: string) => { setDetailSearch(val); setDetailPage(1); }}
-                      pageSize={detailPageSize}
-                      onPageSizeChange={(size: any) => { setDetailPageSize(size); setDetailPage(1); }}
-                      placeholder="SKU, PEDIDO O FACTURA..."
-                      compact
-                    />
-                  </div>
-
+                <div className="p-4 border-b border-slate-50 flex flex-col xl:flex-row justify-end items-center gap-4">
                   <div className="flex items-center gap-3 shrink-0">
                     <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner border border-slate-200">
-                      <button onClick={() => { setActiveDetailTab('reception'); setDetailPage(1); }} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${activeDetailTab === 'reception' ? 'bg-white shadow-md text-emerald-600' : 'text-slate-500'}`}>Recepción</button>
-                      <button onClick={() => { setActiveDetailTab('audit'); setDetailPage(1); }} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${activeDetailTab === 'audit' ? 'bg-white shadow-md text-amber-600' : 'text-slate-500'}`}>Auditoría</button>
-                      <button onClick={() => { setActiveDetailTab('payments'); setDetailPage(1); }} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${activeDetailTab === 'payments' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-500'}`}>Pagos</button>
+                      <button onClick={() => setActiveDetailTab('reception')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${activeDetailTab === 'reception' ? 'bg-white shadow-md text-emerald-600' : 'text-slate-500'}`}>Recepción</button>
+                      <button onClick={() => setActiveDetailTab('audit')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${activeDetailTab === 'audit' ? 'bg-white shadow-md text-amber-600' : 'text-slate-500'}`}>Auditoría</button>
+                      <button onClick={() => setActiveDetailTab('payments')} className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${activeDetailTab === 'payments' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-500'}`}>Pagos</button>
                     </div>
                   </div>
                 </div>
 
-                <div className="overflow-x-auto flex-1 bg-white relative">
+                <div className="flex-1 bg-white p-4">
                   {activeDetailTab === 'reception' ? (
-                    // TABLA DE RECEPCIÓN (Detalle Items)
-                    <table className="w-full text-left text-[10px] animate-in fade-in slide-in-from-left-4 duration-300">
-                      <thead className="bg-slate-900 text-white uppercase tracking-widest font-black sticky top-0 z-10">
-                        <tr>
-                          <th className="p-4 cursor-pointer hover:text-emerald-400" onClick={() => requestSort('articleId')}>Articulo{getSortIndicator('articleId')}</th>
-                          <th className="p-4 cursor-pointer hover:text-emerald-400" onClick={() => requestSort('unCode')}>UN{getSortIndicator('unCode')}</th>
-                          <th className="p-4 cursor-pointer hover:text-emerald-400" onClick={() => requestSort('clientRef')}>REF{getSortIndicator('clientRef')}</th>
-                          <th className="p-4 cursor-pointer hover:text-emerald-400" onClick={() => requestSort('city')}>Ciudad{getSortIndicator('city')}</th>
-                          <th className="p-4 text-center cursor-pointer hover:text-emerald-400" onClick={() => requestSort('expectedQty')}>Cant.{getSortIndicator('expectedQty')}</th>
-                          <th className="p-4 text-center bg-blue-600/20 cursor-pointer hover:text-emerald-400" onClick={() => requestSort('count1')}>Recibido{getSortIndicator('count1')}</th>
-                          <th className="p-4 text-center">UM</th>
-                          <th className="p-4 text-center cursor-pointer hover:text-emerald-400" onClick={() => requestSort('invoice')}>Factura{getSortIndicator('invoice')}</th>
-                          <th className="p-4 text-center cursor-pointer hover:text-emerald-400" onClick={() => requestSort('orderNumber')}>Pedido{getSortIndicator('orderNumber')}</th>
-                          <th className="p-4 text-center">Peso</th>
-                          <th className="p-4 text-center">Estado</th>
-                          <th className="p-4">Obs. Conductor</th>
-                          <th className="p-4">Notas Auditoría</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-bold">
-                        {paginatedDetailItems.map((it, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50 transition-all text-[9px] border-b border-slate-50 last:border-0">
-                            <td className="px-4 py-2 font-black uppercase text-slate-800 tracking-tight leading-tight">{it.articleId}</td>
-                            <td className="px-4 py-2 uppercase text-slate-500 font-bold max-w-[80px] truncate" title={(it as any).unCode}>{(it as any).unCode || '-'}</td>
-                            <td className="px-4 py-2 uppercase text-slate-500 font-bold max-w-[80px] truncate" title={(it as any).clientRef}>{(it as any).clientRef || '-'}</td>
-                            <td className="px-4 py-2 uppercase text-slate-600 max-w-[80px] truncate" title={(it as any).city}>{(it as any).city || '-'}</td>
-                            <td className="px-4 py-2 text-center text-slate-900 font-bold">{it.expectedQty}</td>
-                            <td className="px-4 py-2 text-center text-blue-600 font-black bg-blue-50/20">{it.receivedQty || it.count1 || 0}</td>
-                            <td className="px-4 py-2 text-center text-slate-500 uppercase font-bold">{it.unit || 'und'}</td>
-                            <td className="px-4 py-2 text-center text-slate-500 font-bold">
-                              {(!it.invoice || String(it.invoice).trim() === '' || String(it.invoice).trim().toUpperCase() === 'S/I') ? (
-                                <div className="flex items-center justify-center gap-1.5">
-                                  <span className="text-slate-400 italic font-black text-[8px]">S/I</span>
-                                  {canEditAudit && (
-                                    <button
-                                      onClick={() => {
-                                        setEditingInvoiceItem(it);
-                                        setNewInvoiceValue('');
-                                        setSaveInvoiceError(null);
-                                      }}
-                                      className="p-1 bg-amber-500 hover:bg-amber-600 text-white rounded transition-all active:scale-90"
-                                      title="Asignar Factura"
-                                    >
-                                      <Icons.Edit className="w-2.5 h-2.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className="text-slate-900 font-black">{it.invoice}</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2 text-center text-emerald-600 font-black">{it.orderNumber || 'S/I'}</td>
-                            <td className="px-4 py-2 text-center text-emerald-600 font-black">{formatCurrency(it.peso)}</td>
-                            <td className="px-4 py-2 text-center">
-                              <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest ${it.itemStatus === 'Auditado' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
-                                {it.itemStatus === 'En Conteo' ? 'Pendiente' : getStatusLabel(it.itemStatus || 'EST-03')}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2 uppercase italic text-slate-400 max-w-[150px] truncate" title={'driverNote' in it ? (it as any).driverNote : (it as any).observation}>{'driverNote' in it ? (it as any).driverNote : (it as any).observation || '-'}</td>
-                            <td className="px-4 py-2 uppercase text-slate-600 max-w-[150px] truncate italic" title={it.inventoryNote}>{it.inventoryNote || '-'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <DataTable
+                        data={selectedDoc.items}
+                        columns={[
+                            { header: 'ARTICULO', key: 'articleId', render: (row: any) => <span className="font-black uppercase text-slate-800">{row.articleId}</span> },
+                            { header: 'UN', key: 'unCode', render: (row: any) => <span className="uppercase text-slate-500 font-bold">{row.unCode || '-'}</span> },
+                            { header: 'REF', key: 'clientRef', render: (row: any) => <span className="uppercase text-slate-500 font-bold">{row.clientRef || '-'}</span> },
+                            { header: 'CIUDAD', key: 'city', render: (row: any) => <span className="uppercase text-slate-600">{row.city || '-'}</span> },
+                            { header: 'CANT.', key: 'expectedQty', render: (row: any) => <span className="font-bold text-slate-900">{row.expectedQty}</span> },
+                            { header: 'RECIBIDO', key: 'count1', render: (row: any) => <span className="text-blue-600 font-black">{row.receivedQty || row.count1 || 0}</span> },
+                            { header: 'UM', key: 'unit', render: (row: any) => <span className="uppercase text-slate-500 font-bold">{row.unit || 'und'}</span> },
+                            { header: 'FACTURA', key: 'invoice', render: (row: any) => (
+                                (!row.invoice || String(row.invoice).trim() === '' || String(row.invoice).trim().toUpperCase() === 'S/I') ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-slate-400 italic font-black text-[8px]">S/I</span>
+                                      {canEditAudit && (
+                                        <button
+                                          onClick={() => { setEditingInvoiceItem(row); setNewInvoiceValue(''); setSaveInvoiceError(null); }}
+                                          className="p-1 bg-amber-500 hover:bg-amber-600 text-white rounded transition-all"
+                                        >
+                                          <Icons.Edit className="w-2.5 h-2.5" />
+                                        </button>
+                                      )}
+                                    </div>
+                                ) : <span className="text-slate-900 font-black">{row.invoice}</span>
+                            )},
+                            { header: 'PEDIDO', key: 'orderNumber', render: (row: any) => <span className="text-emerald-600 font-black">{row.orderNumber || 'S/I'}</span> },
+                            { header: 'PESO', key: 'peso', render: (row: any) => <span className="text-emerald-600 font-black">{formatCurrency(row.peso)}</span> },
+                            { header: 'ESTADO', key: 'itemStatus', render: (row: any) => (
+                                <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest ${row.itemStatus === 'Auditado' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
+                                    {row.itemStatus === 'En Conteo' ? 'Pendiente' : getStatusLabel(row.itemStatus || 'EST-03')}
+                                </span>
+                            )},
+                            { header: 'OBS. CONDUCTOR', key: 'driverNote', render: (row: any) => <span className="uppercase italic text-slate-400">{'driverNote' in row ? row.driverNote : (row.observation || '-')}</span> },
+                            { header: 'NOTAS AUDITORIA', key: 'inventoryNote', render: (row: any) => <span className="uppercase text-slate-600 italic">{row.inventoryNote || '-'}</span> }
+                        ]}
+                        excelFileName={`Recepción_${selectedDoc?.externalDocId}.xlsx`}
+                    />
                   ) : activeDetailTab === 'audit' ? (
-                    // TABLA DE AUDITORÍA (Consolidado)
-                    <table className="w-full text-left text-[10px] animate-in fade-in slide-in-from-right-4 duration-300">
-                      <thead className="bg-emerald-900 text-white uppercase tracking-widest font-black sticky top-0 z-10">
-                        <tr>
-                          <th className="p-4">Articulo</th>
-                          <th className="p-4 text-center">Cant. Plan</th>
-                          <th className="p-4 text-center bg-emerald-800/50">Conteo 1</th>
-                          <th className="p-4 text-center bg-amber-800/50">Conteo 2</th>
-                          <th className="p-4 text-center">Alistado</th>
-                          <th className="p-4 text-center">Despachado</th>
-                          <th className="p-4">Obs. Inventario</th>
-                          {canEditAudit && <th className="p-4 text-center w-28"></th>}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-bold">
-                        {paginatedDetailItems.map((it: any, idx: number) => {
-                          const itCount2 = Number(it.count_2 || it.count2 || 0);
-                          const itExpected = Number(it.expected_qty || it.expectedQty || 0);
-                          const hasDiff = itCount2 !== itExpected;
-                          return (
-                            <tr key={idx} className={`hover:bg-slate-50 transition-all text-[9px] border-b border-slate-50 last:border-0 ${hasDiff ? 'bg-red-50/30' : ''}`}>
-                              <td className="px-4 py-2 font-black uppercase text-slate-800 tracking-tight">{it.article_id || it.articleId || it.sku}</td>
-                              <td className="px-4 py-2 text-center text-slate-900 font-bold">{itExpected}</td>
-                              <td className="px-4 py-2 text-center text-emerald-600 font-black bg-emerald-50/20">{it.count_1 || it.count1 || 0}</td>
-                              <td className={`px-4 py-2 text-center font-black bg-amber-50/20 ${hasDiff ? 'text-red-600' : 'text-amber-600'}`}>{itCount2}</td>
-                              <td className="px-4 py-2 text-center text-slate-500 font-bold">{it.picked_qty || it.pickedQty || 0}</td>
-                              <td className="px-4 py-2 text-center text-slate-500 font-bold">{it.dispatched_qty || it.dispatchedQty || 0}</td>
-                              <td className="px-4 py-2 uppercase italic text-slate-400 max-w-[200px] truncate font-medium" title={it.inventory_observation || it.inventoryObservation}>{it.inventory_observation || it.inventoryObservation || '-'}</td>
-                              {canEditAudit && (
-                                <td className="px-4 py-2 text-center">
-                                  <div className="flex items-center justify-center gap-2">
-                                    {!!(it.inventory_observation || it.inventoryObservation) && (
-                                      <button
-                                        onClick={() => fetchHistory(selectedDoc?.id || '', it.article_id || it.articleId || it.sku)}
-                                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-all"
-                                        title="Ver Historial de Conciliación"
-                                      >
-                                        <Icons.History className="w-3.5 h-3.5" />
-                                      </button>
-                                    )}
-                                    {hasDiff && selectedDoc && (selectedDoc.status === DocStatus.INVENTORED || selectedDoc.status === 'INVENTARIADO' || selectedDoc.statusId === 'EST-08') && (
-                                      <button
-                                        onClick={() => { setEditingAuditItem(it); setEditCount2(String(itCount2)); setEditObservation(''); setEditAuditError(null); }}
-                                        className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[8px] font-black uppercase transition-all"
-                                        title="Corregir Conteo 2"
-                                      >
-                                        CONCILIAR
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
-                              )}
-                            </tr>
-                          );
-                        })}
-                        {(!selectedDoc.consolidatedItems || selectedDoc.consolidatedItems.length === 0) && (
-                          <tr>
-                            <td colSpan={canEditAudit ? 8 : 7} className="p-10 text-center text-slate-500 italic">No hay datos consolidados disponibles.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
+                    <DataTable
+                        data={selectedDoc.consolidatedItems || []}
+                        columns={[
+                            { header: 'ARTICULO', key: 'articleId', render: (row: any) => <span className="font-black uppercase text-slate-800">{row.article_id || row.articleId || row.sku}</span> },
+                            { header: 'CANT. PLAN', key: 'expected_qty', render: (row: any) => <span className="text-slate-900 font-bold">{row.expected_qty || row.expectedQty || 0}</span> },
+                            { header: 'CONTEO 1', key: 'count_1', render: (row: any) => <span className="text-emerald-600 font-black">{row.count_1 || row.count1 || 0}</span> },
+                            { header: 'CONTEO 2', key: 'count_2', render: (row: any) => <span className={`font-black ${Number(row.count_2 || row.count2 || 0) !== Number(row.expected_qty || row.expectedQty || 0) ? 'text-red-600' : 'text-amber-600'}`}>{row.count_2 || row.count2 || 0}</span> },
+                            { header: 'ALISTADO', key: 'picked_qty', render: (row: any) => <span className="text-slate-500 font-bold">{row.picked_qty || row.pickedQty || 0}</span> },
+                            { header: 'DESPACHADO', key: 'dispatched_qty', render: (row: any) => <span className="text-slate-500 font-bold">{row.dispatched_qty || row.dispatchedQty || 0}</span> },
+                            { header: 'OBS. INVENTARIO', key: 'inventory_observation', render: (row: any) => <span className="uppercase italic text-slate-400">{row.inventory_observation || row.inventoryObservation || '-'}</span> },
+                            { header: 'ACCIONES', key: 'actions', sortable: false, render: (row: any) => {
+                                const hasDiff = Number(row.count_2 || row.count2 || 0) !== Number(row.expected_qty || row.expectedQty || 0);
+                                return canEditAudit ? (
+                                    <div className="flex gap-2">
+                                        {!!(row.inventory_observation || row.inventoryObservation) && (
+                                            <button onClick={() => fetchHistory(selectedDoc?.id || '', row.article_id || row.articleId || row.sku)} className="p-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-slate-600"><Icons.History className="w-3.5 h-3.5" /></button>
+                                        )}
+                                        {hasDiff && selectedDoc && (selectedDoc.status === DocStatus.INVENTORED || selectedDoc.status === 'INVENTARIADO' || selectedDoc.statusId === 'EST-08') && (
+                                            <button onClick={() => { setEditingAuditItem(row); setEditCount2(String(row.count_2 || row.count2 || 0)); setEditObservation(''); setEditAuditError(null); }} className="px-2 py-1 bg-amber-500 text-white rounded-lg text-[8px] font-black">CONCILIAR</button>
+                                        )}
+                                    </div>
+                                ) : null;
+                            }}
+                        ]}
+                        excelFileName={`Auditoria_${selectedDoc?.externalDocId}.xlsx`}
+                    />
                   ) : (
-                    // TABLA DE PAGOS (Recaudos)
-                    <table className="w-full text-left text-[10px] animate-in fade-in zoom-in-95 duration-300">
-                      <thead className="bg-indigo-900 text-white uppercase tracking-widest font-black sticky top-0 z-10">
-                        <tr>
-                          <th className="p-4">FACTURA / REF</th>
-                          <th className="p-4 text-center">VALOR MÉTODO</th>
-                          <th className="p-4">MÉTODO PAGO</th>
-                          <th className="p-4 text-center">UN CODE</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-bold">
-                        {paginatedDetailItems.map((it: any, idx: number) => (
-                          <tr key={idx} className="hover:bg-slate-50 transition-colors text-[9px]">
-                            <td className="p-4 font-black uppercase text-slate-800 tracking-tight">
-                              {it.invoice}
-                              <div className="text-[7px] text-slate-400 font-bold uppercase">{it.paymentRef || 'S/R'}</div>
-                            </td>
-                            <td className="p-4 text-center text-indigo-600 font-black bg-indigo-50/30">{formatCurrency(it.paymentValue)}</td>
-                            <td className="p-4 uppercase text-slate-900 font-bold">{(it as any).paymentMethod || 'S/M'}</td>
-                            <td className="p-4 text-center text-slate-400 font-mono">{(it as any).unCode || '-'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <DataTable
+                        data={selectedDoc.payments || []}
+                        columns={[
+                            { header: 'FACTURA / REF', key: 'invoice', render: (row: any) => (
+                                <div><span className="font-black uppercase text-slate-800">{row.invoice}</span><div className="text-[7px] text-slate-400 font-bold uppercase">{row.paymentRef || 'S/R'}</div></div>
+                            )},
+                            { header: 'VALOR MÉTODO', key: 'paymentValue', render: (row: any) => <span className="text-indigo-600 font-black">{formatCurrency(row.paymentValue)}</span> },
+                            { header: 'MÉTODO PAGO', key: 'paymentMethod', render: (row: any) => <span className="uppercase text-slate-900 font-bold">{row.paymentMethod || 'S/M'}</span> },
+                            { header: 'UN CODE', key: 'unCode', render: (row: any) => <span className="text-slate-400 font-mono">{row.unCode || '-'}</span> }
+                        ]}
+                        excelFileName={`Pagos_${selectedDoc?.externalDocId}.xlsx`}
+                    />
                   )}
                 </div>
-
-                {/* PAGINACIÓN DEL DETALLE */}
-                {totalDetailPageItems > 1 && (
-                  <div className="p-6 border-t border-slate-50 flex justify-center items-center gap-4 bg-white">
-                    <button disabled={detailPage === 1} onClick={() => setDetailPage(p => p - 1)} className="p-3 bg-slate-50 rounded-xl disabled:opacity-30 hover:bg-slate-900 hover:text-white transition-all shadow-sm"><Icons.ChevronRight className="rotate-180 w-4 h-4" /></button>
-                    <span className="text-[10px] font-black uppercase text-slate-900 bg-slate-100 px-6 py-2 rounded-lg">Pág {detailPage} de {totalDetailPageItems}</span>
-                    <button disabled={detailPage >= totalDetailPageItems} onClick={() => setDetailPage(p => p + 1)} className="p-3 bg-slate-50 rounded-xl disabled:opacity-30 hover:bg-slate-900 hover:text-white transition-all shadow-sm"><Icons.ChevronRight className="w-4 h-4" /></button>
-                  </div>
-                )}
               </div>
             </div>
             <div className="p-5 border-t bg-white flex justify-end shrink-0">
@@ -1016,6 +921,18 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
           userId={user.id}
           onClose={() => { setShowPaymentModal(false); setPaymentTarget(null); }}
           onSuccess={() => { if (onRefresh) onRefresh(); }}
+        />
+      )}
+
+      {showAddMissingInvoiceModal && selectedDoc && (
+        <AddMissingInvoiceModal
+            isOpen={showAddMissingInvoiceModal}
+            onClose={() => setShowAddMissingInvoiceModal(false)}
+            documentId={selectedDoc.id}
+            routes={[]}
+            onSuccess={() => {
+                if (onRefresh) onRefresh();
+            }}
         />
       )}
 
