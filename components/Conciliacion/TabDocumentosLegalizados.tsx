@@ -140,6 +140,7 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
     const [summaryFilter, setSummaryFilter]   = useState<string | null>(null);
     const [detailRoute, setDetailRoute]       = useState<RouteGroup | null>(null);
     const [activeDetailCard, setActiveDetailCard] = useState<string | null>(null);
+    const [showExportFormatModal, setShowExportFormatModal] = useState(false);
 
     const [historyPlate, setHistoryPlate]     = useState<string | null>(null);
     const [plateHistoryList, setPlateHistoryList] = useState<any[]>([]);
@@ -393,7 +394,8 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
 
     // ── Export Excel ──────────────────────────────────────────────────────────
     // ── Export Excel ──────────────────────────────────────────────────────────
-    const handleExportExcel = useCallback(() => {
+    const handleExportExcelMilla7 = useCallback(() => {
+        setShowExportFormatModal(false);
         if (!selectedDoc) return;
         try {
             const wb = XLSX.utils.book_new();
@@ -611,6 +613,184 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
         } catch (err: any) { toast.error('Error al generar Excel: ' + err.message); }
     }, [selectedDoc, invoices, groupPayments, routeSurcharges]);
 
+    const handleExportExcelAjover = useCallback(() => {
+        if (!selectedDoc) return;
+        try {
+            const wb = XLSX.utils.book_new();
+            const docName = selectedDoc.external_doc_id ? `DOC-L-${selectedDoc.external_doc_id}` : 'CONCILIACION';
+
+            const buildAjoverAOA = (
+                docInfo: any, 
+                plateInvoices: any[], 
+                plateGroupPayments: any[], 
+                isGeneral: boolean, 
+                placaName: string,
+                driverName: string
+            ) => {
+                const aoa: any[][] = [];
+                if (isGeneral) aoa.push(['PLANILLA DE CONTROL DE ENTREGAS Y RECAUDOS DE PLAN R']);
+                else aoa.push(['Ajover']);
+                aoa.push([]);
+
+                const totalFacturado = Math.round(plateInvoices.reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
+                const totalCredito = Math.round(plateInvoices.filter(i => {
+                    const m = (i.invoice_metodo_pago || '').toUpperCase().trim();
+                    return !(m === 'EF' || m.includes('EFE') || m === 'CASH' || m === '');
+                }).reduce((s, i) => s + (Number(i.invoice_value) || 0), 0));
+                
+                const totalDevolucion = Math.round(plateInvoices.reduce((s, i) => {
+                    const upperStatus = (i.item_status || '').toUpperCase();
+                    if (i.es_devolucion || DEVUELTO_STATUS.includes(upperStatus)) return s + (Number(i.invoice_value) || 0);
+                    if (PARCIAL_STATUS.includes(upperStatus)) {
+                        const totalQty = i.items?.reduce((acc: number, it: any) => acc + (it.qty || 0), 0) || 1;
+                        const unitPrice = (i.invoice_value || 0) / (totalQty || 1);
+                        const itemsDev = i.items?.reduce((acc: number, it: any) => acc + ((it.returned_value !== undefined && it.returned_value !== null) ? Number(it.returned_value) : (Number(it.returned_qty || 0) * unitPrice)), 0) || 0;
+                        if (itemsDev > 0) return s + itemsDev;
+                        return s + Math.max(0, (Number(i.invoice_value) || 0) - (Number(i.valor) || 0));
+                    }
+                    return s;
+                }, 0));
+
+                const diferencia = totalFacturado - totalCredito - totalDevolucion;
+
+                const consignaciones: any[] = [];
+                let totalConsignaciones = 0;
+                plateGroupPayments?.forEach(g => {
+                    const v = Number(g.valor) || 0;
+                    totalConsignaciones += v;
+                    consignaciones.push([g.metodo_pago || g.metodo || 'BANCOLOMBIA', v, g.referencia || g.nro_aprobacion || '—', g.fecha ? String(g.fecha).slice(0, 10) : '—', g.plate || '—']);
+                });
+                plateInvoices?.filter(i => {
+                    const pm = (i.forma_pago || '').toUpperCase();
+                    return pm === 'CONSIGNACION' || pm === 'TRANSFERENCIA';
+                }).forEach(i => {
+                    const v = Number(i.valor) || 0;
+                    totalConsignaciones += v;
+                    consignaciones.push([i.forma_pago || 'BANCOLOMBIA', v, i.comprobante || '—', i.fecha_pago ? String(i.fecha_pago).slice(0, 10) : '—', i.route_vehicle_plate || i.vehicle_plate || '—']);
+                });
+
+                const leftRows = [
+                    ['Fecha Planilla', docInfo.delivery_date ? String(docInfo.delivery_date).slice(0,10) : ''],
+                    ['No', docInfo.external_doc_id || ''],
+                    ['Fecha Envío', docInfo.delivery_date ? String(docInfo.delivery_date).slice(0,10) : ''],
+                    ['Placa', isGeneral ? (docInfo.vehicle_plate || '') : placaName],
+                    ['Conductor', driverName],
+                    ['Despachador', docInfo.created_by || '']
+                ];
+
+                const maxRows = Math.max(leftRows.length, consignaciones.length + 1);
+                for (let i = 0; i < maxRows; i++) {
+                    const rowData = new Array(14).fill('');
+                    if (i < leftRows.length) {
+                        rowData[0] = leftRows[i][0];
+                        rowData[1] = leftRows[i][1];
+                    }
+                    if (i === 2) {
+                        rowData[7] = '# ENTREGAS';
+                        rowData[8] = plateInvoices.length;
+                    }
+                    if (i === 0) {
+                        rowData[9] = 'BANCO';
+                        rowData[10] = 'VALOR';
+                        rowData[11] = 'COMPROBANTE';
+                        rowData[12] = 'FECHA';
+                        rowData[13] = 'PLACA';
+                    } else if (i - 1 < consignaciones.length) {
+                        const c = consignaciones[i - 1];
+                        rowData[9] = c[0];
+                        rowData[10] = c[1];
+                        rowData[11] = c[2];
+                        rowData[12] = c[3];
+                        rowData[13] = c[4];
+                    }
+                    aoa.push(rowData);
+                }
+
+                aoa.push([]);
+                aoa.push(['', '', '', '', '', '', '', '', '', 'TOTAL', totalConsignaciones]);
+                aoa.push(['', '', '', '', '', '', '', '', '', 'DIFERENCIA', totalConsignaciones - diferencia]);
+                aoa.push([]);
+
+                aoa.push(['NUMERO DE DOC', docInfo.external_doc_id || '']);
+                aoa.push(['REPISE', '']);
+                aoa.push(['CREDITO', totalCredito]);
+                aoa.push(['DEVOLUCION', totalDevolucion]);
+                aoa.push(['TOTAL $', totalFacturado]);
+                aoa.push([]);
+
+                aoa.push(['U. NEG', 'FACTURA', '# INTERNO', 'VALOR', 'RMA', 'VALOR', 'TOTAL PAGAR', 'C.PAG', 'F.PAGO', 'CLIENTE', 'No. CHEQUE', 'BANCO']);
+                
+                plateInvoices.forEach(i => {
+                    const upperStatus = (i.item_status || '').toUpperCase();
+                    let rmaVal = 0;
+                    let rmaText = '';
+                    if (i.es_devolucion || DEVUELTO_STATUS.includes(upperStatus)) {
+                        rmaVal = Number(i.invoice_value) || 0;
+                        rmaText = 'DEVOLUCION';
+                    } else if (PARCIAL_STATUS.includes(upperStatus)) {
+                        const totalQty = i.items?.reduce((acc: number, it: any) => acc + (it.qty || 0), 0) || 1;
+                        const unitPrice = (i.invoice_value || 0) / (totalQty || 1);
+                        const itemsDev = i.items?.reduce((acc: number, it: any) => acc + ((it.returned_value !== undefined && it.returned_value !== null) ? Number(it.returned_value) : (Number(it.returned_qty || 0) * unitPrice)), 0) || 0;
+                        rmaVal = itemsDev > 0 ? itemsDev : Math.max(0, (Number(i.invoice_value) || 0) - (Number(i.valor) || 0));
+                        rmaText = 'PARCIAL';
+                    }
+
+                    const invVal = Number(i.invoice_value) || 0;
+                    const totalPagar = invVal - rmaVal;
+
+                    let cpag = (i.invoice_metodo_pago || '').toUpperCase().trim();
+                    if (cpag === 'EF' || cpag.includes('EFE') || cpag === 'CASH' || cpag === '') cpag = 'EF';
+                    
+                    aoa.push([
+                        i.un_code || 'AJV21',
+                        i.invoice_number,
+                        i.external_id || i.id || '',
+                        invVal,
+                        rmaText,
+                        rmaVal > 0 ? rmaVal : '',
+                        totalPagar,
+                        cpag,
+                        i.forma_pago || '',
+                        cpag,
+                        i.comprobante || '',
+                        i.client_ref || ''
+                    ]);
+                });
+
+                return aoa;
+            };
+
+            // Sheet 1: General (PLANILLAS(R))
+            const generalAoa = buildAjoverAOA(selectedDoc, invoices, groupPayments, true, '', selectedDoc.conductor_name || '');
+            const wsGeneral = XLSX.utils.aoa_to_sheet(generalAoa);
+            XLSX.utils.book_append_sheet(wb, wsGeneral, 'PLANILLAS(R)');
+
+            // Subsequent Sheets: Per Placa
+            const plates = Array.from(new Set(invoices.map(i => i.route_vehicle_plate).filter(Boolean)));
+            plates.forEach(p => {
+                if (!p) return;
+                const plateInvs = invoices.filter(i => i.route_vehicle_plate === p);
+                const plateGroup = groupPayments?.filter(g => g.plate === p) || [];
+                // Para obtener el nombre del conductor, lo sacamos del invoice (o si estuviera en routes)
+                const firstInv = plateInvs.find(i => i.conductor_name) || plateInvs[0];
+                const driverName = firstInv?.conductor_name || '';
+                const sheetName = `${p} ${driverName}`.trim().slice(0, 30);
+                
+                const plateAoa = buildAjoverAOA(selectedDoc, plateInvs, plateGroup, false, p, driverName);
+                const wsPlate = XLSX.utils.aoa_to_sheet(plateAoa);
+                XLSX.utils.book_append_sheet(wb, wsPlate, sheetName);
+            });
+
+            XLSX.writeFile(wb, `${docName}_AJOVER_${new Date().toISOString().slice(0,10)}.xlsx`);
+            toast.success('Excel Ajover generado correctamente');
+        } catch (err: any) {
+            console.error('Export Error:', err);
+            toast.error('Error al generar Excel Ajover: ' + err.message);
+        } finally {
+            setShowExportFormatModal(false);
+        }
+    }, [selectedDoc, invoices, groupPayments, routeSurcharges]);
+
     const handleExportSobrecostos = useCallback(() => {
         if (!selectedDoc || routeSurcharges.length === 0) {
             toast.error('No hay sobrecostos para exportar');
@@ -796,7 +976,7 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                                     🔒 Solo Lectura
                                 </span>
                                 <button
-                                    onClick={handleExportExcel}
+                                    onClick={() => setShowExportFormatModal(true)}
                                     className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[8px] font-black uppercase tracking-widest transition-all shadow-sm">
                                     <Icons.Download className="w-3 h-3" />
                                     Exportar Excel
@@ -1563,6 +1743,39 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                             </button>
                         </div>
 
+                    </div>
+                </div>
+            )}
+
+            {showExportFormatModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+                    <div className="bg-white rounded-[2rem] border border-slate-100 shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6">
+                            <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mb-4">
+                                <Icons.Download className="w-6 h-6" />
+                            </div>
+                            <h3 className="text-xl font-black text-slate-900 tracking-tight leading-tight mb-2">Formato de Exportación</h3>
+                            <p className="text-xs text-slate-500 font-bold mb-6">Selecciona el formato en el que deseas exportar la conciliación actual a Excel.</p>
+                            
+                            <div className="space-y-3">
+                                <button onClick={handleExportExcelMilla7}
+                                    className="w-full text-left p-4 rounded-2xl border-2 border-slate-100 hover:border-emerald-500 hover:bg-emerald-50 group transition-all">
+                                    <h4 className="text-sm font-black text-slate-900 group-hover:text-emerald-700">Formato Milla 7</h4>
+                                    <p className="text-[10px] text-slate-500 mt-1 font-bold">Consolidado general y placas, estándar logístico.</p>
+                                </button>
+                                <button onClick={handleExportExcelAjover}
+                                    className="w-full text-left p-4 rounded-2xl border-2 border-slate-100 hover:border-blue-500 hover:bg-blue-50 group transition-all">
+                                    <h4 className="text-sm font-black text-slate-900 group-hover:text-blue-700">Formato Ajover</h4>
+                                    <p className="text-[10px] text-slate-500 mt-1 font-bold">Planillas (R) con facturación, créditos, devoluciones y bancos.</p>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="px-6 py-4 bg-slate-50 border-t border-slate-100">
+                            <button onClick={() => setShowExportFormatModal(false)}
+                                className="w-full py-2.5 rounded-xl text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-slate-200 transition-all">
+                                Cancelar
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
