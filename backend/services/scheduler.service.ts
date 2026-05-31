@@ -72,4 +72,31 @@ export const initScheduler = () => {
     });
 
     console.log('[M7-SCHEDULER] Tarea "Sync Drive a Planillas" programada: Lunes a Sábado 09:00 AM y (Temporalmente) hoy a las 17:40 PM | Cliente: CLI-09');
+
+    // ── KEEP-ALIVE: ping interno cada 4 minutos ───────────────────────────────
+    // Evita que Traefik/Coolify cierre conexiones TCP inactivas y que el proceso
+    // Node.js quede en estado "zombi" sin tráfico. También mantiene el pool de
+    // PostgreSQL activo para que la primera petición real no tenga latencia extra.
+    cron.schedule('*/10 * * * *', async () => {
+        try {
+            // 1. Ping a la BD — mantiene al menos 1 conexión viva en el pool
+            await pool.query('SELECT 1');
+
+            // 2. Monitoreo de memoria — si supera 85% del heap, fuerza GC o avisa
+            const mem = process.memoryUsage();
+            const heapUsedMB  = Math.round(mem.heapUsed  / 1024 / 1024);
+            const heapTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
+            const rssMB       = Math.round(mem.rss       / 1024 / 1024);
+            const pct = Math.round((mem.heapUsed / mem.heapTotal) * 100);
+
+            if (pct > 85) {
+                console.warn(`[M7-KEEPALIVE] ⚠ Heap alto: ${heapUsedMB}/${heapTotalMB}MB (${pct}%) RSS:${rssMB}MB — forzando GC`);
+                if (global.gc) global.gc();
+            }
+        } catch (err: any) {
+            console.error('[M7-KEEPALIVE] Error en ping de mantenimiento:', err.message);
+        }
+    }, { timezone: 'America/Bogota' });
+
+    console.log('[M7-SCHEDULER] Keep-alive programado: cada 10 minutos (ping BD + monitor memoria)');
 };
