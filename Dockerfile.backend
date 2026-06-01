@@ -40,4 +40,4 @@ COPY --from=builder /app/backend/config/keys ./backend/config/keys
 EXPOSE 8080
 
 # Ejecutamos con node directamente
-CMD ["node", "dist_backend/server.js"]
+CMD ["node", "--max-old-space-size=512", "dist_backend/server.js"]
