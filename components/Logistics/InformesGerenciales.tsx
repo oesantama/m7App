@@ -9,6 +9,7 @@ import { api } from '../../services/api';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid, LabelList } from 'recharts';
+import { DataTable, ColumnDef } from '../shared/DataTable';
 
 interface ManagementOrder {
   oc_number: string;
@@ -164,6 +165,29 @@ export const InformesGerenciales: React.FC = () => {
   const [excelData, setExcelData] = useState<any[]>([]);
   const [uploadType, setUploadType] = useState<'general' | 'recibo' | 'egreso'>('general');
   const [selectedClientForVehiclesInt, setSelectedClientForVehiclesInt] = useState<string | null>(null);
+  const [selectedClientForVehiclesFactMes, setSelectedClientForVehiclesFactMes] = useState<string | null>(null);
+  const [selectedVehicleManifestsFact, setSelectedVehicleManifestsFact] = useState<{
+    plate: string;
+    manifests: Array<{
+      manifest_number: string;
+      manifest_date: string;
+      invoice_date: string;
+      venta: number;
+      facturado: number;
+      factMesPct: number;
+    }>;
+  } | null>(null);
+  const [selectedVehicleManifests, setSelectedVehicleManifests] = useState<{
+    plate: string;
+    manifests: Array<{
+      manifest_number: string;
+      manifest_date: string;
+      venta: number;
+      ingTerceros: number;
+      ingresosPropios: number;
+      int: number;
+    }>;
+  } | null>(null);
   const [vehiclesSearchQuery, setVehiclesSearchQuery] = useState('');
   const [vehiclesSortField, setVehiclesSortField] = useState<'plate' | 'manifestCount' | 'ventaTotal' | 'ingTerceros' | 'ingresosPropios' | 'int'>('ventaTotal');
   const [vehiclesSortDirection, setVehiclesSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -1348,6 +1372,14 @@ export const InformesGerenciales: React.FC = () => {
         ventaTotal: number;
         ingTerceros: number;
         manifestCount: number;
+        manifests: Array<{
+          manifest_number: string;
+          manifest_date: string;
+          venta: number;
+          ingTerceros: number;
+          ingresosPropios: number;
+          int: number;
+        }>;
       }
     } = {};
 
@@ -1369,19 +1401,34 @@ export const InformesGerenciales: React.FC = () => {
       const ventaRecord = cxc === 0 ? cxcFinal : cxc;
 
       const ingTercerosRecord = parseValNum(r.total_value_cxp_final);
+      const manifestNumber = r.manifest_number ? String(r.manifest_number).trim() : 'S/I';
+      const manifestDate = r.manifest_date ? String(r.manifest_date).trim() : 'S/I';
 
       if (!platesMap[plate]) {
         platesMap[plate] = {
           plate,
           ventaTotal: 0,
           ingTerceros: 0,
-          manifestCount: 0
+          manifestCount: 0,
+          manifests: []
         };
       }
 
       platesMap[plate].ventaTotal += ventaRecord;
       platesMap[plate].ingTerceros += ingTercerosRecord;
       platesMap[plate].manifestCount += 1;
+      
+      const currentIngresosPropios = ventaRecord - ingTercerosRecord;
+      const currentInt = ventaRecord > 0 ? (currentIngresosPropios / ventaRecord) * 100 : 0;
+      
+      platesMap[plate].manifests.push({
+        manifest_number: manifestNumber,
+        manifest_date: manifestDate,
+        venta: ventaRecord,
+        ingTerceros: ingTercerosRecord,
+        ingresosPropios: currentIngresosPropios,
+        int: currentInt
+      });
     });
 
     const rawPlates = Object.values(platesMap).map(p => {
@@ -1412,6 +1459,98 @@ export const InformesGerenciales: React.FC = () => {
           : (valB as number) - (valA as number);
       }
     });
+  };
+
+  const getVehiclesFactMesDetails = () => {
+    if (!selectedClientForVehiclesFactMes) return [];
+
+    const targetClient = selectedClientForVehiclesFactMes.toUpperCase();
+    const platesMap: {
+      [plate: string]: {
+        plate: string;
+        ventaTotal: number;
+        facturadoTotal: number;
+        manifestCount: number;
+        manifests: Array<{
+          manifest_number: string;
+          manifest_date: string;
+          invoice_date: string;
+          venta: number;
+          facturado: number;
+          factMesPct: number;
+        }>;
+      }
+    } = {};
+
+    reportRecords.forEach(r => {
+      const manifestStatus = r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : '';
+      if (manifestStatus === 'ANULADO' || manifestStatus === 'ANULADA') {
+        return;
+      }
+
+      const client = r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I';
+      if (client !== targetClient) {
+        return;
+      }
+
+      const plate = r.plate ? String(r.plate).trim().toUpperCase() : 'SIN PLACA';
+
+      const cxc = parseValNum(r.total_cxc);
+      const cxcFinal = parseValNum(r.total_value_cxc_final);
+      const ventaRecord = cxc === 0 ? cxcFinal : cxc;
+
+      let invoicedInSameMonth = 0;
+      const dMan = parseCustomDate(r.manifest_date);
+      const dInv = parseCustomDate(r.invoice_date);
+      
+      if (dMan && dInv) {
+        const hasInvoice = r.invoice_cxc && String(r.invoice_cxc).trim() !== '' && String(r.invoice_cxc).trim() !== '0';
+        if (hasInvoice) {
+          if (dMan.getFullYear() === dInv.getFullYear() && dMan.getMonth() === dInv.getMonth()) {
+            invoicedInSameMonth = ventaRecord;
+          }
+        }
+      }
+
+      const manifestNumber = r.manifest_number ? String(r.manifest_number).trim() : 'S/I';
+      const manifestDate = r.manifest_date ? String(r.manifest_date).trim() : 'S/I';
+      const invoiceDate = r.invoice_date ? String(r.invoice_date).trim() : 'S/I';
+
+      if (!platesMap[plate]) {
+        platesMap[plate] = {
+          plate,
+          ventaTotal: 0,
+          facturadoTotal: 0,
+          manifestCount: 0,
+          manifests: []
+        };
+      }
+
+      platesMap[plate].ventaTotal += ventaRecord;
+      platesMap[plate].facturadoTotal += invoicedInSameMonth;
+      platesMap[plate].manifestCount += 1;
+      
+      const currentFactMesPct = ventaRecord > 0 ? (invoicedInSameMonth / ventaRecord) * 100 : 0;
+      
+      platesMap[plate].manifests.push({
+        manifest_number: manifestNumber,
+        manifest_date: manifestDate,
+        invoice_date: invoiceDate,
+        venta: ventaRecord,
+        facturado: invoicedInSameMonth,
+        factMesPct: currentFactMesPct
+      });
+    });
+
+    const rawPlates = Object.values(platesMap).map(p => {
+      const factMesPct = p.ventaTotal > 0 ? (p.facturadoTotal / p.ventaTotal) * 100 : 0;
+      return {
+        ...p,
+        factMesPct
+      };
+    });
+
+    return rawPlates.sort((a, b) => b.ventaTotal - a.ventaTotal);
   };
 
   const exportGeneralTdmToExcel = () => {
@@ -2751,9 +2890,18 @@ Clientes General</h3>
                                         {row.invoicedSameMonthVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
                                       </td>
                                       <td className="p-3.5 text-right font-mono font-black">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] ${row.invoicedSameMonthPct < 60 ? 'bg-red-100 text-red-600 font-bold' : 'bg-emerald-50 text-emerald-600'}`}>
-                                          {row.invoicedSameMonthPct.toFixed(1)}%
-                                        </span>
+                                        <div className="flex items-center justify-end gap-1.5">
+                                          <span className={`px-2 py-0.5 rounded text-[10px] ${row.invoicedSameMonthPct < 60 ? 'bg-red-100 text-red-600 font-bold' : 'bg-emerald-50 text-emerald-600'}`}>
+                                            {row.invoicedSameMonthPct.toFixed(1)}%
+                                          </span>
+                                          <button 
+                                            onClick={() => setSelectedClientForVehiclesFactMes(row.clientName)}
+                                            title="Ver detalle de facturación por mes"
+                                            className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                          >
+                                            <Truck className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
                                       </td>
                                       <td className="p-3.5 text-right font-mono font-bold text-slate-700">{row.averagePaymentDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
                                       <td className="p-3.5 text-right font-mono font-bold text-indigo-600/85">{row.averageRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
@@ -3032,9 +3180,18 @@ Clientes General</h3>
                                         {row.invoicedSameMonthVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
                                       </td>
                                       <td className="p-3.5 text-right font-mono font-black">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] ${row.invoicedSameMonthPct < 60 ? 'bg-red-100 text-red-600 font-bold' : 'bg-emerald-50 text-emerald-600'}`}>
-                                          {row.invoicedSameMonthPct.toFixed(1)}%
-                                        </span>
+                                        <div className="flex items-center justify-end gap-1.5">
+                                          <span className={`px-2 py-0.5 rounded text-[10px] ${row.invoicedSameMonthPct < 60 ? 'bg-red-100 text-red-600 font-bold' : 'bg-emerald-50 text-emerald-600'}`}>
+                                            {row.invoicedSameMonthPct.toFixed(1)}%
+                                          </span>
+                                          <button 
+                                            onClick={() => setSelectedClientForVehiclesFactMes(row.clientName)}
+                                            title="Ver detalle de facturación por mes"
+                                            className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                                          >
+                                            <Truck className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
                                       </td>
                                       <td className="p-3.5 text-right font-mono font-bold text-slate-700">{row.averagePaymentDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
                                       <td className="p-3.5 text-right font-mono font-bold text-indigo-600/85">{row.averageRecDays.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</td>
@@ -3691,146 +3848,84 @@ Clientes General</h3>
                 </div>
               </div>
 
-              {/* Search and Export Row */}
-              <div className="mx-6 mt-5 p-3.5 bg-slate-50/60 border border-slate-150 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="relative flex-1 max-w-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                    <Search className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="text"
-                    value={vehiclesSearchQuery}
-                    onChange={(e) => setVehiclesSearchQuery(e.target.value)}
-                    placeholder="Buscar por placa de vehículo..."
-                    className="w-full pl-9 pr-8 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 bg-white placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm"
-                  />
-                  {vehiclesSearchQuery && (
-                    <button
-                      onClick={() => setVehiclesSearchQuery('')}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-
-                <button
-                  onClick={exportVehiclesToExcel}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-emerald-700 transition-all active:scale-[0.98] shadow-sm self-start sm:self-auto"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5" />
-                  Exportar a Excel
-                </button>
-              </div>
-
               {/* Table Body Container */}
-              <div className="p-6 overflow-y-auto flex-1 min-h-0">
-                {vehiclesData.length === 0 ? (
-                  <div className="text-center py-8 text-slate-400 uppercase tracking-wider font-bold text-xs">
-                    No se encontraron registros de vehículos.
-                  </div>
-                ) : (
-                  <div className="border border-slate-150 rounded-xl overflow-hidden shadow-sm">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-150 text-[10px] font-black text-slate-500 uppercase tracking-wider">
-                          <th 
-                            onClick={() => handleVehiclesSort('plate')}
-                            className="p-3 cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                          >
-                            <div className="flex items-center gap-1">
-                              <span>Vehículo (Placa)</span>
-                              {vehiclesSortField === 'plate' && (
-                                <span className="text-indigo-600 font-bold text-[8px]">{vehiclesSortDirection === 'asc' ? '▲' : '▼'}</span>
-                              )}
-                            </div>
-                          </th>
-                          <th 
-                            onClick={() => handleVehiclesSort('manifestCount')}
-                            className="p-3 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                          >
-                            <div className="flex items-center justify-end gap-1">
-                              <span>Cantidad Manifiestos</span>
-                              {vehiclesSortField === 'manifestCount' && (
-                                <span className="text-indigo-600 font-bold text-[8px]">{vehiclesSortDirection === 'asc' ? '▲' : '▼'}</span>
-                              )}
-                            </div>
-                          </th>
-                          <th 
-                            onClick={() => handleVehiclesSort('ventaTotal')}
-                            className="p-3 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                          >
-                            <div className="flex items-center justify-end gap-1">
-                              <span>Venta</span>
-                              {vehiclesSortField === 'ventaTotal' && (
-                                <span className="text-indigo-600 font-bold text-[8px]">{vehiclesSortDirection === 'asc' ? '▲' : '▼'}</span>
-                              )}
-                            </div>
-                          </th>
-                          <th 
-                            onClick={() => handleVehiclesSort('ingTerceros')}
-                            className="p-3 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                          >
-                            <div className="flex items-center justify-end gap-1">
-                              <span>Ing Terceros</span>
-                              {vehiclesSortField === 'ingTerceros' && (
-                                <span className="text-indigo-600 font-bold text-[8px]">{vehiclesSortDirection === 'asc' ? '▲' : '▼'}</span>
-                              )}
-                            </div>
-                          </th>
-                          <th 
-                            onClick={() => handleVehiclesSort('ingresosPropios')}
-                            className="p-3 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                          >
-                            <div className="flex items-center justify-end gap-1">
-                              <span>Ingresos Propios</span>
-                              {vehiclesSortField === 'ingresosPropios' && (
-                                <span className="text-indigo-600 font-bold text-[8px]">{vehiclesSortDirection === 'asc' ? '▲' : '▼'}</span>
-                              )}
-                            </div>
-                          </th>
-                          <th 
-                            onClick={() => handleVehiclesSort('int')}
-                            className="p-3 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors"
-                          >
-                            <div className="flex items-center justify-end gap-1">
-                              <span>INT (%)</span>
-                              {vehiclesSortField === 'int' && (
-                                <span className="text-indigo-600 font-bold text-[8px]">{vehiclesSortDirection === 'asc' ? '▲' : '▼'}</span>
-                              )}
-                            </div>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-[11px] text-slate-600 font-medium">
-                        {vehiclesData.map((v, i) => (
-                          <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="p-3">
-                              <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-black text-slate-700">{v.plate}</span>
-                            </td>
-                            <td className="p-3 text-right font-mono font-bold">{v.manifestCount}</td>
-                            <td className="p-3 text-right font-mono font-bold text-slate-900">
-                              {v.ventaTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
-                            </td>
-                            <td className="p-3 text-right font-mono text-slate-500">
-                              {v.ingTerceros.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
-                            </td>
-                            <td className="p-3 text-right font-mono text-indigo-600 font-bold">
-                              {v.ingresosPropios.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
-                            </td>
-                            <td className="p-3 text-right font-mono">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
-                                v.int < 18 ? 'bg-red-100 text-red-600' : 'bg-emerald-50 text-emerald-600'
-                              }`}>
-                                {v.int.toFixed(1)}%
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+              <div className="p-6 overflow-y-auto flex-1 min-h-0 bg-slate-50/30">
+                <div className="border border-slate-150 rounded-xl overflow-hidden shadow-sm bg-white">
+                  <DataTable
+                    data={vehiclesData || []}
+                    columns={[
+                      {
+                        header: 'Vehículo (Placa)',
+                        key: 'plate',
+                        render: (row: any) => <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-black text-slate-700">{row.plate}</span>
+                      },
+                      {
+                        header: 'Cantidad Manifiestos',
+                        key: 'manifestCount',
+                        render: (row: any) => (
+                          <div className="text-right">
+                            <button 
+                              onClick={() => setSelectedVehicleManifests(row)}
+                              className="inline-flex items-center justify-end gap-1.5 px-2 py-1 bg-indigo-50/50 hover:bg-indigo-100 text-indigo-700 rounded transition-colors active:scale-95"
+                              title="Ver detalle de manifiestos"
+                            >
+                              <span className="font-mono font-bold">{row.manifestCount}</span>
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )
+                      },
+                      {
+                        header: 'Venta',
+                        key: 'ventaTotal',
+                        render: (row: any) => (
+                          <div className="text-right">
+                            <span className="font-mono font-bold text-slate-900">
+                              {row.ventaTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                            </span>
+                          </div>
+                        )
+                      },
+                      {
+                        header: 'Ing Terceros',
+                        key: 'ingTerceros',
+                        render: (row: any) => (
+                          <div className="text-right">
+                            <span className="font-mono text-slate-500">
+                              {row.ingTerceros.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                            </span>
+                          </div>
+                        )
+                      },
+                      {
+                        header: 'Ingresos Propios',
+                        key: 'ingresosPropios',
+                        render: (row: any) => (
+                          <div className="text-right">
+                            <span className="font-mono text-indigo-600 font-bold">
+                              {row.ingresosPropios.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                            </span>
+                          </div>
+                        )
+                      },
+                      {
+                        header: 'INT (%)',
+                        key: 'int',
+                        render: (row: any) => (
+                          <div className="text-right">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                              row.int < 18 ? 'bg-red-100 text-red-600' : 'bg-emerald-50 text-emerald-600'
+                            }`}>
+                              {row.int.toFixed(1)}%
+                            </span>
+                          </div>
+                        )
+                      }
+                    ]}
+                    excelFileName={`Vehiculos_INT_${selectedClientForVehiclesInt}.xlsx`}
+                    searchPlaceholder="Buscar por placa de vehículo..."
+                  />
+                </div>
               </div>
 
               {/* Footer */}
@@ -3849,7 +3944,386 @@ Clientes General</h3>
           </div>
         );
       })()}
+
+      {/* Manifests Detail Modal */}
+      {selectedVehicleManifests && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-5 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-150 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Detalle de Manifiestos</h3>
+                  <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wide mt-0.5">Vehículo: {selectedVehicleManifests.plate}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedVehicleManifests(null)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Table Body Container */}
+            <div className="p-6 overflow-y-auto flex-1 min-h-0 bg-slate-50/30">
+              <div className="border border-slate-150 rounded-xl overflow-hidden shadow-sm bg-white">
+                <DataTable
+                  data={selectedVehicleManifests.manifests || []}
+                  columns={[
+                    {
+                      header: 'Manifiesto',
+                      key: 'manifest_number',
+                      render: (row: any) => <span className="font-bold text-slate-800">{row.manifest_number}</span>
+                    },
+                    {
+                      header: 'Fecha',
+                      key: 'manifest_date',
+                      render: (row: any) => <span className="text-slate-500">{formatDate(row.manifest_date)}</span>
+                    },
+                    {
+                      header: 'Venta',
+                      key: 'venta',
+                      render: (row: any) => (
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-slate-900">
+                            {row.venta.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                          </span>
+                        </div>
+                      )
+                    },
+                    {
+                      header: 'Ing Terceros',
+                      key: 'ingTerceros',
+                      render: (row: any) => (
+                        <div className="text-right">
+                          <span className="font-mono text-slate-500">
+                            {row.ingTerceros.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                          </span>
+                        </div>
+                      )
+                    },
+                    {
+                      header: 'Ingresos Propios',
+                      key: 'ingresosPropios',
+                      render: (row: any) => (
+                        <div className="text-right">
+                          <span className="font-mono text-indigo-600 font-bold">
+                            {row.ingresosPropios.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                          </span>
+                        </div>
+                      )
+                    },
+                    {
+                      header: 'INT (%)',
+                      key: 'int',
+                      render: (row: any) => (
+                        <div className="text-right">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                            row.int < 18 ? 'bg-red-100 text-red-600' : 'bg-emerald-50 text-emerald-600'
+                          }`}>
+                            {row.int.toFixed(1)}%
+                          </span>
+                        </div>
+                      )
+                    }
+                  ]}
+                  excelFileName={`Manifiestos_${selectedVehicleManifests.plate}.xlsx`}
+                  searchPlaceholder="Buscar en manifiestos..."
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-150 flex justify-end">
+              <button
+                onClick={() => setSelectedVehicleManifests(null)}
+                className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-black uppercase tracking-wider hover:bg-slate-900 shadow-sm transition-all active:scale-[0.98]"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Vehicles Fact Mes Modal */}
+      {selectedClientForVehiclesFactMes && (() => {
+        const vehiclesDataFact = getVehiclesFactMesDetails();
+        const clientSalesFact = vehiclesDataFact.reduce((sum, v) => sum + v.ventaTotal, 0);
+        const clientFacturado = vehiclesDataFact.reduce((sum, v) => sum + v.facturadoTotal, 0);
+        const clientOverallFactPct = clientSalesFact > 0 ? (clientFacturado / clientSalesFact) * 100 : 0;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+              {/* Header */}
+              <div className="px-6 py-5 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-150 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                    <Truck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Vehículos que afectaron la Facturación del Mes</h3>
+                    <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wide mt-0.5">{selectedClientForVehiclesFactMes}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedClientForVehiclesFactMes(null)}
+                  className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Stats Summary Cards */}
+              <div className="px-6 pt-5 grid grid-cols-3 gap-4">
+                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                  <span className="block text-[9px] font-black text-slate-400 uppercase tracking-wider mb-1">Total Ventas</span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-slate-900">
+                    {clientSalesFact.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                  </span>
+                </div>
+                <div className="p-3 bg-blue-50/40 border border-blue-100/50 rounded-xl text-center">
+                  <span className="block text-[9px] font-black text-blue-400 uppercase tracking-wider mb-1">Total Facturado</span>
+                  <span className="text-xs sm:text-sm font-mono font-bold text-blue-600">
+                    {clientFacturado.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                  </span>
+                </div>
+                <div className="p-3 bg-emerald-50/40 border border-emerald-100/50 rounded-xl text-center">
+                  <span className="block text-[9px] font-black text-emerald-400 uppercase tracking-wider mb-1">% Fact. Mes Consolidado</span>
+                  <span className="block">
+                    <span className={`px-2.5 py-0.5 rounded text-xs font-black font-mono ${
+                      clientOverallFactPct < 60 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
+                    }`}>
+                      {clientOverallFactPct.toFixed(1)}%
+                    </span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Table Body Container */}
+              <div className="p-6 overflow-y-auto flex-1 min-h-0 bg-slate-50/30">
+                <div className="border border-slate-150 rounded-xl overflow-hidden shadow-sm bg-white">
+                  <DataTable
+                    data={vehiclesDataFact || []}
+                    columns={[
+                      {
+                        header: 'Vehículo (Placa)',
+                        key: 'plate',
+                        render: (row: any) => <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-black text-slate-700">{row.plate}</span>
+                      },
+                      {
+                        header: 'Cantidad Manifiestos',
+                        key: 'manifestCount',
+                        render: (row: any) => (
+                          <div className="text-right">
+                            <button 
+                              onClick={() => setSelectedVehicleManifestsFact(row)}
+                              className="inline-flex items-center justify-end gap-1.5 px-2 py-1 bg-blue-50/50 hover:bg-blue-100 text-blue-700 rounded transition-colors active:scale-95"
+                              title="Ver detalle de manifiestos"
+                            >
+                              <span className="font-mono font-bold">{row.manifestCount}</span>
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )
+                      },
+                      {
+                        header: 'Venta',
+                        key: 'ventaTotal',
+                        render: (row: any) => (
+                          <div className="text-right">
+                            <span className="font-mono font-bold text-slate-900">
+                              {row.ventaTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                            </span>
+                          </div>
+                        )
+                      },
+                      {
+                        header: 'Facturado',
+                        key: 'facturadoTotal',
+                        render: (row: any) => (
+                          <div className="text-right">
+                            <span className="font-mono text-blue-600 font-bold">
+                              {row.facturadoTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                            </span>
+                          </div>
+                        )
+                      },
+                      {
+                        header: '% Fact. Mes',
+                        key: 'factMesPct',
+                        render: (row: any) => (
+                          <div className="text-right">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                              row.factMesPct < 60 ? 'bg-red-100 text-red-600' : 'bg-emerald-50 text-emerald-600'
+                            }`}>
+                              {row.factMesPct.toFixed(1)}%
+                            </span>
+                          </div>
+                        )
+                      }
+                    ]}
+                    excelFileName={`Vehiculos_Fact_Mes_${selectedClientForVehiclesFactMes}.xlsx`}
+                    searchPlaceholder="Buscar por placa de vehículo..."
+                    onExportExcel={(exportRows, sortedData) => {
+                      const workbook = XLSX.utils.book_new();
+
+                      // Hoja 1: Resumen
+                      // Round % Fact. Mes to 1 decimal place
+                      const processedExportRows = exportRows.map(row => {
+                        const newRow = { ...row };
+                        if (typeof newRow['% Fact. Mes'] === 'number') {
+                          newRow['% Fact. Mes'] = Number(newRow['% Fact. Mes'].toFixed(1));
+                        }
+                        return newRow;
+                      });
+                      const worksheetResumen = XLSX.utils.json_to_sheet(processedExportRows);
+                      XLSX.utils.book_append_sheet(workbook, worksheetResumen, "Resumen_Vehiculos");
+
+                      // Hoja 2: Detalle Manifiestos
+                      const detailRows: any[] = [];
+                      sortedData.forEach((vehicle: any) => {
+                        if (vehicle.manifests) {
+                          vehicle.manifests.forEach((m: any) => {
+                            detailRows.push({
+                              "PLACA": vehicle.plate,
+                              "Manifiesto": m.manifest_number,
+                              "F. Manifiesto": formatDate(m.manifest_date) || "S/I",
+                              "F. Factura": formatDate(m.invoice_date) || "S/I",
+                              "Venta": m.venta,
+                              "Facturado": m.facturado,
+                              "% Fact. Mes": Number(m.factMesPct.toFixed(1))
+                            });
+                          });
+                        }
+                      });
+                      const worksheetDetalle = XLSX.utils.json_to_sheet(detailRows);
+                      XLSX.utils.book_append_sheet(workbook, worksheetDetalle, "Manifiestos");
+
+                      XLSX.writeFile(workbook, `Vehiculos_Fact_Mes_${selectedClientForVehiclesFactMes}.xlsx`);
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-150 flex justify-end">
+                <button
+                  onClick={() => setSelectedClientForVehiclesFactMes(null)}
+                  className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-black uppercase tracking-wider hover:bg-slate-900 shadow-sm transition-all active:scale-[0.98]"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Manifests Detail Modal for Fact Mes */}
+      {selectedVehicleManifestsFact && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-4xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-5 bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-150 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Detalle de Manifiestos (Fact. Mes)</h3>
+                  <p className="text-[11px] text-slate-500 font-bold uppercase tracking-wide mt-0.5">Vehículo: {selectedVehicleManifestsFact.plate}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setSelectedVehicleManifestsFact(null)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Table Body Container */}
+            <div className="p-6 overflow-y-auto flex-1 min-h-0 bg-slate-50/30">
+              <div className="border border-slate-150 rounded-xl overflow-hidden shadow-sm bg-white">
+                <DataTable
+                  data={selectedVehicleManifestsFact.manifests || []}
+                  columns={[
+                    {
+                      header: 'Manifiesto',
+                      key: 'manifest_number',
+                      render: (row: any) => <span className="font-bold text-slate-800">{row.manifest_number}</span>
+                    },
+                    {
+                      header: 'F. Manifiesto',
+                      key: 'manifest_date',
+                      render: (row: any) => <span className="text-slate-500">{formatDate(row.manifest_date)}</span>
+                    },
+                    {
+                      header: 'F. Factura',
+                      key: 'invoice_date',
+                      render: (row: any) => <span className="text-slate-500">{formatDate(row.invoice_date)}</span>
+                    },
+                    {
+                      header: 'Venta',
+                      key: 'venta',
+                      render: (row: any) => (
+                        <div className="text-right">
+                          <span className="font-mono font-bold text-slate-900">
+                            {row.venta.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                          </span>
+                        </div>
+                      )
+                    },
+                    {
+                      header: 'Facturado',
+                      key: 'facturado',
+                      render: (row: any) => (
+                        <div className="text-right">
+                          <span className="font-mono text-blue-600 font-bold">
+                            {row.facturado.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                          </span>
+                        </div>
+                      )
+                    },
+                    {
+                      header: '% Fact. Mes',
+                      key: 'factMesPct',
+                      render: (row: any) => (
+                        <div className="text-right">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                            row.factMesPct < 60 ? 'bg-red-100 text-red-600' : 'bg-emerald-50 text-emerald-600'
+                          }`}>
+                            {row.factMesPct.toFixed(1)}%
+                          </span>
+                        </div>
+                      )
+                    }
+                  ]}
+                  excelFileName={`Manifiestos_Fact_Mes_${selectedVehicleManifestsFact.plate}.xlsx`}
+                  searchPlaceholder="Buscar en manifiestos..."
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-150 flex justify-end">
+              <button
+                onClick={() => setSelectedVehicleManifestsFact(null)}
+                className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-black uppercase tracking-wider hover:bg-slate-900 shadow-sm transition-all active:scale-[0.98]"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+
   );
 };
 

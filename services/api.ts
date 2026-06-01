@@ -1369,6 +1369,11 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tableName, ids })
   }),
+  runAdminCron: (cronName: string) => fetchJson(`${API_URL}/admin/cron/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ cronName })
+  }),
 
   // --- DASHBOARD & INTELLIGENCE ---
   getDashboardStats: (period: string) => fetchJson(`${API_URL}/dashboard/stats?period=${period}`),

@@ -296,3 +296,34 @@ export const getTableSchema = async (req: any, res: Response) => {
         res.status(500).json({ error: "Error al obtener esquema" });
     }
 };
+
+export const runCron = async (req: any, res: Response) => {
+    const { cronName } = req.body;
+    const user = req.user;
+    try {
+        if (!isUserAdmin(user)) return res.status(403).json({ error: "Acceso denegado." });
+        if (!cronName) return res.status(400).json({ error: "Nombre del cron requerido" });
+
+        const scheduler = await import('../services/scheduler.service.js');
+        let logs: string[] = [];
+
+        switch (cronName) {
+            case 'syncDrive':
+                logs = await scheduler.manualRunSyncDrive();
+                break;
+            case 'cleanNews':
+                logs = await scheduler.manualRunCleanNews();
+                break;
+            case 'facturacionPendiente':
+                logs = await scheduler.runFacturacionPendienteGeneral();
+                break;
+            default:
+                return res.status(404).json({ error: "Cron no encontrado" });
+        }
+
+        res.json({ success: true, logs });
+    } catch (err: any) {
+        console.error('[ADMIN-RUN-CRON]', err.message);
+        res.status(500).json({ error: "Error al ejecutar el cron", details: err.message });
+    }
+};

@@ -15,6 +15,7 @@ interface DataTableProps<T> {
   searchPlaceholder?: string;
   excelFileName?: string;
   excelSheetName?: string;
+  onExportExcel?: (exportRows: Record<string, any>[], sortedData: T[]) => void;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -23,6 +24,7 @@ export function DataTable<T extends Record<string, any>>({
   searchPlaceholder = 'Buscar...',
   excelFileName = 'reporte.xlsx',
   excelSheetName = 'Datos',
+  onExportExcel,
 }: DataTableProps<T>) {
   // Búsqueda
   const [searchTerm, setSearchTerm] = useState('');
@@ -141,6 +143,11 @@ export function DataTable<T extends Record<string, any>>({
       });
       return exportRow;
     });
+
+    if (onExportExcel) {
+      onExportExcel(exportRows, sortedData);
+      return;
+    }
 
     const worksheet = XLSX.utils.json_to_sheet(exportRows);
     const workbook = XLSX.utils.book_new();

@@ -38,7 +38,7 @@ const AdminDBManager: React.FC = () => {
   const [formData, setFormData] = useState<any>({});
 
   // SQL Mode
-  const [mode, setMode] = useState<'TABLE' | 'SQL'>('TABLE');
+  const [mode, setMode] = useState<'TABLE' | 'SQL' | 'CRON'>('TABLE');
   const [customQuery, setCustomQuery] = useState('');
   const [sqlResult, setSqlResult] = useState<any>(null);
   
@@ -55,6 +55,25 @@ const AdminDBManager: React.FC = () => {
 
   // Custom Confirm State
   const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean, type: 'SINGLE' | 'BULK', id?: any } | null>(null);
+
+  // Cron State
+  const [cronLogs, setCronLogs] = useState<string[]>([]);
+  const [isCronRunning, setIsCronRunning] = useState(false);
+
+  const handleRunCron = async (cronName: string) => {
+      setIsCronRunning(true);
+      setCronLogs([`Ejecutando ${cronName}...`]);
+      try {
+          const res = await api.runAdminCron(cronName);
+          setCronLogs(prev => [...prev, ...res.logs]);
+          toast.success('CRON ejecutado con éxito');
+      } catch (err: any) {
+          setCronLogs(prev => [...prev, `Error: ${err.message}`]);
+          toast.error('Error al ejecutar CRON');
+      } finally {
+          setIsCronRunning(false);
+      }
+  };
 
   const exportToExcel = (dataToExport: any[], fileName: string) => {
     if (!dataToExport || dataToExport.length === 0) {
@@ -458,6 +477,12 @@ const AdminDBManager: React.FC = () => {
                 >
                     SQL
                 </button>
+                <button 
+                    onClick={() => setMode('CRON')}
+                    className={`px-4 py-1 rounded text-sm font-bold transition-colors ${mode === 'CRON' ? 'bg-white shadow text-purple-600' : 'text-slate-500'}`}
+                >
+                    Tareas (CRON)
+                </button>
             </div>
         </div>
       </div>
@@ -788,6 +813,75 @@ const AdminDBManager: React.FC = () => {
               <div className="flex-1 overflow-auto border-t border-slate-200 pt-4">
                   {renderSqlResult()}
                   {!sqlResult && <div className="text-center text-slate-400 mt-10">Los resultados de su consulta aparecerán aquí.</div>}
+              </div>
+          </div>
+      )}
+
+      {mode === 'CRON' && (
+          <div className="bg-white p-6 rounded shadow border border-slate-200 h-[calc(100vh-150px)] flex flex-col gap-6 overflow-auto">
+              <div>
+                  <h3 className="text-xl font-bold text-slate-800 border-b pb-2 mb-4">Administración de Tareas Programadas</h3>
+                  <p className="text-sm text-slate-500 mb-6">Ejecute manualmente las tareas programadas (CRON) y observe los logs de ejecución en tiempo real.</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
+                          <h4 className="font-bold text-slate-800">Facturación Pendiente General</h4>
+                          <p className="text-xs text-slate-500">Genera y envía un reporte Excel con los manifiestos no facturados a los correos activos en notificaciones (TGN-04).</p>
+                          <div className="mt-auto pt-2">
+                              <button 
+                                  onClick={() => handleRunCron('facturacionPendiente')}
+                                  disabled={isCronRunning}
+                                  className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
+                              >
+                                  {isCronRunning ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
+                              </button>
+                          </div>
+                      </div>
+
+                      <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
+                          <h4 className="font-bold text-slate-800">Sincronización Planillas Drive</h4>
+                          <p className="text-xs text-slate-500">Sincroniza las fechas de cumplido desde Google Drive hacia el sistema de Planillas Operativas (CLI-09).</p>
+                          <div className="mt-auto pt-2">
+                              <button 
+                                  onClick={() => handleRunCron('syncDrive')}
+                                  disabled={isCronRunning}
+                                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
+                              >
+                                  {isCronRunning ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
+                              </button>
+                          </div>
+                      </div>
+
+                      <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
+                          <h4 className="font-bold text-slate-800">Limpieza Novedades Inventario</h4>
+                          <p className="text-xs text-slate-500">Elimina las novedades de inventario que superen los 5 días hábiles de antigüedad.</p>
+                          <div className="mt-auto pt-2">
+                              <button 
+                                  onClick={() => handleRunCron('cleanNews')}
+                                  disabled={isCronRunning}
+                                  className="w-full bg-slate-600 hover:bg-slate-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
+                              >
+                                  {isCronRunning ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+
+              <div className="flex-1 flex flex-col border border-slate-200 rounded overflow-hidden">
+                  <div className="bg-slate-800 text-white px-4 py-2 font-mono text-sm flex justify-between items-center">
+                      <span>Terminal de Logs (CRON)</span>
+                      <button onClick={() => setCronLogs([])} className="text-xs hover:text-slate-300">Limpiar</button>
+                  </div>
+                  <div className="flex-1 bg-slate-900 text-green-400 p-4 font-mono text-xs overflow-auto whitespace-pre-wrap flex flex-col gap-1 min-h-[200px]">
+                      {cronLogs.length === 0 ? (
+                          <span className="text-slate-500">Esperando ejecución de tareas...</span>
+                      ) : (
+                          cronLogs.map((log, i) => (
+                              <div key={i}>{log}</div>
+                          ))
+                      )}
+                  </div>
               </div>
           </div>
       )}
