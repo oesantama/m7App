@@ -141,11 +141,21 @@ export const runFacturacionPendienteGeneral = async (): Promise<string[]> => {
             SELECT 
                 manifest_number, 
                 manifest_date, 
-                total_value_cxc_final as venta, 
+                CASE 
+                    WHEN COALESCE(total_cxc, 0) = 0 THEN total_value_cxc_final 
+                    ELSE total_cxc 
+                END as venta, 
                 client_name 
             FROM management_orders 
-            WHERE (invoice_cxc IS NULL OR TRIM(invoice_cxc) = '')
+            WHERE (
+                invoice_cxc IS NULL 
+                OR TRIM(invoice_cxc) = '' 
+                OR TRIM(invoice_cxc) = '0'
+                OR UPPER(TRIM(invoice_cxc)) IN ('S/I', 'N/A', 'NA')
+            )
               AND manifest_number IS NOT NULL
+              AND TRIM(manifest_number) <> ''
+              AND UPPER(TRIM(COALESCE(manifest_status, ''))) NOT IN ('ANULADO', 'ANULADA')
             ORDER BY manifest_date DESC
         `);
 
