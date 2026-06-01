@@ -58,10 +58,10 @@ const AdminDBManager: React.FC = () => {
 
   // Cron State
   const [cronLogs, setCronLogs] = useState<string[]>([]);
-  const [isCronRunning, setIsCronRunning] = useState(false);
+  const [runningCrons, setRunningCrons] = useState<Record<string, boolean>>({});
 
   const handleRunCron = async (cronName: string) => {
-      setIsCronRunning(true);
+      setRunningCrons(prev => ({ ...prev, [cronName]: true }));
       setCronLogs([`Ejecutando ${cronName}...`]);
       try {
           const res = await api.runAdminCron(cronName);
@@ -71,7 +71,7 @@ const AdminDBManager: React.FC = () => {
           setCronLogs(prev => [...prev, `Error: ${err.message}`]);
           toast.error('Error al ejecutar CRON');
       } finally {
-          setIsCronRunning(false);
+          setRunningCrons(prev => ({ ...prev, [cronName]: false }));
       }
   };
 
@@ -823,17 +823,33 @@ const AdminDBManager: React.FC = () => {
                   <h3 className="text-xl font-bold text-slate-800 border-b pb-2 mb-4">Administración de Tareas Programadas</h3>
                   <p className="text-sm text-slate-500 mb-6">Ejecute manualmente las tareas programadas (CRON) y observe los logs de ejecución en tiempo real.</p>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
                           <h4 className="font-bold text-slate-800">Facturación Pendiente General</h4>
-                          <p className="text-xs text-slate-500">Genera y envía un reporte Excel con los manifiestos no facturados a los correos activos en notificaciones (TGN-04).</p>
+                          <p className="text-xs text-slate-500">Envía un reporte Excel consolidado de todos los clientes a los correos en notificaciones (TGN-04).</p>
+                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Lunes a Sábado, 10:00 AM</p>
                           <div className="mt-auto pt-2">
                               <button 
                                   onClick={() => handleRunCron('facturacionPendiente')}
-                                  disabled={isCronRunning}
+                                  disabled={runningCrons['facturacionPendiente']}
                                   className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
                               >
-                                  {isCronRunning ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
+                                  {runningCrons['facturacionPendiente'] ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
+                              </button>
+                          </div>
+                      </div>
+
+                      <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
+                          <h4 className="font-bold text-slate-800">Facturación Pendiente Individual</h4>
+                          <p className="text-xs text-slate-500">Envía correos personalizados (TGN-03) únicamente con los clientes asignados a cada usuario o proveedor.</p>
+                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Lunes a Sábado, 10:00 AM</p>
+                          <div className="mt-auto pt-2">
+                              <button 
+                                  onClick={() => handleRunCron('facturacionPendienteIndividual')}
+                                  disabled={runningCrons['facturacionPendienteIndividual']}
+                                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
+                              >
+                                  {runningCrons['facturacionPendienteIndividual'] ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
                               </button>
                           </div>
                       </div>
@@ -841,13 +857,14 @@ const AdminDBManager: React.FC = () => {
                       <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
                           <h4 className="font-bold text-slate-800">Sincronización Planillas Drive</h4>
                           <p className="text-xs text-slate-500">Sincroniza las fechas de cumplido desde Google Drive hacia el sistema de Planillas Operativas (CLI-09).</p>
+                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Lunes a Sábado, 09:00 AM</p>
                           <div className="mt-auto pt-2">
                               <button 
                                   onClick={() => handleRunCron('syncDrive')}
-                                  disabled={isCronRunning}
+                                  disabled={runningCrons['syncDrive']}
                                   className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
                               >
-                                  {isCronRunning ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
+                                  {runningCrons['syncDrive'] ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
                               </button>
                           </div>
                       </div>
@@ -855,13 +872,14 @@ const AdminDBManager: React.FC = () => {
                       <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
                           <h4 className="font-bold text-slate-800">Limpieza Novedades Inventario</h4>
                           <p className="text-xs text-slate-500">Elimina las novedades de inventario que superen los 5 días hábiles de antigüedad.</p>
+                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Diariamente, 01:00 AM</p>
                           <div className="mt-auto pt-2">
                               <button 
                                   onClick={() => handleRunCron('cleanNews')}
-                                  disabled={isCronRunning}
+                                  disabled={runningCrons['cleanNews']}
                                   className="w-full bg-slate-600 hover:bg-slate-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
                               >
-                                  {isCronRunning ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
+                                  {runningCrons['cleanNews'] ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
                               </button>
                           </div>
                       </div>

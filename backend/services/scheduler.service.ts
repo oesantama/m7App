@@ -24,6 +24,185 @@ function subtractBusinessDays(fromDate: Date, businessDays: number): Date {
 /**
  * Servicio de Tareas Programadas (M7 Scheduler)
  */
+export const runFacturacionPendienteIndividual = async (): Promise<string[]> => {
+    const logs: string[] = [];
+    logs.push(`[${new Date().toLocaleString()}] Iniciando cron de Facturación Pendiente Individual (Cruce prov_cliente -> users)...`);
+    
+    try {
+        const { sendEmail } = await import('./notification.service.js');
+        const XLSX_MODULE = await import('xlsx');
+        const XLSX = XLSX_MODULE.default || XLSX_MODULE;
+
+        // 1. Obtener la tabla general de manifiestos pendientes
+        const reportRes = await pool.query(`
+            SELECT 
+                manifest_number, 
+                manifest_date, 
+                CASE 
+                    WHEN COALESCE(total_cxc, 0) = 0 THEN total_value_cxc_final 
+                    ELSE total_cxc 
+                END as venta, 
+                client_name,
+                client_document,
+                manifest_status,
+                plate
+            FROM management_orders 
+            WHERE (
+                invoice_cxc IS NULL 
+                OR TRIM(invoice_cxc) = '' 
+                OR TRIM(invoice_cxc) = '0'
+                OR UPPER(TRIM(invoice_cxc)) IN ('S/I', 'N/A', 'NA', 'SIN FACTURA CXC')
+                OR invoice_date IS NULL
+                OR COALESCE(total_cxc, 0) = 0
+            )
+              AND manifest_number IS NOT NULL
+              AND TRIM(manifest_number) <> ''
+              AND UPPER(TRIM(COALESCE(manifest_status, ''))) NOT IN ('ANULADO', 'ANULADA')
+            ORDER BY client_name, manifest_date DESC
+        `);
+
+        if (reportRes.rowCount === 0) {
+            logs.push(`No hay facturación pendiente general en este momento. Finalizando tarea individual.`);
+            return logs;
+        }
+
+        logs.push(`Se encontraron ${reportRes.rowCount} manifiestos pendientes generales.`);
+
+        // 2. Obtener mapeo de proveedores (prov_cliente)
+        const provRes = await pool.query(`SELECT documento, client_mappings FROM prov_cliente`);
+        const docToClientIds: Record<string, string[]> = {};
+        provRes.rows.forEach(r => {
+            if (r.client_mappings && r.documento) {
+                const mappings = typeof r.client_mappings === 'string' ? JSON.parse(r.client_mappings) : r.client_mappings;
+                if (Array.isArray(mappings)) {
+                    docToClientIds[String(r.documento).trim()] = mappings.map((m: any) => m.clientId).filter(Boolean);
+                }
+            }
+        });
+
+        // 3. Obtener usuarios activos y sus clientes
+        const userRes = await pool.query(`SELECT email, client_ids FROM users WHERE status_id = 'EST-01' AND email IS NOT NULL AND email <> ''`);
+        const clientIdToUsers: Record<string, string[]> = {};
+        userRes.rows.forEach(r => {
+            if (r.client_ids && Array.isArray(r.client_ids)) {
+                r.client_ids.forEach((cId: string) => {
+                    if (!clientIdToUsers[cId]) clientIdToUsers[cId] = [];
+                    if (!clientIdToUsers[cId].includes(r.email)) clientIdToUsers[cId].push(r.email);
+                });
+            }
+        });
+
+        // 4. Agrupar manifiestos por usuario
+        const userToManifests: Record<string, any[]> = {};
+
+        reportRes.rows.forEach(manifest => {
+            const doc = manifest.client_document ? String(manifest.client_document).trim() : null;
+            if (doc && docToClientIds[doc]) {
+                const cIds = docToClientIds[doc];
+                const matchedEmails = new Set<string>();
+                
+                cIds.forEach(cId => {
+                    const emails = clientIdToUsers[cId] || [];
+                    emails.forEach(e => matchedEmails.add(e));
+                });
+
+                matchedEmails.forEach(email => {
+                    if (!userToManifests[email]) userToManifests[email] = [];
+                    userToManifests[email].push(manifest);
+                });
+            }
+        });
+
+        const emailsToSend = Object.keys(userToManifests);
+        if (emailsToSend.length === 0) {
+            logs.push(`Ningún manifiesto pendiente pudo ser mapeado a un usuario a través de prov_cliente. Finalizando.`);
+            return logs;
+        }
+
+        logs.push(`Se enviarán reportes individuales a ${emailsToSend.length} usuarios.`);
+
+        // 5. Enviar correos a cada usuario con sus manifiestos
+        for (const email of emailsToSend) {
+            const userManifests = userToManifests[email];
+            
+            const excelData = userManifests.map(r => ({
+                'Manifiesto': r.manifest_number,
+                'Fecha Manifiesto': r.manifest_date ? new Date(r.manifest_date).toLocaleDateString() : 'S/I',
+                'Cliente': r.client_name,
+                'Estado': r.manifest_status ? String(r.manifest_status).trim() : 'S/I',
+                'Placa': r.plate ? String(r.plate).trim() : 'S/I',
+                'Valor Venta': Number(r.venta) || 0
+            }));
+
+            const summaryByPlate: Record<string, { count: number, total: number }> = {};
+            userManifests.forEach(r => {
+                const p = r.plate ? String(r.plate).trim() : 'S/I';
+                if (!summaryByPlate[p]) summaryByPlate[p] = { count: 0, total: 0 };
+                summaryByPlate[p].count++;
+                summaryByPlate[p].total += (Number(r.venta) || 0);
+            });
+
+            let plateRows = '';
+            for (const [p, stats] of Object.entries(summaryByPlate)) {
+                plateRows += `<tr><td style="border:1px solid #ccc;padding:4px;">${p}</td><td style="border:1px solid #ccc;padding:4px;text-align:center;">${stats.count}</td><td style="border:1px solid #ccc;padding:4px;text-align:right;">$${stats.total.toLocaleString('es-CO')}</td></tr>`;
+            }
+
+            const totalVenta = excelData.reduce((acc, curr) => acc + curr['Valor Venta'], 0);
+
+            const worksheet = XLSX.utils.json_to_sheet(excelData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, 'Pendientes');
+            const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+            const htmlBody = `
+                <div style="font-family: Arial, sans-serif; color: #333;">
+                    <h2 style="color: #4f46e5;">Reporte de Facturación Pendiente (Por Usuario)</h2>
+                    <p>Hola,</p>
+                    <p>A continuación, presentamos el consolidado de facturación pendiente correspondiente a los clientes asignados a tu cuenta.</p>
+                    <ul>
+                        <li><b>Total Manifiestos Pendientes:</b> ${userManifests.length}</li>
+                        <li><b>Total Valor Pendiente:</b> $${totalVenta.toLocaleString('es-CO')}</li>
+                    </ul>
+                    <br/>
+                    <table style="border-collapse: collapse; width: 100%; max-width: 400px; font-size: 14px;">
+                        <thead>
+                            <tr style="background-color: #f3f4f6;">
+                                <th style="border:1px solid #ccc;padding:4px;text-align:left;">Placa</th>
+                                <th style="border:1px solid #ccc;padding:4px;text-align:center;">Cant.</th>
+                                <th style="border:1px solid #ccc;padding:4px;text-align:right;">Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${plateRows}
+                        </tbody>
+                    </table>
+                    <br/>
+                    <p>Por favor, revisa el archivo Excel adjunto para ver el detalle.</p>
+                    <p><small>Este es un mensaje automático generado por M7 App.</small></p>
+                </div>
+            `;
+
+            try {
+                // Send email bypassing notification service typing issues using direct API if needed, but sendEmail is fine
+                await sendEmail(email, 'Reporte de Facturación Pendiente Individual - M7 App', htmlBody, [{
+                    filename: `facturacion_pendiente_individual_${new Date().toISOString().slice(0,10)}.xlsx`,
+                    content: excelBuffer
+                }]);
+                logs.push(`  - Correo enviado a ${email} (${userManifests.length} manifiestos)`);
+            } catch (err: any) {
+                logs.push(`  - Error enviando a ${email}: ${err.message}`);
+            }
+        }
+
+        logs.push(`[${new Date().toLocaleString()}] Tarea de Facturación Pendiente Individual finalizada.`);
+        return logs;
+    } catch (err: any) {
+        logs.push(`ERROR CRÍTICO: ${err.message}`);
+        console.error('[CRON-FACT-INDIVIDUAL]', err);
+        return logs;
+    }
+}
+
 export const initScheduler = () => {
     console.log('[M7-SCHEDULER] Inicializando Motor de Tareas Programadas...');
 
@@ -145,13 +324,16 @@ export const runFacturacionPendienteGeneral = async (): Promise<string[]> => {
                     WHEN COALESCE(total_cxc, 0) = 0 THEN total_value_cxc_final 
                     ELSE total_cxc 
                 END as venta, 
-                client_name 
+                client_name,
+                manifest_status 
             FROM management_orders 
             WHERE (
                 invoice_cxc IS NULL 
                 OR TRIM(invoice_cxc) = '' 
                 OR TRIM(invoice_cxc) = '0'
-                OR UPPER(TRIM(invoice_cxc)) IN ('S/I', 'N/A', 'NA')
+                OR UPPER(TRIM(invoice_cxc)) IN ('S/I', 'N/A', 'NA', 'SIN FACTURA CXC')
+                OR invoice_date IS NULL
+                OR COALESCE(total_cxc, 0) = 0
             )
               AND manifest_number IS NOT NULL
               AND TRIM(manifest_number) <> ''
@@ -170,6 +352,7 @@ export const runFacturacionPendienteGeneral = async (): Promise<string[]> => {
             'Manifiesto': r.manifest_number,
             'Fecha Manifiesto': r.manifest_date ? new Date(r.manifest_date).toLocaleDateString() : 'S/I',
             'Cliente': r.client_name,
+            'Estado': r.manifest_status ? String(r.manifest_status).trim() : 'S/I',
             'Valor Venta': Number(r.venta) || 0
         }));
 
@@ -181,6 +364,19 @@ export const runFacturacionPendienteGeneral = async (): Promise<string[]> => {
         XLSX.utils.book_append_sheet(workbook, worksheet, "Fact_Pendiente");
         const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 
+        const summaryByClient: Record<string, { count: number, total: number }> = {};
+        reportRes.rows.forEach(r => {
+            const c = r.client_name ? String(r.client_name).trim() : 'S/I';
+            if (!summaryByClient[c]) summaryByClient[c] = { count: 0, total: 0 };
+            summaryByClient[c].count++;
+            summaryByClient[c].total += (Number(r.venta) || 0);
+        });
+
+        let clientRows = '';
+        for (const [c, stats] of Object.entries(summaryByClient)) {
+            clientRows += `<tr><td style="border:1px solid #ccc;padding:4px;">${c}</td><td style="border:1px solid #ccc;padding:4px;text-align:center;">${stats.count}</td><td style="border:1px solid #ccc;padding:4px;text-align:right;">$${stats.total.toLocaleString('es-CO')}</td></tr>`;
+        }
+
         const html = `
             <h2>Resumen de Facturación Pendiente General</h2>
             <p>Se adjunta el reporte de facturación pendiente con todos los manifiestos no facturados.</p>
@@ -188,6 +384,21 @@ export const runFacturacionPendienteGeneral = async (): Promise<string[]> => {
                 <li><strong>Total Manifiestos Pendientes:</strong> ${reportRes.rowCount}</li>
                 <li><strong>Valor Total Pendiente:</strong> $${totalVenta.toLocaleString('es-CO')}</li>
             </ul>
+            <br/>
+            <table style="border-collapse: collapse; width: 100%; max-width: 600px; font-size: 14px;">
+                <thead>
+                    <tr style="background-color: #f3f4f6;">
+                        <th style="border:1px solid #ccc;padding:4px;text-align:left;">Cliente</th>
+                        <th style="border:1px solid #ccc;padding:4px;text-align:center;">Cant.</th>
+                        <th style="border:1px solid #ccc;padding:4px;text-align:right;">Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${clientRows}
+                </tbody>
+            </table>
+            <br/>
+            <p>Por favor, revisa el archivo Excel adjunto para ver el detalle completo.</p>
         `;
 
         logs.push(`Enviando correos a: ${targetEmails.join(', ')}...`);

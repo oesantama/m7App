@@ -317,6 +317,9 @@ export const runCron = async (req: any, res: Response) => {
             case 'facturacionPendiente':
                 logs = await scheduler.runFacturacionPendienteGeneral();
                 break;
+            case 'facturacionPendienteIndividual':
+                logs = await scheduler.runFacturacionPendienteIndividual();
+                break;
             default:
                 return res.status(404).json({ error: "Cron no encontrado" });
         }
