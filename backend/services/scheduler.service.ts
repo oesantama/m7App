@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import pool from '../config/database.js';
 import { syncDriveCumplidos } from './drive-gemini.service.js';
+import { scrapeTransportandoReports } from './scraper.service.js';
 
 /**
  * Retrocede N días hábiles (lunes-viernes) desde una fecha dada.
@@ -262,6 +263,16 @@ export const initScheduler = () => {
     });
     console.log('[M7-SCHEDULER] Tarea "Facturación Pendiente" programada: Lunes a Sábado 10:00 AM');
 
+    // Scraping e importación automática desde Transportando: Todos los días a las 5:00 AM
+    cron.schedule('0 5 * * *', async () => {
+        console.log('[M7-SCHEDULER] Ejecutando cron de Importación de Manifiestos desde Transportando...');
+        const logs = await scrapeTransportandoReports();
+        console.log('[M7-SCHEDULER] Logs Scraping Transportando:', logs.join(' | '));
+    }, {
+        timezone: 'America/Bogota'
+    });
+    console.log('[M7-SCHEDULER] Tarea "Importación Transportando" programada: Diariamente 05:00 AM');
+
     // ── KEEP-ALIVE: ping interno cada 4 minutos ───────────────────────────────
     // Evita que Traefik/Coolify cierre conexiones TCP inactivas y que el proceso
     // Node.js quede en estado "zombi" sin tráfico. También mantiene el pool de
@@ -451,4 +462,8 @@ export const manualRunCleanNews = async (): Promise<string[]> => {
     }
     logs.push(`[${new Date().toLocaleString()}] Tarea finalizada.`);
     return logs;
+};
+
+export const manualRunTransportandoScrape = async (): Promise<string[]> => {
+    return await scrapeTransportandoReports();
 };

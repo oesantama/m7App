@@ -305,6 +305,8 @@ export const runCron = async (req: any, res: Response) => {
         if (!cronName) return res.status(400).json({ error: "Nombre del cron requerido" });
 
         const scheduler = await import('../services/scheduler.service.js');
+        // Usamos require o import dinámico para el scraper si es necesario
+        const scraper = await import('../services/scraper.service.js');
         let logs: string[] = [];
 
         switch (cronName) {
@@ -320,6 +322,9 @@ export const runCron = async (req: any, res: Response) => {
             case 'facturacionPendienteIndividual':
                 logs = await scheduler.runFacturacionPendienteIndividual();
                 break;
+            case 'transportandoScrape':
+                logs = await scheduler.manualRunTransportandoScrape();
+                break;
             default:
                 return res.status(404).json({ error: "Cron no encontrado" });
         }
@@ -328,5 +333,14 @@ export const runCron = async (req: any, res: Response) => {
     } catch (err: any) {
         console.error('[ADMIN-RUN-CRON]', err.message);
         res.status(500).json({ error: "Error al ejecutar el cron", details: err.message });
+    }
+};
+
+export const getCronLogs = async (req: any, res: Response) => {
+    try {
+        const scraper = await import('../services/scraper.service.js');
+        res.json({ logs: scraper.activeScraperLogs || [] });
+    } catch (e: any) {
+        res.json({ logs: [] });
     }
 };

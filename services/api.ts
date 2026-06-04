@@ -1374,6 +1374,7 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cronName })
   }),
+  getCronLogs: () => fetchJson(`${API_URL}/admin/cron/logs`),
 
   // --- DASHBOARD & INTELLIGENCE ---
   getDashboardStats: (period: string) => fetchJson(`${API_URL}/dashboard/stats?period=${period}`),
@@ -1558,4 +1559,18 @@ export const api = {
     }),
   deleteFlotaManualEntry: (id: number) =>
     fetchJson(`${API_URL}/flota/manual-entries/${id}`, { method: 'DELETE' }),
+
+  // --- TDM MANIFIESTOS (carga por Excel) ---
+  uploadTdmManifiestos: (data: { clientId: string; clientName: string; rows: any[]; uploadedBy?: string }) =>
+    fetchJson(`${API_URL}/flota/tdm/upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  getTdmManifiestos: (params?: { from?: string; to?: string; clientId?: string; view?: 'detail' | 'summary' }) => {
+    const qs = params ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null) as [string, string][])).toString() : '';
+    return fetchJson(`${API_URL}/flota/tdm/manifiestos${qs}`);
+  },
+  deleteTdmManifiesto: (id: number) =>
+    fetchJson(`${API_URL}/flota/tdm/manifiestos/${id}`, { method: 'DELETE' }),
 };

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getTables, getTableData, saveRecord, deleteRecord, executeSql, getTableSchema, bulkDeleteRecords, runCron } from '../controllers/admin.controller.js';
+import { getTables, getTableData, saveRecord, deleteRecord, executeSql, getTableSchema, bulkDeleteRecords, runCron, getCronLogs } from '../controllers/admin.controller.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 
 const router = Router();
@@ -15,5 +15,6 @@ router.post('/delete', deleteRecord);
 router.post('/bulk-delete', bulkDeleteRecords);
 router.post('/schema', getTableSchema); // New schema route
 router.post('/cron/run', runCron); // New cron runner route
+router.get('/cron/logs', getCronLogs); // Live cron logs
 
 export default router;

@@ -196,18 +196,30 @@ export default function InformesFlota({ user: _user }: Props) {
   const [to, setTo] = useState(today);
   const [loading, setLoading] = useState(false);
   const [rawData, setRawData] = useState<any[]>([]);
+  const [tdmFinancial, setTdmFinancial] = useState<{ totalCobrar: number; totalPagar: number; totalManif: number }>({ totalCobrar: 0, totalPagar: 0, totalManif: 0 });
   const [searched, setSearched] = useState(false);
 
   const handleSearch = useCallback(async () => {
     if (!from || !to) { toast.error('Seleccione rango de fechas'); return; }
     setLoading(true);
     try {
-      const res = await api.getFlotaReport({ from, to });
+      const [res, tdmRes] = await Promise.all([
+        api.getFlotaReport({ from, to }),
+        api.getTdmManifiestos({ from, to, view: 'summary' }).catch(() => ({ success: false, data: [] })),
+      ]);
       if (res.success) {
         setRawData(res.data || []);
         setSearched(true);
       } else {
         toast.error(res.error || 'Error al cargar datos');
+      }
+      if (tdmRes.success) {
+        const rows = tdmRes.data || [];
+        setTdmFinancial({
+          totalCobrar: rows.reduce((s: number, r: any) => s + Number(r.total_cobrar || 0), 0),
+          totalPagar:  rows.reduce((s: number, r: any) => s + Number(r.total_pagar  || 0), 0),
+          totalManif:  rows.reduce((s: number, r: any) => s + Number(r.total_manifiestos || 0), 0),
+        });
       }
     } catch (err: any) {
       toast.error(err.message || 'Error al cargar datos');
@@ -288,19 +300,36 @@ export default function InformesFlota({ user: _user }: Props) {
 
       {/* KPI strip */}
       {searched && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {[
-            { label: 'Total Viajes', value: totalViajes, color: 'bg-indigo-600', icon: '🚛' },
-            { label: 'Viajes M7', value: m7Rows.reduce((s, r) => s + r.quantity, 0), color: 'bg-violet-600', icon: '🏢' },
-            { label: 'Viajes TDM', value: tdmRows.reduce((s, r) => s + r.quantity, 0), color: 'bg-amber-500', icon: '⭐' },
-            { label: 'Clientes', value: new Set(rawData.map(r => r.client_name)).size, color: 'bg-emerald-600', icon: '👥' },
-          ].map(k => (
-            <div key={k.label} className={`${k.color} text-white rounded-3xl p-5 shadow-sm`}>
-              <p className="text-2xl">{k.icon}</p>
-              <p className="text-2xl font-black mt-1">{k.value.toLocaleString('es-CO')}</p>
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mt-0.5">{k.label}</p>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {[
+              { label: 'Total Viajes', value: totalViajes.toLocaleString('es-CO'), color: 'bg-indigo-600', icon: '🚛' },
+              { label: 'Viajes M7', value: m7Rows.reduce((s, r) => s + r.quantity, 0).toLocaleString('es-CO'), color: 'bg-violet-600', icon: '🏢' },
+              { label: 'Viajes TDM', value: tdmRows.reduce((s, r) => s + r.quantity, 0).toLocaleString('es-CO'), color: 'bg-amber-500', icon: '⭐' },
+              { label: 'Clientes', value: new Set(rawData.map(r => r.client_name)).size.toLocaleString('es-CO'), color: 'bg-emerald-600', icon: '👥' },
+            ].map(k => (
+              <div key={k.label} className={`${k.color} text-white rounded-3xl p-5 shadow-sm`}>
+                <p className="text-2xl">{k.icon}</p>
+                <p className="text-2xl font-black mt-1">{k.value}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mt-0.5">{k.label}</p>
+              </div>
+            ))}
+          </div>
+          {tdmFinancial.totalManif > 0 && (
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: 'Manifiestos TDM', value: tdmFinancial.totalManif.toLocaleString('es-CO'), color: 'bg-amber-700', icon: '📋' },
+                { label: 'TDM — Total Cobrar', value: `$${tdmFinancial.totalCobrar.toLocaleString('es-CO')}`, color: 'bg-emerald-700', icon: '💰' },
+                { label: 'TDM — Total Pagar',  value: `$${tdmFinancial.totalPagar.toLocaleString('es-CO')}`,  color: 'bg-rose-700',    icon: '📤' },
+              ].map(k => (
+                <div key={k.label} className={`${k.color} text-white rounded-3xl p-5 shadow-sm`}>
+                  <p className="text-2xl">{k.icon}</p>
+                  <p className="text-xl font-black mt-1">{k.value}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mt-0.5">{k.label}</p>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
       )}
 

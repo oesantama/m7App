@@ -677,7 +677,9 @@ const GestionDocumental: React.FC = () => {
                                             <Upload size={40} />
                                         </div>
                                         <div className="space-y-2">
-                                            <h4 className="text-xl font-black text-slate-800 uppercase tracking-tight">Suelta tus PDFs, fotos o archivos Excel aquí</h4>
+                                            <h4 className="text-xl font-black text-slate-800 uppercase tracking-tight">
+                                                {files.length > 0 ? `${files.length} DE 20 ARCHIVOS SELECCIONADOS` : 'Suelta tus PDFs, fotos o archivos Excel aquí'}
+                                            </h4>
                                             <p className="text-sm text-slate-500 font-medium">Soporta PDF, imágenes y planillas Excel / CSV (hasta 20 simultáneos)</p>
                                         </div>
                                     </label>
@@ -712,7 +714,7 @@ const GestionDocumental: React.FC = () => {
                                                 ? 'bg-slate-200 cursor-not-allowed text-slate-400'
                                                 : 'bg-indigo-600 hover:bg-indigo-500 hover:-translate-y-1 shadow-indigo-500/40'}`}
                                     >
-                                        {isUploading ? <Loader2 className="animate-spin" size={24} /> : <><CheckCircle2 size={24} /> INICIAR TRANSFERENCIA MASIVA</>}
+                                        {isUploading ? <Loader2 className="animate-spin" size={24} /> : <><CheckCircle2 size={24} /> INICIAR TRANSFERENCIA MASIVA ({files.length} DE 20)</>}
                                     </button>
                                 </div>
                             </div>

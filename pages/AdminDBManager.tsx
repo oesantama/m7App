@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore } from '../stores/useAppStore';
 import { api } from '../services/api'; 
 import { toast } from 'sonner';
@@ -59,6 +59,11 @@ const AdminDBManager: React.FC = () => {
   // Cron State
   const [cronLogs, setCronLogs] = useState<string[]>([]);
   const [runningCrons, setRunningCrons] = useState<Record<string, boolean>>({});
+  const logsEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [cronLogs]);
 
   const handleRunCron = async (cronName: string) => {
       setRunningCrons(prev => ({ ...prev, [cronName]: true }));
@@ -143,6 +148,26 @@ const AdminDBManager: React.FC = () => {
         loadTables();
     }
   }, [user]);
+
+  useEffect(() => {
+      let interval: NodeJS.Timeout;
+      const isAnyRunning = Object.values(runningCrons).some(v => v);
+      if (isAnyRunning) {
+          interval = setInterval(async () => {
+              try {
+                  const res = await api.getCronLogs();
+                  if (res && res.logs) {
+                      setCronLogs(res.logs);
+                  }
+              } catch (e) {
+                  // ignore
+              }
+          }, 2000);
+      }
+      return () => {
+          if (interval) clearInterval(interval);
+      };
+  }, [runningCrons]);
 
   useEffect(() => {
     if (selectedTable && mode === 'TABLE' && user && user.token) {
@@ -453,14 +478,6 @@ const AdminDBManager: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
             <h2 className="text-3xl font-black text-slate-800 uppercase tracking-tighter">Gestor de Base de Datos</h2>
-            <button 
-                onClick={triggerManualCron}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-3 rounded shadow-md text-sm transition-colors flex items-center gap-2"
-                title="Provisional: Disparar CRON de Planillas Drive"
-            >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                FORZAR CRON DRIVE
-            </button>
         </div>
         
         <div className="flex gap-2">
@@ -823,7 +840,7 @@ const AdminDBManager: React.FC = () => {
                   <h3 className="text-xl font-bold text-slate-800 border-b pb-2 mb-4">Administración de Tareas Programadas</h3>
                   <p className="text-sm text-slate-500 mb-6">Ejecute manualmente las tareas programadas (CRON) y observe los logs de ejecución en tiempo real.</p>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                       <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
                           <h4 className="font-bold text-slate-800">Facturación Pendiente General</h4>
                           <p className="text-xs text-slate-500">Envía un reporte Excel consolidado de todos los clientes a los correos en notificaciones (TGN-04).</p>
@@ -883,15 +900,29 @@ const AdminDBManager: React.FC = () => {
                               </button>
                           </div>
                       </div>
+                      <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
+                          <h4 className="font-bold text-slate-800">Importación Transportando</h4>
+                          <p className="text-xs text-slate-500">Bot automático de web scraping para descargar informes desde el portal TMS de Transportando y cargarlos a la BD local.</p>
+                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Diariamente, 05:00 AM</p>
+                          <div className="mt-auto pt-2">
+                              <button 
+                                  onClick={() => handleRunCron('transportandoScrape')}
+                                  disabled={runningCrons['transportandoScrape']}
+                                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
+                              >
+                                  {runningCrons['transportandoScrape'] ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
+                              </button>
+                          </div>
+                      </div>
                   </div>
               </div>
 
-              <div className="flex-1 flex flex-col border border-slate-200 rounded overflow-hidden">
+              <div className="min-h-[300px] flex flex-col border border-slate-200 rounded overflow-hidden mt-4">
                   <div className="bg-slate-800 text-white px-4 py-2 font-mono text-sm flex justify-between items-center">
                       <span>Terminal de Logs (CRON)</span>
                       <button onClick={() => setCronLogs([])} className="text-xs hover:text-slate-300">Limpiar</button>
                   </div>
-                  <div className="flex-1 bg-slate-900 text-green-400 p-4 font-mono text-xs overflow-auto whitespace-pre-wrap flex flex-col gap-1 min-h-[200px]">
+                  <div className="flex-1 bg-slate-900 text-green-400 p-4 font-mono text-xs overflow-auto whitespace-pre-wrap flex flex-col gap-1 max-h-[400px]">
                       {cronLogs.length === 0 ? (
                           <span className="text-slate-500">Esperando ejecución de tareas...</span>
                       ) : (
@@ -899,6 +930,7 @@ const AdminDBManager: React.FC = () => {
                               <div key={i}>{log}</div>
                           ))
                       )}
+                      <div ref={logsEndRef} />
                   </div>
               </div>
           </div>

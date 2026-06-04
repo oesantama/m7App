@@ -238,7 +238,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
   
-  // Flota: tabla de operaciones manuales TDM
+  // Flota: tabla de operaciones manuales TDM (legada — se conserva por compatibilidad)
   try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS flota_manual_entries (
@@ -259,6 +259,31 @@ const healSchema = async (client: any) => {
     await client.query(`ALTER TABLE management_orders ADD COLUMN IF NOT EXISTS fecha_egreso TIMESTAMP WITH TIME ZONE`);
   } catch (err) {
     console.error('[M7-DB] Error al crear flota_manual_entries:', err);
+  }
+
+  // Flota TDM: tabla de manifiestos cargados por Excel (clave primaria de negocio: manifiesto)
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS flota_tdm_manifiestos (
+        id SERIAL PRIMARY KEY,
+        client_id VARCHAR(50) NOT NULL,
+        client_name VARCHAR(255) NOT NULL,
+        manifiesto VARCHAR(150) NOT NULL,
+        fecha_operacion DATE NOT NULL,
+        remesa VARCHAR(200),
+        valor_cobrar NUMERIC(15,2) DEFAULT 0,
+        valor_pagar NUMERIC(15,2) DEFAULT 0,
+        ciudad VARCHAR(100) DEFAULT 'SIN CIUDAD',
+        extra_fields JSONB DEFAULT '{}',
+        uploaded_by VARCHAR(100),
+        uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        CONSTRAINT uq_flota_tdm_manifiesto UNIQUE (manifiesto)
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_flota_tdm_fecha ON flota_tdm_manifiestos (fecha_operacion)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_flota_tdm_client ON flota_tdm_manifiestos (client_id)`);
+  } catch (err) {
+    console.error('[M7-DB] Error al crear flota_tdm_manifiestos:', err);
   }
 
   // M7: Crear tabla prov_cliente de forma explícita si no existe

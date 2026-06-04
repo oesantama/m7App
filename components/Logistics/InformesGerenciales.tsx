@@ -721,18 +721,46 @@ export const InformesGerenciales: React.FC = () => {
         'Fecha Manifiesto': formatDate(r.manifest_date),
         'Placa': r.plate,
         'Nombre Cliente': r.client_name,
-        'Valor Total CXC final': r.total_value_cxc_final,
-        'Valor Tot CXP final': r.total_value_cxp_final,
+        'Valor Total CXC final': parseValNum(r.total_value_cxc_final),
+        'Valor Tot CXP final': parseValNum(r.total_value_cxp_final),
         'Factura CXC': r.invoice_cxc,
         'Recibo': r.receipt,
         'Fecha Factura': formatDate(r.invoice_date),
-        'Total CXC': r.total_cxc,
+        'Total CXC': parseValNum(r.total_cxc),
         'Egreso': r.egress,
         'Fecha CXP': formatDate(r.cxp_date),
-        'Total CXP': r.total_cxp
+        'Total CXP': parseValNum(r.total_cxp)
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportRows);
+
+      const colZFormats: Record<string, string> = {
+        'Valor Total CXC final': '"$"#,##0',
+        'Valor Tot CXP final': '"$"#,##0',
+        'Total CXC': '"$"#,##0',
+        'Total CXP': '"$"#,##0'
+      };
+
+      if (worksheet['!ref']) {
+        const range = XLSX.utils.decode_range(worksheet['!ref']);
+        const colNames: Record<number, string> = {};
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cell = worksheet[XLSX.utils.encode_cell({ r: 0, c: C })];
+          if (cell && cell.v) colNames[C] = cell.v.toString();
+        }
+        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+          for (let C = range.s.c; C <= range.e.c; ++C) {
+            const colName = colNames[C];
+            if (colName && colZFormats[colName]) {
+              const cell = worksheet[XLSX.utils.encode_cell({ r: R, c: C })];
+              if (cell && cell.t === 'n') {
+                cell.z = colZFormats[colName];
+              }
+            }
+          }
+        }
+      }
+
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "InformesGerenciales");
       
@@ -1560,22 +1588,22 @@ export const InformesGerenciales: React.FC = () => {
       // Sheet 1: Resumen Ventas TDM (with real numbers)
       const summaryRows = tdmTableData.map(row => ({
         "CLIENTE": row.clientName,
-        "VENTA": row.ventaTotal,
-        "ING TERCEROS": row.ingTerceros,
-        "INGRESOS PROPIOS": row.ingresosPropios,
-        "INT (%)": Math.round(row.int * 10) / 10,
-        "PARTICIPACIÓN (%)": Math.round(row.participation),
-        "FACT. MISMO MES": row.invoicedSameMonthVal,
-        "% FACT. MISMO MES": Math.round(row.invoicedSameMonthPct * 10) / 10,
-        "PROM DÍA PAGO": Math.round(row.averagePaymentDays * 10) / 10,
-        "PROM DIAS REC": Math.round((row.averageRecDays || 0) * 10) / 10,
-        "PROM DIAS EGRESO": Math.round((row.averageEgrDays || 0) * 10) / 10,
-        "PROM DIA MAN RECIBIDO": Math.round((row.averageManRecDays || 0) * 10) / 10,
-        "VL RECIBIDO": row.receivedValue,
-        "% RECIBIDO": Math.round((row.receivedPct || 0) * 10) / 10,
-        "DÍAS LABORADOS": row.workedDaysCount,
-        "VEHÍCULOS UTILIZADOS": row.totalVehicleUtilizations,
-        "PROMEDIO DÍA": Math.round(row.averageVehiclesPerDay * 10) / 10
+        "VENTA": Math.round(row.ventaTotal || 0),
+        "ING TERCEROS": Math.round(row.ingTerceros || 0),
+        "INGRESOS PROPIOS": Math.round(row.ingresosPropios || 0),
+        "INT (%)": (Math.round((row.int || 0) * 10) / 10) / 100,
+        "PARTICIPACIÓN (%)": (Math.round((row.participation || 0) * 10) / 10) / 100,
+        "FACT. MISMO MES": Math.round(row.invoicedSameMonthVal || 0),
+        "% FACT. MISMO MES": (Math.round((row.invoicedSameMonthPct || 0) * 10) / 10) / 100,
+        "PROM DÍA PAGO": Math.round(row.averagePaymentDays || 0),
+        "PROM DIAS REC": Math.round(row.averageRecDays || 0),
+        "PROM DIAS EGRESO": Math.round(row.averageEgrDays || 0),
+        "PROM DIA MAN RECIBIDO": Math.round(row.averageManRecDays || 0),
+        "VL RECIBIDO": Math.round(row.receivedValue || 0),
+        "% RECIBIDO": (Math.round((row.receivedPct || 0) * 10) / 10) / 100,
+        "DÍAS LABORADOS": Math.round(row.workedDaysCount || 0),
+        "VEHÍCULOS UTILIZADOS": Math.round(row.totalVehicleUtilizations || 0),
+        "PROMEDIO DÍA": Math.round((row.averageVehiclesPerDay || 0) * 10) / 10
       }));
 
       // Calculate totals for summary
@@ -1613,25 +1641,65 @@ export const InformesGerenciales: React.FC = () => {
 
       summaryRows.push({
         "CLIENTE": "TOTAL GENERAL",
-        "VENTA": totalVenta,
-        "ING TERCEROS": totalIngTerceros,
-        "INGRESOS PROPIOS": totalIngresosPropios,
-        "INT (%)": Math.round(overallInt * 10) / 10,
-        "PARTICIPACIÓN (%)": 100,
-        "FACT. MISMO MES": totalInvoicedSameMonth,
-        "% FACT. MISMO MES": Math.round(overallInvoicedSameMonthPct * 10) / 10,
-        "PROM DÍA PAGO": Math.round(overallAveragePaymentDays * 10) / 10,
-        "PROM DIAS REC": Math.round(overallAverageRecDays * 10) / 10,
-        "PROM DIAS EGRESO": Math.round(overallAverageEgrDays * 10) / 10,
-        "PROM DIA MAN RECIBIDO": Math.round(overallAverageManRecDays * 10) / 10,
-        "VL RECIBIDO": totalReceivedValueVal,
-        "% RECIBIDO": Math.round(overallReceivedPct * 10) / 10,
-        "DÍAS LABORADOS": totalWorkedDays,
-        "VEHÍCULOS UTILIZADOS": totalVehicleDaysCount,
-        "PROMEDIO DÍA": Math.round(totalAvgVehiclesPerDay * 10) / 10
+        "VENTA": Math.round(totalVenta || 0),
+        "ING TERCEROS": Math.round(totalIngTerceros || 0),
+        "INGRESOS PROPIOS": Math.round(totalIngresosPropios || 0),
+        "INT (%)": (Math.round((overallInt || 0) * 10) / 10) / 100,
+        "PARTICIPACIÓN (%)": 1,
+        "FACT. MISMO MES": Math.round(totalInvoicedSameMonth || 0),
+        "% FACT. MISMO MES": (Math.round((overallInvoicedSameMonthPct || 0) * 10) / 10) / 100,
+        "PROM DÍA PAGO": Math.round(overallAveragePaymentDays || 0),
+        "PROM DIAS REC": Math.round(overallAverageRecDays || 0),
+        "PROM DIAS EGRESO": Math.round(overallAverageEgrDays || 0),
+        "PROM DIA MAN RECIBIDO": Math.round(overallAverageManRecDays || 0),
+        "VL RECIBIDO": Math.round(totalReceivedValueVal || 0),
+        "% RECIBIDO": (Math.round((overallReceivedPct || 0) * 10) / 10) / 100,
+        "DÍAS LABORADOS": Math.round(totalWorkedDays || 0),
+        "VEHÍCULOS UTILIZADOS": Math.round(totalVehicleDaysCount || 0),
+        "PROMEDIO DÍA": Math.round((totalAvgVehiclesPerDay || 0) * 10) / 10
       });
 
       const worksheetSummary = XLSX.utils.json_to_sheet(summaryRows);
+
+      // Apply Excel formatting to raw numbers
+      const colZFormats: Record<string, string> = {
+        "VENTA": '"$"#,##0',
+        "ING TERCEROS": '"$"#,##0',
+        "INGRESOS PROPIOS": '"$"#,##0',
+        "INT (%)": '0.0%',
+        "PARTICIPACIÓN (%)": '0.0%',
+        "FACT. MISMO MES": '"$"#,##0',
+        "% FACT. MISMO MES": '0.0%',
+        "PROM DÍA PAGO": '#,##0',
+        "PROM DIAS REC": '#,##0',
+        "PROM DIAS EGRESO": '#,##0',
+        "PROM DIA MAN RECIBIDO": '#,##0',
+        "VL RECIBIDO": '"$"#,##0',
+        "% RECIBIDO": '0.0%',
+        "DÍAS LABORADOS": '#,##0',
+        "VEHÍCULOS UTILIZADOS": '#,##0',
+        "PROMEDIO DÍA": '0.0'
+      };
+
+      if (worksheetSummary['!ref']) {
+        const range = XLSX.utils.decode_range(worksheetSummary['!ref']);
+        const colNames: Record<number, string> = {};
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cell = worksheetSummary[XLSX.utils.encode_cell({ r: 0, c: C })];
+          if (cell && cell.v) colNames[C] = cell.v.toString();
+        }
+        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+          for (let C = range.s.c; C <= range.e.c; ++C) {
+            const colName = colNames[C];
+            if (colName && colZFormats[colName]) {
+              const cell = worksheetSummary[XLSX.utils.encode_cell({ r: R, c: C })];
+              if (cell && cell.t === 'n') {
+                cell.z = colZFormats[colName];
+              }
+            }
+          }
+        }
+      }
 
       // Sheet 2: Detalle Transacciones (exclude ANULADO)
       const detailRecords = reportRecords.filter(r => {
@@ -1674,22 +1742,22 @@ export const InformesGerenciales: React.FC = () => {
       // Sheet 1: Resumen Ventas TDM (with real numbers)
       const summaryRows = tdmTableData.map(row => ({
         "CLIENTE": row.clientName,
-        "VENTA": row.ventaTotal,
-        "ING TERCEROS": row.ingTerceros,
-        "INGRESOS PROPIOS": row.ingresosPropios,
-        "INT (%)": Math.round(row.int * 10) / 10,
-        "PARTICIPACIÓN (%)": Math.round(row.participation),
-        "FACT. MISMO MES": row.invoicedSameMonthVal,
-        "% FACT. MISMO MES": Math.round(row.invoicedSameMonthPct * 10) / 10,
-        "PROM DÍA PAGO": Math.round(row.averagePaymentDays * 10) / 10,
-        "PROM DIAS REC": Math.round((row.averageRecDays || 0) * 10) / 10,
-        "PROM DIAS EGRESO": Math.round((row.averageEgrDays || 0) * 10) / 10,
-        "PROM DIA MAN RECIBIDO": Math.round((row.averageManRecDays || 0) * 10) / 10,
-        "VL RECIBIDO": row.receivedValue,
-        "% RECIBIDO": Math.round((row.receivedPct || 0) * 10) / 10,
-        "DÍAS LABORADOS": row.workedDaysCount,
-        "VEHÍCULOS UTILIZADOS": row.totalVehicleUtilizations,
-        "PROMEDIO DÍA": Math.round(row.averageVehiclesPerDay * 10) / 10
+        "VENTA": Math.round(row.ventaTotal || 0),
+        "ING TERCEROS": Math.round(row.ingTerceros || 0),
+        "INGRESOS PROPIOS": Math.round(row.ingresosPropios || 0),
+        "INT (%)": (Math.round((row.int || 0) * 10) / 10) / 100,
+        "PARTICIPACIÓN (%)": (Math.round((row.participation || 0) * 10) / 10) / 100,
+        "FACT. MISMO MES": Math.round(row.invoicedSameMonthVal || 0),
+        "% FACT. MISMO MES": (Math.round((row.invoicedSameMonthPct || 0) * 10) / 10) / 100,
+        "PROM DÍA PAGO": Math.round(row.averagePaymentDays || 0),
+        "PROM DIAS REC": Math.round(row.averageRecDays || 0),
+        "PROM DIAS EGRESO": Math.round(row.averageEgrDays || 0),
+        "PROM DIA MAN RECIBIDO": Math.round(row.averageManRecDays || 0),
+        "VL RECIBIDO": Math.round(row.receivedValue || 0),
+        "% RECIBIDO": (Math.round((row.receivedPct || 0) * 10) / 10) / 100,
+        "DÍAS LABORADOS": Math.round(row.workedDaysCount || 0),
+        "VEHÍCULOS UTILIZADOS": Math.round(row.totalVehicleUtilizations || 0),
+        "PROMEDIO DÍA": Math.round((row.averageVehiclesPerDay || 0) * 10) / 10
       }));
 
       // Calculate totals for summary
@@ -1727,25 +1795,65 @@ export const InformesGerenciales: React.FC = () => {
 
       summaryRows.push({
         "CLIENTE": "TOTAL GENERAL",
-        "VENTA": totalVenta,
-        "ING TERCEROS": totalIngTerceros,
-        "INGRESOS PROPIOS": totalIngresosPropios,
-        "INT (%)": Math.round(overallInt * 10) / 10,
-        "PARTICIPACIÓN (%)": 100,
-        "FACT. MISMO MES": totalInvoicedSameMonth,
-        "% FACT. MISMO MES": Math.round(overallInvoicedSameMonthPct * 10) / 10,
-        "PROM DÍA PAGO": Math.round(overallAveragePaymentDays * 10) / 10,
-        "PROM DIAS REC": Math.round(overallAverageRecDays * 10) / 10,
-        "PROM DIAS EGRESO": Math.round(overallAverageEgrDays * 10) / 10,
-        "PROM DIA MAN RECIBIDO": Math.round(overallAverageManRecDays * 10) / 10,
-        "VL RECIBIDO": totalReceivedValueVal,
-        "% RECIBIDO": Math.round(overallReceivedPct * 10) / 10,
-        "DÍAS LABORADOS": totalWorkedDays,
-        "VEHÍCULOS UTILIZADOS": totalVehicleDaysCount,
-        "PROMEDIO DÍA": Math.round(totalAvgVehiclesPerDay * 10) / 10
+        "VENTA": Math.round(totalVenta || 0),
+        "ING TERCEROS": Math.round(totalIngTerceros || 0),
+        "INGRESOS PROPIOS": Math.round(totalIngresosPropios || 0),
+        "INT (%)": (Math.round((overallInt || 0) * 10) / 10) / 100,
+        "PARTICIPACIÓN (%)": 1,
+        "FACT. MISMO MES": Math.round(totalInvoicedSameMonth || 0),
+        "% FACT. MISMO MES": (Math.round((overallInvoicedSameMonthPct || 0) * 10) / 10) / 100,
+        "PROM DÍA PAGO": Math.round(overallAveragePaymentDays || 0),
+        "PROM DIAS REC": Math.round(overallAverageRecDays || 0),
+        "PROM DIAS EGRESO": Math.round(overallAverageEgrDays || 0),
+        "PROM DIA MAN RECIBIDO": Math.round(overallAverageManRecDays || 0),
+        "VL RECIBIDO": Math.round(totalReceivedValueVal || 0),
+        "% RECIBIDO": (Math.round((overallReceivedPct || 0) * 10) / 10) / 100,
+        "DÍAS LABORADOS": Math.round(totalWorkedDays || 0),
+        "VEHÍCULOS UTILIZADOS": Math.round(totalVehicleDaysCount || 0),
+        "PROMEDIO DÍA": Math.round((totalAvgVehiclesPerDay || 0) * 10) / 10
       });
 
       const worksheetSummary = XLSX.utils.json_to_sheet(summaryRows);
+
+      // Apply Excel formatting to raw numbers
+      const colZFormats: Record<string, string> = {
+        "VENTA": '"$"#,##0',
+        "ING TERCEROS": '"$"#,##0',
+        "INGRESOS PROPIOS": '"$"#,##0',
+        "INT (%)": '0.0%',
+        "PARTICIPACIÓN (%)": '0.0%',
+        "FACT. MISMO MES": '"$"#,##0',
+        "% FACT. MISMO MES": '0.0%',
+        "PROM DÍA PAGO": '#,##0',
+        "PROM DIAS REC": '#,##0',
+        "PROM DIAS EGRESO": '#,##0',
+        "PROM DIA MAN RECIBIDO": '#,##0',
+        "VL RECIBIDO": '"$"#,##0',
+        "% RECIBIDO": '0.0%',
+        "DÍAS LABORADOS": '#,##0',
+        "VEHÍCULOS UTILIZADOS": '#,##0',
+        "PROMEDIO DÍA": '0.0'
+      };
+
+      if (worksheetSummary['!ref']) {
+        const range = XLSX.utils.decode_range(worksheetSummary['!ref']);
+        const colNames: Record<number, string> = {};
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cell = worksheetSummary[XLSX.utils.encode_cell({ r: 0, c: C })];
+          if (cell && cell.v) colNames[C] = cell.v.toString();
+        }
+        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+          for (let C = range.s.c; C <= range.e.c; ++C) {
+            const colName = colNames[C];
+            if (colName && colZFormats[colName]) {
+              const cell = worksheetSummary[XLSX.utils.encode_cell({ r: R, c: C })];
+              if (cell && cell.t === 'n') {
+                cell.z = colZFormats[colName];
+              }
+            }
+          }
+        }
+      }
 
       // Sheet 2: Detalle Transacciones (exclude ANULADO)
       const detailRecords = reportRecords.filter(r => {
@@ -1806,11 +1914,11 @@ export const InformesGerenciales: React.FC = () => {
       const vehiclesData = getVehiclesIntDetails();
       const exportRows = vehiclesData.map(v => ({
         "PLACA / VEHÍCULO": v.plate,
-        "CANTIDAD MANIFIESTOS": v.manifestCount,
-        "VALOR CXC CXP INICIAL (VENTA)": v.ventaTotal,
-        "ING TERCEROS": v.ingTerceros,
-        "INGRESOS PROPIOS": v.ingresosPropios,
-        "INT (%)": Math.round(v.int * 10) / 10
+        "CANTIDAD MANIFIESTOS": Math.round(v.manifestCount || 0),
+        "VALOR CXC CXP INICIAL (VENTA)": Math.round(v.ventaTotal || 0),
+        "ING TERCEROS": Math.round(v.ingTerceros || 0),
+        "INGRESOS PROPIOS": Math.round(v.ingresosPropios || 0),
+        "INT (%)": (Math.round((v.int || 0) * 10) / 10) / 100
       }));
 
       // Calculate totals
@@ -1822,14 +1930,43 @@ export const InformesGerenciales: React.FC = () => {
 
       exportRows.push({
         "PLACA / VEHÍCULO": "TOTAL GENERAL",
-        "CANTIDAD MANIFIESTOS": totalManifests,
-        "VALOR CXC CXP INICIAL (VENTA)": totalVentas,
-        "ING TERCEROS": totalIngTerceros,
-        "INGRESOS PROPIOS": totalIngresosPropios,
-        "INT (%)": Math.round(overallInt * 10) / 10
+        "CANTIDAD MANIFIESTOS": Math.round(totalManifests || 0),
+        "VALOR CXC CXP INICIAL (VENTA)": Math.round(totalVentas || 0),
+        "ING TERCEROS": Math.round(totalIngTerceros || 0),
+        "INGRESOS PROPIOS": Math.round(totalIngresosPropios || 0),
+        "INT (%)": (Math.round((overallInt || 0) * 10) / 10) / 100
       });
 
       const worksheet = XLSX.utils.json_to_sheet(exportRows);
+      
+      const colZFormats: Record<string, string> = {
+        "CANTIDAD MANIFIESTOS": '#,##0',
+        "VALOR CXC CXP INICIAL (VENTA)": '"$"#,##0',
+        "ING TERCEROS": '"$"#,##0',
+        "INGRESOS PROPIOS": '"$"#,##0',
+        "INT (%)": '0.0%'
+      };
+
+      if (worksheet['!ref']) {
+        const range = XLSX.utils.decode_range(worksheet['!ref']);
+        const colNames: Record<number, string> = {};
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cell = worksheet[XLSX.utils.encode_cell({ r: 0, c: C })];
+          if (cell && cell.v) colNames[C] = cell.v.toString();
+        }
+        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+          for (let C = range.s.c; C <= range.e.c; ++C) {
+            const colName = colNames[C];
+            if (colName && colZFormats[colName]) {
+              const cell = worksheet[XLSX.utils.encode_cell({ r: R, c: C })];
+              if (cell && cell.t === 'n') {
+                cell.z = colZFormats[colName];
+              }
+            }
+          }
+        }
+      }
+
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Vehículos INT");
       XLSX.writeFile(workbook, `Vehiculos_INT_${selectedClientForVehiclesInt.replace(/\s+/g, '_')}.xlsx`);
@@ -4173,15 +4310,47 @@ Clientes General</h3>
                       const workbook = XLSX.utils.book_new();
 
                       // Hoja 1: Resumen
-                      // Round % Fact. Mes to 1 decimal place
                       const processedExportRows = exportRows.map(row => {
                         const newRow = { ...row };
                         if (typeof newRow['% Fact. Mes'] === 'number') {
-                          newRow['% Fact. Mes'] = Number(newRow['% Fact. Mes'].toFixed(1));
+                          newRow['% Fact. Mes'] = newRow['% Fact. Mes'] / 100;
+                        }
+                        if (typeof newRow['Venta'] === 'number') {
+                          newRow['Venta'] = Math.round(newRow['Venta']);
+                        }
+                        if (typeof newRow['Facturado'] === 'number') {
+                          newRow['Facturado'] = Math.round(newRow['Facturado']);
                         }
                         return newRow;
                       });
                       const worksheetResumen = XLSX.utils.json_to_sheet(processedExportRows);
+                      
+                      const colZFormatsResumen: Record<string, string> = {
+                        "Venta": '"$"#,##0',
+                        "Facturado": '"$"#,##0',
+                        "% Fact. Mes": '0.0%'
+                      };
+
+                      if (worksheetResumen['!ref']) {
+                        const range = XLSX.utils.decode_range(worksheetResumen['!ref']);
+                        const colNames: Record<number, string> = {};
+                        for (let C = range.s.c; C <= range.e.c; ++C) {
+                          const cell = worksheetResumen[XLSX.utils.encode_cell({ r: 0, c: C })];
+                          if (cell && cell.v) colNames[C] = cell.v.toString();
+                        }
+                        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                          for (let C = range.s.c; C <= range.e.c; ++C) {
+                            const colName = colNames[C];
+                            if (colName && colZFormatsResumen[colName]) {
+                              const cell = worksheetResumen[XLSX.utils.encode_cell({ r: R, c: C })];
+                              if (cell && cell.t === 'n') {
+                                cell.z = colZFormatsResumen[colName];
+                              }
+                            }
+                          }
+                        }
+                      }
+
                       XLSX.utils.book_append_sheet(workbook, worksheetResumen, "Resumen_Vehiculos");
 
                       // Hoja 2: Detalle Manifiestos
@@ -4194,14 +4363,41 @@ Clientes General</h3>
                               "Manifiesto": m.manifest_number,
                               "F. Manifiesto": formatDate(m.manifest_date) || "S/I",
                               "F. Factura": formatDate(m.invoice_date) || "S/I",
-                              "Venta": m.venta,
-                              "Facturado": m.facturado,
-                              "% Fact. Mes": Number(m.factMesPct.toFixed(1))
+                              "Venta": Math.round(m.venta || 0),
+                              "Facturado": Math.round(m.facturado || 0),
+                              "% Fact. Mes": (m.factMesPct || 0) / 100
                             });
                           });
                         }
                       });
                       const worksheetDetalle = XLSX.utils.json_to_sheet(detailRows);
+
+                      const colZFormatsDetalle: Record<string, string> = {
+                        "Venta": '"$"#,##0',
+                        "Facturado": '"$"#,##0',
+                        "% Fact. Mes": '0.0%'
+                      };
+
+                      if (worksheetDetalle['!ref']) {
+                        const range = XLSX.utils.decode_range(worksheetDetalle['!ref']);
+                        const colNames: Record<number, string> = {};
+                        for (let C = range.s.c; C <= range.e.c; ++C) {
+                          const cell = worksheetDetalle[XLSX.utils.encode_cell({ r: 0, c: C })];
+                          if (cell && cell.v) colNames[C] = cell.v.toString();
+                        }
+                        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                          for (let C = range.s.c; C <= range.e.c; ++C) {
+                            const colName = colNames[C];
+                            if (colName && colZFormatsDetalle[colName]) {
+                              const cell = worksheetDetalle[XLSX.utils.encode_cell({ r: R, c: C })];
+                              if (cell && cell.t === 'n') {
+                                cell.z = colZFormatsDetalle[colName];
+                              }
+                            }
+                          }
+                        }
+                      }
+
                       XLSX.utils.book_append_sheet(workbook, worksheetDetalle, "Manifiestos");
 
                       XLSX.writeFile(workbook, `Vehiculos_Fact_Mes_${selectedClientForVehiclesFactMes}.xlsx`);
