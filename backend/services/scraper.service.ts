@@ -89,7 +89,7 @@ export const scrapeTransportandoReports = async (): Promise<string[]> => {
         const currentYear = currentDate.getFullYear();
         const currentMonth = currentDate.getMonth(); // 0 = Enero, 11 = Diciembre
 
-        const monthsToQuery = [];
+        const monthsToQuery: {start: string, end: string}[] = [];
         for (let m = 0; m <= currentMonth; m++) {
             const firstDay = new Date(currentYear, m, 1);
             let lastDay = new Date(currentYear, m + 1, 0); // Último día del mes
@@ -149,17 +149,17 @@ export const scrapeTransportandoReports = async (): Promise<string[]> => {
             log(`Seleccionando "Tipo de fecha"...`);
             await page.evaluate(() => {
                 const inputs = Array.from(document.querySelectorAll('input.el-select__input'));
-                if(inputs[0]) (inputs[0] as HTMLElement).click();
+                if(inputs[0]) (inputs[0] as any).click();
                 
                 const wrappers = Array.from(document.querySelectorAll('.el-select__wrapper'));
-                if (wrappers[0]) (wrappers[0] as HTMLElement).click();
+                if (wrappers[0]) (wrappers[0] as any).click();
             });
             await new Promise(r => setTimeout(r, 1500));
 
             await page.evaluate(() => {
                 const items = Array.from(document.querySelectorAll('.el-select-dropdown__item span'));
                 const opt = items.find(s => s.textContent?.trim() === 'Fecha de manifiesto');
-                if (opt) (opt as HTMLElement).click();
+                if (opt) (opt as any).click();
             });
             await new Promise(r => setTimeout(r, 1000));
 
@@ -167,7 +167,7 @@ export const scrapeTransportandoReports = async (): Promise<string[]> => {
             await page.evaluate(() => {
                 const labels = Array.from(document.querySelectorAll('label.el-radio'));
                 const noLabel = labels.find(l => l.textContent?.includes('No'));
-                if (noLabel) (noLabel as HTMLElement).click();
+                if (noLabel) (noLabel as any).click();
             });
             await new Promise(r => setTimeout(r, 500));
             
@@ -236,7 +236,7 @@ export const scrapeTransportandoReports = async (): Promise<string[]> => {
             await page.evaluate(() => {
                 const btns = Array.from(document.querySelectorAll('button, a'));
                 const btn = btns.find(b => b.textContent?.toLowerCase().includes('descargar excel'));
-                if (btn) (btn as HTMLElement).click();
+                if (btn) (btn as any).click();
             });
 
             // Esperar archivo descargado
