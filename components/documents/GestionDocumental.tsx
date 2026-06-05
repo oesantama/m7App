@@ -455,7 +455,7 @@ const GestionDocumental: React.FC = () => {
         }
     };
 
-    const calculateSLA = (uploadStr: string, folderStr: string, type: string) => {
+    function calculateSLA(uploadStr: string, folderStr: string, type: string) {
         if (!uploadStr || !folderStr) return { diffHours: 0, status: 'SUCCESS', limit: 24 };
 
         const upload = new Date(uploadStr);
@@ -609,7 +609,7 @@ const GestionDocumental: React.FC = () => {
         };
     };
 
-    const formatDate = (dateStr: string) => {
+    function formatDate(dateStr: string) {
         if (!dateStr) return '---';
         const normalized = dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`;
         const d = new Date(normalized);
@@ -617,7 +617,7 @@ const GestionDocumental: React.FC = () => {
         return d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' });
     };
 
-    const formatTime = (dateStr: string) => {
+    function formatTime(dateStr: string) {
         if (!dateStr) return '';
         const d = new Date(dateStr);
         if (isNaN(d.getTime())) return '';

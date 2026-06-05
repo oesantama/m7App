@@ -286,6 +286,70 @@ const healSchema = async (client: any) => {
     console.error('[M7-DB] Error al crear flota_tdm_manifiestos:', err);
   }
 
+  // GH: Inventario Físico — sesiones de toma de inventario y conciliación
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gh_inventarios_fisicos (
+        id SERIAL PRIMARY KEY,
+        titulo VARCHAR(255) NOT NULL,
+        fecha_apertura TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        fecha_cierre TIMESTAMP WITH TIME ZONE,
+        created_by VARCHAR(100) NOT NULL,
+        assigned_to VARCHAR(100) NOT NULL,
+        estado VARCHAR(50) NOT NULL DEFAULT 'ABIERTO'
+          CHECK (estado IN ('ABIERTO','EN_CONTEO','PENDIENTE_AUTORIZACION','CERRADO','ANULADO')),
+        observaciones TEXT,
+        total_items INTEGER DEFAULT 0,
+        items_con_diferencia INTEGER DEFAULT 0,
+        usuario_control VARCHAR(100),
+        fecha_control TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gh_inventarios_fisicos_items (
+        id SERIAL PRIMARY KEY,
+        inventario_id INTEGER NOT NULL REFERENCES gh_inventarios_fisicos(id) ON DELETE CASCADE,
+        elemento_id INTEGER NOT NULL REFERENCES gh_elementos(id) ON DELETE RESTRICT,
+        elemento_nombre VARCHAR(255) NOT NULL,
+        cantidad_sistema INTEGER NOT NULL DEFAULT 0,
+        cantidad_fisica INTEGER,
+        diferencia INTEGER GENERATED ALWAYS AS (COALESCE(cantidad_fisica, cantidad_sistema) - cantidad_sistema) STORED,
+        tipo_diferencia VARCHAR(20) GENERATED ALWAYS AS (
+          CASE
+            WHEN cantidad_fisica IS NULL THEN 'PENDIENTE'
+            WHEN cantidad_fisica = cantidad_sistema THEN 'OK'
+            WHEN cantidad_fisica > cantidad_sistema THEN 'SOBRANTE'
+            ELSE 'FALTANTE'
+          END
+        ) STORED,
+        justificacion TEXT,
+        estado_justificacion VARCHAR(30) DEFAULT 'PENDIENTE'
+          CHECK (estado_justificacion IN ('PENDIENTE','JUSTIFICADO')),
+        contado_at TIMESTAMP WITH TIME ZONE,
+        UNIQUE(inventario_id, elemento_id)
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gh_inventarios_fisicos_auth (
+        id SERIAL PRIMARY KEY,
+        inventario_id INTEGER NOT NULL REFERENCES gh_inventarios_fisicos(id) ON DELETE CASCADE,
+        codigo VARCHAR(20) NOT NULL,
+        generado_por VARCHAR(100) NOT NULL,
+        generado_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        expira_at TIMESTAMP WITH TIME ZONE NOT NULL,
+        usado_at TIMESTAMP WITH TIME ZONE,
+        usado_por VARCHAR(100),
+        estado VARCHAR(20) DEFAULT 'VIGENTE'
+          CHECK (estado IN ('VIGENTE','USADO','EXPIRADO'))
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_inv_fisico_estado ON gh_inventarios_fisicos (estado)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_inv_fisico_items_inv ON gh_inventarios_fisicos_items (inventario_id)`);
+    console.log('[M7-DB] Tablas gh_inventarios_fisicos creadas correctamente.');
+  } catch (err) {
+    console.error('[M7-DB] Error al crear tablas gh_inventarios_fisicos:', err);
+  }
+
   // M7: Crear tabla prov_cliente de forma explícita si no existe
   try {
     await client.query(`
@@ -1346,6 +1410,7 @@ export const restoreSystem = async () => {
       ('PAG-53', 'ASIGNACIÓN Y DEVOLUCIÓN', 'gestion-humana-asignacion-devolucion', 'MOD-09', 'MOD-09', 'EST-01'),
       ('PAG-54', 'CONSULTAS INVENTARIO', 'gestion-humana-consultas-inventario', 'MOD-09', 'MOD-09', 'EST-01'),
       ('PAG-55', 'MASTER INVENTARIO', 'gestion-humana-master-inventario', 'MOD-09', 'MOD-09', 'EST-01'),
+      ('PAG-56', 'INVENTARIO FÍSICO', 'gestion-humana-inventario-fisico', 'MOD-09', 'MOD-09', 'EST-01'),
 
       -- Configuración Maestros extra (MOD-01)
       ('PAG-42', 'CIUDADES', 'cfg-ciudades', 'MOD-01', 'MOD-01', 'EST-01'),
