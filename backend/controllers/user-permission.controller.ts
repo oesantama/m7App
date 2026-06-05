@@ -43,7 +43,7 @@ export const getUserPermissions = async (req: Request, res: Response) => {
   const uId = String(userId);
   const isSuperAdmin = uId.toLowerCase() === 'admin' ||
                        uId.toUpperCase() === 'USR-01' ||
-                       email?.toLowerCase() === 'admin@millasiete.com';
+                       email?.toLowerCase() === 'directorti@millasiete.com';
 
   if (isSuperAdmin) {
     try {

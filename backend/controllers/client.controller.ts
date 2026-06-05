@@ -5,7 +5,7 @@ import pool from '../config/database.js';
 export const getClients = async (req: Request, res: Response) => {
   try {
     const user = (req as any).user;
-    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
     
     let query = 'SELECT * FROM clients';
     let params: any[] = [];

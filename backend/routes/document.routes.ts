@@ -15,13 +15,13 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 200
 // PAG-30 = RECIBIDO MANUAL
 const DOCS_VIEW_PAGES = ['PAG-13', 'PAG-15', 'PAG-16', 'PAG-17', 'PAG-30'];
 const hasDocsView = (user: any) =>
-  user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com' ||
+  user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com' ||
   user?.permissions?.some((p: any) => DOCS_VIEW_PAGES.includes(p.module) && p.actions.includes('view'));
 
 // Middleware para edición de auditoría (PAG-16, PAG-17, PAG-30)
 const requireAuditEdit = (req: any, res: any, next: any) => {
   const user = req.user;
-  const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
   const hasPerm = user?.permissions?.some((p: any) =>
     ['PAG-16', 'PAG-17', 'PAG-30'].includes(p.module) &&
     (p.actions.includes('edit') || p.actions.includes('create'))
@@ -45,7 +45,7 @@ router.post('/resend-notification', requireAuditEdit, resendInventoryNotificatio
 // Log de Existencias
 router.get('/inventory-log', (req, res, next) => {
   const user = (req as any).user;
-  const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
   const hasPerm = user?.permissions?.some((p: any) =>
     ['PAG-16', 'PAG-17', 'PAG-01'].includes(p.module) && p.actions.includes('view')
   );
@@ -62,7 +62,7 @@ router.post('/payments-l', requirePermission('DOCUMENTOS_L', 'edit'), processDoc
 
 router.get('/mastersuite-report', (req, res, next) => {
   const user = (req as any).user;
-  const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
   const hasPerm = user?.permissions?.some((p: any) =>
     ['PAG-34', 'PAG-16', 'PAG-15'].includes(p.module) && p.actions.includes('view')
   );
@@ -77,7 +77,7 @@ router.get('/conciliations/:docId/:articleId', requireAuditEdit, getConciliation
 
 router.get('/invoice-traceability', (req, res, next) => {
   const user = (req as any).user;
-  const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
   const hasPerm = user?.permissions?.some((p: any) =>
     ['PAG-13', 'PAG-16', 'PAG-15', 'PAG-17', 'PAG-30', 'PAG-01'].includes(p.module) && p.actions.includes('view')
   );

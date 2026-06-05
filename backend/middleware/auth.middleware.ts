@@ -66,7 +66,7 @@ export const requirePermission = (moduleName: string | string[], action: string)
 
         // El rol de ADMIN (ROL-01) tiene acceso total por defecto
         const isAdminRole = user.roleId === 'ROL-01' || user.role_id === 'ROL-01';
-        const isAdminEmail = user.email?.toLowerCase() === 'admin@millasiete.com';
+        const isAdminEmail = user.email?.toLowerCase() === 'directorti@millasiete.com';
 
         if (isAdminRole || isAdminEmail) {
             return next();

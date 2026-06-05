@@ -5,7 +5,7 @@ import pool from '../config/database.js';
 // Middleware de validación robusta para Administrador
 const isUserAdmin = (user: any) => {
   if (!user) return false;
-  return user.email === 'admin@millasiete.com' || user.roleId === 'ROL-01' || user.role_id === 'ROL-01';
+  return user.email === 'directorti@millasiete.com' || user.roleId === 'ROL-01' || user.role_id === 'ROL-01';
 };
 
 export const getTables = async (req: any, res: Response) => {

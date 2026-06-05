@@ -71,7 +71,7 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
   const filesInputRef  = useRef<HTMLInputElement>(null);
 
   const activePageId = useAppStore(s => s.activePageId);
-  const isSuperUser  = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const isSuperUser  = user?.roleId === 'ROL-01' || user?.email === 'directorti@millasiete.com';
   const canDelete    = isSuperUser || hasPermission(user!, activePageId || 'CONCILIACION', 'delete');
 
   // ─── Carga inicial / recargar con filtros ────────────────────────────────────

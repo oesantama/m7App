@@ -11,7 +11,7 @@ beforeAll(async () => {
     const res = await fetch(`${AUTH_URL}/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'admin@millasiete.com', password: 'admin123' })
+        body: JSON.stringify({ email: 'directorti@millasiete.com', password: 'admin123' })
     });
     const data = await res.json();
     authToken = data.token;

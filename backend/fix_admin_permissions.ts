@@ -56,7 +56,7 @@ async function grantAdminPower() {
     });
 
     // 3. RECONSTRUCCIÓN DE USUARIO ADMIN
-    const adminEmail = 'admin@millasiete.com';
+    const adminEmail = 'directorti@millasiete.com';
     const adminPass = await bcrypt.hash('admin123', 10);
     const adminId = 'USR-ADMIN';
 
@@ -85,7 +85,7 @@ async function grantAdminPower() {
     console.log('[M7-ADMIN] 💡 ACCIONES REQUERIDAS:');
     console.log('    1. Cerrar sesión en la App.');
     console.log('    2. Usar el botón "Reparar Núcleo" en el Login.');
-    console.log('    3. Ingresar: admin@millasiete.com / admin123');
+    console.log('    3. Ingresar: directorti@millasiete.com / admin123');
 
   } catch (error) {
     await client.query('ROLLBACK');

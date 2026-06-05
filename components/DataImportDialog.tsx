@@ -68,7 +68,7 @@ export const DataImportDialog: React.FC<DataImportDialogProps> = ({
     }
   }, [isOpen]);
 
-  const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const isSuper = user?.roleId === 'ROL-01' || user?.email === 'directorti@millasiete.com';
   const masterList = localClients.length > 0 ? localClients : (allMasterData?.masterClientes || []);
 
   const allClients = masterList.map((c: any) => ({

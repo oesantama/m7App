@@ -63,7 +63,7 @@ const GestionDocumental: React.FC = () => {
         isOpen: false, doc: null, reason: '', isSubmitting: false
     });
 
-    const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
+    const isSuper = user?.roleId === 'ROL-01' || user?.email === 'directorti@millasiete.com';
     const hasEditPermission = isSuper || user?.permissions?.some((p: any) => p.module === 'PAG-45' && p.actions.includes('edit'));
 
     // Fetch clients directly if masterClientes not yet hydrated

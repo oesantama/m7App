@@ -10,7 +10,7 @@ export const getDrivers = async (req: Request, res: Response) => {
     await pool.query('ALTER TABLE drivers ADD COLUMN IF NOT EXISTS license_category TEXT;');
 
     const user = (req as any).user;
-    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
 
     let query = 'SELECT * FROM drivers';
     let params: any[] = [];

@@ -15,7 +15,7 @@ describe('API Service - Authentication', () => {
       json: async () => mockResponse,
     });
 
-    const result = await api.login('admin@millasiete.com', 'admin123');
+    const result = await api.login('directorti@millasiete.com', 'admin123');
     expect(result.success).toBe(true);
     expect(result.user.name).toBe('Admin');
     expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/auth/login'), expect.any(Object));
@@ -37,6 +37,6 @@ describe('API Service - Authentication', () => {
   it('login should throw error on network failure', async () => {
     (global.fetch as any).mockRejectedValueOnce(new Error('Network Error'));
 
-    await expect(api.login('admin@millasiete.com', 'admin123')).rejects.toThrow('Network Error');
+    await expect(api.login('directorti@millasiete.com', 'admin123')).rejects.toThrow('Network Error');
   });
 });

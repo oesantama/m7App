@@ -1447,7 +1447,7 @@ export const restoreSystem = async () => {
     await client.query(`
       INSERT INTO users (id, email, password, name, role_id, status_id, permissions)
       VALUES 
-      ('USR-01', 'admin@millasiete.com', $1, 'OSCAR SANTAMARIA', 'ROL-01', 'EST-01', '[{"module": "all", "actions": ["view", "edit", "delete", "create"]}]'::jsonb)
+      ('USR-01', 'directorti@millasiete.com', $1, 'OSCAR SANTAMARIA', 'ROL-01', 'EST-01', '[{"module": "all", "actions": ["view", "edit", "delete", "create"]}]'::jsonb)
       ON CONFLICT (id) DO NOTHING;
     `, [adminHash]);
 

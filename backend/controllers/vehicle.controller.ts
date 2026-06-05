@@ -11,7 +11,7 @@ export const getVehicles = async (req: Request, res: Response) => {
     
     // Filtrar eliminados (Soft Delete)
     const user = (req as any).user;
-    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
     
     let query = "SELECT * FROM vehicles WHERE status_id != 'ELIMINADO'";
     let params: any[] = [];

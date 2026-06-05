@@ -476,7 +476,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (isAuthenticated && needsWelcomeRedirect && pages.length > 0 && modules.length > 0 && user) {
 
-      const isSuperUser = user.roleId === 'ROL-01' || user.email === 'admin@millasiete.com';
+      const isSuperUser = user.roleId === 'ROL-01' || user.email === 'directorti@millasiete.com';
 
       // 1. PRIORIDAD: DASHBOARD (Usando utilidad centralizada)
       const hasDashboard = hasPermission(user, 'DASHBOARD', 'view');

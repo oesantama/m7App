@@ -132,7 +132,7 @@ const AdminDBManager: React.FC = () => {
   };
 
   // Security Check
-  if (user?.email !== 'admin@millasiete.com') {
+  if (user?.email !== 'directorti@millasiete.com') {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-900 text-white">
         <div className="text-center">

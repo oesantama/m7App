@@ -11,7 +11,7 @@ describe('Auditoría de Seguridad - Integración JWT & RBAC', () => {
       const res = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'admin@millasiete.com', password: 'admin123' })
+        body: JSON.stringify({ email: 'directorti@millasiete.com', password: 'admin123' })
       });
       const data = await res.json();
       validToken = data.token || '';
@@ -33,7 +33,7 @@ describe('Auditoría de Seguridad - Integración JWT & RBAC', () => {
     const res = await fetch(`${API_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@millasiete.com', password: 'admin123' })
+      body: JSON.stringify({ email: 'directorti@millasiete.com', password: 'admin123' })
     });
     const data = await res.json();
     expect(res.status).toBe(200);

@@ -273,6 +273,16 @@ export const initScheduler = () => {
     });
     console.log('[M7-SCHEDULER] Tarea "Importación Transportando" programada: Diariamente 05:00 AM');
 
+    // Validación de Novedades no subidas a Drive: Todos los días a las 11:00 AM
+    cron.schedule('0 11 * * *', async () => {
+        console.log('[M7-SCHEDULER] Validando novedades pendientes por subir a Drive...');
+        const logs = await validateMissingNovedadesDrive();
+        console.log('[M7-SCHEDULER] Logs Novedades faltantes:', logs.join(' | '));
+    }, {
+        timezone: 'America/Bogota'
+    });
+    console.log('[M7-SCHEDULER] Tarea "Validación Novedades Drive" programada: Diariamente 11:00 AM');
+
     // ── KEEP-ALIVE: ping interno cada 4 minutos ───────────────────────────────
     // Evita que Traefik/Coolify cierre conexiones TCP inactivas y que el proceso
     // Node.js quede en estado "zombi" sin tráfico. También mantiene el pool de
@@ -466,4 +476,48 @@ export const manualRunCleanNews = async (): Promise<string[]> => {
 
 export const manualRunTransportandoScrape = async (): Promise<string[]> => {
     return await scrapeTransportandoReports();
+};
+
+export const validateMissingNovedadesDrive = async (): Promise<string[]> => {
+    const logs: string[] = [];
+    logs.push(`[${new Date().toLocaleString()}] Iniciando validación de novedades no subidas a Drive...`);
+    try {
+        const { sendEmail } = await import('./notification.service.js');
+        const res = await pool.query(`
+            SELECT DISTINCT d.id as doc_id, d.external_doc_id, d.client_id, d.created_at
+            FROM inventory_news n
+            JOIN documents_l d ON n.document_id = d.id
+            WHERE n.created_at >= NOW() - INTERVAL '30 days'
+              AND NOT EXISTS (
+                  SELECT 1 FROM document_drive_logs log 
+                  WHERE log.category = 'NOVEDADES MILLA 7' 
+                    AND log.file_name ILIKE '%' || REPLACE(COALESCE(d.external_doc_id, d.id::text), ' ', '_') || '.pdf%'
+              )
+        `);
+        
+        if (res.rowCount === 0) {
+            logs.push(`Todas las novedades recientes han sido registradas en Drive.`);
+            return logs;
+        }
+
+        logs.push(`Se encontraron ${res.rowCount} documentos con novedades que NO tienen registro en Drive.`);
+        
+        // Aquí enviamos una alerta o podríamos subirlos automáticamente.
+        // Por ahora enviamos alerta al administrador.
+        let htmlBody = `<h3>Novedades pendientes por subir a Drive</h3>
+            <p>Se encontraron ${res.rowCount} documentos con novedades en los últimos 30 días que no tienen registro de subida a Drive.</p>
+            <ul>`;
+        
+        res.rows.forEach(r => {
+            htmlBody += `<li>Documento ID: ${r.doc_id} | Ref: ${r.external_doc_id} | Fecha: ${new Date(r.created_at).toLocaleDateString()}</li>`;
+        });
+        htmlBody += `</ul>`;
+
+        await sendEmail('directorti@millasiete.com', 'Alerta: Novedades no subidas a Drive', htmlBody);
+        logs.push(`Alerta enviada a directorti@millasiete.com.`);
+    } catch (err: any) {
+        logs.push(`ERROR CRÍTICO: ${err.message}`);
+    }
+    logs.push(`[${new Date().toLocaleString()}] Tarea finalizada.`);
+    return logs;
 };

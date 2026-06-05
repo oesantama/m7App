@@ -20,7 +20,7 @@ const router = Router();
 // Permiso flexible: admin, PAG-15 (planificador), PAG-16 (documentos), PAG-17 (recibido)
 const requireInventoryView = (req: any, res: any, next: any) => {
   const user = req.user;
-  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
   const hasPerm = user?.permissions?.some((p: any) =>
     ['PAG-15', 'PAG-16', 'PAG-17', 'PAG-30', 'PAG-01'].includes(p.module) &&
     p.actions.includes('view')
@@ -31,7 +31,7 @@ const requireInventoryView = (req: any, res: any, next: any) => {
 
 const requireInventoryEdit = (req: any, res: any, next: any) => {
   const user = req.user;
-  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+  const isSuper = user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
   const hasPerm = user?.permissions?.some((p: any) =>
     ['PAG-15', 'PAG-16', 'PAG-17'].includes(p.module) &&
     p.actions.includes('edit')

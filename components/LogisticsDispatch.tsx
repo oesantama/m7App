@@ -228,7 +228,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             : user?.clientId ? [user.clientId] : [];
         
         // M7-FIX: Admin check based on roleId and specific email as fallback
-        const isSuperAdmin = user?.roleId === 'ROL-01' || (user as any)?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+        const isSuperAdmin = user?.roleId === 'ROL-01' || (user as any)?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
         
         console.log(`[M7-DISPATCH-DIAGNOSTIC] 🛰️ Cargando clientes para usuario: ${user?.email}. isSuperAdmin: ${isSuperAdmin}`);
 
@@ -1422,7 +1422,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
     const fetchAllUsers = async () => {
         // Solo intentar cargar usuarios si el usuario es Admin o tiene el permiso explícito
-        const isAdmin = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+        const isAdmin = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
         const hasUserPerm = user?.permissions?.some((p: any) => (p.module === 'USUARIOS' || p.module === 'PAG-21') && p.actions.includes('view'));
         
         if (!isAdmin && !hasUserPerm) return;

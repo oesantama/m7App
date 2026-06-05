@@ -4,7 +4,7 @@ test.describe('Módulo Usuarios - Auditoría Funcional & Seguridad', () => {
   test.beforeEach(async ({ page }) => {
     // Login inicial para obtener acceso al UI
     await page.goto('/');
-    await page.fill('input[name="email"]', 'admin@millasiete.com');
+    await page.fill('input[name="email"]', 'directorti@millasiete.com');
     await page.fill('input[name="password"]', 'admin123');
     await page.click('button:has-text("Acceder al Sistema")');
     await expect(page.locator('nav')).toBeVisible({ timeout: 10000 });

@@ -51,7 +51,7 @@ const ESTADO_CONFIG: Record<string, { label: string; color: string; icon: React.
 const fmt = (d: string) => d ? new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '---';
 
 export default function InventarioFisico({ user }: Props) {
-    const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
+    const isSuper = user?.roleId === 'ROL-01' || user?.email === 'directorti@millasiete.com';
     const canCreate = hasPermission(user, 'INVENTARIO_FISICO_GH', 'create') || isSuper;
     const canDelete = hasPermission(user, 'INVENTARIO_FISICO_GH', 'delete') || isSuper;
     const userName = user?.name || user?.email || 'Usuario';

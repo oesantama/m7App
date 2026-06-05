@@ -273,7 +273,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   invoices, vehicles, drivers, assignments, documents, activeRoutes, user, clients, onAssign, onSaveRoute, onRefresh
 }) => {
   const mapRef = useRef<L.Map | null>(null);
-  const isSuperAdmin = user.roleId === 'ROL-01' || user.email === 'admin@millasiete.com';
+  const isSuperAdmin = user.roleId === 'ROL-01' || user.email === 'directorti@millasiete.com';
   const allowedClientIds = user.clientIds || [];
 
   // Filtrar clientes permitidos

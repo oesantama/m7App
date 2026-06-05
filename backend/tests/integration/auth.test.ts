@@ -11,7 +11,7 @@ describe('Auth Integration Tests', () => {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    email: 'admin@millasiete.com',
+                    email: 'directorti@millasiete.com',
                     password: 'admin123'
                 })
             });
@@ -25,7 +25,7 @@ describe('Auth Integration Tests', () => {
             if (data.require2FA) {
                 expect(data).toHaveProperty('userId');
             } else {
-                expect(data.user).toHaveProperty('email', 'admin@millasiete.com');
+                expect(data.user).toHaveProperty('email', 'directorti@millasiete.com');
                 authToken = data.token;
             }
         } catch (e) {
@@ -39,7 +39,7 @@ describe('Auth Integration Tests', () => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                email: 'admin@millasiete.com',
+                email: 'directorti@millasiete.com',
                 password: 'wrongpassword'
             })
         });

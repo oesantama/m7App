@@ -45,7 +45,7 @@ export const hasPermission = (user: User | null | any, moduleName: string, actio
   if (!user) return false;
 
   // Los Super Administradores tienen acceso total
-  const isSuper = user.roleId === 'ROL-01' || user.role_id === 'ROL-01' || user.email === 'admin@millasiete.com';
+  const isSuper = user.roleId === 'ROL-01' || user.role_id === 'ROL-01' || user.email === 'directorti@millasiete.com';
   if (isSuper) return true;
 
   const pageId = ID_MAP[moduleName];

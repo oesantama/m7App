@@ -33,7 +33,7 @@ export const useAppData = () => {
         modules: modulesRaw
       });
 
-      const isSuper = (currentUser as any)?.roleId === 'ROL-01' || (currentUser as any)?.role_id === 'ROL-01' || (currentUser as any)?.email === 'admin@millasiete.com';
+      const isSuper = (currentUser as any)?.roleId === 'ROL-01' || (currentUser as any)?.role_id === 'ROL-01' || (currentUser as any)?.email === 'directorti@millasiete.com';
       const hasPerm = (mod: string) => hasPermission(currentUser, mod, 'view');
 
 

@@ -25,7 +25,7 @@ test.describe('Autenticación - Paridad E2E', () => {
 
   test('acceso exitoso con credenciales demo', async ({ page }) => {
     // Usamos las credenciales del .env que vimos previamente
-    await page.fill('input[name="email"]', 'admin@millasiete.com');
+    await page.fill('input[name="email"]', 'directorti@millasiete.com');
     await page.fill('input[name="password"]', 'admin123');
     await page.click('button:has-text("Acceder al Sistema")');
 

@@ -83,7 +83,7 @@ export const getDocuments = async (req: Request, res: Response) => {
     const queryParams: any[] = [];
     const { clientId, docL, statuses, plate } = req.query;
     const user = (req as any).user;
-    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
 
     if (clientId) {
       queryParams.push(clientId);
@@ -1017,7 +1017,7 @@ export const getInvoices = async (req: Request, res: Response) => {
     `;
 
     const user = (req as any).user;
-    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
 
     if (clientId && clientId !== 'GLOBAL') {
       queryParams.push(clientId);
@@ -1686,7 +1686,7 @@ export const getInventoryLog = async (req: Request, res: Response) => {
   try {
     const { clientId, articleId, search } = req.query;
     const user = (req as any).user;
-    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+    const isSuper = user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
 
     const params: any[] = [];
     let whereClause = 'WHERE 1=1';
@@ -2340,7 +2340,7 @@ export const getDocumentStats = async (req: Request, res: Response) => {
     try {
         const { dateFrom, dateTo, clientId, userId, search, folderDate, category, clientName, fileName } = req.query;
         const user = (req as any).user;
-        const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+        const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
 
         const params: any[] = [];
         const conditions: string[] = [];
@@ -2433,7 +2433,7 @@ export const renameCumplido = async (req: Request, res: Response) => {
         const user = (req as any).user;
 
         // Check permission (PAG-45 edit)
-        const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+        const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
         const hasPerm = user?.permissions?.some((p: any) => p.module === 'PAG-45' && p.actions.includes('edit'));
         if (!isSuper && !hasPerm) {
             return res.status(403).json({ error: 'No tienes permisos para editar archivos.' });
@@ -2500,7 +2500,7 @@ export const appendCumplido = async (req: Request, res: Response) => {
         const user = (req as any).user;
         const file = req.file as Express.Multer.File;
 
-        const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+        const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
         const hasPerm = user?.permissions?.some((p: any) => p.module === 'PAG-45' && p.actions.includes('edit'));
         if (!isSuper && !hasPerm) return res.status(403).json({ error: 'No tienes permisos para editar archivos.' });
         if (!file) return res.status(400).json({ error: 'Se requiere un archivo PDF.' });
@@ -2567,7 +2567,7 @@ export const deleteCumplido = async (req: Request, res: Response) => {
         const { reason } = req.body;
         const user = (req as any).user;
 
-        const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
+        const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
         const hasPerm = user?.permissions?.some((p: any) => p.module === 'PAG-45' && p.actions.includes('edit'));
         if (!isSuper && !hasPerm) {
             return res.status(403).json({ error: 'No tienes permisos para eliminar archivos.' });
@@ -2892,7 +2892,8 @@ export const getDriveCoverage = async (req: Request, res: Response) => {
          FROM document_drive_logs d
          LEFT JOIN clients c ON d.client_id = c.id
          WHERE (d.folder_date::date BETWEEN $1 AND $2 OR d.upload_date::date BETWEEN $1 AND $2)
-           AND COALESCE(d.is_deleted, false) = false`,
+           AND COALESCE(d.is_deleted, false) = false
+           AND d.category = 'CUMPLIDOS'`,
         [dateFrom, dateTo]
       ),
       pool.query(`SELECT documento, nombre, client_mappings FROM prov_cliente WHERE client_mappings IS NOT NULL AND client_mappings != '[]'::jsonb`),
