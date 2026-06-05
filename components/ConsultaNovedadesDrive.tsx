@@ -47,7 +47,7 @@ const ConsultaNovedadesDrive: React.FC<Props> = ({ user, clientId, clients }) =>
       if (filterClientId) p.append('clientId', filterClientId);
       
       if (fileName) p.append('fileName', fileName);
-      p.append('category', 'NOVEDADES');
+      p.append('category', 'NOVEDADES MILLA 7');
 
       const res = await fetch(`/api/documents/drive-logs?${p}`, {
         headers: { Authorization: `Bearer ${token()}` }
@@ -77,7 +77,7 @@ const ConsultaNovedadesDrive: React.FC<Props> = ({ user, clientId, clients }) =>
           </div>
           <div className="min-w-0">
             <p className="font-black text-slate-900 text-xs truncate max-w-[200px]" title={r.fileName || r.file_name}>{r.fileName || r.file_name}</p>
-            <p className="text-[9px] font-bold text-slate-400 uppercase">NOVEDADES</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase">NOVEDAD M7</p>
           </div>
         </div>
       )

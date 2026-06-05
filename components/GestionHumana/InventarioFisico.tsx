@@ -6,6 +6,7 @@ import {
     PackageSearch, Loader2, BadgeCheck, ShieldAlert, Archive, Search,
 } from 'lucide-react';
 import { api } from '../../services/api';
+import { hasPermission } from '../../utils/permissions';
 
 interface Props { user: any }
 
@@ -51,6 +52,8 @@ const fmt = (d: string) => d ? new Date(d).toLocaleDateString('es-CO', { day: '2
 
 export default function InventarioFisico({ user }: Props) {
     const isSuper = user?.roleId === 'ROL-01' || user?.email === 'admin@millasiete.com';
+    const canCreate = hasPermission(user, 'INVENTARIO_FISICO_GH', 'create') || isSuper;
+    const canDelete = hasPermission(user, 'INVENTARIO_FISICO_GH', 'delete') || isSuper;
     const userName = user?.name || user?.email || 'Usuario';
 
     // ── Vistas ────────────────────────────────────────────────────────────────
@@ -326,7 +329,7 @@ export default function InventarioFisico({ user }: Props) {
                     <button onClick={cargarSesiones} className="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2 font-bold text-sm">
                         <RefreshCw size={16} /> Refrescar
                     </button>
-                    {isSuper && (
+                    {canCreate && (
                         <button onClick={() => setShowForm(true)} className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-500 transition-all flex items-center gap-2 font-black text-sm shadow-lg shadow-indigo-500/30">
                             <Plus size={16} /> Nueva Sesión
                         </button>
@@ -487,9 +490,9 @@ export default function InventarioFisico({ user }: Props) {
     const puedeContar = sesionActiva.estado === 'ABIERTO';
     const puedeVerConteo = ['ABIERTO', 'EN_CONTEO'].includes(sesionActiva.estado);
     const puedeJustificar = ['EN_CONTEO', 'PENDIENTE_AUTORIZACION'].includes(sesionActiva.estado);
-    const puedeGenCodigo = sesionActiva.estado === 'PENDIENTE_AUTORIZACION' && isSuper;
+    const puedeGenCodigo = sesionActiva.estado === 'PENDIENTE_AUTORIZACION' && canCreate;
     const puedeCerrar = sesionActiva.estado === 'PENDIENTE_AUTORIZACION';
-    const puedeAnular = !['CERRADO', 'ANULADO'].includes(sesionActiva.estado) && isSuper;
+    const puedeAnular = !['CERRADO', 'ANULADO'].includes(sesionActiva.estado) && canDelete;
 
     return (
         <div className="p-4 md:p-8 max-w-[1400px] mx-auto space-y-6 animate-in fade-in duration-500">

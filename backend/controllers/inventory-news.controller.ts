@@ -355,7 +355,7 @@ export const saveNovedadToDrive = async (req: Request, res: Response) => {
         await pool.query(
             `INSERT INTO document_drive_logs (user_id, client_id, file_name, drive_path, drive_link, category, folder_date)
              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [userId, doc.client_id || doc.clientId || null, fileName, drivePath, driveLink, 'NOVEDADES', driveDate || null]
+            [userId, doc.client_id || doc.clientId || null, fileName, drivePath, driveLink, 'NOVEDADES MILLA 7', driveDate || null]
         );
 
         fs.unlink(tmpPath, () => {});
