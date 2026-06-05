@@ -345,6 +345,7 @@ const healSchema = async (client: any) => {
     `);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_inv_fisico_estado ON gh_inventarios_fisicos (estado)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_inv_fisico_items_inv ON gh_inventarios_fisicos_items (inventario_id)`);
+    await client.query(`ALTER TABLE gh_inventarios_fisicos_items ADD COLUMN IF NOT EXISTS cantidad_final INTEGER`);
     console.log('[M7-DB] Tablas gh_inventarios_fisicos creadas correctamente.');
   } catch (err) {
     console.error('[M7-DB] Error al crear tablas gh_inventarios_fisicos:', err);

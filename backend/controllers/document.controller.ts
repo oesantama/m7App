@@ -2338,7 +2338,7 @@ export const uploadCumplido = async (req: Request, res: Response) => {
 
 export const getDocumentStats = async (req: Request, res: Response) => {
     try {
-        const { dateFrom, dateTo, clientId, userId, search, folderDate } = req.query;
+        const { dateFrom, dateTo, clientId, userId, search, folderDate, category, clientName, fileName } = req.query;
         const user = (req as any).user;
         const isSuper = user?.roleId === 'ROL-01' || user?.role_id === 'ROL-01' || user?.email === 'admin@millasiete.com';
 
@@ -2351,7 +2351,12 @@ export const getDocumentStats = async (req: Request, res: Response) => {
             conditions.push(`d.client_id = ANY($${params.length}::text[])`);
         }
 
-        if (!dateFrom && !dateTo && !search && !clientId) {
+        if (category) {
+            params.push(category);
+            conditions.push(`d.category = $${params.length}`);
+        }
+
+        if (!dateFrom && !dateTo && !search && !clientId && !clientName && !fileName) {
             conditions.push("d.upload_date >= NOW() - INTERVAL '48 hours'");
         }
 
@@ -2378,6 +2383,14 @@ export const getDocumentStats = async (req: Request, res: Response) => {
         if (search) {
             params.push(`%${search}%`);
             conditions.push(`(d.file_name ILIKE $${params.length} OR c.name ILIKE $${params.length})`);
+        }
+        if (clientName) {
+            params.push(`%${clientName}%`);
+            conditions.push(`c.name ILIKE $${params.length}`);
+        }
+        if (fileName) {
+            params.push(`%${fileName}%`);
+            conditions.push(`d.file_name ILIKE $${params.length}`);
         }
 
         const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -2872,19 +2885,14 @@ export const getDriveCoverage = async (req: Request, res: Response) => {
       pool.query(
         `SELECT d.client_id,
                 UPPER(TRIM(COALESCE(c.name, d.client_id))) AS client_name,
-                COUNT(d.id)::int AS upload_count,
-                COUNT(CASE WHEN d.status = 'SUCCESS' THEN 1 END)::int AS success_count,
-                COUNT(CASE WHEN d.status = 'ERROR'   THEN 1 END)::int AS error_count,
-                ROUND(AVG(
-                  CASE WHEN d.upload_date IS NOT NULL AND d.folder_date IS NOT NULL
-                    THEN EXTRACT(EPOCH FROM (d.upload_date - d.folder_date)) / 3600.0
-                  END
-                )::numeric, 1)::float AS avg_delay_hours
+                d.status,
+                d.upload_date,
+                d.folder_date,
+                c.client_type
          FROM document_drive_logs d
          LEFT JOIN clients c ON d.client_id = c.id
          WHERE (d.folder_date::date BETWEEN $1 AND $2 OR d.upload_date::date BETWEEN $1 AND $2)
-           AND COALESCE(d.is_deleted, false) = false
-         GROUP BY d.client_id, UPPER(TRIM(COALESCE(c.name, d.client_id)))`,
+           AND COALESCE(d.is_deleted, false) = false`,
         [dateFrom, dateTo]
       ),
       pool.query(`SELECT documento, nombre, client_mappings FROM prov_cliente WHERE client_mappings IS NOT NULL AND client_mappings != '[]'::jsonb`),
@@ -2917,14 +2925,75 @@ export const getDriveCoverage = async (req: Request, res: Response) => {
       }
     }
 
-    // uploadMap by client_id for fast lookup
-    const uploadByClientId = new Map<string, any>(
-      uploadsRes.rows.map((r: any) => [r.client_id, r])
-    );
-    // uploadMap by client_name for fallback (no mapping configured)
-    const uploadByName = new Map<string, any>(
-      uploadsRes.rows.map((r: any) => [r.client_name, r])
-    );
+    const calculateSLA = (uploadDate: any, folderDate: any, type: string) => {
+      if (!uploadDate || !folderDate) return 0;
+      const uploadMs = new Date(uploadDate).getTime();
+      let foStr = folderDate instanceof Date ? folderDate.toISOString().split('T')[0] : String(folderDate).split('T')[0];
+      const folderMs = new Date(`${foStr}T12:00:00`).getTime();
+      if (uploadMs <= folderMs) return 0;
+      const years = new Set<number>([new Date(folderMs).getFullYear(), new Date(uploadMs).getFullYear()]);
+      const colombianHolidays = new Set<string>();
+      const getHolidays = (year: number) => {
+        const h = new Set<string>();
+        const add = (m: number, d: number) => h.add(`${year}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+        const addMov = (m: number, d: number) => {
+          const dt = new Date(year, m - 1, d);
+          const dow = dt.getDay();
+          if (dow === 1) { add(m, d); } else { const skip = dow === 0 ? 1 : 8 - dow; const mv = new Date(year, m - 1, d + skip); add(mv.getMonth()+1, mv.getDate()); }
+        };
+        [[1,1],[5,1],[7,20],[8,7],[12,8],[12,25]].forEach(([m,d])=>add(m,d));
+        [[1,6],[3,19],[6,29],[8,15],[10,12],[11,1],[11,11]].forEach(([m,d])=>addMov(m,d));
+        const a=year%19,b=Math.floor(year/100),c=year%100,d2=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),hh=(19*a+b-d2-g+15)%30,i=Math.floor(c/4),k=c%4,L=(32+2*e+2*i-hh-k)%7,mm=Math.floor((a+11*hh+22*L)/451),mo=Math.floor((hh+L-7*mm+114)/31),dy=((hh+L-7*mm+114)%31)+1;
+        const easter=new Date(year,mo-1,dy);
+        const fromE=(days:number,mov=false)=>{const dd=new Date(easter);dd.setDate(easter.getDate()+days);if(mov){const dow=dd.getDay();if(dow!==1){const sk=dow===0?1:8-dow;dd.setDate(dd.getDate()+sk);}}add(dd.getMonth()+1,dd.getDate());};
+        fromE(-3);fromE(-2);fromE(39,true);fromE(60,true);fromE(68,true);
+        return h;
+      };
+      years.forEach(y => getHolidays(y).forEach(hh => colombianHolidays.add(hh)));
+      let totalMs = 0;
+      const toYMD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      const startTrunc = new Date(new Date(folderMs).getFullYear(), new Date(folderMs).getMonth(), new Date(folderMs).getDate());
+      const endTrunc   = new Date(new Date(uploadMs).getFullYear(), new Date(uploadMs).getMonth(), new Date(uploadMs).getDate());
+      const endDay     = new Date(uploadMs);
+      for (let t = startTrunc.getTime(); t <= endTrunc.getTime(); t += 86400000) {
+        const d = new Date(t);
+        if (d.getDay() === 0 || colombianHolidays.has(toYMD(d))) continue;
+        if (startTrunc.getTime() === endTrunc.getTime()) {
+          const uh = endDay.getHours() + endDay.getMinutes() / 60;
+          totalMs += (Math.min(17, Math.max(7, uh)) - 7) * 3600000;
+        } else if (t === startTrunc.getTime() || t !== endTrunc.getTime()) {
+          totalMs += 10 * 3600000;
+        } else {
+          const uh = endDay.getHours() + endDay.getMinutes() / 60;
+          totalMs += (Math.min(17, Math.max(7, uh)) - 7) * 3600000;
+        }
+      }
+      const diff = totalMs / 3600000;
+      return isNaN(diff) ? 0 : diff;
+    };
+
+    const uploadByClientId = new Map<string, any>();
+    const uploadByName = new Map<string, any>();
+
+    for (const row of uploadsRes.rows) {
+      const id = row.client_id;
+      const name = row.client_name;
+      const status = row.status;
+      const h = (row.upload_date && row.folder_date) ? calculateSLA(row.upload_date, row.folder_date, row.client_type) : null;
+
+      const add = (map: Map<string, any>, key: string) => {
+        if (!key) return;
+        if (!map.has(key)) map.set(key, { upload_count: 0, success_count: 0, error_count: 0, delaySum: 0, delayCount: 0, client_id: id, client_name: name });
+        const g = map.get(key);
+        g.upload_count++;
+        if (status === 'SUCCESS') g.success_count++;
+        if (status === 'ERROR') g.error_count++;
+        if (h !== null) { g.delaySum += h; g.delayCount++; }
+        g.avg_delay_hours = g.delayCount > 0 ? Math.round((g.delaySum / g.delayCount) * 10) / 10 : null;
+      };
+      add(uploadByClientId, id);
+      add(uploadByName, name);
+    }
 
     const manifestMap = new Map<string, number>(
       manifestsRes.rows.map((r: any) => [r.client_name, r.manifest_count])
@@ -2968,7 +3037,7 @@ export const getDriveCoverage = async (req: Request, res: Response) => {
       const status    = manifests > 0 && uploads > 0 ? 'CUBIERTO'
                       : manifests > 0 && uploads === 0 ? 'FALTANTE'
                       : 'EXCEDENTE';
-      const coveragePct = manifests > 0 ? Math.min(100, Math.round((uploads / manifests) * 100)) : null;
+      const coveragePct = manifests > 0 ? (uploads >= manifests ? 100 : Math.min(99, Math.floor((uploads / manifests) * 100))) : null;
       return { clientName: mgmtNameToDisplay.get(client) || client, manifestCount: manifests, uploadCount: uploads, successCount: successes, errorCount: errors, avgDelayHours: avgDelay, coveragePct, status };
     }).sort((a, b) => b.manifestCount - a.manifestCount);
 

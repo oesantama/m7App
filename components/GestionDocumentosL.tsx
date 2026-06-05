@@ -266,7 +266,10 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
       const filtered = isAdmin ? all : all.filter((c: any) => allowedIds.includes(c.id));
       const mapped: GDocClient[] = filtered.map((c: any) => ({ id: c.id, name: c.name || c.id }));
       setClients(mapped);
-      if (mapped.length === 1) setSelectedClientId(mapped[0].id);
+      if (mapped.length === 1) {
+        setSelectedClientId(mapped[0].id);
+        setCorrClientId(mapped[0].id);
+      }
       setClientsReady(true);
     }).catch(() => setClientsReady(true));
   }, [user]);
@@ -741,7 +744,9 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const handleCorrectionFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!corrClientId) {
+    
+    const activeClient = corrClientId || (clients.length === 1 ? clients[0].id : '');
+    if (!activeClient) {
       toast.error('Selecciona un cliente antes de cargar el archivo');
       e.target.value = '';
       return;

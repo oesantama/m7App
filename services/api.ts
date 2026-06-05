@@ -720,6 +720,46 @@ export const api = {
     a.remove();
   },
 
+  // GH Inventario Físico
+  getInventariosFisicos: () => fetchJson(`${API_URL}/gh-inventario-fisico`),
+  getInventarioFisicoById: (id: number | string) => fetchJson(`${API_URL}/gh-inventario-fisico/${id}`),
+  createInventarioFisico: (data: { titulo: string; assigned_to: string; created_by: string; observaciones?: string; elementos_ids?: number[] }) =>
+    fetchJson(`${API_URL}/gh-inventario-fisico`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  saveConteos: (id: number | string, conteos: { elemento_id: number; cantidad_fisica: number }[]) =>
+    fetchJson(`${API_URL}/gh-inventario-fisico/${id}/items`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conteos }),
+    }),
+  saveJustificaciones: (id: number | string, justificaciones: { item_id: number; justificacion: string }[]) =>
+    fetchJson(`${API_URL}/gh-inventario-fisico/${id}/justificar`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ justificaciones }),
+    }),
+  generarCodigoInventario: (id: number | string, generado_por: string) =>
+    fetchJson(`${API_URL}/gh-inventario-fisico/${id}/generar-codigo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ generado_por }),
+    }),
+  cerrarInventarioFisico: (id: number | string, codigo: string, usado_por: string) =>
+    fetchJson(`${API_URL}/gh-inventario-fisico/${id}/cerrar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ codigo, usado_por }),
+    }),
+  anularInventarioFisico: (id: number | string, motivo: string) =>
+    fetchJson(`${API_URL}/gh-inventario-fisico/${id}/anular`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo }),
+    }),
+
   // Marcas
   getMarcas: () => fetchJson(`${API_URL}/marcas?_t=${Date.now()}`),
   saveMarca: (data: any) => fetchJson(`${API_URL}/marcas`, {

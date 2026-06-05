@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   FileText, TrendingUp, Upload, CheckCircle, AlertCircle, Clock,
-  Download, RefreshCw, Filter, Users, BarChart2, Target, ShieldCheck,
+  Download, RefreshCw, Filter, Users, BarChart2, Target, ShieldCheck, Loader2
 } from 'lucide-react';
 import { DataTable, ColumnDef } from '../shared/DataTable';
 import { User } from '../../types';
@@ -338,6 +338,46 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
         : <span className="text-slate-300">—</span> },
   ];
 
+  const coverageColumns: ColumnDef<(typeof filteredCoverage)[0]>[] = [
+    { header: 'Cliente', key: 'clientName', render: r => <span className="font-black text-slate-800">{r.clientName}</span> },
+    { header: 'Manifiestos', key: 'manifestCount', sortable: true, render: r => <span className="font-black text-indigo-700">{r.manifestCount}</span> },
+    { header: 'Cumplidos Subidos', key: 'uploadCount', sortable: true, render: r => (
+      <div className="flex items-center gap-1">
+        <span className="font-black text-slate-700">{r.uploadCount}</span>
+        {r.errorCount > 0 && <span className="text-[9px] text-rose-500">({r.errorCount} err)</span>}
+      </div>
+    ) },
+    { header: 'Cobertura %', key: 'coveragePct', sortable: true, render: r => r.coveragePct !== null ? (
+      <div className="flex items-center gap-2">
+        <div className="w-16 bg-slate-100 rounded-full h-1.5 flex overflow-hidden">
+          <div className="h-full" style={{ width: `${r.coveragePct}%`, background: r.coveragePct >= 100 ? '#10b981' : r.coveragePct >= 50 ? '#f59e0b' : '#ef4444' }} />
+        </div>
+        <span className="text-[10px] font-black text-slate-700 w-8 text-right">{r.coveragePct}%</span>
+      </div>
+    ) : <span className="text-slate-300">—</span> },
+    { header: 'Demora Prom. (h)', key: 'avgDelayHours', sortable: true, render: r => <span className="text-slate-600 font-bold">{r.avgDelayHours !== null ? `${r.avgDelayHours}h` : '—'}</span> },
+    { header: 'Estado', key: 'status', render: r => (
+      <span className={`px-2.5 py-1 rounded-lg border font-black text-[9px] uppercase tracking-wider ${COVERAGE_BADGE[r.status] || ''}`}>
+        {r.status}
+      </span>
+    ) }
+  ];
+
+  const userStatsColumns: ColumnDef<(typeof userStats)[0]>[] = [
+    { header: 'Usuario', key: 'name', render: r => <span className="font-black text-slate-800 uppercase">{r.name}</span> },
+    { header: 'Archivos Subidos', key: 'uploads', sortable: true, render: r => <span className="text-lg font-black text-indigo-700">{r.uploads}</span> },
+    { header: 'Demora Prom. (h)', key: 'avgHours', sortable: true, render: r => r.avgHours !== null ? (
+      <span className={`font-black ${r.avgHours > 72 ? 'text-rose-600' : r.avgHours > 24 ? 'text-amber-600' : 'text-emerald-600'}`}>{r.avgHours}h</span>
+    ) : <span className="text-slate-300">—</span> },
+    { header: 'Dentro de SLA', key: 'compliant', sortable: true, render: r => <><span className="font-black text-slate-700">{r.compliant}</span><span className="text-slate-400"> / {r.slaCount}</span></> },
+    { header: '% Cumplimiento', key: 'pct', sortable: true, render: r => <span className={`font-black text-lg ${r.pct >= 90 ? 'text-emerald-600' : r.pct >= 70 ? 'text-amber-500' : 'text-rose-600'}`}>{r.pct}%</span> },
+    { header: 'Rendimiento', key: 'pct', render: r => (
+      <div className="w-24 bg-slate-100 rounded-full h-2 overflow-hidden">
+        <div className="h-full transition-all" style={{ width: `${r.pct}%`, background: r.pct >= 90 ? '#10b981' : r.pct >= 70 ? '#f59e0b' : '#ef4444' }} />
+      </div>
+    ) }
+  ];
+
   const exportToExcel = () => {
     if (filtered.length === 0) { toast.warning('No hay datos para exportar'); return; }
     import('xlsx').then(XLSX => {
@@ -503,50 +543,20 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
               ))}
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[11px]">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  {['Cliente','Manifiestos','Cumplidos Subidos','Cobertura %','Demora Prom. (h)','Estado'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left font-black uppercase tracking-wider text-slate-500 whitespace-nowrap text-[9px]">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-bold">
-                {loadingCov ? (
-                  <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-400 text-[11px] font-black uppercase">Cargando…</td></tr>
-                ) : filteredCoverage.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-300 text-[11px] font-black uppercase">Sin datos — actualice con un rango de fechas</td></tr>
-                ) : filteredCoverage.map((r, i) => (
-                  <tr key={i} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-4 py-3 text-slate-800 font-black">{r.clientName}</td>
-                    <td className="px-4 py-3 text-center text-indigo-700 font-black">{r.manifestCount}</td>
-                    <td className="px-4 py-3 text-center text-slate-700">
-                      <span className="font-black">{r.uploadCount}</span>
-                      {r.errorCount > 0 && <span className="ml-1 text-[9px] text-rose-500">({r.errorCount} error)</span>}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {r.coveragePct !== null ? (
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-slate-100 rounded-full h-1.5">
-                            <div className="h-1.5 rounded-full" style={{ width: `${r.coveragePct}%`, background: r.coveragePct >= 100 ? '#10b981' : r.coveragePct >= 50 ? '#f59e0b' : '#ef4444' }} />
-                          </div>
-                          <span className="text-[10px] font-black text-slate-700 w-8 text-right">{r.coveragePct}%</span>
-                        </div>
-                      ) : <span className="text-slate-300">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-center text-slate-600">
-                      {r.avgDelayHours !== null ? `${r.avgDelayHours}h` : '—'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2.5 py-1 rounded-lg border font-black text-[9px] uppercase tracking-wider ${COVERAGE_BADGE[r.status]}`}>
-                        {r.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-0">
+            {loadingCov ? (
+              <div className="flex items-center justify-center py-12"><Loader2 className="animate-spin text-slate-300" /></div>
+            ) : filteredCoverage.length === 0 ? (
+              <div className="text-center py-12 text-slate-400 text-[11px] font-black uppercase">Sin datos</div>
+            ) : (
+              <DataTable
+                data={filteredCoverage}
+                columns={coverageColumns}
+                searchPlaceholder="Buscar por cliente…"
+                excelFileName={`Cobertura_${Date.now()}.xlsx`}
+                excelSheetName="Cobertura"
+              />
+            )}
           </div>
         </div>
       </section>
@@ -655,65 +665,26 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
           {userStats.length === 0 ? (
             <div className="flex items-center justify-center h-28 text-slate-300 text-[11px] font-black uppercase">Sin datos de productividad</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-[11px]">
-                <thead className="bg-slate-50 border-b border-slate-100">
-                  <tr>
-                    {['#','Usuario','Archivos Subidos','Demora Prom. (h)','Dentro de SLA','% Cumplimiento','Rendimiento'].map(h => (
-                      <th key={h} className="px-5 py-3 text-left font-black uppercase tracking-wider text-slate-500 text-[9px] whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {userStats.map((u, i) => (
-                    <tr key={u.name} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-5 py-3 text-slate-400 font-medium">{i + 1}</td>
-                      <td className="px-5 py-3 font-black text-slate-800 uppercase">{u.name}</td>
-                      <td className="px-5 py-3 text-center">
-                        <span className="text-lg font-black text-indigo-700">{u.uploads}</span>
-                      </td>
-                      <td className="px-5 py-3 text-center">
-                        {u.avgHours !== null ? (
-                          <span className={`font-black ${u.avgHours > 72 ? 'text-rose-600' : u.avgHours > 24 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                            {u.avgHours}h
-                          </span>
-                        ) : <span className="text-slate-300">—</span>}
-                      </td>
-                      <td className="px-5 py-3 text-center">
-                        <span className="font-black text-slate-700">{u.compliant}</span>
-                        <span className="text-slate-400"> / {u.slaCount}</span>
-                      </td>
-                      <td className="px-5 py-3 text-center">
-                        <span className={`font-black text-lg ${u.pct >= 90 ? 'text-emerald-600' : u.pct >= 70 ? 'text-amber-500' : 'text-rose-600'}`}>{u.pct}%</span>
-                      </td>
-                      <td className="px-5 py-3 min-w-[120px]">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-slate-100 rounded-full h-2">
-                            <div className="h-2 rounded-full transition-all"
-                              style={{ width: `${u.pct}%`, background: u.pct >= 90 ? '#10b981' : u.pct >= 70 ? '#f59e0b' : '#ef4444' }} />
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-                {userStats.length > 1 && (
-                  <tfoot className="border-t-2 border-slate-200">
-                    <tr className="font-black text-slate-800">
-                      <td colSpan={2} className="px-5 py-3 text-[9px] uppercase tracking-widest text-slate-500">TOTAL EQUIPO</td>
-                      <td className="px-5 py-3 text-center text-lg text-indigo-700">{total}</td>
-                      <td className="px-5 py-3 text-center text-[10px] text-slate-400">—</td>
-                      <td className="px-5 py-3 text-center">{compliance[0].value} / {compliance[0].value + compliance[1].value}</td>
-                      <td className="px-5 py-3 text-center">
-                        <span className={`text-lg font-black ${compliance[0].pct >= 90 ? 'text-emerald-600' : compliance[0].pct >= 70 ? 'text-amber-500' : 'text-rose-600'}`}>
-                          {compliance[0].pct}%
-                        </span>
-                      </td>
-                      <td />
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
+            <div className="p-0">
+              <DataTable
+                data={userStats}
+                columns={userStatsColumns}
+                searchPlaceholder="Buscar usuario…"
+              />
+              {userStats.length > 1 && (
+                <div className="bg-slate-50 border-t-2 border-slate-200 p-4 flex items-center justify-between text-[11px] font-black">
+                  <div className="flex items-center gap-4">
+                    <span className="text-[9px] uppercase tracking-widest text-slate-500">TOTAL EQUIPO</span>
+                    <span className="text-lg text-indigo-700">{total} <span className="text-[9px] text-slate-400">SUBIDOS</span></span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-slate-700">{compliance[0].value} / {compliance[0].value + compliance[1].value} SLA</span>
+                    <span className={`text-lg ${compliance[0].pct >= 90 ? 'text-emerald-600' : compliance[0].pct >= 70 ? 'text-amber-500' : 'text-rose-600'}`}>
+                      {compliance[0].pct}%
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

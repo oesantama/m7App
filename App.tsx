@@ -71,6 +71,7 @@ const GestionHumanaEntregasSalidas = lazyWithRetry(() => import('./components/Ge
 const GestionHumanaAsignacionDevolucion = lazyWithRetry(() => import('./components/GestionHumana/AsignacionDevolucion'));
 const GestionHumanaConsultasInventario = lazyWithRetry(() => import('./components/GestionHumana/ConsultasInventario'));
 const GestionHumanaMasterInventario = lazyWithRetry(() => import('./components/GestionHumana/MasterInventario'));
+const GestionHumanaInventarioFisico = lazyWithRetry(() => import('./components/GestionHumana/InventarioFisico'));
 const PublicSurvey = lazyWithRetry(() => import('./components/GestionHumana/PublicSurvey'));
 const PublicTraining = lazyWithRetry(() => import('./components/GestionHumana/PublicTraining'));
 const PublicVisitForm = lazyWithRetry(() => import('./components/GestionHumana/PublicVisitForm'));
@@ -1001,6 +1002,8 @@ const App: React.FC = () => {
         return <GestionHumanaConsultasInventario user={user!} />;
       case 'gestion-humana-master-inventario':
         return <GestionHumanaMasterInventario user={user!} />;
+      case 'gestion-humana-inventario-fisico':
+        return <GestionHumanaInventarioFisico user={user!} />;
       case 'cfg-ciudades':
         return <CfgCiudades user={user!} />;
       case 'prov-clientes':

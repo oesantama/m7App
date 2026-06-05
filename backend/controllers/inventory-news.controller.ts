@@ -351,6 +351,13 @@ export const saveNovedadToDrive = async (req: Request, res: Response) => {
             exec(`rclone link "${remoteFile}"`, (_, stdout) => resolve((stdout || '').trim()));
         });
 
+        const userId = (req as any).user?.id || 'SYSTEM';
+        await pool.query(
+            `INSERT INTO document_drive_logs (user_id, client_id, file_name, drive_path, drive_link, category, folder_date)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [userId, doc.client_id || doc.clientId || null, fileName, drivePath, driveLink, 'NOVEDADES', driveDate || null]
+        );
+
         fs.unlink(tmpPath, () => {});
         console.log(`[NOV-DRIVE] Guardado: ${remoteFile} | Link: ${driveLink}`);
         res.json({ success: true, message: `Novedad guardada en Drive: ${fileName}`, driveLink, drivePath });

@@ -7,6 +7,7 @@ import BlindCount from './BlindCount';
 import PickingView from './PickingView';
 import PickingHistory from './PickingHistory';
 import NovedadesView from './NovedadesView';
+import ConsultaNovedadesDrive from './ConsultaNovedadesDrive';
 import { hasPermission } from '../utils/permissions';
 import * as XLSX from 'xlsx';
 
@@ -83,7 +84,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const [manualEmail, setManualEmail] = useState('');
   const [showResendDialog, setShowResendDialog] = useState(false);
   const [resendTarget, setResendTarget] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'recibo' | 'picking' | 'novedades' | 'historico'>('recibo');
+  const [activeTab, setActiveTab] = useState<'recibo' | 'picking' | 'novedades' | 'historico' | 'drive-consultas'>('recibo');
   const [pickingSearch, setPickingSearch] = useState('');
   const [isSyncingPartial, setIsSyncingPartial] = useState(false);
   const [isSyncingFinal, setIsSyncingFinal] = useState(false);
@@ -525,6 +526,13 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
               <Icons.History className="w-4 h-4 shrink-0" />
               <span className="whitespace-nowrap">Historial de Picking</span>
             </button>
+            <button 
+              onClick={() => setActiveTab('drive-consultas')}
+              className={`shrink-0 snap-center flex-1 min-w-[200px] flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'drive-consultas' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Icons.Upload className="w-4 h-4 shrink-0" />
+              <span className="whitespace-nowrap">Consultas Drive</span>
+            </button>
           </div>
 
           {activeTab === 'recibo' ? (
@@ -788,9 +796,13 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
             />
             )}
           </div>
-        ) : (
+        ) : activeTab === 'historico' ? (
           <div className="p-8 flex-1 overflow-hidden flex flex-col">
             <PickingHistory clientId={selectedClientId} />
+          </div>
+        ) : (
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <ConsultaNovedadesDrive user={user} clientId={selectedClientId} clients={clients} />
           </div>
         )}
       </div>

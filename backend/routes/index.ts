@@ -54,6 +54,7 @@ import provClienteRoutes from './prov-cliente.routes.js';
 
 import ghMasterInventarioRoutes from './gh-master-inventario.routes.js';
 import ghEntradasSalidasRoutes from './gh-entradas-salidas.routes.js';
+import ghInventarioFisicoRoutes from './gh-inventario-fisico.routes.js';
 import adminCenterRoutes from './admin-center.routes.js';
 import tarifasLineaBlancaRoutes from './tarifas-linea-blanca.routes.js';
 import conciliacionLBRoutes from './conciliacion-linea-blanca.routes.js';
@@ -116,6 +117,7 @@ router.use('/management-reports', managementReportRoutes);
 router.use('/prov-clientes', provClienteRoutes);
 router.use('/gh-master-inventario', ghMasterInventarioRoutes);
 router.use('/gh-entradas-salidas', ghEntradasSalidasRoutes);
+router.use('/gh-inventario-fisico', ghInventarioFisicoRoutes);
 router.use('/admin-center', adminCenterRoutes);
 router.use('/tarifas-linea-blanca', tarifasLineaBlancaRoutes);
 router.use('/conciliacion-linea-blanca', conciliacionLBRoutes);
