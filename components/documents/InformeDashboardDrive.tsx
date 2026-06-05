@@ -3,6 +3,7 @@ import {
   FileText, TrendingUp, Upload, CheckCircle, AlertCircle, Clock,
   Download, RefreshCw, Filter, Users, BarChart2, Target, ShieldCheck,
 } from 'lucide-react';
+import { DataTable, ColumnDef } from '../shared/DataTable';
 import { User } from '../../types';
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell,
@@ -143,7 +144,6 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
   const [loadingCov, setLoadingCov] = useState(false);
   const [dateFrom, setDateFrom]     = useState('');
   const [dateTo, setDateTo]         = useState('');
-  const [search, setSearch]         = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [coverageFilter, setCoverageFilter] = useState<'ALL'|'CUBIERTO'|'FALTANTE'|'EXCEDENTE'>('ALL');
 
@@ -176,13 +176,10 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
 
   useEffect(() => { fetchLogs(); fetchCoverage(); }, []);
 
-  // ── Filtro local ────────────────────────────────────────────────────────────
-  const filtered = useMemo(() => logs.filter(l => {
-    const nm = (l.fileName || l.file_name || '').toLowerCase();
-    const cn = (l.clientName || l.client_id || '').toLowerCase();
-    const t  = search.toLowerCase();
-    return (!search || nm.includes(t) || cn.includes(t)) && (!filterStatus || (l.status || 'SUCCESS') === filterStatus);
-  }), [logs, search, filterStatus]);
+  // ── Filtro local (estado — el texto lo maneja DataTable internamente) ────────
+  const filtered = useMemo(() => logs.filter(l =>
+    !filterStatus || (l.status || 'SUCCESS') === filterStatus
+  ), [logs, filterStatus]);
 
   // ── KPI base ────────────────────────────────────────────────────────────────
   const total   = filtered.length;
@@ -290,6 +287,57 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
     return coverageFilter === 'ALL' ? coverage.data : coverage.data.filter(r => r.status === coverageFilter);
   }, [coverage, coverageFilter]);
 
+  // Datos enriquecidos para DataTable (campos computados para ordenamiento)
+  const tableData = useMemo(() => filtered.map((l, idx) => {
+    const up   = l.uploadDate || l.upload_date || '';
+    const fo   = l.folderDate  || l.folder_date  || '';
+    const type = l.clientType  || 'MUNICIPAL';
+    const sla  = up && fo ? calculateLocalSLA(up, fo, type) : null;
+    const lim  = type.toUpperCase() === 'NACIONAL' ? 72 : 24;
+    return {
+      ...l,
+      _idx:        idx + 1,
+      _fileName:   l.fileName   || l.file_name   || '',
+      _clientName: l.clientName || l.client_id   || '',
+      _userName:   l.userName   || l.userId       || '',
+      _uploadDate: up,
+      _folderDate: fo,
+      _slaHours:   sla !== null ? Number(sla.toFixed(1)) : null,
+      _slaLimit:   lim,
+      _status:     l.status || 'SUCCESS',
+    };
+  }), [filtered]);
+
+  const tableColumns: ColumnDef<(typeof tableData)[0]>[] = [
+    { header: '#',              key: '_idx',        sortable: false,
+      render: r => <span className="text-slate-400 font-medium">{r._idx}</span> },
+    { header: 'Archivo',        key: '_fileName',
+      render: r => <span className="font-bold text-slate-800 uppercase max-w-[200px] truncate block" title={r._fileName}>{r._fileName || '—'}</span> },
+    { header: 'Cliente',        key: '_clientName',
+      render: r => <span className="text-slate-600 uppercase">{r._clientName || '—'}</span> },
+    { header: 'Subido Por',     key: '_userName',
+      render: r => <span className="text-slate-500">{r._userName || '—'}</span> },
+    { header: 'Fecha Documento', key: '_folderDate',
+      render: r => <span className="text-slate-500 whitespace-nowrap">{r._folderDate ? fmtShortDate(r._folderDate) : '—'}</span> },
+    { header: 'Fecha Subida',   key: '_uploadDate',
+      render: r => <span className="text-slate-500 whitespace-nowrap">{r._uploadDate ? fmtDate(r._uploadDate) : '—'}</span> },
+    { header: 'SLA (h)',        key: '_slaHours',
+      render: r => r._slaHours !== null
+        ? <span className={`font-black text-[11px] ${r._slaHours > r._slaLimit ? 'text-rose-600' : 'text-emerald-600'}`}>{r._slaHours}h</span>
+        : <span className="text-slate-300">—</span> },
+    { header: 'Estado',         key: '_status',
+      render: r => <span className={`px-2 py-0.5 rounded-lg border font-black text-[9px] uppercase ${STATUS_BADGE[r._status] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+        {r._status === 'SUCCESS' ? 'Exitoso' : r._status === 'ERROR' ? 'Error' : r._status}
+      </span> },
+    { header: 'Drive',          key: 'drive_link',  sortable: false,
+      render: r => (r.driveLink || r.drive_link)
+        ? <a href={r.driveLink || r.drive_link} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-black text-[9px] uppercase">
+            <FileText size={10} />Abrir
+          </a>
+        : <span className="text-slate-300">—</span> },
+  ];
+
   const exportToExcel = () => {
     if (filtered.length === 0) { toast.warning('No hay datos para exportar'); return; }
     import('xlsx').then(XLSX => {
@@ -351,8 +399,6 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
       {/* ── FILTROS ── */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 flex flex-wrap items-end gap-4">
         <Filter size={14} className="text-slate-400 self-center" />
-        <input type="text" placeholder="Buscar archivo o cliente…" value={search} onChange={e => setSearch(e.target.value)}
-          className="flex-1 min-w-[180px] px-4 py-2.5 border-2 border-slate-200 rounded-2xl text-[11px] font-bold focus:outline-none focus:border-emerald-500 bg-white transition-all" />
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
           className="px-4 py-2.5 border-2 border-slate-200 rounded-2xl text-[11px] font-bold focus:outline-none focus:border-emerald-500 bg-white cursor-pointer">
           <option value="">Todos los estados</option>
@@ -681,66 +727,20 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
           {isSuper && <span className="text-[9px] text-slate-400 font-bold uppercase">— Vista de todos los clientes</span>}
         </div>
 
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
-            <span className="text-[11px] font-black uppercase tracking-widest text-slate-600">
-              {filtered.length} resultado{filtered.length !== 1 ? 's' : ''}
-            </span>
+        {loading ? (
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm flex items-center justify-center py-16">
+            <RefreshCw size={24} className="animate-spin text-slate-300" />
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[11px]">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr>
-                  {['#','Archivo','Cliente','Subido Por','Fecha Documento','Fecha Subida','SLA (h)','Estado','Drive'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left font-black uppercase tracking-wider text-slate-500 text-[9px] whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-bold">
-                {loading ? (
-                  <tr><td colSpan={9} className="px-4 py-16 text-center"><RefreshCw size={24} className="animate-spin text-slate-300 mx-auto" /></td></tr>
-                ) : filtered.length === 0 ? (
-                  <tr><td colSpan={9} className="px-4 py-16 text-center text-slate-300 text-[11px] font-black uppercase tracking-widest">Sin registros</td></tr>
-                ) : filtered.map((l, idx) => {
-                  const up   = l.uploadDate || l.upload_date || '';
-                  const fo   = l.folderDate  || l.folder_date  || '';
-                  const type = l.clientType  || 'MUNICIPAL';
-                  const sla  = up && fo ? calculateLocalSLA(up, fo, type) : null;
-                  const lim  = type.toUpperCase() === 'NACIONAL' ? 72 : 24;
-                  const st   = l.status || 'SUCCESS';
-                  return (
-                    <tr key={l.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 text-slate-400">{idx + 1}</td>
-                      <td className="px-4 py-3 text-slate-800 max-w-[200px] truncate uppercase" title={l.fileName || l.file_name}>{l.fileName || l.file_name || '—'}</td>
-                      <td className="px-4 py-3 text-slate-600 uppercase">{l.clientName || l.client_id || '—'}</td>
-                      <td className="px-4 py-3 text-slate-500">{l.userName || l.userId || '—'}</td>
-                      <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{fo ? fmtShortDate(fo) : '—'}</td>
-                      <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{fmtDate(up)}</td>
-                      <td className="px-4 py-3 text-center">
-                        {sla !== null ? (
-                          <span className={`font-black text-[10px] ${sla > lim ? 'text-rose-600' : 'text-emerald-600'}`}>{sla.toFixed(1)}h</span>
-                        ) : <span className="text-slate-300">—</span>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded-lg border font-black text-[9px] uppercase ${STATUS_BADGE[st] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                          {st === 'SUCCESS' ? 'Exitoso' : st === 'ERROR' ? 'Error' : st}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {(l.driveLink || l.drive_link) ? (
-                          <a href={l.driveLink || l.drive_link} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-black text-[9px] uppercase">
-                            <FileText size={10} />Abrir
-                          </a>
-                        ) : <span className="text-slate-300">—</span>}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        ) : (
+          <DataTable
+            data={tableData}
+            columns={tableColumns}
+            searchPlaceholder="Buscar archivo, cliente, usuario…"
+            excelFileName={`InformeDrive_${Date.now()}.xlsx`}
+            excelSheetName="Cumplidos Drive"
+            onExportExcel={() => exportToExcel()}
+          />
+        )}
       </section>
     </div>
   );

@@ -2,10 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../stores/useAppStore';
 import { 
     Upload, FileText, CheckCircle2, AlertCircle, ExternalLink, 
-    Search, Calendar, RotateCcw, Download, X, Loader2, LayoutGrid, List, Edit2, Trash2, FolderSearch, Link, Image
+    Search, Calendar, RotateCcw, X, Loader2, LayoutGrid, List, Edit2, Trash2, FolderSearch, Link, Image
 } from 'lucide-react';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { DataTable, ColumnDef } from '../shared/DataTable';
 
 interface DocumentLog {
     id: number;
@@ -44,11 +45,6 @@ const GestionDocumental: React.FC = () => {
     const [uploadDate, setUploadDate] = useState<string>(today);
     const [dateFrom, setDateFrom] = useState<string>('');
     const [dateTo, setDateTo] = useState<string>('');
-
-    // Table pagination and search state
-    const [tableSearchTerm, setTableSearchTerm] = useState('');
-    const [currentPage, setCurrentPage] = useState(1);
-    const [rowsPerPage, setRowsPerPage] = useState<number | 'all'>(5);
 
     // Explore States
     const [exploreYear, setExploreYear] = useState<string>(new Date().getFullYear().toString());
@@ -147,20 +143,133 @@ const GestionDocumental: React.FC = () => {
         }
     }, [activeTab]);
 
-    // Calcular datos paginados
-    const filteredHistory = history.filter(h => 
-        h.fileName.toLowerCase().includes(tableSearchTerm.toLowerCase()) ||
-        h.clientName.toLowerCase().includes(tableSearchTerm.toLowerCase()) ||
-        h.userName.toLowerCase().includes(tableSearchTerm.toLowerCase())
-    );
+    type TableRow = DocumentLog & {
+        _slaStatus: string;
+        _slaHours: number;
+        _uploadDateStr: string;
+        _uploadTimeStr: string;
+        _folderDateStr: string;
+    };
 
-    const totalPages = rowsPerPage === 'all' ? 1 : Math.ceil(filteredHistory.length / (rowsPerPage as number)) || 1;
-    const startIndex = rowsPerPage === 'all' ? 0 : (currentPage - 1) * (rowsPerPage as number);
-    const paginatedHistory = rowsPerPage === 'all' ? filteredHistory : filteredHistory.slice(startIndex, startIndex + (rowsPerPage as number));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const tableData: TableRow[] = React.useMemo(() => history.map(h => {
+        const { diffHours, status } = calculateSLA(h.uploadDate, h.folderDate, h.clientType);
+        return {
+            ...h,
+            _slaStatus: status,
+            _slaHours: diffHours,
+            _uploadDateStr: formatDate(h.uploadDate),
+            _uploadTimeStr: formatTime(h.uploadDate),
+            _folderDateStr: formatDate(h.folderDate),
+        };
+    }), [history]);
 
-    useEffect(() => {
-        setCurrentPage(1);
-    }, [tableSearchTerm, history, rowsPerPage]);
+    const tableColumns: ColumnDef<TableRow>[] = React.useMemo(() => [
+        {
+            header: 'SLA',
+            key: '_slaStatus',
+            sortable: true,
+            render: (row) => (
+                <div className={`w-4 h-4 rounded-full shadow-lg ${row._slaStatus === 'SUCCESS' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-rose-500 shadow-rose-500/20'}`}
+                     title={row._slaStatus === 'SUCCESS' ? 'Cumple SLA' : 'Fuera de Tiempo'} />
+            )
+        },
+        {
+            header: 'Documento & Cargue',
+            key: '_uploadDateStr',
+            sortable: true,
+            render: (row) => (
+                <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-2xl transition-all ${row.isDeleted ? 'bg-rose-100 text-rose-500' : 'bg-slate-50 text-slate-400'}`}>
+                        <FileText size={20} />
+                    </div>
+                    <div className="flex flex-col max-w-[200px]">
+                        <span className={`font-black text-[13px] truncate ${row.isDeleted ? 'text-rose-700 line-through' : 'text-slate-800'}`} title={row.fileName}>{row.fileName}</span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase">{row._uploadDateStr} @ {row._uploadTimeStr}</span>
+                        {row.isDeleted && (
+                            <span className="text-[9px] text-rose-600 font-bold mt-1 line-clamp-2">{row.deleteReason}</span>
+                        )}
+                    </div>
+                </div>
+            )
+        },
+        {
+            header: 'Cliente',
+            key: 'clientName',
+            sortable: true,
+            render: (row) => (
+                <div className="flex flex-col">
+                    <span className="font-black text-slate-700 text-[12px] uppercase">{row.clientName}</span>
+                    <span className={`text-[9px] font-black px-2.5 py-1 rounded-full w-fit mt-1 shadow-sm ${row.clientType === 'NACIONAL' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {row.clientType}
+                    </span>
+                </div>
+            )
+        },
+        {
+            header: 'Usuario Responsable',
+            key: 'userName',
+            sortable: true,
+            render: (row) => <span className="text-slate-500 text-[11px] font-black uppercase tracking-tight">{row.userName}</span>
+        },
+        {
+            header: 'Carpeta Origen',
+            key: '_folderDateStr',
+            sortable: true,
+            render: (row) => (
+                <div className="flex items-center gap-2">
+                    <Calendar size={12} className="text-slate-400" />
+                    <span className="text-slate-800 text-[12px] font-black">{row._folderDateStr}</span>
+                </div>
+            )
+        },
+        {
+            header: 'Respuesta Neta',
+            key: '_slaHours',
+            sortable: true,
+            render: (row) => (
+                <div className="flex flex-col">
+                    <span className={`text-[13px] font-black ${row._slaStatus === 'SUCCESS' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {Math.floor(row._slaHours)}h {Math.round((row._slaHours % 1) * 60)}m
+                    </span>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">SLA: {row._slaStatus === 'SUCCESS' ? 'EFECTIVO' : 'CRÍTICO'}</span>
+                </div>
+            )
+        },
+        {
+            header: 'Nube',
+            key: 'id',
+            sortable: false,
+            render: (row) => (
+                <div className="flex items-center justify-center gap-2">
+                    {!row.isDeleted && (
+                        <a href={row.driveLink} target="_blank" rel="noopener noreferrer" title="Ver en Drive"
+                           className="w-10 h-10 bg-slate-50 hover:bg-slate-900 hover:text-white rounded-[1rem] transition-all inline-flex items-center justify-center shadow-sm text-slate-500">
+                            <ExternalLink size={16} />
+                        </a>
+                    )}
+                    {hasEditPermission && !row.isDeleted && (
+                        <>
+                            <button onClick={() => handleRename(row)} title="Renombrar Archivo"
+                                    className="w-10 h-10 bg-slate-50 hover:bg-indigo-500 hover:text-white rounded-[1rem] transition-all inline-flex items-center justify-center shadow-sm text-slate-500">
+                                <Edit2 size={16} />
+                            </button>
+                            <button onClick={() => handleDelete(row)} title="Eliminar Archivo"
+                                    className="w-10 h-10 bg-slate-50 hover:bg-rose-500 hover:text-white rounded-[1rem] transition-all inline-flex items-center justify-center shadow-sm text-slate-500">
+                                <Trash2 size={16} />
+                            </button>
+                        </>
+                    )}
+                    {row.isDeleted && (
+                        <div className="text-[10px] bg-rose-100 text-rose-700 px-2 py-1 rounded-lg font-bold w-fit mx-auto" title={row.deleteReason}>
+                            ELIMINADO
+                        </div>
+                    )}
+                </div>
+            )
+        },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    ], [hasEditPermission]);
 
     const handleAddFiles = (newFiles: FileList | null) => {
         if (!newFiles) return;
@@ -515,29 +624,6 @@ const GestionDocumental: React.FC = () => {
         return d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
     };
 
-    const exportToExcel = () => {
-        if (history.length === 0) return;
-        import('xlsx').then(XLSX => {
-            const data = history.map(h => {
-                const { diffHours, status } = calculateSLA(h.uploadDate, h.folderDate, h.clientType);
-                return {
-                    'Archivo': h.fileName,
-                    'Cliente': h.clientName,
-                    'Tipo Cliente': h.clientType,
-                    'Usuario': h.userName,
-                    'Fecha Carpeta': formatDate(h.folderDate),
-                    'Fecha Subida': `${formatDate(h.uploadDate)} ${formatTime(h.uploadDate)}`,
-                    'Tiempo Respuesta (Horas)': diffHours.toFixed(1),
-                    'Estado SLA': status === 'SUCCESS' ? 'A TIEMPO' : 'FUERA DE TIEMPO'
-                };
-            });
-            const ws = XLSX.utils.json_to_sheet(data);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Trazabilidad");
-            XLSX.writeFile(wb, `Trazabilidad_Drive_${Date.now()}.xlsx`);
-        });
-    };
-
     const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
     const refDate = (uploadDate && !isNaN(new Date(uploadDate).getTime())) ? new Date(`${uploadDate}T12:00:00`) : new Date();
     const selectedClientName = authorizedClients.find(c => c.id === selectedClient)?.name || '';
@@ -773,7 +859,6 @@ const GestionDocumental: React.FC = () => {
                                                 setFolderDateFilter('');
                                                 setSelectedClientFilter('');
                                                 setSearchTerm('');
-                                                setTableSearchTerm('');
                                             }}
                                             className="w-14 h-[52px] bg-slate-100 text-slate-500 rounded-2xl hover:bg-rose-100 hover:text-rose-600 transition-all flex items-center justify-center shrink-0 shadow-inner"
                                             title="Limpiar Filtros"
@@ -795,156 +880,19 @@ const GestionDocumental: React.FC = () => {
 
                         {/* Tabla de Resultados */}
                         <div className="bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden">
-                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center p-8 bg-slate-50/30 border-b border-slate-50 gap-4">
-                                <h3 className="text-slate-800 font-black uppercase tracking-tight flex items-center gap-3">
-                                    <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
-                                    Registros de Trazabilidad ({filteredHistory.length})
+                            <div className="flex items-center gap-3 p-8 pb-4">
+                                <div className="w-1.5 h-6 bg-indigo-500 rounded-full"></div>
+                                <h3 className="text-slate-800 font-black uppercase tracking-tight">
+                                    Registros de Trazabilidad ({history.length})
                                 </h3>
-                                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                                    <div className="relative flex-1 md:flex-none">
-                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                        <input
-                                            type="text"
-                                            placeholder="Buscar en tabla..."
-                                            className="w-full md:w-64 pl-10 pr-4 py-2.5 bg-white border-2 border-slate-100 rounded-xl text-[11px] font-black outline-none focus:border-indigo-500 transition-all"
-                                            value={tableSearchTerm}
-                                            onChange={e => setTableSearchTerm(e.target.value)}
-                                        />
-                                    </div>
-                                    <select
-                                        className="py-2.5 px-4 bg-white border-2 border-slate-100 rounded-xl text-[11px] font-black outline-none focus:border-indigo-500 transition-all cursor-pointer"
-                                        value={rowsPerPage}
-                                        onChange={e => setRowsPerPage(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                                    >
-                                        <option value={5}>5 Filas</option>
-                                        <option value={10}>10 Filas</option>
-                                        <option value={20}>20 Filas</option>
-                                        <option value={50}>50 Filas</option>
-                                        <option value="all">Todas</option>
-                                    </select>
-                                    <button onClick={exportToExcel} className="px-5 py-2.5 bg-emerald-500 text-white font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20">
-                                        <Download size={16} /> Exportar
-                                    </button>
-                                </div>
                             </div>
 
-                            <div className="overflow-x-auto custom-scrollbar">
-                                <table className="w-full border-collapse min-w-[1000px]">
-                                    <thead>
-                                        <tr className="bg-slate-50/50">
-                                            <th className="px-8 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">SLA</th>
-                                            <th className="px-6 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Documento & Cargue</th>
-                                            <th className="px-6 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Cliente</th>
-                                            <th className="px-6 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Usuario Responsable</th>
-                                            <th className="px-6 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Carpeta Origen</th>
-                                            <th className="px-6 py-6 text-left text-[11px] font-black text-slate-400 uppercase tracking-widest">Respuesta Neta</th>
-                                            <th className="px-8 py-6 text-center text-[11px] font-black text-slate-400 uppercase tracking-widest">Nube</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-50">
-                                        {paginatedHistory.map(h => {
-                                            const { diffHours, status } = calculateSLA(h.uploadDate, h.folderDate, h.clientType);
-                                            return (
-                                                <tr key={h.id} className={`transition-all group ${h.isDeleted ? 'bg-rose-50/30' : 'hover:bg-slate-50/50'}`}>
-                                                    <td className="px-8 py-6">
-                                                        <div className={`w-4 h-4 rounded-full shadow-lg ${status === 'SUCCESS' ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-rose-500 shadow-rose-500/20'}`} 
-                                                             title={status === 'SUCCESS' ? 'Cumple SLA' : 'Fuera de Tiempo'} />
-                                                    </td>
-                                                    <td className="px-6 py-6">
-                                                        <div className="flex items-center gap-4">
-                                                            <div className={`p-3 rounded-2xl transition-all ${h.isDeleted ? 'bg-rose-100 text-rose-500' : 'bg-slate-50 text-slate-400 group-hover:bg-indigo-500 group-hover:text-white'}`}>
-                                                                <FileText size={20} />
-                                                            </div>
-                                                            <div className="flex flex-col max-w-[200px]">
-                                                                <span className={`font-black text-[13px] truncate ${h.isDeleted ? 'text-rose-700 line-through' : 'text-slate-800'}`} title={h.fileName}>{h.fileName}</span>
-                                                                <span className="text-[10px] text-slate-400 font-bold uppercase">{formatDate(h.uploadDate)} @ {formatTime(h.uploadDate)}</span>
-                                                                {h.isDeleted && (
-                                                                    <span className="text-[9px] text-rose-600 font-bold mt-1 line-clamp-2" title={h.deleteReason}>Motivo: {h.deleteReason}</span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-6">
-                                                        <div className="flex flex-col">
-                                                            <span className="font-black text-slate-700 text-[12px] uppercase">{h.clientName}</span>
-                                                            <span className={`text-[9px] font-black px-2.5 py-1 rounded-full w-fit mt-1 shadow-sm ${h.clientType === 'NACIONAL' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'}`}>
-                                                                {h.clientType}
-                                                            </span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-6">
-                                                        <span className="text-slate-500 text-[11px] font-black uppercase tracking-tight">{h.userName}</span>
-                                                    </td>
-                                                    <td className="px-6 py-6">
-                                                        <div className="flex items-center gap-2">
-                                                            <Calendar size={12} className="text-slate-400" />
-                                                            <span className="text-slate-800 text-[12px] font-black">{formatDate(h.folderDate)}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-6">
-                                                        <div className="flex flex-col">
-                                                            <span className={`text-[13px] font-black ${status === 'SUCCESS' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                                                {Math.floor(diffHours)}h {Math.round((diffHours % 1) * 60)}m
-                                                            </span>
-                                                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">SLA: {status === 'SUCCESS' ? 'EFECTIVO' : 'CRÍTICO'}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-8 py-6 text-center">
-                                                        <div className="flex items-center justify-center gap-2">
-                                                            {!h.isDeleted && (
-                                                                <a href={h.driveLink} target="_blank" rel="noopener noreferrer" title="Ver en Drive" className="w-10 h-10 bg-slate-50 hover:bg-slate-900 hover:text-white rounded-[1rem] transition-all inline-flex items-center justify-center shadow-sm text-slate-500">
-                                                                    <ExternalLink size={16} />
-                                                                </a>
-                                                            )}
-                                                            {hasEditPermission && !h.isDeleted && (
-                                                                <>
-                                                                    <button onClick={() => handleRename(h)} title="Renombrar Archivo" className="w-10 h-10 bg-slate-50 hover:bg-indigo-500 hover:text-white rounded-[1rem] transition-all inline-flex items-center justify-center shadow-sm text-slate-500">
-                                                                        <Edit2 size={16} />
-                                                                    </button>
-                                                                    <button onClick={() => handleDelete(h)} title="Eliminar Archivo" className="w-10 h-10 bg-slate-50 hover:bg-rose-500 hover:text-white rounded-[1rem] transition-all inline-flex items-center justify-center shadow-sm text-slate-500">
-                                                                        <Trash2 size={16} />
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                        {h.isDeleted && (
-                                                            <div className="mt-2 text-[10px] bg-rose-100 text-rose-700 px-2 py-1 rounded-lg font-bold w-fit mx-auto" title={h.deleteReason}>
-                                                                ELIMINADO
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            {filteredHistory.length > 0 && rowsPerPage !== 'all' && (
-                                <div className="p-6 bg-slate-50/50 border-t border-slate-100 flex items-center justify-between">
-                                    <span className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                                        Página {currentPage} de {totalPages}
-                                    </span>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                            disabled={currentPage === 1}
-                                            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition-all uppercase"
-                                        >
-                                            Anterior
-                                        </button>
-                                        <button
-                                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                            disabled={currentPage === totalPages}
-                                            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-[11px] font-black text-slate-700 hover:bg-slate-100 disabled:opacity-50 transition-all uppercase"
-                                        >
-                                            Siguiente
-                                        </button>
-                                    </div>
+                            {isConsulting ? (
+                                <div className="flex flex-col items-center justify-center py-32 gap-6 bg-slate-50/20">
+                                    <Loader2 className="animate-spin text-indigo-500" size={64} />
+                                    <p className="text-slate-500 font-black uppercase tracking-widest animate-pulse">Sincronizando Historial...</p>
                                 </div>
-                            )}
-
-                            {filteredHistory.length === 0 && !isConsulting && (
+                            ) : history.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-32 gap-6 bg-slate-50/20">
                                     <div className="w-32 h-32 bg-white rounded-[3rem] shadow-xl flex items-center justify-center text-slate-100">
                                         <Search size={64} />
@@ -954,13 +902,32 @@ const GestionDocumental: React.FC = () => {
                                         <p className="text-slate-400 text-sm font-medium">Usa los filtros superiores y haz clic en CONSULTAR.</p>
                                     </div>
                                 </div>
-                            )}
-                            
-                            {isConsulting && (
-                                <div className="flex flex-col items-center justify-center py-32 gap-6 bg-slate-50/20">
-                                    <Loader2 className="animate-spin text-indigo-500" size={64} />
-                                    <p className="text-slate-500 font-black uppercase tracking-widest animate-pulse">Sincronizando Historial...</p>
-                                </div>
+                            ) : (
+                                <DataTable
+                                    data={tableData}
+                                    columns={tableColumns}
+                                    searchPlaceholder="Buscar por archivo, cliente, usuario..."
+                                    excelFileName={`Trazabilidad_Drive_${Date.now()}.xlsx`}
+                                    excelSheetName="Trazabilidad"
+                                    onExportExcel={(_rows, sortedData) => {
+                                        import('xlsx').then(XLSX => {
+                                            const exportData = sortedData.map(h => ({
+                                                'Archivo': h.fileName,
+                                                'Cliente': h.clientName,
+                                                'Tipo Cliente': h.clientType,
+                                                'Usuario': h.userName,
+                                                'Fecha Carpeta': h._folderDateStr,
+                                                'Fecha Subida': `${h._uploadDateStr} ${h._uploadTimeStr}`,
+                                                'Tiempo Respuesta (Horas)': h._slaHours.toFixed(1),
+                                                'Estado SLA': h._slaStatus === 'SUCCESS' ? 'A TIEMPO' : 'FUERA DE TIEMPO'
+                                            }));
+                                            const ws = XLSX.utils.json_to_sheet(exportData);
+                                            const wb = XLSX.utils.book_new();
+                                            XLSX.utils.book_append_sheet(wb, ws, "Trazabilidad");
+                                            XLSX.writeFile(wb, `Trazabilidad_Drive_${Date.now()}.xlsx`);
+                                        });
+                                    }}
+                                />
                             )}
                         </div>
                     </div>

@@ -2890,21 +2890,30 @@ export const getDriveCoverage = async (req: Request, res: Response) => {
       pool.query(`SELECT documento, nombre, client_mappings FROM prov_cliente WHERE client_mappings IS NOT NULL AND client_mappings != '[]'::jsonb`),
     ]);
 
-    // Build mapping: managementName (from manifests) → { clientIds for uploads, displayName }
-    // Each prov_cliente entry has client_mappings: [{clientId, clientName, managementName, bodega}]
-    // managementName matches management_orders.client_name
+    // Build mapping: Provider Name (from manifests) → { clientIds for uploads, displayName }
+    // Each prov_cliente entry has a name (provider) and client_mappings: [{clientId, clientName, ...}]
+    // The manifest client name is the provider name.
     // clientId matches document_drive_logs.client_id
     const mgmtNameToClientIds = new Map<string, Set<string>>();
     const mgmtNameToDisplay = new Map<string, string>();
 
     for (const prov of provRes.rows) {
+      if (!prov.nombre) continue;
+      const providerNameKey = String(prov.nombre).trim().toUpperCase();
       const mappings: Array<{clientId: string; clientName: string; managementName: string; bodega?: string}> = prov.client_mappings || [];
+      
       for (const m of mappings) {
-        if (!m.managementName || !m.clientId) continue;
-        const key = m.managementName.trim().toUpperCase();
-        if (!mgmtNameToClientIds.has(key)) mgmtNameToClientIds.set(key, new Set());
-        mgmtNameToClientIds.get(key)!.add(m.clientId);
-        mgmtNameToDisplay.set(key, m.clientName || key);
+        if (!m.clientId) continue;
+        
+        // We also check m.managementName as a fallback key in case the manifest uses the mapped managementName
+        const keysToMap = new Set([providerNameKey]);
+        if (m.managementName) keysToMap.add(m.managementName.trim().toUpperCase());
+
+        for (const key of keysToMap) {
+          if (!mgmtNameToClientIds.has(key)) mgmtNameToClientIds.set(key, new Set());
+          mgmtNameToClientIds.get(key)!.add(m.clientId);
+          mgmtNameToDisplay.set(key, providerNameKey); // Always display the provider name
+        }
       }
     }
 
