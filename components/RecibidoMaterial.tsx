@@ -500,35 +500,35 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
           <div className="flex bg-slate-100/50 p-2 shrink-0 border-b border-slate-200 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] snap-x">
             <button
               onClick={() => setActiveTab('recibo')}
-              className={`shrink-0 snap-center flex-1 min-w-[200px] flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'recibo' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`shrink-0 snap-center flex-1 px-4 min-w-max flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'recibo' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
             >
               <Icons.Package className="w-4 h-4 shrink-0" />
               <span className="whitespace-nowrap">Recibo / Auditoría</span>
             </button>
             <button 
               onClick={() => setActiveTab('picking')}
-              className={`shrink-0 snap-center flex-1 min-w-[200px] flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'picking' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`shrink-0 snap-center flex-1 px-4 min-w-max flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'picking' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
             >
               <Icons.Audit className="w-4 h-4 shrink-0" />
               <span className="whitespace-nowrap">Alistado / Picking</span>
             </button>
             <button 
               onClick={() => setActiveTab('novedades')}
-              className={`shrink-0 snap-center flex-1 min-w-[200px] flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'novedades' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`shrink-0 snap-center flex-1 px-4 min-w-max flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'novedades' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
             >
               <Icons.Alert className="w-4 h-4 shrink-0" />
               <span className="whitespace-nowrap">Novedades</span>
             </button>
             <button 
               onClick={() => setActiveTab('historico')}
-              className={`shrink-0 snap-center flex-1 min-w-[200px] flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'historico' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`shrink-0 snap-center flex-1 px-4 min-w-max flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'historico' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
             >
               <Icons.History className="w-4 h-4 shrink-0" />
               <span className="whitespace-nowrap">Historial de Picking</span>
             </button>
             <button 
               onClick={() => setActiveTab('drive-consultas')}
-              className={`shrink-0 snap-center flex-1 min-w-[200px] flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'drive-consultas' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+              className={`shrink-0 snap-center flex-1 px-4 min-w-max flex items-center justify-center gap-3 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'drive-consultas' ? 'bg-white text-slate-900 shadow-xl shadow-slate-200 border-2 border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
             >
               <Icons.Upload className="w-4 h-4 shrink-0" />
               <span className="whitespace-nowrap">Consultas Drive</span>

@@ -100,9 +100,9 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
 
     const filteredDocs = useMemo(() => {
         const now = new Date();
-        const twoDaysAgo = new Date(now);
-        twoDaysAgo.setDate(now.getDate() - 30);
-        twoDaysAgo.setHours(0, 0, 0, 0);
+        const fiveDaysAgo = new Date(now);
+        fiveDaysAgo.setDate(now.getDate() - 5);
+        fiveDaysAgo.setHours(0, 0, 0, 0);
 
         return documents.filter(d => {
             const s = String(d.status || '').toUpperCase();
@@ -120,7 +120,7 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
             // M7 V16.5: Filtro de fecha (Hoy + 2 días atrás)
             const displayDateStr = d.createdAt || d.inventoryDate || (d as any).receivingDate || d.updatedAt;
             const displayDate = displayDateStr ? new Date(displayDateStr) : null;
-            const matchDate = displayDate ? displayDate >= twoDaysAgo : true; // Si no hay fecha, lo mostramos por seguridad
+            const matchDate = displayDate ? displayDate >= fiveDaysAgo : true; // Si no hay fecha, lo mostramos por seguridad
             
             return matchStatus && matchSearch && matchDate;
         });
@@ -732,20 +732,6 @@ const NovedadesView: React.FC<NovedadesViewProps> = ({ documents, user, masterAr
     return (
         <div className="p-3 sm:p-4 md:p-6 h-full flex flex-col bg-slate-50 overflow-hidden">
             <div className="max-w-full mx-auto w-full flex flex-col h-full space-y-3 sm:space-y-4 animate-in fade-in duration-500">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 sm:gap-4">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-900 text-white rounded-xl sm:rounded-2xl flex items-center justify-center shadow-2xl border border-white/10 ring-4 ring-slate-900/5 animate-pulse-slow shrink-0">
-                            <Icons.Alert className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-400" />
-                        </div>
-                        <div>
-                            <h2 className="text-base sm:text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">Gestión de Novedades</h2>
-                            <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 sm:mt-1.5 flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                                {filteredDocs.length} documentos encontrados
-                            </p>
-                        </div>
-                    </div>
-                </div>
 
                 <div className="bg-white rounded-2xl p-3 sm:p-4 md:p-6 shadow-sm border border-slate-200 flex-1 flex flex-col min-h-0 overflow-hidden">
                     <div className="relative mb-3 sm:mb-6">

@@ -131,6 +131,7 @@ app.get('/ready', (req, res) => {
 app.use('/api', (req, res, next) => {
   const publicPaths = [
     '/auth/login', 
+    '/auth/forgot-password',
     '/health', 
     '/', 
     '/geocode', 

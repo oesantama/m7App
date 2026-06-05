@@ -114,7 +114,8 @@ const GestionDocumental: React.FC = () => {
                     search: searchTerm, 
                     clientId: selectedClientFilter,
                     userId: selectedUserFilter,
-                    folderDate: folderDateFilter
+                    folderDate: folderDateFilter,
+                    category: 'CUMPLIDOS'
                 },
             });
             if (Array.isArray(res.data)) {
@@ -637,13 +638,7 @@ const GestionDocumental: React.FC = () => {
         <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
             {/* Header */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-                <div className="space-y-1">
-                    <h1 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none">CUMPLIDOS DRIVE PRO</h1>
-                    <p className="text-slate-500 font-bold flex items-center gap-2">
-                        <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
-                        Gestión de Documentación y Trazabilidad SLA
-                    </p>
-                </div>
+
                 
                 <div className="flex bg-slate-100 p-1.5 rounded-[2rem] shadow-inner w-full lg:w-auto overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] snap-x">
                     <button 
