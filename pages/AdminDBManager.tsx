@@ -70,12 +70,17 @@ const AdminDBManager: React.FC = () => {
       setCronLogs([`Ejecutando ${cronName}...`]);
       try {
           const res = await api.runAdminCron(cronName);
-          setCronLogs(prev => [...prev, ...res.logs]);
-          toast.success('CRON ejecutado con éxito');
+          setCronLogs(prev => [...prev, ...(res.logs || [])]);
+          
+          if (res.isBackground) {
+              toast.info('CRON iniciado en segundo plano. Observa la terminal.');
+          } else {
+              toast.success('CRON ejecutado con éxito');
+              setRunningCrons(prev => ({ ...prev, [cronName]: false }));
+          }
       } catch (err: any) {
           setCronLogs(prev => [...prev, `Error: ${err.message}`]);
           toast.error('Error al ejecutar CRON');
-      } finally {
           setRunningCrons(prev => ({ ...prev, [cronName]: false }));
       }
   };
@@ -158,6 +163,11 @@ const AdminDBManager: React.FC = () => {
                   const res = await api.getCronLogs();
                   if (res && res.logs) {
                       setCronLogs(res.logs);
+                      
+                      // Auto-stop polling when completion or critical error detected
+                      if (res.logs.some((l: string) => l.includes('[COMPLETADO]') || l.includes('ERROR CRÍTICO'))) {
+                          setRunningCrons({});
+                      }
                   }
               } catch (e) {
                   // ignore

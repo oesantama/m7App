@@ -510,7 +510,7 @@ export const InformesGerenciales: React.FC = () => {
           }
 
           setExcelData(rawJson);
-          toast.success(`Archivo de ${uploadType === 'recibo' ? 'Recibidos' : 'Egresos'} cargado: ${rawJson.length} filas detectadas.`);
+          toast.success(`Archivo de ${uploadType === 'recibo' ? 'Recibo' : 'Egresos'} cargado: ${rawJson.length} filas detectadas.`);
           return;
         }
 
@@ -3674,7 +3674,7 @@ Clientes General</h3>
                 </div>
                 <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide text-center">
                   {uploadType === 'general' && 'Arrastra tu archivo formatoinforme.xlsx aquí'}
-                  {uploadType === 'recibo' && 'Arrastra tu archivo de Recibidos aquí'}
+                  {uploadType === 'recibo' && 'Arrastra tu archivo de Recibos aquí'}
                   {uploadType === 'egreso' && 'Arrastra tu archivo de Egresos aquí'}
                 </h4>
                 <p className="text-xs text-slate-400 mt-1 max-w-sm text-center">O haz clic para explorar tus archivos locales (.xlsx, .xls).</p>
@@ -3730,7 +3730,7 @@ Clientes General</h3>
                   <div>
                     <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">
                       {uploadType === 'general' && `Previsualización de Carga Gerencial (${excelData.length} registros)`}
-                      {uploadType === 'recibo' && `Previsualización de Carga de Recibidos (${excelData.length} registros)`}
+                      {uploadType === 'recibo' && `Previsualización de Carga de Recibos (${excelData.length} registros)`}
                       {uploadType === 'egreso' && `Previsualización de Carga de Egresos (${excelData.length} registros)`}
                     </h2>
                     <p className="text-[10px] text-slate-400">

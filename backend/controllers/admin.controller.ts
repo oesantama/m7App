@@ -323,8 +323,13 @@ export const runCron = async (req: any, res: Response) => {
                 logs = await scheduler.runFacturacionPendienteIndividual();
                 break;
             case 'transportandoScrape':
-                logs = await scheduler.manualRunTransportandoScrape();
-                break;
+                scheduler.manualRunTransportandoScrape().then(resLogs => {
+                    scraper.activeScraperLogs.push("[COMPLETADO] Scraping finalizado.");
+                }).catch(err => {
+                    scraper.activeScraperLogs.push(`[ERROR CRÍTICO] Scraping falló: ${err.message}`);
+                });
+                logs = ["Iniciando importación en segundo plano...", "Por favor, mantén esta ventana abierta y observa la terminal de logs."];
+                return res.json({ success: true, logs, isBackground: true });
             default:
                 return res.status(404).json({ error: "Cron no encontrado" });
         }

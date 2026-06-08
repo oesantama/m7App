@@ -144,7 +144,11 @@ export const scrapeTransportandoReports = async (): Promise<string[]> => {
             log(`Procesando periodo: ${start} al ${end} (${index + 1}/${monthsToQuery.length})...`);
             
             // Recargar la página para asegurar un DOM limpio antes de cada interacción
-            await page.reload({ waitUntil: 'networkidle2' });
+            try {
+                await page.reload({ waitUntil: 'domcontentloaded', timeout: 60000 });
+            } catch (err: any) {
+                log(`ADVERTENCIA: Timeout recargando la página, intentando continuar de todas formas: ${err.message}`);
+            }
             await new Promise(r => setTimeout(r, 4000));
 
             log(`Seleccionando "Tipo de fecha"...`);
@@ -217,9 +221,9 @@ export const scrapeTransportandoReports = async (): Promise<string[]> => {
 
             log(`Esperando a que la tabla de resultados cargue...`);
             
-            // Esperar explícitamente hasta 40 segundos a que aparezca el botón de Descargar Excel
+            // Esperar explícitamente hasta 60 segundos a que aparezca el botón de Descargar Excel
             let excelButtonFound = false;
-            for (let i = 0; i < 40; i++) {
+            for (let i = 0; i < 60; i++) {
                 await new Promise(r => setTimeout(r, 1000));
                 excelButtonFound = await page.evaluate(() => {
                     const btns = Array.from(document.querySelectorAll('button, a'));
