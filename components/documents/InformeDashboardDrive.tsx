@@ -358,14 +358,17 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
         {r.errorCount > 0 && <span className="text-[9px] text-rose-500">({r.errorCount} err)</span>}
       </div>
     ) },
-    { header: 'Cobertura %', key: 'coveragePct', sortable: true, render: r => r.coveragePct !== null ? (
-      <div className="flex items-center gap-2">
-        <div className="w-16 bg-slate-100 rounded-full h-1.5 flex overflow-hidden">
-          <div className="h-full" style={{ width: `${r.coveragePct}%`, background: r.coveragePct >= 100 ? '#10b981' : r.coveragePct >= 50 ? '#f59e0b' : '#ef4444' }} />
+    { header: 'Cobertura %', key: 'coveragePct', sortable: true,
+      render: r => r.coveragePct !== null ? (
+        <div className="flex items-center gap-2">
+          <div className="w-16 bg-slate-100 rounded-full h-1.5 flex overflow-hidden">
+            <div className="h-full" style={{ width: `${r.coveragePct}%`, background: r.coveragePct >= 100 ? '#10b981' : r.coveragePct >= 50 ? '#f59e0b' : '#ef4444' }} />
+          </div>
+          <span className="text-[10px] font-black text-slate-700 w-8 text-right">{r.coveragePct}%</span>
         </div>
-        <span className="text-[10px] font-black text-slate-700 w-8 text-right">{r.coveragePct}%</span>
-      </div>
-    ) : <span className="text-slate-300">—</span> },
+      ) : <span className="text-slate-300">—</span>,
+      exportRender: r => r.coveragePct !== null ? `${r.coveragePct}%` : '—'
+    },
     { header: 'Demora Prom. (h)', key: 'avgDelayHours', sortable: true, render: r => <span className="text-slate-600 font-bold">{r.avgDelayHours !== null ? `${r.avgDelayHours}h` : '—'}</span> },
     { header: 'Estado', key: 'status', render: r => (
       <span className={`px-2.5 py-1 rounded-lg border font-black text-[9px] uppercase tracking-wider ${COVERAGE_BADGE[r.status] || ''}`}>
@@ -388,6 +391,78 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
       </div>
     ) }
   ];
+
+  const handleExportCoverage = async (exportRows: any[], sortedData: typeof filteredCoverage) => {
+    try {
+      const ExcelJS = (await import('exceljs')).default;
+      const { saveAs } = await import('file-saver');
+
+      const wb = new ExcelJS.Workbook();
+      const ws = wb.addWorksheet('Cobertura');
+
+      ws.columns = [
+        { header: 'CLIENTE', key: 'cliente', width: 45 },
+        { header: 'MANIFIESTOS', key: 'manifiestos', width: 15 },
+        { header: 'CUMPLIDOS', key: 'cumplidos', width: 15 },
+        { header: '% DE CUMPLIMIENTO', key: 'porcentaje', width: 22 },
+      ];
+
+      // Style the header
+      const headerRow = ws.getRow(1);
+      headerRow.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF00FFFF' } };
+        cell.font = { bold: true };
+        cell.border = {
+          top: { style: 'thin' }, left: { style: 'thin' },
+          bottom: { style: 'thin' }, right: { style: 'thin' }
+        };
+      });
+
+      // Add data
+      sortedData.forEach((row) => {
+        const pctValue = row.coveragePct !== null ? row.coveragePct / 100 : 0; // Export as real percentage decimal
+        
+        const excelRow = ws.addRow({
+          cliente: row.clientName,
+          manifiestos: row.manifestCount,
+          cumplidos: row.uploadCount,
+          porcentaje: pctValue,
+        });
+
+        // Format the percentage column
+        excelRow.getCell('porcentaje').numFmt = '0%';
+
+        // Apply semaforo colors
+        const pct = row.coveragePct !== null ? row.coveragePct : 0;
+        let rowColor = 'FFFFFFFF'; // White default
+        
+        if (pct <= 10) {
+          rowColor = 'FFFF0000'; // Red
+        } else if (pct <= 60) {
+          rowColor = 'FFFFFF00'; // Yellow
+        } else {
+          rowColor = 'FF92D050'; // Green
+        }
+
+        excelRow.eachCell((cell) => {
+          if (rowColor !== 'FFFFFFFF') {
+            cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowColor } };
+          }
+          cell.border = {
+            top: { style: 'thin' }, left: { style: 'thin' },
+            bottom: { style: 'thin' }, right: { style: 'thin' }
+          };
+        });
+      });
+
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `Cobertura_${Date.now()}.xlsx`);
+    } catch (error) {
+      console.error('Error exporting excel:', error);
+      toast.error('Error al exportar el archivo Excel');
+    }
+  };
 
   const exportToExcel = () => {
     if (filtered.length === 0) { toast.warning('No hay datos para exportar'); return; }
@@ -557,6 +632,7 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
                 searchPlaceholder="Buscar por cliente…"
                 excelFileName={`Cobertura_${Date.now()}.xlsx`}
                 excelSheetName="Cobertura"
+                onExportExcel={handleExportCoverage}
                 renderExpandedRow={(row) => {
                   if (!row.subClients || row.subClients.length === 0) return null;
                   return (

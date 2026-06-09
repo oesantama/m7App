@@ -7,6 +7,7 @@ export interface ColumnDef<T> {
   key: keyof T | string;
   sortable?: boolean;
   render?: (row: T) => React.ReactNode;
+  exportRender?: (row: T) => any;
 }
 
 interface DataTableProps<T> {
@@ -130,17 +131,21 @@ export function DataTable<T extends Record<string, any>>({
       const exportRow: Record<string, any> = {};
       columns.forEach((col) => {
         // Ignorar la columna de "Acciones" en el reporte de Excel
-        if (col.header.toLowerCase() === 'acciones' || col.header.toLowerCase() === 'accion') return;
+        if (col.header.toLowerCase() === 'acciones' || col.header.toLowerCase() === 'accion' || col.header === '') return;
         
-        let value = row[col.key as string];
-        if (value === null || value === undefined) {
-          exportRow[col.header] = '—';
-        } else if (typeof value === 'boolean') {
-          exportRow[col.header] = value ? 'Sí' : 'No';
-        } else if (typeof value === 'number') {
-          exportRow[col.header] = value;
+        if (col.exportRender) {
+          exportRow[col.header] = col.exportRender(row);
         } else {
-          exportRow[col.header] = String(value);
+          let value = row[col.key as string];
+          if (value === null || value === undefined) {
+            exportRow[col.header] = '—';
+          } else if (typeof value === 'boolean') {
+            exportRow[col.header] = value ? 'Sí' : 'No';
+          } else if (typeof value === 'number') {
+            exportRow[col.header] = value;
+          } else {
+            exportRow[col.header] = String(value);
+          }
         }
       });
       return exportRow;
