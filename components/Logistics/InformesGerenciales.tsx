@@ -3,7 +3,7 @@ import {
   Upload, X, Search, Calendar, Filter, 
   CheckCircle2, RefreshCw, ChevronLeft, ChevronRight, 
   FileSpreadsheet, HelpCircle, BarChart3, ChevronDown, AlertCircle,
-  Download, Eye, Truck
+  Download, Eye, Truck, FileText
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
@@ -85,7 +85,7 @@ export const InformesGerenciales: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'informes' | 'consultas' | 'cargar'>('informes');
 
   // Sub-reports tab: 'estados' | 'clientes'
-  const [subReportTab, setSubReportTab] = useState<'estados' | 'clientes' | 'tdmVentas'>('tdmVentas');
+  const [subReportTab, setSubReportTab] = useState<'estados' | 'clientes' | 'tdmVentas' | 'pendienteFacturar'>('tdmVentas');
   const [provClientes, setProvClientes] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -127,6 +127,12 @@ export const InformesGerenciales: React.FC = () => {
     'clientName' | 'ventaTotal' | 'ingTerceros' | 'ingresosPropios' | 'int' | 'participation' | 'invoicedSameMonthVal' | 'invoicedSameMonthPct' | 'averagePaymentDays' | 'workedDaysCount' | 'totalVehicleUtilizations' | 'averageVehiclesPerDay' | 'averageRecDays' | 'averageEgrDays' | 'averageManRecDays' | 'receivedValue' | 'receivedPct'
   >('ventaTotal');
   const [tdmSortDirection, setTdmSortDirection] = useState<'asc' | 'desc'>('desc');
+
+  const [pendienteSearchQuery, setPendienteSearchQuery] = useState('');
+  const [pendienteSortField, setPendienteSortField] = useState<string>('cxc');
+  const [pendienteSortDirection, setPendienteSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [pendienteShowCounts, setPendienteShowCounts] = useState(false);
+  const [selectedPendingManifests, setSelectedPendingManifests] = useState<{ title: string, manifests: any[] } | null>(null);
 
   // DB Records state
   const [records, setRecords] = useState<ManagementOrder[]>([]);
@@ -1064,7 +1070,8 @@ export const InformesGerenciales: React.FC = () => {
         clientsMap[client].totalPaymentDays += diffDays;
         clientsMap[client].paymentDaysCount += 1;
 
-        const hasInvoice = r.invoice_cxc && String(r.invoice_cxc).trim() !== '' && String(r.invoice_cxc).trim() !== '0';
+        const invStr = r.invoice_cxc ? String(r.invoice_cxc).trim().toUpperCase() : '';
+        const hasInvoice = invStr !== '' && invStr !== '0' && invStr !== 'S/I' && invStr !== 'N/A' && !invStr.includes('SIN FACTURA') && invStr !== 'NO APLICA';
         if (hasInvoice) {
           if (dMan.getFullYear() === dInv.getFullYear() && dMan.getMonth() === dInv.getMonth()) {
             invoicedInSameMonth = ventaRecord;
@@ -1265,7 +1272,8 @@ export const InformesGerenciales: React.FC = () => {
         clientsMap[client].totalPaymentDays += diffDays;
         clientsMap[client].paymentDaysCount += 1;
 
-        const hasInvoice = r.invoice_cxc && String(r.invoice_cxc).trim() !== '' && String(r.invoice_cxc).trim() !== '0';
+        const invStr = r.invoice_cxc ? String(r.invoice_cxc).trim().toUpperCase() : '';
+        const hasInvoice = invStr !== '' && invStr !== '0' && invStr !== 'S/I' && invStr !== 'N/A' && !invStr.includes('SIN FACTURA') && invStr !== 'NO APLICA';
         if (hasInvoice) {
           if (dMan.getFullYear() === dInv.getFullYear() && dMan.getMonth() === dInv.getMonth()) {
             invoicedInSameMonth = ventaRecord;
@@ -1397,6 +1405,7 @@ export const InformesGerenciales: React.FC = () => {
     const platesMap: {
       [plate: string]: {
         plate: string;
+        clientName: string;
         ventaTotal: number;
         ingTerceros: number;
         manifestCount: number;
@@ -1417,8 +1426,11 @@ export const InformesGerenciales: React.FC = () => {
         return;
       }
 
-      const client = r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I';
-      if (client !== targetClient) {
+      const doc = r.client_document ? String(r.client_document).trim().toUpperCase() : 'S/I';
+      const match = provClientes.find(pc => String(pc.documento).trim().toUpperCase() === doc);
+      const client = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
+
+      if (targetClient !== 'GENERAL' && client !== targetClient) {
         return;
       }
 
@@ -1432,9 +1444,12 @@ export const InformesGerenciales: React.FC = () => {
       const manifestNumber = r.manifest_number ? String(r.manifest_number).trim() : 'S/I';
       const manifestDate = r.manifest_date ? String(r.manifest_date).trim() : 'S/I';
 
-      if (!platesMap[plate]) {
-        platesMap[plate] = {
+      const mapKey = targetClient === 'GENERAL' ? `${plate}_${client}` : plate;
+
+      if (!platesMap[mapKey]) {
+        platesMap[mapKey] = {
           plate,
+          clientName: client,
           ventaTotal: 0,
           ingTerceros: 0,
           manifestCount: 0,
@@ -1442,14 +1457,14 @@ export const InformesGerenciales: React.FC = () => {
         };
       }
 
-      platesMap[plate].ventaTotal += ventaRecord;
-      platesMap[plate].ingTerceros += ingTercerosRecord;
-      platesMap[plate].manifestCount += 1;
+      platesMap[mapKey].ventaTotal += ventaRecord;
+      platesMap[mapKey].ingTerceros += ingTercerosRecord;
+      platesMap[mapKey].manifestCount += 1;
       
       const currentIngresosPropios = ventaRecord - ingTercerosRecord;
       const currentInt = ventaRecord > 0 ? (currentIngresosPropios / ventaRecord) * 100 : 0;
       
-      platesMap[plate].manifests.push({
+      platesMap[mapKey].manifests.push({
         manifest_number: manifestNumber,
         manifest_date: manifestDate,
         venta: ventaRecord,
@@ -1496,6 +1511,7 @@ export const InformesGerenciales: React.FC = () => {
     const platesMap: {
       [plate: string]: {
         plate: string;
+        clientName: string;
         ventaTotal: number;
         facturadoTotal: number;
         manifestCount: number;
@@ -1516,8 +1532,11 @@ export const InformesGerenciales: React.FC = () => {
         return;
       }
 
-      const client = r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I';
-      if (client !== targetClient) {
+      const doc = r.client_document ? String(r.client_document).trim().toUpperCase() : 'S/I';
+      const match = provClientes.find(pc => String(pc.documento).trim().toUpperCase() === doc);
+      const client = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
+
+      if (targetClient !== 'GENERAL' && client !== targetClient) {
         return;
       }
 
@@ -1532,7 +1551,8 @@ export const InformesGerenciales: React.FC = () => {
       const dInv = parseCustomDate(r.invoice_date);
       
       if (dMan && dInv) {
-        const hasInvoice = r.invoice_cxc && String(r.invoice_cxc).trim() !== '' && String(r.invoice_cxc).trim() !== '0';
+        const invStr = r.invoice_cxc ? String(r.invoice_cxc).trim().toUpperCase() : '';
+        const hasInvoice = invStr !== '' && invStr !== '0' && invStr !== 'S/I' && invStr !== 'N/A' && !invStr.includes('SIN FACTURA') && invStr !== 'NO APLICA';
         if (hasInvoice) {
           if (dMan.getFullYear() === dInv.getFullYear() && dMan.getMonth() === dInv.getMonth()) {
             invoicedInSameMonth = ventaRecord;
@@ -1543,10 +1563,12 @@ export const InformesGerenciales: React.FC = () => {
       const manifestNumber = r.manifest_number ? String(r.manifest_number).trim() : 'S/I';
       const manifestDate = r.manifest_date ? String(r.manifest_date).trim() : 'S/I';
       const invoiceDate = r.invoice_date ? String(r.invoice_date).trim() : 'S/I';
+      const mapKey = targetClient === 'GENERAL' ? `${plate}_${client}` : plate;
 
-      if (!platesMap[plate]) {
-        platesMap[plate] = {
+      if (!platesMap[mapKey]) {
+        platesMap[mapKey] = {
           plate,
+          clientName: client,
           ventaTotal: 0,
           facturadoTotal: 0,
           manifestCount: 0,
@@ -1554,13 +1576,13 @@ export const InformesGerenciales: React.FC = () => {
         };
       }
 
-      platesMap[plate].ventaTotal += ventaRecord;
-      platesMap[plate].facturadoTotal += invoicedInSameMonth;
-      platesMap[plate].manifestCount += 1;
+      platesMap[mapKey].ventaTotal += ventaRecord;
+      platesMap[mapKey].facturadoTotal += invoicedInSameMonth;
+      platesMap[mapKey].manifestCount += 1;
       
       const currentFactMesPct = ventaRecord > 0 ? (invoicedInSameMonth / ventaRecord) * 100 : 0;
       
-      platesMap[plate].manifests.push({
+      platesMap[mapKey].manifests.push({
         manifest_number: manifestNumber,
         manifest_date: manifestDate,
         invoice_date: invoiceDate,
@@ -1912,30 +1934,44 @@ export const InformesGerenciales: React.FC = () => {
       if (!selectedClientForVehiclesInt) return;
 
       const vehiclesData = getVehiclesIntDetails();
-      const exportRows = vehiclesData.map(v => ({
-        "PLACA / VEHÍCULO": v.plate,
-        "CANTIDAD MANIFIESTOS": Math.round(v.manifestCount || 0),
-        "VALOR CXC CXP INICIAL (VENTA)": Math.round(v.ventaTotal || 0),
-        "ING TERCEROS": Math.round(v.ingTerceros || 0),
-        "INGRESOS PROPIOS": Math.round(v.ingresosPropios || 0),
-        "INT (%)": (Math.round((v.int || 0) * 10) / 10) / 100
-      }));
+      const exportRows = vehiclesData.map(v => {
+        const ingresosPropios = v.ventaTotal - v.ingTerceros;
+        const currentInt = v.ventaTotal > 0 ? (ingresosPropios / v.ventaTotal) : 0;
+        
+        const row: any = {
+          "PLACA / VEHÍCULO": v.plate
+        };
+        if (selectedClientForVehiclesInt === 'GENERAL') {
+          row["CLIENTE"] = v.clientName || 'S/I';
+        }
+        row["CANTIDAD MANIFIESTOS"] = Math.round(v.manifestCount || 0);
+        row["VALOR CXC CXP INICIAL (VENTA)"] = Math.round(v.ventaTotal || 0);
+        row["ING TERCEROS"] = Math.round(v.ingTerceros || 0);
+        row["INGRESOS PROPIOS"] = Math.round(ingresosPropios || 0);
+        row["INT (%)"] = currentInt;
+        return row;
+      });
 
       // Calculate totals
       const totalVentas = vehiclesData.reduce((sum, item) => sum + item.ventaTotal, 0);
       const totalIngTerceros = vehiclesData.reduce((sum, item) => sum + item.ingTerceros, 0);
-      const totalIngresosPropios = vehiclesData.reduce((sum, item) => sum + item.ingresosPropios, 0);
-      const overallInt = totalVentas > 0 ? (totalIngresosPropios / totalVentas) * 100 : 0;
+      const totalIngresosPropios = totalVentas - totalIngTerceros;
+      const overallInt = totalVentas > 0 ? (totalIngresosPropios / totalVentas) : 0;
       const totalManifests = vehiclesData.reduce((sum, item) => sum + item.manifestCount, 0);
 
-      exportRows.push({
-        "PLACA / VEHÍCULO": "TOTAL GENERAL",
-        "CANTIDAD MANIFIESTOS": Math.round(totalManifests || 0),
-        "VALOR CXC CXP INICIAL (VENTA)": Math.round(totalVentas || 0),
-        "ING TERCEROS": Math.round(totalIngTerceros || 0),
-        "INGRESOS PROPIOS": Math.round(totalIngresosPropios || 0),
-        "INT (%)": (Math.round((overallInt || 0) * 10) / 10) / 100
-      });
+      const totalRow: any = {
+        "PLACA / VEHÍCULO": "TOTAL GENERAL"
+      };
+      if (selectedClientForVehiclesInt === 'GENERAL') {
+        totalRow["CLIENTE"] = "";
+      }
+      totalRow["CANTIDAD MANIFIESTOS"] = Math.round(totalManifests || 0);
+      totalRow["VALOR CXC CXP INICIAL (VENTA)"] = Math.round(totalVentas || 0);
+      totalRow["ING TERCEROS"] = Math.round(totalIngTerceros || 0);
+      totalRow["INGRESOS PROPIOS"] = Math.round(totalIngresosPropios || 0);
+      totalRow["INT (%)"] = overallInt;
+
+      exportRows.push(totalRow);
 
       const worksheet = XLSX.utils.json_to_sheet(exportRows);
       
@@ -1944,7 +1980,7 @@ export const InformesGerenciales: React.FC = () => {
         "VALOR CXC CXP INICIAL (VENTA)": '"$"#,##0',
         "ING TERCEROS": '"$"#,##0',
         "INGRESOS PROPIOS": '"$"#,##0',
-        "INT (%)": '0.0%'
+        "INT (%)": '0.00%'
       };
 
       if (worksheet['!ref']) {
@@ -2518,7 +2554,18 @@ export const InformesGerenciales: React.FC = () => {
                       : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/50'
                   }`}
                 >
-                  Ventas con el 100% de TDM
+                  Ventas con el generales
+                </button>
+
+                <button
+                  onClick={() => setSubReportTab('pendienteFacturar')}
+                  className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-center ${
+                    subReportTab === 'pendienteFacturar'
+                      ? 'bg-slate-950 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/50'
+                  }`}
+                >
+                  Pendiente por Facturar
                 </button>
 
                 <button
@@ -2545,7 +2592,437 @@ export const InformesGerenciales: React.FC = () => {
               </div>
 
               {/* RENDER TREE SYSTEM */}
-              {subReportTab === 'estados' ? (
+              {subReportTab === 'pendienteFacturar' ? (
+                <div className="space-y-4 animate-in fade-in duration-300">
+                  {(() => {
+                    // Calculate pending data
+                    const pendingRows = reportRecords.filter(r => {
+                      const manifestStatus = r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : '';
+                      if (manifestStatus === 'ANULADO' || manifestStatus === 'ANULADA') return false;
+
+                      const invStr = r.invoice_cxc ? String(r.invoice_cxc).trim().toUpperCase() : '';
+                      const hasInvoice = invStr !== '' && invStr !== '0' && invStr !== 'S/I' && invStr !== 'N/A' && !invStr.includes('SIN FACTURA') && invStr !== 'NO APLICA';
+                      return !hasInvoice;
+                    });
+
+                    const clientMap = new Map<string, any>();
+                    const monthsSet = new Set<string>();
+
+                    pendingRows.forEach(r => {
+                      const doc = r.client_document ? String(r.client_document).trim().toUpperCase() : 'S/I';
+                      const match = provClientes.find(pc => String(pc.documento).trim().toUpperCase() === doc);
+                      const clientName = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
+
+                      let d = new Date(r.manifest_date);
+                      if (isNaN(d.getTime())) d = new Date(); // fallback
+                      
+                      const m = d.getMonth();
+                      const y = d.getFullYear();
+                      const monthKey = `${y}-${m.toString().padStart(2, '0')}`;
+                      monthsSet.add(monthKey);
+
+                      if (!clientMap.has(clientName)) {
+                        clientMap.set(clientName, {
+                          clientName,
+                          cxc: 0,
+                          cxp: 0,
+                          months: {} as Record<string, number>,
+                          manifestCount: 0,
+                          monthCounts: {} as Record<string, number>,
+                          manifests: [] as any[],
+                          monthManifests: {} as Record<string, any[]>
+                        });
+                      }
+                      const c = clientMap.get(clientName);
+                      
+                      const cxc = parseValNum(r.total_cxc);
+                      const cxcFinal = parseValNum(r.total_value_cxc_final);
+                      const cxcVal = cxc === 0 ? cxcFinal : cxc;
+
+                      const cxpVal = parseValNum(r.total_value_cxp_final);
+                      
+                      c.cxc += cxcVal;
+                      c.cxp += cxpVal;
+                      c.manifestCount += 1;
+                      c.months[monthKey] = (c.months[monthKey] || 0) + cxcVal;
+                      c.monthCounts[monthKey] = (c.monthCounts[monthKey] || 0) + 1;
+                      
+                      const manifestData = { manifest_number: r.manifest_number, manifest_date: r.manifest_date, cxc: cxcVal, cxp: cxpVal, plate: r.plate, clientName: clientName };
+                      c.manifests.push(manifestData);
+                      if (!c.monthManifests[monthKey]) c.monthManifests[monthKey] = [];
+                      c.monthManifests[monthKey].push(manifestData);
+                    });
+
+                    const sortedMonths = Array.from(monthsSet).sort();
+                    const tableRows = Array.from(clientMap.values()).sort((a, b) => b.cxc - a.cxc);
+                    
+                    const totals = { cxc: 0, cxp: 0, months: {} as Record<string, number>, manifestCount: 0, monthCounts: {} as Record<string, number>, manifests: [] as any[], monthManifests: {} as Record<string, any[]> };
+                    tableRows.forEach(r => {
+                      totals.cxc += r.cxc;
+                      totals.cxp += r.cxp;
+                      totals.manifestCount += r.manifestCount;
+                      totals.manifests.push(...r.manifests);
+                      sortedMonths.forEach(sm => {
+                        totals.months[sm] = (totals.months[sm] || 0) + (r.months[sm] || 0);
+                        totals.monthCounts[sm] = (totals.monthCounts[sm] || 0) + (r.monthCounts[sm] || 0);
+                        if (!totals.monthManifests[sm]) totals.monthManifests[sm] = [];
+                        totals.monthManifests[sm].push(...(r.monthManifests[sm] || []));
+                      });
+                    });
+
+                    const monthNames = sortedMonths.map(sm => {
+                      const [y, m] = sm.split('-');
+                      const d = new Date(Number(y), Number(m), 1);
+                      return d.toLocaleString('es-CO', { month: 'long', year: 'numeric' }).toUpperCase();
+                    });
+
+                    let filteredTableRows = tableRows;
+                    if (pendienteSearchQuery.trim() !== '') {
+                      filteredTableRows = tableRows.filter(r => r.clientName.toLowerCase().includes(pendienteSearchQuery.toLowerCase()));
+                    }
+
+                    filteredTableRows.sort((a, b) => {
+                      let valA: any = a[pendienteSortField as keyof typeof a];
+                      let valB: any = b[pendienteSortField as keyof typeof b];
+
+                      if (pendienteSortField.startsWith('month_')) {
+                        const month = pendienteSortField.replace('month_', '');
+                        valA = a.months[month] || 0;
+                        valB = b.months[month] || 0;
+                      }
+
+                      if (valA < valB) return pendienteSortDirection === 'asc' ? -1 : 1;
+                      if (valA > valB) return pendienteSortDirection === 'asc' ? 1 : -1;
+                      return 0;
+                    });
+
+                    const handleSort = (field: string) => {
+                      if (pendienteSortField === field) {
+                        setPendienteSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+                      } else {
+                        setPendienteSortField(field);
+                        setPendienteSortDirection('desc');
+                      }
+                    };
+
+                    const exportPendienteFacturarToExcel = () => {
+                      import('xlsx').then(XLSX => {
+                        const rowsForExcel = filteredTableRows.map(r => {
+                          const row: any = {
+                            "CLIENTE": r.clientName,
+                            "VALOR CXC FINAL": Math.round(r.cxc),
+                            "VALOR CXP FINAL": Math.round(r.cxp),
+                          };
+                          sortedMonths.forEach((sm, idx) => {
+                            row[monthNames[idx]] = Math.round(r.months[sm] || 0);
+                          });
+                          return row;
+                        });
+
+                        const totalsRow: any = {
+                          "CLIENTE": "TOTAL",
+                          "VALOR CXC FINAL": Math.round(totals.cxc),
+                          "VALOR CXP FINAL": Math.round(totals.cxp),
+                        };
+                        sortedMonths.forEach((sm, idx) => {
+                          totalsRow[monthNames[idx]] = Math.round(totals.months[sm] || 0);
+                        });
+
+                        rowsForExcel.push(totalsRow);
+
+                        const ws = XLSX.utils.json_to_sheet(rowsForExcel);
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "Pendiente Facturar");
+                        XLSX.writeFile(wb, "Informe_Pendiente_Facturar.xlsx");
+                      }).catch(err => console.error("Error loading xlsx", err));
+                    };
+
+                    return (
+                      <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
+                        <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div>
+                            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">
+                              Pendiente por Facturar 
+                              {pendienteShowCounts && <span className="ml-2 text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full text-[10px]">Total: {totals.manifestCount} Manifiestos</span>}
+                            </h3>
+                            <p className="text-xs text-slate-500 font-medium">Consolidado de valores pendientes según el rango seleccionado</p>
+                          </div>
+                          
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="relative">
+                              <input
+                                type="text"
+                                placeholder="Buscar por cliente..."
+                                value={pendienteSearchQuery}
+                                onChange={(e) => setPendienteSearchQuery(e.target.value)}
+                                className="bg-white border border-slate-200 rounded-xl pl-8 pr-8 py-1.5 text-xs font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-[180px] sm:w-[220px] transition-all"
+                              />
+                              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                              {pendienteSearchQuery && (
+                                <button
+                                  type="button"
+                                  onClick={() => setPendienteSearchQuery('')}
+                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-xs"
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedPendingManifests({ title: 'Consolidado General de Manifiestos', manifests: totals.manifests })}
+                              className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-indigo-600/15 transition-all"
+                            >
+                              <Eye size={14} />
+                              <span>Ver Detalle General</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setPendienteShowCounts(!pendienteShowCounts)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md transition-all ${
+                                pendienteShowCounts ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/15' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                              }`}
+                            >
+                              <FileText size={14} />
+                              <span>{pendienteShowCounts ? 'Ocultar Manifiestos' : 'Ver Manifiestos'}</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={exportPendienteFacturarToExcel}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-emerald-600/15 transition-all"
+                            >
+                              <Download size={14} />
+                              <span>Exportar Excel</span>
+                            </button>
+
+                            <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase font-mono border border-indigo-100/50">
+                              {filteredTableRows.length} Clientes
+                            </span>
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-slate-100 bg-slate-50 select-none">
+                                <th onClick={() => handleSort('clientName')} className="text-left cursor-pointer hover:bg-slate-100 transition-colors font-black text-[10px] text-slate-400 uppercase tracking-widest p-4">
+                                  Cliente {pendienteSortField === 'clientName' && <span className="text-indigo-600 text-[8px]">{pendienteSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                </th>
+                                <th onClick={() => handleSort('cxc')} className="text-right cursor-pointer hover:bg-slate-100 transition-colors font-black text-[10px] text-slate-400 uppercase tracking-widest p-4 border-l border-slate-200">
+                                  Valor CXC Final {pendienteSortField === 'cxc' && <span className="text-indigo-600 text-[8px]">{pendienteSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                </th>
+                                <th onClick={() => handleSort('cxp')} className="text-right cursor-pointer hover:bg-slate-100 transition-colors font-black text-[10px] text-slate-400 uppercase tracking-widest p-4">
+                                  Valor CXP Final {pendienteSortField === 'cxp' && <span className="text-indigo-600 text-[8px]">{pendienteSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                </th>
+                                {sortedMonths.map((sm, idx) => {
+                                  const pct = totals.cxc > 0 ? ((totals.months[sm] || 0) / totals.cxc) * 100 : 0;
+                                  return (
+                                    <th onClick={() => handleSort(`month_${sm}`)} key={sm} className="text-right cursor-pointer hover:bg-slate-100 transition-colors font-black text-[10px] text-slate-400 uppercase tracking-widest p-4 border-l border-slate-200">
+                                      <div className="text-[9px] text-indigo-500 mb-1">{pct.toFixed(2)}%</div>
+                                      {monthNames[idx]} {pendienteSortField === `month_${sm}` && <span className="text-indigo-600 text-[8px]">{pendienteSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                    </th>
+                                  );
+                                })}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                              {filteredTableRows.map((row, i) => (
+                                <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                                  <td className="p-4 text-[11px] font-bold text-slate-700">
+                                    <div className="flex items-center justify-between group">
+                                      <span>{row.clientName}</span>
+                                      <button 
+                                        onClick={() => setSelectedPendingManifests({ title: `Cliente: ${row.clientName}`, manifests: row.manifests })}
+                                        className="p-1.5 bg-slate-100 hover:bg-indigo-100 hover:text-indigo-600 rounded-lg transition-all text-slate-400"
+                                        title="Ver manifiestos del cliente"
+                                      >
+                                        <Eye size={12} />
+                                      </button>
+                                    </div>
+                                  </td>
+                                  <td className="p-4 text-right border-l border-slate-100">
+                                    <div className="font-black text-slate-800 text-[11px]">
+                                      {row.cxc.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    </div>
+                                    {pendienteShowCounts && <div className="text-[9px] text-indigo-500 font-bold mt-0.5">{row.manifestCount} Manifiestos</div>}
+                                  </td>
+                                  <td className="p-4 text-right font-bold text-slate-600 text-[11px]">
+                                    {row.cxp.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                  </td>
+                                  {sortedMonths.map((sm, idx) => (
+                                    <td key={sm} className="p-4 text-right border-l border-slate-100 group relative">
+                                      <div className="font-bold text-slate-600 text-[11px]">
+                                        {(row.months[sm] || 0) > 0 ? (row.months[sm] || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 }) : ''}
+                                      </div>
+                                      {pendienteShowCounts && (row.monthCounts[sm] || 0) > 0 && (
+                                        <div className="text-[9px] text-indigo-500 font-bold mt-0.5">{row.monthCounts[sm]} Manifiestos</div>
+                                      )}
+                                      {(row.months[sm] || 0) > 0 && (
+                                        <button 
+                                          onClick={() => setSelectedPendingManifests({ title: `Cliente: ${row.clientName} - Mes: ${monthNames[idx]}`, manifests: row.monthManifests[sm] })}
+                                          className="absolute top-1/2 -translate-y-1/2 left-2 p-1 bg-slate-100 hover:bg-indigo-100 hover:text-indigo-600 rounded-md transition-all text-slate-400"
+                                          title="Ver detalle del mes"
+                                        >
+                                          <Eye size={10} />
+                                        </button>
+                                      )}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                              <tr className="bg-slate-900 text-white">
+                                <td className="p-4 font-black text-[11px] uppercase tracking-widest">TOTAL</td>
+                                <td className="p-4 text-right border-l border-slate-700">
+                                  <div className="font-black text-[11px]">
+                                    {totals.cxc.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                  </div>
+                                  {pendienteShowCounts && <div className="text-[9px] text-indigo-300 font-bold mt-0.5">{totals.manifestCount} Manifiestos</div>}
+                                </td>
+                                <td className="p-4 text-right border-l border-slate-700 font-black text-[11px]">
+                                  {totals.cxp.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                </td>
+                                {sortedMonths.map((sm, idx) => (
+                                    <td key={sm} className="p-4 text-right border-l border-slate-700 text-indigo-200 group relative">
+                                      <div className="font-black text-[11px]">
+                                        {(totals.months[sm] || 0).toLocaleString('es-CO', { minimumFractionDigits: 0 })}
+                                      </div>
+                                      {pendienteShowCounts && (totals.monthCounts[sm] || 0) > 0 && (
+                                        <div className="text-[9px] text-indigo-300 font-bold mt-0.5">{totals.monthCounts[sm]} Manifiestos</div>
+                                      )}
+                                      {(totals.months[sm] || 0) > 0 && (
+                                        <button 
+                                          onClick={() => setSelectedPendingManifests({ title: `Consolidado: ${monthNames[idx]}`, manifests: totals.monthManifests[sm] })}
+                                          className="absolute top-1/2 -translate-y-1/2 left-2 p-1 bg-slate-800 hover:bg-indigo-600 hover:text-white rounded-md transition-all text-slate-400"
+                                          title="Ver detalle del mes"
+                                        >
+                                          <Eye size={10} />
+                                        </button>
+                                      )}
+                                    </td>
+                                  ))}
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                        
+                        {/* Detail Modal */}
+                        {selectedPendingManifests && (
+                          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+                            <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                              <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50/50">
+                                <div>
+                                  <h3 className="text-lg font-black text-slate-800 tracking-tight flex items-center gap-2">
+                                    <FileText className="text-indigo-500" size={20} />
+                                    Detalle de Manifiestos Pendientes
+                                  </h3>
+                                  <p className="text-sm font-medium text-slate-500">{selectedPendingManifests.title} ({selectedPendingManifests.manifests.length} Registros)</p>
+                                </div>
+                                <button
+                                  onClick={() => setSelectedPendingManifests(null)}
+                                  className="text-slate-400 hover:text-slate-600 hover:bg-slate-200 p-2 rounded-full transition-colors bg-white border border-slate-200 shadow-sm"
+                                >
+                                  <X size={20} />
+                                </button>
+                              </div>
+                              <div className="p-4 overflow-auto flex-1 bg-slate-50/30">
+                                <DataTable
+                                  data={selectedPendingManifests.manifests || []}
+                                  columns={[
+                                    {
+                                      header: 'Manifiesto',
+                                      key: 'manifest_number',
+                                      render: (row: any) => <span className="font-bold text-indigo-700 text-xs">{row.manifest_number || 'S/I'}</span>
+                                    },
+                                    {
+                                      header: 'Fecha',
+                                      key: 'manifest_date',
+                                      render: (row: any) => <span className="font-bold text-slate-600 text-xs">{row.manifest_date ? new Date(row.manifest_date).toLocaleDateString('es-CO') : 'S/I'}</span>
+                                    },
+                                    {
+                                      header: 'Placa',
+                                      key: 'plate',
+                                      render: (row: any) => <span className="font-black text-slate-700 text-xs">{row.plate || 'S/I'}</span>
+                                    },
+                                    ...(selectedPendingManifests.title.includes('Consolidado General') ? [{
+                                      header: 'Cliente',
+                                      key: 'clientName',
+                                      render: (row: any) => <span className="font-bold text-slate-600 text-xs">{row.clientName || 'S/I'}</span>
+                                    }] : []),
+                                    {
+                                      header: 'Valor CXC',
+                                      key: 'cxc',
+                                      render: (row: any) => (
+                                        <div className="text-right font-black text-slate-800 text-xs">
+                                          {row.cxc.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                        </div>
+                                      )
+                                    },
+                                    {
+                                      header: 'Valor CXP',
+                                      key: 'cxp',
+                                      render: (row: any) => (
+                                        <div className="text-right font-bold text-slate-600 text-xs">
+                                          {row.cxp.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                        </div>
+                                      )
+                                    }
+                                  ]}
+                                  searchPlaceholder="Buscar en manifiestos..."
+                                  excelFileName="Manifiestos_Pendientes.xlsx"
+                                  onExportExcel={(exportRows, sortedData) => {
+                                    const workbook = XLSX.utils.book_new();
+                                    const processedRows = sortedData.map((m: any) => {
+                                      const newRow: any = {
+                                        "Manifiesto": m.manifest_number || 'S/I',
+                                        "Fecha": m.manifest_date ? new Date(m.manifest_date).toLocaleDateString('es-CO') : 'S/I',
+                                        "Placa": m.plate || 'S/I'
+                                      };
+                                      if (selectedPendingManifests.title.includes('Consolidado General')) {
+                                        newRow["Cliente"] = m.clientName || 'S/I';
+                                      }
+                                      newRow["Valor CXC"] = Math.round(m.cxc || 0);
+                                      newRow["Valor CXP"] = Math.round(m.cxp || 0);
+                                      return newRow;
+                                    });
+                                    const worksheet = XLSX.utils.json_to_sheet(processedRows);
+                                    const colZFormats: Record<string, string> = {
+                                      "Valor CXC": '"$"#,##0',
+                                      "Valor CXP": '"$"#,##0'
+                                    };
+                                    if (worksheet['!ref']) {
+                                      const range = XLSX.utils.decode_range(worksheet['!ref']);
+                                      const colNames: Record<number, string> = {};
+                                      for (let C = range.s.c; C <= range.e.c; ++C) {
+                                        const cell = worksheet[XLSX.utils.encode_cell({ r: 0, c: C })];
+                                        if (cell && cell.v) colNames[C] = cell.v.toString();
+                                      }
+                                      for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                                        for (let C = range.s.c; C <= range.e.c; ++C) {
+                                          const colName = colNames[C];
+                                          if (colName && colZFormats[colName]) {
+                                            const cell = worksheet[XLSX.utils.encode_cell({ r: R, c: C })];
+                                            if (cell && cell.t === 'n') {
+                                              cell.z = colZFormats[colName];
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                    XLSX.utils.book_append_sheet(workbook, worksheet, "Pendientes");
+                                    XLSX.writeFile(workbook, `Detalle_Pendiente_Facturar_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : subReportTab === 'estados' ? (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between px-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
                     <span>Arborescencia: Estado OC ➔ Estado Remesa ➔ Estado Manifiesto ➔ Clientes con Cantidad</span>
@@ -2838,10 +3315,27 @@ export const InformesGerenciales: React.FC = () => {
                           <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                               <div className="flex items-center gap-2">
-                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">Ventas
-Clientes General</h3>
+                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">Ventas Clientes General</h3>
+                                <div className="flex items-center gap-1.5 ml-2">
+                                  <button 
+                                    onClick={() => setSelectedClientForVehiclesInt('GENERAL')}
+                                    className="p-1.5 bg-slate-100 hover:bg-indigo-100 hover:text-indigo-600 rounded-lg transition-all text-slate-500 shadow-sm border border-slate-200/50 flex items-center gap-1.5"
+                                    title="Ver detalle general de INT"
+                                  >
+                                    <Truck size={12} />
+                                    <span className="text-[9px] font-black uppercase tracking-wider">Ver INT</span>
+                                  </button>
+                                  <button 
+                                    onClick={() => setSelectedClientForVehiclesFactMes('GENERAL')}
+                                    className="p-1.5 bg-slate-100 hover:bg-emerald-100 hover:text-emerald-600 rounded-lg transition-all text-slate-500 shadow-sm border border-slate-200/50 flex items-center gap-1.5"
+                                    title="Ver detalle general de % FACT. MES"
+                                  >
+                                    <Truck size={12} />
+                                    <span className="text-[9px] font-black uppercase tracking-wider">Ver % Fact. Mes</span>
+                                  </button>
                                 </div>
-                              <p className="text-[10px] text-slate-400 mt-0.5">Agrupado por el nombre del cliente de prov_cliente según su documento. Excluye anulados.</p>
+                              </div>
+                              <p className="text-[10px] text-slate-400 mt-1">Agrupado por el nombre del cliente de prov_cliente según su documento. Excluye anulados.</p>
                             </div>
                             
                             <div className="flex flex-wrap items-center gap-2.5">
@@ -3996,6 +4490,11 @@ Clientes General</h3>
                         key: 'plate',
                         render: (row: any) => <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-black text-slate-700">{row.plate}</span>
                       },
+                      ...(selectedClientForVehiclesInt === 'GENERAL' ? [{
+                        header: 'Cliente',
+                        key: 'clientName',
+                        render: (row: any) => <span className="text-xs font-bold text-slate-600">{row.clientName || 'S/I'}</span>
+                      }] : []),
                       {
                         header: 'Cantidad Manifiestos',
                         key: 'manifestCount',
@@ -4037,30 +4536,108 @@ Clientes General</h3>
                       {
                         header: 'Ingresos Propios',
                         key: 'ingresosPropios',
-                        render: (row: any) => (
-                          <div className="text-right">
-                            <span className="font-mono text-indigo-600 font-bold">
-                              {row.ingresosPropios.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
-                            </span>
-                          </div>
-                        )
+                        render: (row: any) => {
+                          const ip = (row.ventaTotal || 0) - (row.ingTerceros || 0);
+                          return (
+                            <div className="text-right">
+                              <span className="font-mono text-indigo-600 font-bold">
+                                {ip.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                              </span>
+                            </div>
+                          );
+                        }
                       },
                       {
                         header: 'INT (%)',
                         key: 'int',
-                        render: (row: any) => (
-                          <div className="text-right">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
-                              row.int < 18 ? 'bg-red-100 text-red-600' : 'bg-emerald-50 text-emerald-600'
-                            }`}>
-                              {row.int.toFixed(1)}%
-                            </span>
-                          </div>
-                        )
+                        render: (row: any) => {
+                          const ip = (row.ventaTotal || 0) - (row.ingTerceros || 0);
+                          const currentInt = row.ventaTotal > 0 ? (ip / row.ventaTotal) * 100 : 0;
+                          return (
+                            <div className="text-right">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                                currentInt < 18 ? 'bg-red-100 text-red-600' : 'bg-emerald-50 text-emerald-600'
+                              }`}>
+                                {currentInt.toFixed(1)}%
+                              </span>
+                            </div>
+                          );
+                        }
                       }
                     ]}
                     excelFileName={`Vehiculos_INT_${selectedClientForVehiclesInt}.xlsx`}
                     searchPlaceholder="Buscar por placa de vehículo..."
+                    onExportExcel={(exportRows, sortedData) => {
+                      const workbook = XLSX.utils.book_new();
+
+                      const processedExportRows = sortedData.map((v: any) => {
+                        const ip = (v.ventaTotal || 0) - (v.ingTerceros || 0);
+                        const currentInt = v.ventaTotal > 0 ? (ip / v.ventaTotal) : 0;
+                        const newRow: any = {};
+                        newRow['Vehículo (Placa)'] = v.plate;
+                        if (selectedClientForVehiclesInt === 'GENERAL') {
+                          newRow['Cliente'] = v.clientName || 'S/I';
+                        }
+                        newRow['Cantidad Manifiestos'] = Math.round(v.manifestCount || 0);
+                        newRow['Venta'] = Math.round(v.ventaTotal || 0);
+                        newRow['Ing Terceros'] = Math.round(v.ingTerceros || 0);
+                        newRow['Ingresos Propios'] = Math.round(ip || 0);
+                        newRow['INT (%)'] = currentInt;
+                        return newRow;
+                      });
+
+                      const totalVentas = sortedData.reduce((sum: number, item: any) => sum + item.ventaTotal, 0);
+                      const totalIngTerceros = sortedData.reduce((sum: number, item: any) => sum + item.ingTerceros, 0);
+                      const totalIngresosPropios = totalVentas - totalIngTerceros;
+                      const overallInt = totalVentas > 0 ? (totalIngresosPropios / totalVentas) : 0;
+                      const totalManifests = sortedData.reduce((sum: number, item: any) => sum + item.manifestCount, 0);
+
+                      const totalRow: any = {
+                        "Vehículo (Placa)": "TOTAL GENERAL"
+                      };
+                      if (selectedClientForVehiclesInt === 'GENERAL') {
+                        totalRow["Cliente"] = "";
+                      }
+                      totalRow["Cantidad Manifiestos"] = Math.round(totalManifests || 0);
+                      totalRow["Venta"] = Math.round(totalVentas || 0);
+                      totalRow["Ing Terceros"] = Math.round(totalIngTerceros || 0);
+                      totalRow["Ingresos Propios"] = Math.round(totalIngresosPropios || 0);
+                      totalRow["INT (%)"] = overallInt;
+
+                      processedExportRows.push(totalRow);
+
+                      const worksheetResumen = XLSX.utils.json_to_sheet(processedExportRows);
+                      
+                      const colZFormatsResumen: Record<string, string> = {
+                        "Venta": '"$"#,##0',
+                        "Ing Terceros": '"$"#,##0',
+                        "Ingresos Propios": '"$"#,##0',
+                        "INT (%)": '0.00%'
+                      };
+
+                      if (worksheetResumen['!ref']) {
+                        const range = XLSX.utils.decode_range(worksheetResumen['!ref']);
+                        const colNames: Record<number, string> = {};
+                        for (let C = range.s.c; C <= range.e.c; ++C) {
+                          const cell = worksheetResumen[XLSX.utils.encode_cell({ r: 0, c: C })];
+                          if (cell && cell.v) colNames[C] = cell.v.toString();
+                        }
+                        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                          for (let C = range.s.c; C <= range.e.c; ++C) {
+                            const colName = colNames[C];
+                            if (colName && colZFormatsResumen[colName]) {
+                              const cell = worksheetResumen[XLSX.utils.encode_cell({ r: R, c: C })];
+                              if (cell && cell.t === 'n') {
+                                cell.z = colZFormatsResumen[colName];
+                              }
+                            }
+                          }
+                        }
+                      }
+                      
+                      XLSX.utils.book_append_sheet(workbook, worksheetResumen, "Resumen_Vehiculos");
+                      XLSX.writeFile(workbook, `Vehiculos_INT_${selectedClientForVehiclesInt}.xlsx`);
+                    }}
                   />
                 </div>
               </div>
@@ -4252,6 +4829,11 @@ Clientes General</h3>
                         key: 'plate',
                         render: (row: any) => <span className="px-2 py-0.5 bg-slate-100 rounded text-[10px] font-black text-slate-700">{row.plate}</span>
                       },
+                      ...(selectedClientForVehiclesFactMes === 'GENERAL' ? [{
+                        header: 'Cliente',
+                        key: 'clientName',
+                        render: (row: any) => <span className="text-xs font-bold text-slate-600">{row.clientName || 'S/I'}</span>
+                      }] : []),
                       {
                         header: 'Cantidad Manifiestos',
                         key: 'manifestCount',
@@ -4310,25 +4892,43 @@ Clientes General</h3>
                       const workbook = XLSX.utils.book_new();
 
                       // Hoja 1: Resumen
-                      const processedExportRows = exportRows.map(row => {
-                        const newRow = { ...row };
-                        if (typeof newRow['% Fact. Mes'] === 'number') {
-                          newRow['% Fact. Mes'] = newRow['% Fact. Mes'] / 100;
+                      const processedExportRows = sortedData.map((v: any) => {
+                        const newRow: any = {};
+                        newRow['Vehículo (Placa)'] = v.plate;
+                        if (selectedClientForVehiclesFactMes === 'GENERAL') {
+                          newRow['Cliente'] = v.clientName || 'S/I';
                         }
-                        if (typeof newRow['Venta'] === 'number') {
-                          newRow['Venta'] = Math.round(newRow['Venta']);
-                        }
-                        if (typeof newRow['Facturado'] === 'number') {
-                          newRow['Facturado'] = Math.round(newRow['Facturado']);
-                        }
+                        newRow['Cantidad Manifiestos'] = Math.round(v.manifestCount || 0);
+                        newRow['Venta'] = Math.round(v.ventaTotal || 0);
+                        newRow['Facturado'] = Math.round(v.facturadoTotal || 0);
+                        newRow['% Fact. Mes'] = v.ventaTotal > 0 ? (v.facturadoTotal / v.ventaTotal) : 0;
                         return newRow;
                       });
+
+                      const totalVentas = sortedData.reduce((sum: number, item: any) => sum + item.ventaTotal, 0);
+                      const totalFacturado = sortedData.reduce((sum: number, item: any) => sum + item.facturadoTotal, 0);
+                      const overallPct = totalVentas > 0 ? (totalFacturado / totalVentas) : 0;
+                      const totalManifests = sortedData.reduce((sum: number, item: any) => sum + item.manifestCount, 0);
+
+                      const totalRow: any = {
+                        "Vehículo (Placa)": "TOTAL GENERAL"
+                      };
+                      if (selectedClientForVehiclesFactMes === 'GENERAL') {
+                        totalRow["Cliente"] = "";
+                      }
+                      totalRow["Cantidad Manifiestos"] = Math.round(totalManifests || 0);
+                      totalRow["Venta"] = Math.round(totalVentas || 0);
+                      totalRow["Facturado"] = Math.round(totalFacturado || 0);
+                      totalRow["% Fact. Mes"] = overallPct;
+
+                      processedExportRows.push(totalRow);
+
                       const worksheetResumen = XLSX.utils.json_to_sheet(processedExportRows);
                       
                       const colZFormatsResumen: Record<string, string> = {
                         "Venta": '"$"#,##0',
                         "Facturado": '"$"#,##0',
-                        "% Fact. Mes": '0.0%'
+                        "% Fact. Mes": '0.00%'
                       };
 
                       if (worksheetResumen['!ref']) {
@@ -4358,7 +4958,7 @@ Clientes General</h3>
                       sortedData.forEach((vehicle: any) => {
                         if (vehicle.manifests) {
                           vehicle.manifests.forEach((m: any) => {
-                            detailRows.push({
+                            const rowObj: any = {
                               "PLACA": vehicle.plate,
                               "Manifiesto": m.manifest_number,
                               "F. Manifiesto": formatDate(m.manifest_date) || "S/I",
@@ -4366,7 +4966,11 @@ Clientes General</h3>
                               "Venta": Math.round(m.venta || 0),
                               "Facturado": Math.round(m.facturado || 0),
                               "% Fact. Mes": (m.factMesPct || 0) / 100
-                            });
+                            };
+                            if (selectedClientForVehiclesFactMes === 'GENERAL') {
+                              rowObj["Cliente"] = vehicle.clientName || 'S/I';
+                            }
+                            detailRows.push(rowObj);
                           });
                         }
                       });
@@ -4375,7 +4979,7 @@ Clientes General</h3>
                       const colZFormatsDetalle: Record<string, string> = {
                         "Venta": '"$"#,##0',
                         "Facturado": '"$"#,##0',
-                        "% Fact. Mes": '0.0%'
+                        "% Fact. Mes": '0.00%'
                       };
 
                       if (worksheetDetalle['!ref']) {
