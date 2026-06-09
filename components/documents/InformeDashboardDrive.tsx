@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   FileText, TrendingUp, Upload, CheckCircle, AlertCircle, Clock,
-  Download, RefreshCw, Filter, Users, BarChart2, Target, ShieldCheck, Loader2
+  Download, RefreshCw, Filter, Users, BarChart2, Target, ShieldCheck, Loader2,
+  ChevronRight, ChevronDown
 } from 'lucide-react';
 import { DataTable, ColumnDef } from '../shared/DataTable';
 import { User } from '../../types';
@@ -29,6 +30,13 @@ interface DriveLog {
   deleteReason?: string;
 }
 
+interface SubClient {
+  id: string;
+  name: string;
+  uploadCount: number;
+  avgDelayHours: number | null;
+}
+
 interface CoverageRow {
   clientName: string;
   manifestCount: number;
@@ -38,6 +46,7 @@ interface CoverageRow {
   avgDelayHours: number | null;
   coveragePct: number | null;
   status: 'CUBIERTO' | 'FALTANTE' | 'EXCEDENTE';
+  subClients?: SubClient[];
 }
 
 interface CoverageSummary {
@@ -340,6 +349,7 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
   ];
 
   const coverageColumns: ColumnDef<(typeof filteredCoverage)[0]>[] = [
+    { header: '', key: '_expand', sortable: false, render: r => r.subClients && r.subClients.length > 0 ? <ChevronDown size={14} className="text-slate-400 group-hover:text-indigo-500 transition-colors" /> : null },
     { header: 'Cliente', key: 'clientName', render: r => <span className="font-black text-slate-800">{r.clientName}</span> },
     { header: 'Manifiestos', key: 'manifestCount', sortable: true, render: r => <span className="font-black text-indigo-700">{r.manifestCount}</span> },
     { header: 'Cumplidos Subidos', key: 'uploadCount', sortable: true, render: r => (
@@ -542,11 +552,39 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
               <div className="text-center py-12 text-slate-400 text-[11px] font-black uppercase">Sin datos</div>
             ) : (
               <DataTable
-                data={filteredCoverage}
+                data={filteredCoverage.map((r, i) => ({ ...r, id: `cov-${i}` }))}
                 columns={coverageColumns}
                 searchPlaceholder="Buscar por cliente…"
                 excelFileName={`Cobertura_${Date.now()}.xlsx`}
                 excelSheetName="Cobertura"
+                renderExpandedRow={(row) => {
+                  if (!row.subClients || row.subClients.length === 0) return null;
+                  return (
+                    <div className="p-4 bg-slate-50/50 pl-16">
+                      <div className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3">Sub-Clientes Registrados</div>
+                      <div className="grid gap-2">
+                        {row.subClients.map(sub => (
+                          <div key={sub.id} className="flex items-center justify-between bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-slate-800 uppercase">{sub.name}</span>
+                              <span className="text-[9px] font-bold text-slate-400 uppercase">ID: {sub.id}</span>
+                            </div>
+                            <div className="flex items-center gap-6">
+                              <div className="flex flex-col items-end">
+                                <span className="text-[9px] font-black uppercase text-slate-400">Subidos</span>
+                                <span className="text-sm font-black text-indigo-600">{sub.uploadCount}</span>
+                              </div>
+                              <div className="flex flex-col items-end">
+                                <span className="text-[9px] font-black uppercase text-slate-400">Demora</span>
+                                <span className="text-sm font-black text-slate-600">{sub.avgDelayHours !== null ? `${sub.avgDelayHours}h` : '—'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }}
               />
             )}
           </div>

@@ -3000,24 +3000,57 @@ export const getDriveCoverage = async (req: Request, res: Response) => {
       manifestsRes.rows.map((r: any) => [r.client_name, r.manifest_count])
     );
 
+    // Client names for subClients mapping
+    const clientIdToName = new Map<string, string>();
+    for (const prov of provRes.rows) {
+      if (!prov.nombre) continue;
+      const mappings: Array<any> = prov.client_mappings || [];
+      for (const m of mappings) {
+        if (m.clientId) clientIdToName.set(m.clientId, m.clientName || m.clientId);
+      }
+    }
+
     // Aggregate uploads for a manifest client_name using mappings when available
     const getUploadsForManifestClient = (clientName: string) => {
       const clientIds = mgmtNameToClientIds.get(clientName);
+      const subClients: any[] = [];
+
       if (clientIds && clientIds.size > 0) {
         let upload_count = 0, success_count = 0, error_count = 0, delaySum = 0, delayCount = 0;
         for (const cid of clientIds) {
           const u = uploadByClientId.get(cid);
-          if (!u) continue;
-          upload_count  += u.upload_count  ?? 0;
-          success_count += u.success_count ?? 0;
-          error_count   += u.error_count   ?? 0;
-          if (u.avg_delay_hours != null) { delaySum += u.avg_delay_hours * (u.upload_count ?? 1); delayCount += u.upload_count ?? 1; }
+          if (u) {
+            upload_count  += u.upload_count  ?? 0;
+            success_count += u.success_count ?? 0;
+            error_count   += u.error_count   ?? 0;
+            if (u.avg_delay_hours != null) { delaySum += u.avg_delay_hours * (u.upload_count ?? 1); delayCount += u.upload_count ?? 1; }
+            subClients.push({
+              id: cid,
+              name: clientIdToName.get(cid) || u.client_name || cid,
+              uploadCount: u.upload_count ?? 0,
+              avgDelayHours: u.avg_delay_hours ?? null
+            });
+          } else {
+            subClients.push({
+              id: cid,
+              name: clientIdToName.get(cid) || cid,
+              uploadCount: 0,
+              avgDelayHours: null
+            });
+          }
         }
-        return { upload_count, success_count, error_count, avg_delay_hours: delayCount > 0 ? Math.round((delaySum / delayCount) * 10) / 10 : null };
+        return { upload_count, success_count, error_count, avg_delay_hours: delayCount > 0 ? Math.round((delaySum / delayCount) * 10) / 10 : null, subClients };
       }
       // Fallback: direct name match
       const u = uploadByName.get(clientName);
-      return u ? { upload_count: u.upload_count, success_count: u.success_count, error_count: u.error_count, avg_delay_hours: u.avg_delay_hours } : null;
+      if (u) {
+        subClients.push({
+          name: u.client_name || clientName,
+          uploadCount: u.upload_count ?? 0,
+          avgDelayHours: u.avg_delay_hours ?? null
+        });
+      }
+      return u ? { upload_count: u.upload_count, success_count: u.success_count, error_count: u.error_count, avg_delay_hours: u.avg_delay_hours, subClients } : { upload_count: 0, success_count: 0, error_count: 0, avg_delay_hours: null, subClients };
     };
 
     // Collect upload client names that are NOT covered by any mapping (to surface as EXCEDENTE)
@@ -3039,7 +3072,7 @@ export const getDriveCoverage = async (req: Request, res: Response) => {
                       : manifests > 0 && uploads === 0 ? 'FALTANTE'
                       : 'EXCEDENTE';
       const coveragePct = manifests > 0 ? (uploads >= manifests ? 100 : Math.min(99, Math.floor((uploads / manifests) * 100))) : null;
-      return { clientName: mgmtNameToDisplay.get(client) || client, manifestCount: manifests, uploadCount: uploads, successCount: successes, errorCount: errors, avgDelayHours: avgDelay, coveragePct, status };
+      return { clientName: mgmtNameToDisplay.get(client) || client, manifestCount: manifests, uploadCount: uploads, successCount: successes, errorCount: errors, avgDelayHours: avgDelay, coveragePct, status, subClients: up?.subClients || [] };
     }).sort((a, b) => b.manifestCount - a.manifestCount);
 
     const cubiertos  = coverage.filter(c => c.status === 'CUBIERTO').length;

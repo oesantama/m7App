@@ -16,6 +16,7 @@ interface DataTableProps<T> {
   excelFileName?: string;
   excelSheetName?: string;
   onExportExcel?: (exportRows: Record<string, any>[], sortedData: T[]) => void;
+  renderExpandedRow?: (row: T) => React.ReactNode;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -25,6 +26,7 @@ export function DataTable<T extends Record<string, any>>({
   excelFileName = 'reporte.xlsx',
   excelSheetName = 'Datos',
   onExportExcel,
+  renderExpandedRow,
 }: DataTableProps<T>) {
   // Búsqueda
   const [searchTerm, setSearchTerm] = useState('');
@@ -167,6 +169,18 @@ export function DataTable<T extends Record<string, any>>({
     XLSX.writeFile(workbook, excelFileName);
   };
 
+  // Estado para filas expandidas
+  const [expandedRows, setExpandedRows] = useState<Set<string | number>>(new Set());
+
+  const toggleRow = (id: string | number) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 p-6 md:p-8 animate-in fade-in duration-500">
       {/* Controles de Búsqueda, Acciones y Exportar */}
@@ -243,30 +257,45 @@ export function DataTable<T extends Record<string, any>>({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {paginatedData.length > 0 ? (
-              paginatedData.map((row, rIdx) => (
-                <tr
-                  key={row.id || rIdx}
-                  className="hover:bg-slate-50/70 transition-colors group"
-                >
-                  {columns.map((col) => {
-                    const value = row[col.key as string];
-                    return (
-                      <td
-                        key={String(col.key)}
-                        className="px-6 py-4 text-sm text-slate-600 font-medium whitespace-nowrap"
-                      >
-                        {col.render ? (
-                          col.render(row)
-                        ) : value !== null && value !== undefined && value !== '' ? (
-                          String(value)
-                        ) : (
-                          <span className="text-slate-300 font-bold">—</span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))
+              paginatedData.map((row, rIdx) => {
+                const rowId = row.id || rIdx;
+                const isExpanded = expandedRows.has(rowId);
+                return (
+                  <React.Fragment key={rowId}>
+                    <tr
+                      className={`hover:bg-slate-50/70 transition-colors group ${renderExpandedRow ? 'cursor-pointer' : ''}`}
+                      onClick={() => renderExpandedRow && toggleRow(rowId)}
+                    >
+                      {columns.map((col) => {
+                        const value = row[col.key as string];
+                        return (
+                          <td
+                            key={String(col.key)}
+                            className="px-6 py-4 text-sm text-slate-600 font-medium whitespace-nowrap"
+                          >
+                            {col.render ? (
+                              col.render(row)
+                            ) : value !== null && value !== undefined && value !== '' ? (
+                              String(value)
+                            ) : (
+                              <span className="text-slate-300 font-bold">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    {renderExpandedRow && isExpanded && (
+                      <tr>
+                        <td colSpan={columns.length} className="bg-slate-50 border-b-2 border-slate-200 p-0">
+                          <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                            {renderExpandedRow(row)}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })
             ) : (
               <tr>
                 <td
