@@ -18,6 +18,56 @@ const COLORS = [
 
 const TDM_COLORS = ['#f59e0b','#fbbf24','#fcd34d','#f97316','#fb923c','#fdba74','#fde68a','#d97706','#b45309','#92400e','#78350f','#451a03'];
 
+const CITY_TO_DEPT: Record<string, string> = {
+  'MEDELLIN': 'ANTIOQUIA',
+  'ITAGUI': 'ANTIOQUIA',
+  'ENVIGADO': 'ANTIOQUIA',
+  'BELLO': 'ANTIOQUIA',
+  'SABANETA': 'ANTIOQUIA',
+  'LA ESTRELLA': 'ANTIOQUIA',
+  'COPACABANA': 'ANTIOQUIA',
+  'GIRARDOTA': 'ANTIOQUIA',
+  'CALDAS': 'ANTIOQUIA',
+  'BARBOSA': 'ANTIOQUIA',
+  'RIONEGRO': 'ANTIOQUIA',
+  'MARINILLA': 'ANTIOQUIA',
+  'GUARNE': 'ANTIOQUIA',
+  'CARMEN DE VIBORAL': 'ANTIOQUIA',
+  'BOGOTA': 'CUNDINAMARCA',
+  'BOGOTA D.C.': 'CUNDINAMARCA',
+  'CALI': 'VALLE DEL CAUCA',
+  'YUMBO': 'VALLE DEL CAUCA',
+  'PALMIRA': 'VALLE DEL CAUCA',
+  'BUENAVENTURA': 'VALLE DEL CAUCA',
+  'BARRANQUILLA': 'ATLANTICO',
+  'SOLEDAD': 'ATLANTICO',
+  'CARTAGENA': 'BOLIVAR',
+  'SANTA MARTA': 'MAGDALENA',
+  'MONTERIA': 'CORDOBA',
+  'SINCELEJO': 'SUCRE',
+  'VALLEDUPAR': 'CESAR',
+  'PEREIRA': 'RISARALDA',
+  'DOSQUEBRADAS': 'RISARALDA',
+  'MANIZALES': 'CALDAS',
+  'ARMENIA': 'QUINDIO',
+  'IBAGUE': 'TOLIMA',
+  'NEIVA': 'HUILA',
+  'VILLAVICENCIO': 'META',
+  'CUCUTA': 'NORTE DE SANTANDER',
+  'BUCARAMANGA': 'SANTANDER',
+  'FLORIDABLANCA': 'SANTANDER',
+  'GIRON': 'SANTANDER',
+  'PIEDECUESTA': 'SANTANDER',
+  'POPAYAN': 'CAUCA',
+  'PASTO': 'NARIÑO',
+  'TUNJA': 'BOYACA',
+};
+
+const getDepartment = (city: string) => {
+  const cleanCity = (city || '').toUpperCase().trim();
+  return CITY_TO_DEPT[cleanCity] || cleanCity || 'SIN DEPARTAMENTO/CIUDAD';
+};
+
 const EmptyChart = ({ label }: { label: string }) => (
   <div className="flex flex-col items-center justify-center h-64 text-slate-300">
     <p className="text-4xl mb-2">📊</p>
@@ -31,50 +81,65 @@ const truncateName = (str: string, maxLen: number = 18) => {
 };
 
 const InteractiveBarCard = ({
-  title, data, colors, rawRows, cityMode,
+  title, data, colors, rawRows, primaryGroup, secondaryGroup, dateRange, dualColumns
 }: {
   title: string;
-  data: PieEntry[];
+  data: any[];
   colors: string[];
   rawRows: any[];
-  cityMode?: boolean;
+  primaryGroup: 'client' | 'department';
+  secondaryGroup: 'client' | 'department';
+  dateRange: string;
+  dualColumns?: boolean;
 }) => {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const total = data.reduce((s, d) => s + d.value, 0);
 
   const selected = activeIdx !== null ? data[activeIdx] : null;
 
+  const getPrimaryName = (r: any) => primaryGroup === 'client' ? r.client_name : getDepartment(r.department || r.city);
+  const getSecondaryName = (r: any) => secondaryGroup === 'client' ? r.client_name : getDepartment(r.department || r.city);
+
   // Filter rows based on selection
   const filteredRows = selected 
-    ? rawRows.filter(r => 
-        cityMode 
-          ? (r.city || 'SIN CIUDAD').toUpperCase().trim() === selected.name
-          : r.client_name === selected.name
-      )
-    : rawRows; // Show all if nothing selected
+    ? rawRows.filter(r => getPrimaryName(r) === selected.name)
+    : rawRows; 
 
   // Group breakdown
   const detailBreakdown = selected
     ? Object.entries(
         filteredRows.reduce((acc: Record<string, number>, r) => {
-          const key = cityMode ? r.operator : (r.city || 'SIN CIUDAD').toUpperCase();
-          acc[key] = (acc[key] || 0) + r.quantity;
-          return acc;
-        }, {})
-      ).map(([label, qty]) => ({ label, client: '', city: '', operator: '', qty: qty as number })).sort((a, b) => b.qty - a.qty)
-    : Object.entries(
-        filteredRows.reduce((acc: Record<string, number>, r) => {
-          const client = r.client_name;
-          const city = (r.city || 'SIN CIUDAD').toUpperCase();
-          const op = r.operator;
-          const key = `${client}|||${city}|||${op}`;
+          const key = dualColumns 
+            ? `${r.client_name}|||${getDepartment(r.department || r.city)}`
+            : getSecondaryName(r);
           acc[key] = (acc[key] || 0) + r.quantity;
           return acc;
         }, {})
       ).map(([key, qty]) => {
-          const [client, city, operator] = key.split('|||');
-          return { label: '', client, city, operator, qty: qty as number };
+         if (dualColumns) {
+           const [client, dept] = key.split('|||');
+           return { client, dept, qty: qty as number };
+         }
+         return { label: key, qty: qty as number };
+      }).sort((a, b) => b.qty - a.qty)
+    : Object.entries(
+        filteredRows.reduce((acc: Record<string, number>, r) => {
+          const key = dualColumns
+            ? `${r.client_name}|||${getDepartment(r.department || r.city)}`
+            : getPrimaryName(r);
+          acc[key] = (acc[key] || 0) + r.quantity;
+          return acc;
+        }, {})
+      ).map(([key, qty]) => {
+         if (dualColumns) {
+           const [client, dept] = key.split('|||');
+           return { client, dept, qty: qty as number };
+         }
+         return { label: key, qty: qty as number };
       }).sort((a, b) => b.qty - a.qty);
+
+  const primaryLabel = primaryGroup === 'client' ? 'Cliente' : 'Departamento';
+  const secondaryLabel = secondaryGroup === 'client' ? 'Cliente' : 'Departamento';
 
   return (
     <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 mb-6">
@@ -114,76 +179,81 @@ const InteractiveBarCard = ({
               borderColor: selected ? colors[activeIdx! % colors.length] + '55' : '#e2e8f0', 
               background: selected ? colors[activeIdx! % colors.length] + '0d' : '#f8fafc' 
             }}>
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-2">
                 {selected ? (
                   <>
-                    <span className="w-3 h-3 rounded-full inline-block" style={{ background: colors[activeIdx! % colors.length] }} />
-                    <span className="font-black text-slate-800 text-sm">{selected.name}</span>
+                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: colors[activeIdx! % colors.length] }} />
+                    <span className="font-black text-slate-800 text-sm leading-tight">
+                      {selected.name} <span className="text-slate-400 font-bold ml-1">({dateRange}) — {selected.value.toLocaleString('es-CO')} Viajes</span>
+                    </span>
                   </>
                 ) : (
-                  <span className="font-black text-slate-800 text-sm">📋 TODA LA INFORMACIÓN</span>
+                  <span className="font-black text-slate-800 text-sm flex items-center gap-2">
+                    <span className="text-lg">📋</span> TODA LA INFORMACIÓN 
+                    <span className="text-slate-400 font-bold ml-1">({dateRange}) — {total.toLocaleString('es-CO')} Viajes</span>
+                  </span>
                 )}
               </div>
               {selected && (
                 <button onClick={() => setActiveIdx(null)}
-                  className="text-slate-400 hover:text-slate-600 text-xs font-black px-2 py-0.5 rounded-lg hover:bg-slate-200 transition-all">
+                  className="text-slate-500 hover:text-slate-800 text-xs font-black px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-all flex-shrink-0 border border-slate-200 bg-white shadow-sm">
                   ✕ Mostrar Todos
                 </button>
               )}
             </div>
 
-            <div className="flex flex-wrap gap-4 mb-3">
-              <div className="bg-white rounded-xl px-4 py-2 shadow-sm border border-slate-100">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Viajes</p>
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-slate-100 flex flex-col justify-center">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Viajes</p>
                 <p className="text-xl font-black" style={{ color: selected ? colors[activeIdx! % colors.length] : '#475569' }}>
                   {(selected ? selected.value : total).toLocaleString('es-CO')}
                 </p>
               </div>
-              <div className="bg-white rounded-xl px-4 py-2 shadow-sm border border-slate-100">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">% del Total</p>
+              <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-slate-100 flex flex-col justify-center">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">% del Total</p>
                 <p className="text-xl font-black text-slate-700">
                   {selected ? ((selected.value / total) * 100).toFixed(1) : '100.0'}%
                 </p>
               </div>
-              <div className="bg-white rounded-xl px-4 py-2 shadow-sm border border-slate-100">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                  {cityMode ? 'Operadores' : 'Ciudades (Destino)'}
+              <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-slate-100 flex flex-col justify-center">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">
+                  {dualColumns ? 'Registros' : (selected ? secondaryLabel : primaryLabel) + '(s)'}
                 </p>
-                <p className="text-xl font-black text-slate-700">{selected ? detailBreakdown.length : new Set(detailBreakdown.map(d => d.city)).size}</p>
+                <p className="text-xl font-black text-slate-700">{detailBreakdown.length}</p>
               </div>
             </div>
 
             {detailBreakdown.length > 0 && (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto bg-white rounded-xl border border-slate-100 shadow-sm">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
-                      {!selected && <th className="text-left pb-2 px-1">Cliente</th>}
-                      {!selected && <th className="text-left pb-2 px-1">Ciudad (Destino)</th>}
-                      {!selected && <th className="text-left pb-2 px-1">Operador</th>}
-                      
-                      {selected && <th className="text-left pb-2 px-1">{cityMode ? 'Operador' : 'Ciudad (Destino)'}</th>}
-                      
-                      <th className="text-right pb-2 px-1">Viajes</th>
-                      <th className="text-right pb-2 px-1">%</th>
+                    <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 border-b border-slate-100">
+                      {dualColumns ? (
+                        <>
+                          <th className="text-left py-3 px-4">Cliente</th>
+                          <th className="text-left py-3 px-4">Departamento</th>
+                        </>
+                      ) : (
+                        <th className="text-left py-3 px-4">{selected ? secondaryLabel : primaryLabel}</th>
+                      )}
+                      <th className="text-right py-3 px-4">Viajes</th>
+                      <th className="text-right py-3 px-4">%</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {detailBreakdown.map((row, idx) => (
-                      <tr key={idx} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
-                        {!selected && <td className="py-2 px-1 font-bold text-slate-700">{row.client}</td>}
-                        {!selected && <td className="py-2 px-1 font-bold text-slate-500">{row.city}</td>}
-                        {!selected && <td className="py-2 px-1 font-bold">
-                          <span className={`px-2 py-0.5 rounded-md text-[9px] uppercase tracking-widest ${row.operator === 'M7' ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {row.operator}
-                          </span>
-                        </td>}
-                        
-                        {selected && <td className="py-2 px-1 font-bold text-slate-700">{row.label}</td>}
-                        
-                        <td className="text-right px-1 font-black text-slate-800">{row.qty}</td>
-                        <td className="text-right px-1 font-bold text-slate-500">
+                    {detailBreakdown.map((row: any, idx) => (
+                      <tr key={idx} className="border-t border-slate-50 hover:bg-slate-50/80 transition-colors">
+                        {dualColumns ? (
+                          <>
+                            <td className="py-2.5 px-4 font-bold text-slate-700">{row.client}</td>
+                            <td className="py-2.5 px-4 font-bold text-slate-500">{row.dept}</td>
+                          </>
+                        ) : (
+                          <td className="py-2.5 px-4 font-bold text-slate-700">{row.label}</td>
+                        )}
+                        <td className="text-right px-4 font-black text-slate-800">{row.qty}</td>
+                        <td className="text-right px-4 font-bold text-slate-500">
                           {((row.qty / (selected ? selected.value : total)) * 100).toFixed(1)}%
                         </td>
                       </tr>
@@ -239,27 +309,24 @@ export default function InformesFlota({ user: _user }: Props) {
     }
   }, [from, to]);
 
-  const aggregate = (rows: any[]): PieEntry[] => {
+  const groupRows = (rows: any[], keyFn: (r: any) => string) => {
     const map = new Map<string, number>();
-    rows.forEach(r => map.set(r.client_name, (map.get(r.client_name) || 0) + r.quantity));
+    rows.forEach(r => {
+      const key = keyFn(r);
+      map.set(key, (map.get(key) || 0) + r.quantity);
+    });
     return Array.from(map.entries()).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
   };
 
   const m7Rows  = rawData.filter(r => r.operator === 'M7');
   const tdmRows = rawData.filter(r => r.operator === 'TDM');
 
-  const m7Data  = aggregate(m7Rows);
-  const tdmData = aggregate(tdmRows);
+  const m7Data  = groupRows(m7Rows, r => r.client_name);
+  const tdmData = groupRows(tdmRows, r => r.client_name);
 
-  // Participation by city — aggregate all operators
-  const cityMap = new Map<string, number>();
-  rawData.forEach(r => {
-    const city = (r.city || 'SIN CIUDAD').toUpperCase().trim();
-    cityMap.set(city, (cityMap.get(city) || 0) + r.quantity);
-  });
-  const cityData: PieEntry[] = Array.from(cityMap.entries())
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
+  // Data grouped by Department
+  const m7DeptData  = groupRows(m7Rows, r => getDepartment(r.department || r.city));
+  const tdmDeptData = groupRows(tdmRows, r => getDepartment(r.department || r.city));
 
   const CITY_COLORS = [
     '#6366f1','#22c55e','#f59e0b','#ef4444','#8b5cf6',
@@ -351,9 +418,13 @@ export default function InformesFlota({ user: _user }: Props) {
             Haz clic en una tajada para ver detalle del cliente
           </p>
 
-          <InteractiveBarCard title="🏢 Flota M7 — Por Cliente"    data={m7Data}   colors={COLORS}      rawRows={m7Rows} />
-          <InteractiveBarCard title="⭐ Flota TDM — Por Cliente"  data={tdmData}  colors={TDM_COLORS}  rawRows={tdmRows} />
-          <InteractiveBarCard title="🏙️ Participación por Ciudad" data={cityData} colors={CITY_COLORS} rawRows={rawData} cityMode />
+          <InteractiveBarCard title="🏢 Flota M7 — Por Cliente" data={m7Data} colors={COLORS} rawRows={m7Rows} primaryGroup="client" secondaryGroup="department" dateRange={`${from} a ${to}`} />
+          <InteractiveBarCard title="⭐ Flota TDM — Por Cliente" data={tdmData} colors={TDM_COLORS} rawRows={tdmRows} primaryGroup="client" secondaryGroup="department" dateRange={`${from} a ${to}`} />
+          
+          <div className="grid grid-cols-1 gap-6">
+            <InteractiveBarCard title="🏙️ Flota M7 — Por Departamento" data={m7DeptData} colors={CITY_COLORS} rawRows={m7Rows} primaryGroup="department" secondaryGroup="client" dateRange={`${from} a ${to}`} dualColumns />
+            <InteractiveBarCard title="🗺️ Flota TDM — Por Departamento" data={tdmDeptData} colors={TDM_COLORS.slice().reverse()} rawRows={tdmRows} primaryGroup="department" secondaryGroup="client" dateRange={`${from} a ${to}`} dualColumns />
+          </div>
 
           {/* Gráfica comparativa */}
           <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">

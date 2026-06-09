@@ -2554,7 +2554,7 @@ export const InformesGerenciales: React.FC = () => {
                       : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/50'
                   }`}
                 >
-                  Ventas con el generales
+                  Ventas generales
                 </button>
 
                 <button
