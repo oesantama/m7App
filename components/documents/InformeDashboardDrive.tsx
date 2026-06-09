@@ -154,8 +154,8 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
     setLoading(true);
     try {
       const p = new URLSearchParams();
-      if (dateFrom) p.append('from', dateFrom);
-      if (dateTo)   p.append('to', dateTo);
+      if (dateFrom) p.append('dateFrom', dateFrom);
+      if (dateTo)   p.append('dateTo', dateTo);
       p.append('category', 'CUMPLIDOS');
       const res = await fetch(`/api/documents/drive-logs?${p}`, { headers: { Authorization: `Bearer ${token()}` } });
       if (res.ok) { const d = await res.json(); setLogs(Array.isArray(d) ? d : d.data || []); }
