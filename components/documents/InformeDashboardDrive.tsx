@@ -440,13 +440,6 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
       {/* ── FILTROS ── */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 flex flex-wrap items-end gap-4">
         <Filter size={14} className="text-slate-400 self-center" />
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          className="px-4 py-2.5 border-2 border-slate-200 rounded-2xl text-[11px] font-bold focus:outline-none focus:border-emerald-500 bg-white cursor-pointer">
-          <option value="">Todos los estados</option>
-          <option value="SUCCESS">Exitoso</option>
-          <option value="ERROR">Con Error</option>
-          <option value="PENDING">Pendiente</option>
-        </select>
         <div className="flex items-center gap-2">
           <label className="text-[9px] font-black text-slate-400 uppercase">Desde</label>
           <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
@@ -470,7 +463,7 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
           { label: 'Total Subidos',    value: total,   icon: <Upload size={16} />,       color: 'bg-blue-600',    sub: 'archivos en Drive' },
           { label: 'Exitosos',         value: success, icon: <CheckCircle size={16} />,  color: 'bg-emerald-600', sub: `${total > 0 ? Math.round((success/total)*100) : 0}% del total` },
           { label: 'Con Error',        value: errors,  icon: <AlertCircle size={16} />,  color: 'bg-rose-600',    sub: 'requieren revisión' },
-          { label: 'Pendientes',       value: pending, icon: <Clock size={16} />,        color: 'bg-amber-500',   sub: 'en procesamiento' },
+          { label: 'Tot. Manifiestos', value: coverage ? coverage.data.reduce((sum, r) => sum + r.manifestCount, 0) : '—', icon: <FileText size={16} />, color: 'bg-amber-500', sub: 'en el período' },
           { label: 'Cobertura Global', value: coverage ? `${coverage.summary.coveragePct}%` : '—', icon: <Target size={16} />, color: 'bg-violet-600', sub: 'clientes cubiertos' },
           { label: 'Faltantes',        value: coverage ? coverage.summary.faltantes : '—', icon: <ShieldCheck size={16} />, color: 'bg-orange-500', sub: 'sin cumplido subido' },
         ].map(k => (
