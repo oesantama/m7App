@@ -133,7 +133,7 @@ export const uploadReports = async (req: Request, res: Response) => {
         parseNum(row.totalCxp || row['Total CXP']),
         user,
         cleanStr(row.clientDocument || row['Documento Cliente'] || row['NIT Cliente'] || row['Nit Cliente'] || row['NIT cliente'] || row['Documento cliente']),
-        cleanStr(row.city || row['Origen'] || row['origen'] || row['ORIGEN'] || '').toUpperCase() || null
+        cleanStr(row.city || row['Destino'] || row['destino'] || row['DESTINO'] || row['Origen'] || row['origen'] || '').toUpperCase() || null
       ];
 
       await client.query(insertQuery, values);

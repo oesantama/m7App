@@ -26,21 +26,11 @@ const EmptyChart = ({ label }: { label: string }) => (
   </div>
 );
 
-const renderActiveShape = (props: any) => {
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
-  return (
-    <g>
-      <Sector cx={cx} cy={cy} innerRadius={innerRadius} outerRadius={outerRadius + 12}
-        startAngle={startAngle} endAngle={endAngle} fill={fill} />
-      <Sector cx={cx} cy={cy} innerRadius={outerRadius + 14} outerRadius={outerRadius + 18}
-        startAngle={startAngle} endAngle={endAngle} fill={fill} />
-    </g>
-  );
+const truncateName = (str: string, maxLen: number = 18) => {
+  return str.length > maxLen ? str.substring(0, maxLen - 1) + '…' : str;
 };
 
-interface PieEntry { name: string; value: number; }
-
-const InteractivePieCard = ({
+const InteractiveBarCard = ({
   title, data, colors, rawRows, cityMode,
 }: {
   title: string;
@@ -54,31 +44,40 @@ const InteractivePieCard = ({
 
   const selected = activeIdx !== null ? data[activeIdx] : null;
 
-  // In cityMode: show operator breakdown; otherwise: show city breakdown
-  const detailBreakdown: { label: string; qty: number }[] = selected
-    ? cityMode
-      ? Object.entries(
-          rawRows
-            .filter(r => (r.city || 'SIN CIUDAD').toUpperCase().trim() === selected.name)
-            .reduce((acc: Record<string, number>, r) => {
-              acc[r.operator] = (acc[r.operator] || 0) + r.quantity;
-              return acc;
-            }, {})
-        ).map(([label, qty]) => ({ label, qty: qty as number })).sort((a, b) => b.qty - a.qty)
-      : Object.entries(
-          rawRows
-            .filter(r => r.client_name === selected.name)
-            .reduce((acc: Record<string, number>, r) => {
-              acc[(r.city || 'SIN CIUDAD').toUpperCase()] = (acc[(r.city || 'SIN CIUDAD').toUpperCase()] || 0) + r.quantity;
-              return acc;
-            }, {})
-        ).map(([label, qty]) => ({ label, qty: qty as number })).sort((a, b) => b.qty - a.qty)
-    : [];
+  // Filter rows based on selection
+  const filteredRows = selected 
+    ? rawRows.filter(r => 
+        cityMode 
+          ? (r.city || 'SIN CIUDAD').toUpperCase().trim() === selected.name
+          : r.client_name === selected.name
+      )
+    : rawRows; // Show all if nothing selected
 
-  const cityBreakdown = detailBreakdown; // alias for template below
+  // Group breakdown
+  const detailBreakdown = selected
+    ? Object.entries(
+        filteredRows.reduce((acc: Record<string, number>, r) => {
+          const key = cityMode ? r.operator : (r.city || 'SIN CIUDAD').toUpperCase();
+          acc[key] = (acc[key] || 0) + r.quantity;
+          return acc;
+        }, {})
+      ).map(([label, qty]) => ({ label, client: '', city: '', operator: '', qty: qty as number })).sort((a, b) => b.qty - a.qty)
+    : Object.entries(
+        filteredRows.reduce((acc: Record<string, number>, r) => {
+          const client = r.client_name;
+          const city = (r.city || 'SIN CIUDAD').toUpperCase();
+          const op = r.operator;
+          const key = `${client}|||${city}|||${op}`;
+          acc[key] = (acc[key] || 0) + r.quantity;
+          return acc;
+        }, {})
+      ).map(([key, qty]) => {
+          const [client, city, operator] = key.split('|||');
+          return { label: '', client, city, operator, qty: qty as number };
+      }).sort((a, b) => b.qty - a.qty);
 
   return (
-    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
+    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-[11px] font-black uppercase tracking-widest text-slate-700">{title}</h3>
         <span className="px-3 py-0.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-500">{total} viajes</span>
@@ -89,99 +88,111 @@ const InteractivePieCard = ({
       ) : (
         <>
           <ResponsiveContainer width="100%" height={460}>
-            <PieChart>
-              <Pie
-                data={data}
-                cx="50%" cy="50%"
-                outerRadius={160}
-                dataKey="value"
-                activeIndex={activeIdx ?? undefined}
-                activeShape={renderActiveShape}
-                onMouseEnter={(_, idx) => setActiveIdx(idx)}
-                onMouseLeave={() => { if (activeIdx !== null) {} }}
-                onClick={(_, idx) => setActiveIdx(prev => prev === idx ? null : idx)}
-                cursor="pointer"
-                labelLine={false}
-              >
+            <BarChart data={data} margin={{ top: 30, right: 20, bottom: 120, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+              <XAxis dataKey="name" tickFormatter={(v) => truncateName(v)} angle={-45} textAnchor="end" interval={0} tick={{ fontSize: 9, fontWeight: 600, fill: '#64748b' }} />
+              <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
+              <Tooltip
+                cursor={{ fill: '#f1f5f9' }}
+                formatter={(v: any, name: string) => [
+                  `${v} viajes (${((v / total) * 100).toFixed(1)}%)`, 'Viajes'
+                ]}
+              />
+              <Bar dataKey="value" onClick={(e, idx) => setActiveIdx(prev => prev === idx ? null : idx)} cursor="pointer">
                 {data.map((_, i) => (
                   <Cell key={i} fill={colors[i % colors.length]}
                     opacity={activeIdx === null || activeIdx === i ? 1 : 0.45} />
                 ))}
-              </Pie>
-              <Tooltip
-                formatter={(v: any, name: string) => [
-                  `${v} viajes (${((v / total) * 100).toFixed(1)}%)`, name
-                ]}
-              />
-              <Legend
-                iconType="circle" iconSize={8}
-                formatter={(v) => (
-                  <span className="text-[10px] font-bold text-slate-600">{v}</span>
-                )}
-              />
-            </PieChart>
+                <LabelList dataKey="value" position="top" style={{ fontSize: 10, fontWeight: 'bold', fill: '#475569' }} />
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
 
           {/* Detail panel */}
-          {selected && (
-            <div className={`mt-4 rounded-2xl border-2 p-4 transition-all`}
-              style={{ borderColor: colors[activeIdx! % colors.length] + '55', background: colors[activeIdx! % colors.length] + '0d' }}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full inline-block" style={{ background: colors[activeIdx! % colors.length] }} />
-                  <span className="font-black text-slate-800 text-sm">{selected.name}</span>
-                </div>
+          <div className={`mt-4 rounded-2xl border-2 p-4 transition-all`}
+            style={{ 
+              borderColor: selected ? colors[activeIdx! % colors.length] + '55' : '#e2e8f0', 
+              background: selected ? colors[activeIdx! % colors.length] + '0d' : '#f8fafc' 
+            }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                {selected ? (
+                  <>
+                    <span className="w-3 h-3 rounded-full inline-block" style={{ background: colors[activeIdx! % colors.length] }} />
+                    <span className="font-black text-slate-800 text-sm">{selected.name}</span>
+                  </>
+                ) : (
+                  <span className="font-black text-slate-800 text-sm">📋 TODA LA INFORMACIÓN</span>
+                )}
+              </div>
+              {selected && (
                 <button onClick={() => setActiveIdx(null)}
-                  className="text-slate-400 hover:text-slate-600 text-xs font-black px-2 py-0.5 rounded-lg hover:bg-slate-100 transition-all">
-                  ✕ Cerrar
+                  className="text-slate-400 hover:text-slate-600 text-xs font-black px-2 py-0.5 rounded-lg hover:bg-slate-200 transition-all">
+                  ✕ Mostrar Todos
                 </button>
-              </div>
+              )}
+            </div>
 
-              <div className="flex flex-wrap gap-4 mb-3">
-                <div className="bg-white rounded-xl px-4 py-2 shadow-sm border border-slate-100">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Viajes</p>
-                  <p className="text-xl font-black" style={{ color: colors[activeIdx! % colors.length] }}>
-                    {selected.value.toLocaleString('es-CO')}
-                  </p>
-                </div>
-                <div className="bg-white rounded-xl px-4 py-2 shadow-sm border border-slate-100">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">% del Total</p>
-                  <p className="text-xl font-black text-slate-700">
-                    {((selected.value / total) * 100).toFixed(1)}%
-                  </p>
-                </div>
-                <div className="bg-white rounded-xl px-4 py-2 shadow-sm border border-slate-100">
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                    {cityMode ? 'Operadores' : 'Ciudades'}
-                  </p>
-                  <p className="text-xl font-black text-slate-700">{cityBreakdown.length}</p>
-                </div>
+            <div className="flex flex-wrap gap-4 mb-3">
+              <div className="bg-white rounded-xl px-4 py-2 shadow-sm border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Viajes</p>
+                <p className="text-xl font-black" style={{ color: selected ? colors[activeIdx! % colors.length] : '#475569' }}>
+                  {(selected ? selected.value : total).toLocaleString('es-CO')}
+                </p>
               </div>
+              <div className="bg-white rounded-xl px-4 py-2 shadow-sm border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">% del Total</p>
+                <p className="text-xl font-black text-slate-700">
+                  {selected ? ((selected.value / total) * 100).toFixed(1) : '100.0'}%
+                </p>
+              </div>
+              <div className="bg-white rounded-xl px-4 py-2 shadow-sm border border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                  {cityMode ? 'Operadores' : 'Ciudades (Destino)'}
+                </p>
+                <p className="text-xl font-black text-slate-700">{selected ? detailBreakdown.length : new Set(detailBreakdown.map(d => d.city)).size}</p>
+              </div>
+            </div>
 
-              {cityBreakdown.length > 0 && (
+            {detailBreakdown.length > 0 && (
+              <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-200">
-                      <th className="text-left pb-2">{cityMode ? 'Operador' : 'Ciudad'}</th>
-                      <th className="text-right pb-2">Viajes</th>
-                      <th className="text-right pb-2">%</th>
+                      {!selected && <th className="text-left pb-2 px-1">Cliente</th>}
+                      {!selected && <th className="text-left pb-2 px-1">Ciudad (Destino)</th>}
+                      {!selected && <th className="text-left pb-2 px-1">Operador</th>}
+                      
+                      {selected && <th className="text-left pb-2 px-1">{cityMode ? 'Operador' : 'Ciudad (Destino)'}</th>}
+                      
+                      <th className="text-right pb-2 px-1">Viajes</th>
+                      <th className="text-right pb-2 px-1">%</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {cityBreakdown.map(({ label, qty }) => (
-                      <tr key={label} className="border-t border-slate-100">
-                        <td className="py-1.5 font-bold text-slate-700">{label}</td>
-                        <td className="text-right font-black text-slate-800">{qty}</td>
-                        <td className="text-right font-bold text-slate-500">
-                          {((qty / selected!.value) * 100).toFixed(1)}%
+                    {detailBreakdown.map((row, idx) => (
+                      <tr key={idx} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                        {!selected && <td className="py-2 px-1 font-bold text-slate-700">{row.client}</td>}
+                        {!selected && <td className="py-2 px-1 font-bold text-slate-500">{row.city}</td>}
+                        {!selected && <td className="py-2 px-1 font-bold">
+                          <span className={`px-2 py-0.5 rounded-md text-[9px] uppercase tracking-widest ${row.operator === 'M7' ? 'bg-indigo-100 text-indigo-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {row.operator}
+                          </span>
+                        </td>}
+                        
+                        {selected && <td className="py-2 px-1 font-bold text-slate-700">{row.label}</td>}
+                        
+                        <td className="text-right px-1 font-black text-slate-800">{row.qty}</td>
+                        <td className="text-right px-1 font-bold text-slate-500">
+                          {((row.qty / (selected ? selected.value : total)) * 100).toFixed(1)}%
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>
@@ -340,9 +351,9 @@ export default function InformesFlota({ user: _user }: Props) {
             Haz clic en una tajada para ver detalle del cliente
           </p>
 
-          <InteractivePieCard title="🏢 Flota M7 — Por Cliente"    data={m7Data}   colors={COLORS}      rawRows={m7Rows} />
-          <InteractivePieCard title="⭐ Flota TDM — Por Cliente"  data={tdmData}  colors={TDM_COLORS}  rawRows={tdmRows} />
-          <InteractivePieCard title="🏙️ Participación por Ciudad" data={cityData} colors={CITY_COLORS} rawRows={rawData} cityMode />
+          <InteractiveBarCard title="🏢 Flota M7 — Por Cliente"    data={m7Data}   colors={COLORS}      rawRows={m7Rows} />
+          <InteractiveBarCard title="⭐ Flota TDM — Por Cliente"  data={tdmData}  colors={TDM_COLORS}  rawRows={tdmRows} />
+          <InteractiveBarCard title="🏙️ Participación por Ciudad" data={cityData} colors={CITY_COLORS} rawRows={rawData} cityMode />
 
           {/* Gráfica comparativa */}
           <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6">
