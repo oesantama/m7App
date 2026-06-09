@@ -458,14 +458,12 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
       </div>
 
       {/* ── BLOQUE 1: KPIs base + cobertura ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Subidos',    value: total,   icon: <Upload size={16} />,       color: 'bg-blue-600',    sub: 'archivos en Drive' },
-          { label: 'Exitosos',         value: success, icon: <CheckCircle size={16} />,  color: 'bg-emerald-600', sub: `${total > 0 ? Math.round((success/total)*100) : 0}% del total` },
-          { label: 'Con Error',        value: errors,  icon: <AlertCircle size={16} />,  color: 'bg-rose-600',    sub: 'requieren revisión' },
-          { label: 'Tot. Manifiestos', value: coverage ? coverage.data.reduce((sum, r) => sum + r.manifestCount, 0) : '—', icon: <FileText size={16} />, color: 'bg-amber-500', sub: 'en el período' },
+          { label: 'Tot. Manifiestos', value: coverage ? coverage.data.reduce((sum, r) => sum + r.manifestCount, 0) : '—', icon: <FileText size={16} />, color: 'bg-blue-600', sub: 'en el período' },
+          { label: 'Archivos Subidos', value: coverage ? coverage.data.reduce((sum, r) => sum + r.uploadCount, 0) : '—', icon: <Upload size={16} />, color: 'bg-emerald-600', sub: 'cumplidos en drive' },
+          { label: 'Manif. Faltantes', value: coverage ? coverage.data.reduce((sum, r) => sum + Math.max(0, r.manifestCount - r.uploadCount), 0) : '—', icon: <AlertCircle size={16} />, color: 'bg-rose-600', sub: 'pendientes por subir' },
           { label: 'Cobertura Global', value: coverage ? `${coverage.summary.coveragePct}%` : '—', icon: <Target size={16} />, color: 'bg-violet-600', sub: 'clientes cubiertos' },
-          { label: 'Faltantes',        value: coverage ? coverage.summary.faltantes : '—', icon: <ShieldCheck size={16} />, color: 'bg-orange-500', sub: 'sin cumplido subido' },
         ].map(k => (
           <div key={k.label} className={`${k.color} text-white rounded-3xl p-4 shadow-sm`}>
             <div className="opacity-80 mb-2">{k.icon}</div>
@@ -669,7 +667,7 @@ const InformeDashboardDrive: React.FC<Props> = ({ user }) => {
                 <div className="bg-slate-50 border-t-2 border-slate-200 p-4 flex items-center justify-between text-[11px] font-black">
                   <div className="flex items-center gap-4">
                     <span className="text-[9px] uppercase tracking-widest text-slate-500">TOTAL EQUIPO</span>
-                    <span className="text-lg text-indigo-700">{total} <span className="text-[9px] text-slate-400">SUBIDOS</span></span>
+                    <span className="text-lg text-indigo-700">{total} <span className="text-[9px] text-slate-400">ARCHIVOS SUBIDOS AL DRIVE</span></span>
                   </div>
                   <div className="flex items-center gap-4">
                     <span className="text-slate-700">{compliance[0].value} / {compliance[0].value + compliance[1].value} SLA</span>
