@@ -1428,11 +1428,24 @@ export const InformesGerenciales: React.FC = () => {
 
       const doc = r.client_document ? String(r.client_document).trim().toUpperCase() : 'S/I';
       const match = provClientes.find(pc => String(pc.documento).trim().toUpperCase() === doc);
-      const client = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
+      const providerClient = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
 
-      if (targetClient !== 'GENERAL' && client !== targetClient) {
+      let tdmClient = r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I';
+      if (tdmClient === 'LOGISTICA,TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S' || tdmClient === 'LOGISTICA, TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S') {
+        const p = r.plate ? String(r.plate).trim().toUpperCase() : '';
+        const veh = vehicles.find(v => String(v.plate).trim().toUpperCase() === p);
+        if (veh && veh.client_id) {
+          const cli = clients.find(c => String(c.id).trim().toUpperCase() === String(veh.client_id).trim().toUpperCase());
+          if (cli && cli.name) {
+            tdmClient = String(cli.name).trim().toUpperCase();
+          }
+        }
+      }
+
+      if (targetClient !== 'GENERAL' && providerClient !== targetClient && tdmClient !== targetClient) {
         return;
       }
+      const client = providerClient === targetClient ? providerClient : tdmClient;
 
       const plate = r.plate ? String(r.plate).trim().toUpperCase() : 'SIN PLACA';
 
@@ -1534,11 +1547,24 @@ export const InformesGerenciales: React.FC = () => {
 
       const doc = r.client_document ? String(r.client_document).trim().toUpperCase() : 'S/I';
       const match = provClientes.find(pc => String(pc.documento).trim().toUpperCase() === doc);
-      const client = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
+      const providerClient = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
 
-      if (targetClient !== 'GENERAL' && client !== targetClient) {
+      let tdmClient = r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I';
+      if (tdmClient === 'LOGISTICA,TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S' || tdmClient === 'LOGISTICA, TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S') {
+        const p = r.plate ? String(r.plate).trim().toUpperCase() : '';
+        const veh = vehicles.find(v => String(v.plate).trim().toUpperCase() === p);
+        if (veh && veh.client_id) {
+          const cli = clients.find(c => String(c.id).trim().toUpperCase() === String(veh.client_id).trim().toUpperCase());
+          if (cli && cli.name) {
+            tdmClient = String(cli.name).trim().toUpperCase();
+          }
+        }
+      }
+
+      if (targetClient !== 'GENERAL' && providerClient !== targetClient && tdmClient !== targetClient) {
         return;
       }
+      const client = providerClient === targetClient ? providerClient : tdmClient;
 
       const plate = r.plate ? String(r.plate).trim().toUpperCase() : 'SIN PLACA';
 
@@ -3620,7 +3646,7 @@ export const InformesGerenciales: React.FC = () => {
                           <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                               <div className="flex items-center gap-2">
-                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 font-bold">Resumen: Ventas con el 100% de TDM</h3>
+                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 font-bold">Resumen: Ventas Generales</h3>
                                 <span className="bg-indigo-50 border border-indigo-100/50 text-indigo-700 px-2 py-0.5 rounded text-[9px] font-black uppercase font-mono">
                                   FECHA MANIFIESTO
                                 </span>
