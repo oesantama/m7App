@@ -81,19 +81,29 @@ const CapacitacionesAdmin: React.FC<Props> = ({ user }) => {
   const [previewCap, setPreviewCap] = useState<Capacitacion | null>(null);
   const [iniciarCap, setIniciarCap] = useState<Capacitacion | null>(null);
 
-  const isEspecialista = hasPermission(user, 'CAPACITACIONES', 'create');
-  const canEdit        = hasPermission(user, 'CAPACITACIONES', 'edit');
-  const canDelete      = hasPermission(user, 'CAPACITACIONES', 'delete');
+  const canEdit          = hasPermission(user, 'CAPACITACIONES', 'edit');
+  const canDelete        = hasPermission(user, 'CAPACITACIONES', 'delete');
+  const isSuperAdmin     = user.roleId === 'ROL-01' || user.role_id === 'ROL-01';
+  const [isDbEspecialista, setIsDbEspecialista] = useState(false);
+  // Solo quien está en cap_especialistas (o super admin) puede crear, ver RADAR y ESPECIALISTAS
+  const isEspecialista   = isSuperAdmin || isDbEspecialista;
 
   useEffect(() => {
+    // Verificar si el usuario está en la tabla cap_especialistas (independiente del rol)
+    api.capGetEspecialistaMe()
+      .then((r: any) => { if (r?.isEspecialista) setIsDbEspecialista(true); })
+      .catch(() => {});
     loadCaps();
+  }, []);
+
+  useEffect(() => {
     if (isEspecialista) {
       api.getPersonal().then(setPersonal).catch(() => {});
       api.capGetCargos().then(setCargos).catch(() => {});
       api.getUsers().then(setAppUsers).catch(() => {});
       loadEspecialistas();
     }
-  }, []);
+  }, [isEspecialista]);
 
   const loadEspecialistas = async () => {
     setLoadingEsp(true);

@@ -100,6 +100,20 @@ export const streamRecurso = async (req: Request, res: Response) => {
 
 // ─── ESPECIALISTAS CRUD ───────────────────────────────────────────────────────
 
+// Devuelve si el usuario autenticado está registrado como especialista activo
+export const getEspecialistaMe = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id || (req as any).user?.userId;
+    if (!userId) return res.json({ isEspecialista: false, categorias: [] });
+    const r = await pool.query(
+      `SELECT categorias FROM cap_especialistas WHERE user_id = $1 AND activo = true LIMIT 1`,
+      [userId]
+    );
+    if (r.rows.length === 0) return res.json({ isEspecialista: false, categorias: [] });
+    res.json({ isEspecialista: true, categorias: r.rows[0].categorias || [] });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+};
+
 export const getEspecialistas = async (_req: Request, res: Response) => {
   try {
     const r = await pool.query(`

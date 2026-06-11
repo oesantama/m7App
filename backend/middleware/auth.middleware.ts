@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt.util.js';
+import pool from '../config/database.js';
 
 export interface AuthRequest extends Request {
     user?: any;
@@ -57,7 +58,7 @@ const ID_MAP: Record<string, string> = {
 const RUTAS_READ_ALLOWED = new Set(['VEHICULOS', 'ASIGNACIONES', 'UBICACIONES', 'CONDUCTORES']);
 
 export const requirePermission = (moduleName: string | string[], action: string) => {
-    return (req: AuthRequest, res: Response, next: NextFunction) => {
+    return async (req: AuthRequest, res: Response, next: NextFunction) => {
         const user = req.user;
         
         if (!user) {
@@ -95,6 +96,21 @@ export const requirePermission = (moduleName: string | string[], action: string)
                     p.actions.includes('view')
                 );
                 if (hasRutas) return next();
+            }
+        }
+
+        // Para módulo CAPACITACIONES: verificar si el usuario está registrado como especialista activo
+        const isCap = modulesToCheck.some(m => m === 'CAPACITACIONES' || ID_MAP[m] === 'PAG-32');
+        if (isCap) {
+            const userId = user.id;
+            if (userId) {
+                try {
+                    const r = await pool.query(
+                        `SELECT 1 FROM cap_especialistas WHERE user_id = $1 AND activo = true LIMIT 1`,
+                        [userId]
+                    );
+                    if (r.rows.length > 0) return next();
+                } catch { /* ignorar error DB, continuar con 403 */ }
             }
         }
 

@@ -1691,6 +1691,7 @@ export const api = {
 
   capGetCargos: () => fetchJson(`${API_URL}/cap/cargos`),
   capGetPreview: (id: number) => fetchJson(`${API_URL}/cap/capacitaciones/${id}/preview`),
+  capGetEspecialistaMe: () => fetchJson(`${API_URL}/cap/especialistas/me`),
   capGetEspecialistas: () => fetchJson(`${API_URL}/cap/especialistas`),
   capSaveEspecialista: (data: any) => fetchJson(`${API_URL}/cap/especialistas${data.id ? `/${data.id}` : ''}`, {
     method: data.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),

@@ -6,6 +6,9 @@ import { requirePermission } from '../middleware/auth.middleware.js';
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
 
+// ── Especialista self-check (solo auth, sin permiso especial) ────────────────
+router.get('/especialistas/me', cap.getEspecialistaMe);
+
 // ── Admin (requieren auth + permiso CAPACITACIONES) ───────────────────────────
 router.get('/capacitaciones', cap.getCapacitaciones);
 router.get('/capacitaciones/:id', requirePermission('CAPACITACIONES', 'view'), cap.getCapacitacionById);
