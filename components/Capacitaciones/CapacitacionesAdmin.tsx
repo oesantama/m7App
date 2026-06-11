@@ -98,9 +98,14 @@ const CapacitacionesAdmin: React.FC<Props> = ({ user }) => {
 
   useEffect(() => {
     if (isEspecialista) {
-      api.getPersonal().then(setPersonal).catch(() => {});
+      // Solo llamar si tiene permiso — evita 403 en consola
+      if (hasPermission(user, 'PERSONAL_GH', 'view') || isSuperAdmin) {
+        api.getPersonal().then(setPersonal).catch(() => {});
+      }
       api.capGetCargos().then(setCargos).catch(() => {});
-      api.getUsers().then(setAppUsers).catch(() => {});
+      if (hasPermission(user, 'USUARIOS', 'view') || isSuperAdmin) {
+        api.getUsers().then(setAppUsers).catch(() => {});
+      }
       loadEspecialistas();
     }
   }, [isEspecialista]);

@@ -338,15 +338,19 @@ const App: React.FC = () => {
         const fetches: Promise<any>[] = [];
 
         if (['documentos', 'recibido', 'recibido-manual', 'cumplidos', 'rutas'].includes(activeTab)) {
-          fetches.push(
-            api.getDocuments(clientId).then(d => useAppStore.setState({ documents: d || [] })).catch(() => { })
-          );
+          if (hasPerm('DOCUMENTOS_L') || hasPerm('RUTAS') || hasPerm('RECIBIDO_MATERIAL') || hasPerm('RECIBIDO_MANUAL')) {
+            fetches.push(
+              api.getDocuments(clientId).then(d => useAppStore.setState({ documents: d || [] })).catch(() => { })
+            );
+          }
         }
 
         if (['documentos', 'recibido', 'recibido-manual', 'cumplidos', 'rutas', 'despacho', 'dashboard-ajover'].includes(activeTab)) {
-          fetches.push(
-            api.getInvoices(clientId).then(inv => useAppStore.setState({ invoices: inv || [] })).catch(() => { })
-          );
+          if (hasPerm('DOCUMENTOS_L') || hasPerm('RUTAS') || hasPerm('DESPACHO_L') || hasPerm('RECIBIDO_MATERIAL')) {
+            fetches.push(
+              api.getInvoices(clientId).then(inv => useAppStore.setState({ invoices: inv || [] })).catch(() => { })
+            );
+          }
         }
 
         if (['rutas', 'despacho', 'dashboard-ajover'].includes(activeTab)) {
