@@ -92,6 +92,28 @@ export const fetchJson = async (url: string, options?: any) => {
   return executeFetch();
 };
 
+// Fetch sin token — para rutas públicas (cap/public, etc.)
+export const fetchPublic = async (url: string, options?: any) => {
+  const isFormData = options?.body instanceof FormData;
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
+      ...options?.headers,
+    },
+    cache: 'no-cache' as RequestCache,
+  });
+  const isJson = res.headers.get('content-type')?.includes('application/json');
+  const data = isJson ? await res.json().catch(() => ({})) : await res.text();
+  if (!res.ok) {
+    const msg = typeof data === 'object' ? (data.error || data.message || `Error ${res.status}`) : String(data);
+    const err: any = new Error(msg);
+    if (typeof data === 'object' && data.codigo) err.codigo = data.codigo;
+    throw err;
+  }
+  return data;
+};
+
 export const api = {
   getHealth: () => fetchJson(API_URL.replace('/api', '/health')),
   // Autenticación
@@ -790,9 +812,13 @@ export const api = {
   // Notificaciones Config
   getNotificacionesConfig: () => fetchJson(`${API_URL}/notificaciones-config?_t=${Date.now()}`),
   saveNotificacionConfig: (data: any) => fetchJson(`${API_URL}/notificaciones-config`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data)
+    method: data.id ? 'PUT' : 'POST',
+    body: JSON.stringify(data),
+  }),
+  getNotificacionesWhatsapp: () => fetchJson(`${API_URL}/notificaciones-whatsapp?_t=${Date.now()}`),
+  saveNotificacionWhatsapp: (data: any) => fetchJson(`${API_URL}/notificaciones-whatsapp`, {
+    method: data.id ? 'PUT' : 'POST',
+    body: JSON.stringify(data),
   }),
   deleteNotificacionConfig: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/notificaciones-config/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
@@ -1613,4 +1639,78 @@ export const api = {
   },
   deleteTdmManifiesto: (id: number) =>
     fetchJson(`${API_URL}/flota/tdm/manifiestos/${id}`, { method: 'DELETE' }),
+
+  // ─── MÓDULO CAPACITACIONES (cap_*) ──────────────────────────────────────────
+  capGetCapacitaciones: (cedula?: string, cedulaSelf?: string) => {
+    const p = new URLSearchParams();
+    if (cedula) p.set('cedula', cedula);
+    if (cedulaSelf) p.set('cedula_self', cedulaSelf);
+    const qs = p.toString();
+    return fetchJson(`${API_URL}/cap/capacitaciones${qs ? `?${qs}` : ''}`);
+  },
+  capGetCapacitacion: (id: number) => fetchJson(`${API_URL}/cap/capacitaciones/${id}`),
+  capSaveCapacitacion: (data: any) => fetchJson(`${API_URL}/cap/capacitaciones`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+  }),
+  capUpdateCapacitacion: (id: number, data: any) => fetchJson(`${API_URL}/cap/capacitaciones/${id}`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+  }),
+  capDeleteCapacitacion: (id: number) => fetchJson(`${API_URL}/cap/capacitaciones/${id}`, { method: 'DELETE' }),
+
+  capUploadRecurso: (formData: FormData) => fetchJson(`${API_URL}/cap/recursos`, { method: 'POST', body: formData }),
+  capDeleteRecurso: (id: number) => fetchJson(`${API_URL}/cap/recursos/${id}`, { method: 'DELETE' }),
+
+  capGetAsignaciones: (capacitacion_id?: number) => {
+    const qs = capacitacion_id ? `?capacitacion_id=${capacitacion_id}` : '';
+    return fetchJson(`${API_URL}/cap/asignaciones${qs}`);
+  },
+  capAsignar: (data: any) => fetchJson(`${API_URL}/cap/asignaciones`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+  }),
+  capActualizarFechas: (id: number, fecha_inicio: string, fecha_fin: string) =>
+    fetchJson(`${API_URL}/cap/asignaciones/${id}/fechas`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fecha_inicio, fecha_fin }),
+    }),
+
+  capGetDashboard: (capacitacion_id?: number, cedula?: string) => {
+    const p = new URLSearchParams();
+    if (capacitacion_id) p.set('capacitacion_id', String(capacitacion_id));
+    if (cedula)          p.set('cedula', cedula);
+    const qs = p.toString() ? `?${p.toString()}` : '';
+    return fetchJson(`${API_URL}/cap/dashboard${qs}`);
+  },
+
+  capGetCertificado: (numero: string) => fetchJson(`${API_URL}/cap/certificados/${encodeURIComponent(numero)}`),
+  capGetCertificadosByAsignacion: (asignacion_id: number) =>
+    fetchJson(`${API_URL}/cap/certificados/asignacion/${asignacion_id}`),
+
+  capGetCargos: () => fetchJson(`${API_URL}/cap/cargos`),
+  capGetPreview: (id: number) => fetchJson(`${API_URL}/cap/capacitaciones/${id}/preview`),
+  capGetEspecialistas: () => fetchJson(`${API_URL}/cap/especialistas`),
+  capSaveEspecialista: (data: any) => fetchJson(`${API_URL}/cap/especialistas${data.id ? `/${data.id}` : ''}`, {
+    method: data.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+  }),
+  capDeleteEspecialista: (id: number) => fetchJson(`${API_URL}/cap/especialistas/${id}`, { method: 'DELETE' }),
+  capResetAsignacion: (id: number, usuario_control: string) =>
+    fetchJson(`${API_URL}/cap/asignaciones/${id}/reset`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuario_control }),
+    }),
+  capAmpliarIntentos: (id: number, cantidad: number, usuario_control: string) =>
+    fetchJson(`${API_URL}/cap/asignaciones/${id}/intentos`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cantidad, usuario_control }),
+    }),
+  capGetIntentosByAsignacion: (asignacion_id: number) =>
+    fetchJson(`${API_URL}/cap/asignaciones/${asignacion_id}/intentos`),
+
+  // Públicas (sin auth)
+  capGetPublicCapacitacion: (id: number, cedula: string) =>
+    fetchPublic(`${API_URL}/cap/public/capacitacion?id=${id}&cedula=${encodeURIComponent(cedula)}`),
+  capIniciarIntento: (data: { asignacion_id: number; cedula: string }) =>
+    fetchPublic(`${API_URL}/cap/public/intento/start`, {
+      method: 'POST', body: JSON.stringify(data),
+    }),
+  capSubmitIntento: (data: any) => fetchPublic(`${API_URL}/cap/public/intento/submit`, {
+    method: 'POST', body: JSON.stringify(data),
+  }),
 };

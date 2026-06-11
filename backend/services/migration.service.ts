@@ -1510,6 +1510,184 @@ export const restoreSystem = async () => {
         ON delivery_schedules (client_id, day_of_week);
     `);
 
+    // ── MÓDULO CAPACITACIONES (cap_*) ─────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cap_capacitaciones (
+        id SERIAL PRIMARY KEY,
+        titulo VARCHAR(255) NOT NULL,
+        descripcion TEXT,
+        objetivo TEXT,
+        categoria VARCHAR(100) DEFAULT 'GENERAL',
+        portada_drive_url TEXT,
+        nota_minima_aprobacion INTEGER DEFAULT 70,
+        max_intentos INTEGER DEFAULT 3,
+        tiempo_limite_minutos INTEGER,
+        tipo_proceso VARCHAR(50) DEFAULT 'AMBOS',
+        estado VARCHAR(50) DEFAULT 'BORRADOR',
+        drive_folder_id TEXT,
+        drive_folder_path TEXT,
+        usuario_control VARCHAR(255),
+        fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      ALTER TABLE cap_capacitaciones
+        ADD COLUMN IF NOT EXISTS tipo_acceso VARCHAR(20) DEFAULT 'INTERNO' NOT NULL
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cap_preguntas (
+        id SERIAL PRIMARY KEY,
+        capacitacion_id INTEGER NOT NULL REFERENCES cap_capacitaciones(id) ON DELETE CASCADE,
+        tipo VARCHAR(50) NOT NULL,
+        pregunta TEXT NOT NULL,
+        imagen_url TEXT,
+        imagen_drive_id TEXT,
+        peso INTEGER DEFAULT 1,
+        orden INTEGER DEFAULT 0,
+        retroalimentacion_correcta TEXT,
+        retroalimentacion_incorrecta TEXT,
+        usuario_control VARCHAR(255),
+        fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_cap_preguntas_cap ON cap_preguntas(capacitacion_id);
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cap_opciones (
+        id SERIAL PRIMARY KEY,
+        pregunta_id INTEGER NOT NULL REFERENCES cap_preguntas(id) ON DELETE CASCADE,
+        texto TEXT,
+        imagen_url TEXT,
+        imagen_drive_id TEXT,
+        es_correcta BOOLEAN DEFAULT FALSE,
+        orden INTEGER DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_cap_opciones_preg ON cap_opciones(pregunta_id);
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cap_recursos (
+        id SERIAL PRIMARY KEY,
+        capacitacion_id INTEGER NOT NULL REFERENCES cap_capacitaciones(id) ON DELETE CASCADE,
+        tipo VARCHAR(50) NOT NULL,
+        titulo VARCHAR(255) NOT NULL,
+        descripcion TEXT,
+        drive_file_id TEXT,
+        drive_link TEXT,
+        drive_path TEXT,
+        url_externa TEXT,
+        tamano_bytes BIGINT,
+        mime_type VARCHAR(100),
+        orden INTEGER DEFAULT 0,
+        usuario_control VARCHAR(255),
+        fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_cap_recursos_cap ON cap_recursos(capacitacion_id);
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cap_asignaciones (
+        id SERIAL PRIMARY KEY,
+        capacitacion_id INTEGER NOT NULL REFERENCES cap_capacitaciones(id) ON DELETE RESTRICT,
+        cedula VARCHAR(50) NOT NULL,
+        nombre_colaborador VARCHAR(255),
+        cargo_id INTEGER,
+        tipo_proceso VARCHAR(50),
+        fecha_inicio DATE NOT NULL,
+        fecha_fin DATE NOT NULL,
+        max_intentos_override INTEGER,
+        estado VARCHAR(50) DEFAULT 'PENDIENTE',
+        intentos_realizados INTEGER DEFAULT 0,
+        mejor_calificacion DECIMAL(5,2),
+        fecha_ultimo_intento TIMESTAMP WITH TIME ZONE,
+        fecha_completado TIMESTAMP WITH TIME ZONE,
+        asignado_por VARCHAR(255),
+        usuario_control VARCHAR(255),
+        fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(capacitacion_id, cedula, tipo_proceso)
+      );
+      CREATE INDEX IF NOT EXISTS idx_cap_asig_cedula ON cap_asignaciones(cedula);
+      CREATE INDEX IF NOT EXISTS idx_cap_asig_cap ON cap_asignaciones(capacitacion_id);
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cap_intentos (
+        id SERIAL PRIMARY KEY,
+        asignacion_id INTEGER NOT NULL REFERENCES cap_asignaciones(id) ON DELETE CASCADE,
+        cedula VARCHAR(50) NOT NULL,
+        capacitacion_id INTEGER NOT NULL,
+        numero_intento INTEGER NOT NULL,
+        fecha_inicio TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        fecha_fin TIMESTAMP WITH TIME ZONE,
+        tiempo_empleado_segundos INTEGER,
+        calificacion DECIMAL(5,2),
+        aprobado BOOLEAN DEFAULT FALSE,
+        estado VARCHAR(50) DEFAULT 'EN_CURSO',
+        ip_address VARCHAR(50),
+        device_info TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_cap_intentos_asig ON cap_intentos(asignacion_id);
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cap_respuestas (
+        id SERIAL PRIMARY KEY,
+        intento_id INTEGER NOT NULL REFERENCES cap_intentos(id) ON DELETE CASCADE,
+        pregunta_id INTEGER NOT NULL REFERENCES cap_preguntas(id) ON DELETE CASCADE,
+        opciones_seleccionadas INTEGER[],
+        respuesta_texto TEXT,
+        es_correcta BOOLEAN,
+        puntos_obtenidos DECIMAL(5,2) DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_cap_respuestas_intento ON cap_respuestas(intento_id);
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cap_certificados (
+        id SERIAL PRIMARY KEY,
+        asignacion_id INTEGER NOT NULL REFERENCES cap_asignaciones(id) ON DELETE RESTRICT,
+        intento_id INTEGER NOT NULL REFERENCES cap_intentos(id) ON DELETE RESTRICT,
+        cedula VARCHAR(50) NOT NULL,
+        capacitacion_id INTEGER NOT NULL,
+        numero_certificado VARCHAR(100) UNIQUE NOT NULL,
+        fecha_emision TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        calificacion_obtenida DECIMAL(5,2),
+        drive_file_id TEXT,
+        drive_link TEXT,
+        drive_path TEXT,
+        estado VARCHAR(50) DEFAULT 'VALIDO',
+        usuario_control VARCHAR(255),
+        fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cap_especialistas (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(100) NOT NULL,
+        categorias TEXT[] DEFAULT '{}',
+        activo BOOLEAN DEFAULT TRUE,
+        usuario_control VARCHAR(255),
+        fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_cap_especialistas_user ON cap_especialistas(user_id);
+    `);
+    // Migrar esquema viejo (cedula/nombre/cargo) → user_id si la columna no existe
+    await client.query(`
+      ALTER TABLE cap_especialistas ADD COLUMN IF NOT EXISTS user_id VARCHAR(100);
+      ALTER TABLE cap_especialistas DROP COLUMN IF EXISTS cedula;
+      ALTER TABLE cap_especialistas DROP COLUMN IF EXISTS nombre;
+      ALTER TABLE cap_especialistas DROP COLUMN IF EXISTS cargo;
+    `);
+
+    // Registrar página PAG-33 como CURSOS Y TALLERES con tab 'capacitaciones-v2'
+    await client.query(`
+      UPDATE pages SET route = 'capacitaciones' WHERE id = 'PAG-33';
+    `);
+
     await client.query('COMMIT');
 
     // FASE FINAL: SINCRONIZACIÓN NUCLEAR DE MENÚS (REUBICACIÓN LOGÍSTICA)

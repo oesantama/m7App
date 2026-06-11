@@ -143,7 +143,8 @@ app.use('/api', (req, res, next) => {
     '/cfg-ciudades/departamentos',
     '/cfg-ciudades/ciudades',
     '/gh-miscelaneos',
-    '/gh-visitas/public'
+    '/gh-visitas/public',
+    '/cap/public'
   ];
   
   if (publicPaths.some(p => p === '/' ? req.path === '/' : req.path.startsWith(p))) {

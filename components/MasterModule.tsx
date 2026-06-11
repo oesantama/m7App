@@ -206,6 +206,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     masterTiposVehiculo: 'TVH',
     masterMarcas: 'MAR',
     masterNotificaciones: 'NOT',
+    masterNotificacionesWhatsapp: 'WAP',
     masterTipoNotificacion: 'TGN',
     masterUnidadMedida: 'UOM',
     masterArticulo: 'ART',
@@ -227,6 +228,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     masterTiposVehiculo: 'TIPOS DE VEHÍCULO',
     masterMarcas: 'MARCAS COMERCIALES',
     masterNotificaciones: 'ALERTAS & NOTIFICACIONES',
+    masterNotificacionesWhatsapp: 'ALERTAS WHATSAPP',
     masterTipoNotificacion: 'GRUPOS DE ALERTA',
     masterUnidadMedida: 'UNIDADES DE MEDIDA',
     masterArticulo: 'MAESTRO DE ARTÍCULOS',
@@ -307,6 +309,12 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         notificationEmail: '',
         tipoNotificacionId: '',
       });
+    } else if (category === 'masterNotificacionesWhatsapp') {
+      Object.assign(defaults, {
+        userId: '',
+        phone: '',
+        tipoNotificacionId: '',
+      });
     }
 
     const normalizedRecord = {
@@ -328,6 +336,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       iconClass: record.iconClass || record.icon_class || '',
       notificationEmail: record.notificationEmail || record.notification_email || '',
       tipoNotificacionId: record.tipoNotificacionId || record.tipo_notificacion_id || '',
+      userId: record.userId || record.user_id || '',
       categoryArticuloId: record.categoryArticuloId || record.category_articulo_id || '',
       uomGeneralId: record.uomGeneralId || record.uom_general_id || '',
       uomInterId: record.uomInterId || record.uom_inter_id || '',
@@ -663,6 +672,17 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
           updatedBy: user.name
         };
         saveResponse = await api.saveNotificacionConfig(cleanData);
+      } else if (activeMaster === 'masterNotificacionesWhatsapp') {
+        const cleanData = {
+          id: newRecord.id,
+          userId: newRecord.userId,
+          phone: newRecord.phone || '',
+          tipoNotificacionId: newRecord.tipoNotificacionId,
+          statusId: newRecord.statusId,
+          createdBy: newRecord.createdBy || user.name,
+          updatedBy: user.name
+        };
+        saveResponse = await api.saveNotificacionWhatsapp(cleanData);
       } else if (activeMaster === 'masterTiposVehiculo') {
         const cleanData = {
           id: newRecord.id,
@@ -727,6 +747,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
             case 'masterTipoDocumento': rawData = await api.getTiposDocumento(); break;
             case 'masterUnidadMedida': rawData = await api.getUnidadesMedida(); break;
             case 'masterNotificaciones': rawData = await api.getNotificacionesConfig(); break;
+            case 'masterNotificacionesWhatsapp': rawData = await api.getNotificacionesWhatsapp(); break;
             case 'masterTiposVehiculo': rawData = await api.getTiposVehiculo(); break;
             case 'masterTipoNotificacion': rawData = await api.getTiposNotificacion(); break;
             default:
@@ -1784,6 +1805,35 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
               <input type="email" placeholder="ejemplo@correo.com" value={formData.notificationEmail || ''} onChange={e => setFormData({ ...formData, notificationEmail: e.target.value.toLowerCase() })} className={commonInputStyle} required />
             </div>
             <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Tipo de Notificación</label>
+              <select value={formData.tipoNotificacionId || ''} onChange={e => setFormData({ ...formData, tipoNotificacionId: e.target.value })} className={commonInputStyle} required>
+                <option value="">Seleccione Tipo...</option>
+                {notificationTypes.map(nt => <option key={nt.id} value={nt.id}>{nt.name}</option>)}
+              </select>
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterNotificacionesWhatsapp':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Usuario</label>
+              <select 
+                value={formData.userId || ''} 
+                onChange={e => {
+                  const selectedUserId = e.target.value;
+                  const selectedUser = (allMasterData.masterUsuarios || []).find((u: any) => u.id === selectedUserId);
+                  setFormData({ ...formData, userId: selectedUserId, phone: selectedUser?.phone || '' });
+                }} 
+                className={commonInputStyle} required>
+                <option value="">Seleccione Usuario...</option>
+                {(allMasterData.masterUsuarios || []).map((u: any) => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
+              </select>
+            </div>
+            <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Celular Whatsapp</label>
+              <input type="text" placeholder="Ej: 3001234567" value={formData.phone || ''} onChange={e => setFormData({ ...formData, phone: e.target.value })} className={commonInputStyle} required />
+            </div>
+            <div className="space-y-1 md:col-span-2"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Tipo de Notificación</label>
               <select value={formData.tipoNotificacionId || ''} onChange={e => setFormData({ ...formData, tipoNotificacionId: e.target.value })} className={commonInputStyle} required>
                 <option value="">Seleccione Tipo...</option>
                 {notificationTypes.map(nt => <option key={nt.id} value={nt.id}>{nt.name}</option>)}

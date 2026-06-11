@@ -49,7 +49,8 @@ const FleetManager = lazyWithRetry(() => import('./components/FleetManager'));
 const AssignmentManager = lazyWithRetry(() => import('./components/AssignmentManager'));
 const AIChat = lazyWithRetry(() => import('./components/AIChat'));
 const DigitalSignature = lazyWithRetry(() => import('./components/DigitalSignature'));
-const CentroCapacitaciones = lazyWithRetry(() => import('./components/CentroCapacitaciones'));
+const CentroCapacitaciones = lazyWithRetry(() => import('./components/Capacitaciones/CapacitacionesAdmin'));
+const PublicCapacitacion = lazyWithRetry(() => import('./components/Capacitaciones/PublicCapacitacion'));
 const ApprovalManager = lazyWithRetry(() => import('./components/ApprovalManager'));
 const ChatbotWidget = lazyWithRetry(() => import('./components/ChatbotWidget'));
 const DriverGamification = lazyWithRetry(() => import('./components/DriverGamification'));
@@ -1065,6 +1066,16 @@ const App: React.FC = () => {
         <AutoUpdate />
         <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>}>
           <PublicTraining />
+        </React.Suspense>
+      </>
+    );
+  }
+
+  if (window.location.pathname.startsWith('/publico/cap')) {
+    return (
+      <>
+        <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>}>
+          <PublicCapacitacion />
         </React.Suspense>
       </>
     );

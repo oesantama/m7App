@@ -32,6 +32,7 @@ import marcaRoutes from './marca.routes.js';
 import tipoDocumentoRoutes from './tipo-documento.routes.js';
 import unidadMedidaRoutes from './unidad-medida.routes.js';
 import notificacionRoutes from './notificacion.routes.js';
+import notificacionWhatsappRoutes from './notificacion-whatsapp.routes.js';
 import tipoVehiculoRoutes from './tipo-vehiculo.routes.js';
 import tipoNotificacionRoutes from './tipo-notificacion.routes.js';
 import dispatchRoutes from './dispatch.routes.js';
@@ -60,6 +61,7 @@ import tarifasLineaBlancaRoutes from './tarifas-linea-blanca.routes.js';
 import conciliacionLBRoutes from './conciliacion-linea-blanca.routes.js';
 import flotaRoutes from './flota.routes.js';
 import planillasOperativasRoutes from './planillas-operativas.routes.js';
+import capRoutes from './cap.routes.js';
 
 const router = Router();
 
@@ -75,6 +77,7 @@ router.use('/marcas', marcaRoutes);
 router.use('/tipos-documento', tipoDocumentoRoutes);
 router.use('/unidades-medida', unidadMedidaRoutes);
 router.use('/notificaciones-config', notificacionRoutes);
+router.use('/notificaciones-whatsapp', notificacionWhatsappRoutes);
 router.use('/tipos-vehiculo', tipoVehiculoRoutes);
 router.use('/tipos-notificacion', tipoNotificacionRoutes);
 router.use('/auth', authRoutes);
@@ -123,6 +126,7 @@ router.use('/tarifas-linea-blanca', tarifasLineaBlancaRoutes);
 router.use('/conciliacion-linea-blanca', conciliacionLBRoutes);
 router.use('/flota', flotaRoutes);
 router.use('/planillas-operativas', planillasOperativasRoutes);
+router.use('/cap', capRoutes);
 
 // Endpoint seguro: devuelve la API key de Gemini del backend al frontend autenticado
 router.get('/config/gemini-key', (req: any, res) => {

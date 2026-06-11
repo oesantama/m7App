@@ -285,6 +285,7 @@ export type MasterCategory =
   | 'masterMarcas'
   | 'masterNotificaciones'
   | 'masterTipoNotificacion'
+  | 'masterNotificacionesWhatsapp'
   | 'masterUnidadMedida'
   | 'masterTipoDocumento'
   | 'masterVehiculos'

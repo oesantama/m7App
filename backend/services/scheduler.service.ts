@@ -193,6 +193,27 @@ export const runFacturacionPendienteIndividual = async (): Promise<string[]> => 
             } catch (err: any) {
                 logs.push(`  - Error enviando a ${email}: ${err.message}`);
             }
+
+            // M7: WhatsApp Integration para alertas de facturación individual
+            try {
+                const waRes = await pool.query(
+                    `SELECT phone FROM notificaciones_whatsapp 
+                     WHERE user_id = (SELECT id FROM users WHERE email = $1 LIMIT 1) 
+                     AND status_id = 'EST-01'`, 
+                    [email]
+                );
+                
+                if (waRes.rowCount && waRes.rowCount > 0) {
+                    const phone = waRes.rows[0].phone;
+                    const waBody = `*Reporte de Facturación Pendiente*\nHola,\n\nSe ha enviado a tu correo (${email}) el consolidado de facturación pendiente.\n\n* Total Manifiestos: ${userManifests.length}\n* Total Valor: $${totalVenta.toLocaleString('es-CO')}\n\nRevisa tu bandeja de entrada para ver el detalle por placa.\n\n_M7 App_`;
+                    
+                    const evoService = await import('./evolution.service.js');
+                    await evoService.evolutionService.sendMessage('system', phone, waBody);
+                    logs.push(`  - WhatsApp de alerta enviado a ${phone}`);
+                }
+            } catch (err: any) {
+                logs.push(`  - Error enviando WhatsApp a ${email}: ${err.message}`);
+            }
         }
 
         logs.push(`[${new Date().toLocaleString()}] Tarea de Facturación Pendiente Individual finalizada.`);
@@ -262,6 +283,16 @@ export const initScheduler = () => {
         timezone: 'America/Bogota'
     });
     console.log('[M7-SCHEDULER] Tarea "Facturación Pendiente" programada: Lunes a Sábado 10:00 AM');
+
+    // Facturación Pendiente Individual: Lunes a Sábado a las 10:00 AM
+    cron.schedule('0 10 * * 1-6', async () => {
+        console.log('[M7-SCHEDULER] Ejecutando cron de Facturación Pendiente Individual...');
+        const logs = await runFacturacionPendienteIndividual();
+        console.log('[M7-SCHEDULER] Logs Facturación Pendiente Individual:', logs.join(' | '));
+    }, {
+        timezone: 'America/Bogota'
+    });
+    console.log('[M7-SCHEDULER] Tarea "Facturación Pendiente Individual" programada: Lunes a Sábado 10:00 AM');
 
     // Scraping e importación automática desde Transportando: Todos los días a las 5:00 AM
     cron.schedule('0 5 * * *', async () => {
