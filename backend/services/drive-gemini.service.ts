@@ -48,6 +48,7 @@ export const syncDriveCumplidos = async () => {
                   SELECT 1 FROM registros_logistica rl 
                   WHERE rl.archivo = d.file_name
               )
+            LIMIT 15
         `;
         const { rows: missingDocs } = await pool.query(query);
 

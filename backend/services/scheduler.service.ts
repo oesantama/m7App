@@ -23,6 +23,48 @@ function subtractBusinessDays(fromDate: Date, businessDays: number): Date {
 }
 
 /**
+ * Ejecuta una función y registra el resultado en la tabla cron_logs.
+ */
+async function executeWithCronLog(taskName: string, taskFunction: () => Promise<any>) {
+    let cronLogId: number | null = null;
+    const startTime = Date.now();
+    try {
+        const initLog = await pool.query(
+            `INSERT INTO cron_logs (task_name, status, details, duration_ms) VALUES ($1, 'RUNNING', 'Iniciando ejecución...', 0) RETURNING id`,
+            [taskName]
+        );
+        cronLogId = initLog.rows[0]?.id || null;
+        
+        const resultLogs = await taskFunction();
+        
+        let details = 'Ejecución exitosa';
+        if (Array.isArray(resultLogs) && resultLogs.length > 0) {
+            details = resultLogs.join(' | ');
+            if (details.length > 1000) details = details.substring(0, 997) + '...';
+        }
+        
+        if (cronLogId) {
+            await pool.query(
+                `UPDATE cron_logs SET status='SUCCESS', details=$1, duration_ms=$2 WHERE id=$3`,
+                [details, Date.now() - startTime, cronLogId]
+            );
+        }
+    } catch (err: any) {
+        if (cronLogId) {
+            await pool.query(
+                `UPDATE cron_logs SET status='ERROR', error_message=$1, duration_ms=$2 WHERE id=$3`,
+                [err.message || 'Error desconocido', Date.now() - startTime, cronLogId]
+            );
+        } else {
+            await pool.query(
+                `INSERT INTO cron_logs (task_name, status, error_message, duration_ms) VALUES ($1, 'ERROR', $2, $3)`,
+                [taskName, err.message || 'Error desconocido', Date.now() - startTime]
+            );
+        }
+    }
+}
+
+/**
  * Servicio de Tareas Programadas (M7 Scheduler)
  */
 export const runFacturacionPendienteIndividual = async (): Promise<string[]> => {
@@ -239,16 +281,15 @@ export const initScheduler = () => {
 
         console.log(`[M7-SCHEDULER] Limpiando novedades anteriores a ${cutoffStr} (5 días hábiles)...`);
 
-        try {
+        await executeWithCronLog('Limpieza_Novedades', async () => {
             const result = await pool.query(
                 `DELETE FROM inventory_news WHERE created_at < $1`,
                 [cutoff]
             );
             const duration = Date.now() - startTime;
             console.log(`[M7-SCHEDULER] Limpieza completada. Eliminados: ${result.rowCount} registros | Duración: ${duration}ms`);
-        } catch (error: any) {
-            console.error('[M7-SCHEDULER] ERROR en limpieza de novedades:', error.message);
-        }
+            return [`Eliminados: ${result.rowCount} registros`];
+        });
     }, {
         timezone: 'America/Bogota'
     });
@@ -256,8 +297,8 @@ export const initScheduler = () => {
     console.log('[M7-SCHEDULER] Tarea "Limpieza Novedades" programada: Diariamente 01:00 AM | Retención: 5 días hábiles (L-V)');
 
     // Sincronización Automática de Drive a Planillas (Exito Línea Blanca CLI-09)
-    // Cron normal: de Lunes a Sábado (1-6) a las 09:00 hora Colombia (Domingos excluidos)
-    cron.schedule('0 9 * * 1-6', async () => {
+    // Cron para recuperar el atraso procesando en bloques de a 15, cada 15 minutos.
+    cron.schedule('*/15 * * * *', async () => {
         console.log('[M7-SCHEDULER] Ejecutando sincronización de Drive vs Planillas...');
         await syncDriveCumplidos();
     }, {
@@ -277,8 +318,11 @@ export const initScheduler = () => {
     // Facturación Pendiente General: Lunes a Sábado a las 10:00 AM
     cron.schedule('0 10 * * 1-6', async () => {
         console.log('[M7-SCHEDULER] Ejecutando cron de Facturación Pendiente General...');
-        const logs = await runFacturacionPendienteGeneral();
-        console.log('[M7-SCHEDULER] Logs Facturación Pendiente:', logs.join(' | '));
+        await executeWithCronLog('Facturacion_Pendiente_General', async () => {
+            const logs = await runFacturacionPendienteGeneral();
+            console.log('[M7-SCHEDULER] Logs Facturación Pendiente:', logs.join(' | '));
+            return logs;
+        });
     }, {
         timezone: 'America/Bogota'
     });
@@ -287,8 +331,11 @@ export const initScheduler = () => {
     // Facturación Pendiente Individual: Lunes a Sábado a las 10:00 AM
     cron.schedule('0 10 * * 1-6', async () => {
         console.log('[M7-SCHEDULER] Ejecutando cron de Facturación Pendiente Individual...');
-        const logs = await runFacturacionPendienteIndividual();
-        console.log('[M7-SCHEDULER] Logs Facturación Pendiente Individual:', logs.join(' | '));
+        await executeWithCronLog('Facturacion_Pendiente_Individual', async () => {
+            const logs = await runFacturacionPendienteIndividual();
+            console.log('[M7-SCHEDULER] Logs Facturación Pendiente Individual:', logs.join(' | '));
+            return logs;
+        });
     }, {
         timezone: 'America/Bogota'
     });
@@ -297,8 +344,11 @@ export const initScheduler = () => {
     // Scraping e importación automática desde Transportando: Todos los días a las 5:00 AM
     cron.schedule('0 5 * * *', async () => {
         console.log('[M7-SCHEDULER] Ejecutando cron de Importación de Manifiestos desde Transportando...');
-        const logs = await scrapeTransportandoReports();
-        console.log('[M7-SCHEDULER] Logs Scraping Transportando:', logs.join(' | '));
+        await executeWithCronLog('Importacion_Transportando', async () => {
+            const logs = await scrapeTransportandoReports();
+            console.log('[M7-SCHEDULER] Logs Scraping Transportando:', logs.join(' | '));
+            return logs;
+        });
     }, {
         timezone: 'America/Bogota'
     });
@@ -307,8 +357,11 @@ export const initScheduler = () => {
     // Validación de Novedades no subidas a Drive: Todos los días a las 11:00 AM
     cron.schedule('0 11 * * *', async () => {
         console.log('[M7-SCHEDULER] Validando novedades pendientes por subir a Drive...');
-        const logs = await validateMissingNovedadesDrive();
-        console.log('[M7-SCHEDULER] Logs Novedades faltantes:', logs.join(' | '));
+        await executeWithCronLog('Validacion_Novedades_Drive', async () => {
+            const logs = await validateMissingNovedadesDrive();
+            console.log('[M7-SCHEDULER] Logs Novedades faltantes:', logs.join(' | '));
+            return logs;
+        });
     }, {
         timezone: 'America/Bogota'
     });
