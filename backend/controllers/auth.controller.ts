@@ -68,7 +68,12 @@ export const login = async (req: Request, res: Response) => {
         });
     }
 
-    // GENERAR TOKEN JWT — sin permissions para mantener el token compacto
+    // Compactar permisos para el JWT: solo module + actions
+    const compactPerms = permissions.map((p: any) => ({
+        module: p.module,
+        actions: Array.isArray(p.actions) ? p.actions : []
+    }));
+
     const tokenPayload = {
         id: user.id,
         email: user.email,
@@ -76,11 +81,12 @@ export const login = async (req: Request, res: Response) => {
         role_id: user.role_id,
         document_number: user.document_number || '',
         client_ids: user.client_ids || [],
+        permissions: compactPerms,
     };
 
     const accessToken = signAccessToken(tokenPayload);
 
-    // La respuesta al cliente sí incluye permissions para hidratar el store
+    // La respuesta al cliente incluye permissions para hidratar el store
     const userData = { ...tokenPayload, permissions };
 
     res.json({
