@@ -75,7 +75,13 @@ export default function NoticiasAdmin({ user }: Props) {
   const load = async () => {
     setLoading(true);
     try { setNoticias(await api.noticiasGetAll()); }
-    catch { toast.error('Error al cargar noticias'); }
+    catch (e: any) {
+      // 403 = sin permiso → mostrar lista vacía sin toast de error
+      if (!e?.message?.toLowerCase().includes('permiso') && !e?.message?.includes('403')) {
+        toast.error('Error al cargar noticias');
+      }
+      setNoticias([]);
+    }
     finally { setLoading(false); }
   };
 

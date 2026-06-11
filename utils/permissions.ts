@@ -33,7 +33,8 @@ export const ID_MAP: Record<string, string> = {
   'INVENTARIO_FISICO_GH': 'PAG-56',
   'CONSULTA_FACTURAS': 'PAG-37',
   'CONCILIACION': 'PAG-40',
-  'CAPACITACIONES': 'PAG-32'
+  'CAPACITACIONES': 'PAG-32',
+  'NOTICIAS': 'PAG-63'
 };
 
 /**
