@@ -68,21 +68,23 @@ export const login = async (req: Request, res: Response) => {
         });
     }
 
-    // GENERAR TOKEN JWT (Seguridad Arquitectónica)
-    const userData = {
+    // GENERAR TOKEN JWT — sin permissions para mantener el token compacto
+    const tokenPayload = {
         id: user.id,
         email: user.email,
         name: user.name,
         role_id: user.role_id,
         document_number: user.document_number || '',
         client_ids: user.client_ids || [],
-        permissions: permissions
     };
 
-    const accessToken = signAccessToken(userData);
+    const accessToken = signAccessToken(tokenPayload);
 
-    res.json({ 
-        success: true, 
+    // La respuesta al cliente sí incluye permissions para hidratar el store
+    const userData = { ...tokenPayload, permissions };
+
+    res.json({
+        success: true,
         token: accessToken,
         user: userData
     });

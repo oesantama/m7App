@@ -1688,6 +1688,31 @@ export const restoreSystem = async () => {
       UPDATE pages SET route = 'capacitaciones' WHERE id = 'PAG-33';
     `);
 
+    // ── MÓDULO NOTICIAS Y AVISOS ──────────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS noticias (
+        id SERIAL PRIMARY KEY,
+        titulo VARCHAR(255) NOT NULL,
+        descripcion TEXT,
+        link VARCHAR(500),
+        archivo_drive_id TEXT,
+        archivo_drive_path TEXT,
+        archivo_nombre VARCHAR(255),
+        archivo_tipo VARCHAR(20),
+        tipo_acceso VARCHAR(20) DEFAULT 'AMBOS',
+        fecha_vencimiento DATE,
+        estado VARCHAR(20) DEFAULT 'ACTIVO',
+        usuario_control VARCHAR(255),
+        fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
+      VALUES ('PAG-63', 'NOTICIAS Y AVISOS', 'noticias-avisos', 'MOD-08', 'MOD-08', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, route = EXCLUDED.route;
+    `);
+
     await client.query('COMMIT');
 
     // FASE FINAL: SINCRONIZACIÓN NUCLEAR DE MENÚS (REUBICACIÓN LOGÍSTICA)

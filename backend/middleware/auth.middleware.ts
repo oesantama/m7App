@@ -40,6 +40,7 @@ const ID_MAP: Record<string, string> = {
     'GRUPO_INTER': 'PAG-31',
     'WHATSAPP': 'PAG-07',
     'CAPACITACIONES': 'PAG-32',
+    'NOTICIAS': 'PAG-63',
     'PAG-33': 'PAG-33',
     'PAG-35': 'PAG-35',
     'CONCILIACION': 'PAG-36',

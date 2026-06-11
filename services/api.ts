@@ -66,8 +66,17 @@ export const fetchJson = async (url: string, options?: any) => {
       if (res.status === 401) {
         console.warn('[ORBIT-AUTH] 401 detectado. Caducidad o token inválido.');
         localStorage.removeItem('token');
-        window.dispatchEvent(new CustomEvent('orbit-auth-failed', { 
-          detail: { message: data?.error || 'Su sesión ha caducado por seguridad.' } 
+        window.dispatchEvent(new CustomEvent('orbit-auth-failed', {
+          detail: { message: data?.error || 'Su sesión ha caducado por seguridad.' }
+        }));
+      }
+
+      if (res.status === 431) {
+        console.warn('[ORBIT-AUTH] 431 — token demasiado grande. Forzando re-login.');
+        localStorage.removeItem('token');
+        localStorage.removeItem('m7_user_session');
+        window.dispatchEvent(new CustomEvent('orbit-auth-failed', {
+          detail: { message: 'Sesión inválida. Por favor inicie sesión nuevamente.' }
         }));
       }
 
@@ -368,20 +377,15 @@ export const api = {
     body: JSON.stringify(records)
   }),
   deletePlanillaRecord: async (id: string) => {
-    const res = await apiFetch(`/planillas-operativas/${id}`, { method: 'DELETE' });
+    const res = await fetchJson(`${API_URL}/planillas-operativas/${id}`, { method: 'DELETE' });
     return res.json();
   },
-  updatePlanillaRecord: async (id: string, data: { pedido: string }) => {
-    const res = await apiFetch(`/planillas-operativas/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-    });
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Error al actualizar registro');
-    }
-    return res.json();
-  },
+  updatePlanillaRecord: (id: string, data: { pedido: string }) =>
+    fetchJson(`${API_URL}/planillas-operativas/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
   clearPlanillasRecords: () => fetchJson(`${API_URL}/planillas-operativas`, { method: 'DELETE' }),
   checkPlanillasFiles: (files: string[]) => fetchJson(`${API_URL}/planillas-operativas/check-files`, {
     method: 'POST',
@@ -1713,4 +1717,24 @@ export const api = {
   capSubmitIntento: (data: any) => fetchPublic(`${API_URL}/cap/public/intento/submit`, {
     method: 'POST', body: JSON.stringify(data),
   }),
+
+  // ── NOTICIAS Y AVISOS ──────────────────────────────────────────────────────
+  noticiasGetAll: () => fetchJson(`${API_URL}/noticias`),
+  noticiasSave: (data: any) => fetchJson(`${API_URL}/noticias${data.id ? `/${data.id}` : ''}`, {
+    method: data.id ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }),
+  noticiasDelete: (id: number) => fetchJson(`${API_URL}/noticias/${id}`, { method: 'DELETE' }),
+  noticiasDeleteArchivo: (id: number) => fetchJson(`${API_URL}/noticias/${id}/archivo`, { method: 'DELETE' }),
+  noticiasUpload: (file: File) => {
+    const fd = new FormData();
+    fd.append('archivo', file);
+    return fetchJson(`${API_URL}/noticias/upload`, { method: 'POST', body: fd });
+  },
+  noticiasGetFeed: () => fetchJson(`${API_URL}/noticias/feed`),
+  noticiasGetPublicFeed: () => fetchPublic(`${API_URL}/noticias/public/feed`),
+  noticiasStreamUrl: (id: number) => `${API_URL}/noticias/${id}/stream`,
+  noticiasPublicStreamUrl: (id: number) => `${API_URL}/noticias/public/${id}/stream`,
+  noticiasGetPublicById: (id: number) => fetchJson(`${API_URL}/noticias/public/${id}`),
 };

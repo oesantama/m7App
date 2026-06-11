@@ -14,6 +14,7 @@ import { useAppData } from './hooks/useAppData';
 import { normalizeData } from './utils/normalize';
 import { hasPermission } from './utils/permissions';
 import AutoUpdate from './components/shared/AutoUpdate';
+import NoticiaModal from './components/Noticias/NoticiaModal';
 
 // ========== LAZY LOADING (CODE SPLITTING CHUNKS) ==========
 // Wrapper para auto-recargar la PWA si un chunk falla por cambio de nombre
@@ -51,6 +52,7 @@ const AIChat = lazyWithRetry(() => import('./components/AIChat'));
 const DigitalSignature = lazyWithRetry(() => import('./components/DigitalSignature'));
 const CentroCapacitaciones = lazyWithRetry(() => import('./components/Capacitaciones/CapacitacionesAdmin'));
 const PublicCapacitacion = lazyWithRetry(() => import('./components/Capacitaciones/PublicCapacitacion'));
+const NoticiasAdmin = lazyWithRetry(() => import('./components/Noticias/NoticiasAdmin'));
 const ApprovalManager = lazyWithRetry(() => import('./components/ApprovalManager'));
 const ChatbotWidget = lazyWithRetry(() => import('./components/ChatbotWidget'));
 const DriverGamification = lazyWithRetry(() => import('./components/DriverGamification'));
@@ -76,6 +78,7 @@ const GestionHumanaInventarioFisico = lazyWithRetry(() => import('./components/G
 const PublicSurvey = lazyWithRetry(() => import('./components/GestionHumana/PublicSurvey'));
 const PublicTraining = lazyWithRetry(() => import('./components/GestionHumana/PublicTraining'));
 const PublicVisitForm = lazyWithRetry(() => import('./components/GestionHumana/PublicVisitForm'));
+const PublicNoticiaPage = lazyWithRetry(() => import('./components/Noticias/PublicNoticiaPage'));
 const CfgCiudades = lazyWithRetry(() => import('./components/Configuracion/Ciudades'));
 const ProvClientes = lazyWithRetry(() => import('./components/Configuracion/ProvClientes'));
 const GestionDocumental = lazyWithRetry(() => import('./components/documents/GestionDocumental'));
@@ -154,6 +157,18 @@ const App: React.FC = () => {
 
   const { refreshAppData } = useAppData();
 
+
+  // ============ NOTICIAS MODAL ============
+  const [noticiasFeed, setNoticiasFeed] = useState<any[]>([]);
+  const [showNoticiasModal, setShowNoticiasModal] = useState(false);
+
+  // Cargar feed de noticias después del login
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
+    api.noticiasGetFeed().then((data: any[]) => {
+      if (data?.length) { setNoticiasFeed(data); setShowNoticiasModal(true); }
+    }).catch(() => {});
+  }, [isAuthenticated, user?.id]);
 
   // ============ PORTAL ROUTING ============
   const [activeRoutes, setActiveRoutes] = useState<any[]>([]); // Estado para rutas activas
@@ -532,6 +547,15 @@ const App: React.FC = () => {
     }
   }, [isAuthenticated, needsWelcomeRedirect, pages, modules, user]);
 
+
+  // Rutas 100% públicas — deben evaluarse ANTES de cualquier guard de auth o restore
+  if (window.location.pathname.startsWith('/publico/noticia')) {
+    return (
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"/></div>}>
+        <PublicNoticiaPage />
+      </React.Suspense>
+    );
+  }
 
   if (isRestoring) {
     return (
@@ -987,6 +1011,8 @@ const App: React.FC = () => {
         return <SalidaProveedor user={user!} />;
       case 'capacitaciones':
         return <CentroCapacitaciones user={user!} />;
+      case 'noticias-avisos':
+        return <NoticiasAdmin user={user!} />;
       case 'chatbot':
         return <AIChat context={{ user: user!.name, activeTab: 'chatbot-fullscreen' }} />;
       case 'gestion-humana-miscelaneos':
@@ -1137,6 +1163,15 @@ const App: React.FC = () => {
       />
       <PWABanner />
       <AutoUpdate />
+
+      {/* Modal de noticias/avisos con animación del camión */}
+      {showNoticiasModal && noticiasFeed.length > 0 && user && (
+        <NoticiaModal
+          noticias={noticiasFeed}
+          userId={user.id}
+          onAllSeen={() => setShowNoticiasModal(false)}
+        />
+      )}
 
       <React.Suspense fallback={
         <div className="flex items-center justify-center h-screen w-full bg-slate-950">

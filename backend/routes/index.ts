@@ -62,6 +62,7 @@ import conciliacionLBRoutes from './conciliacion-linea-blanca.routes.js';
 import flotaRoutes from './flota.routes.js';
 import planillasOperativasRoutes from './planillas-operativas.routes.js';
 import capRoutes from './cap.routes.js';
+import noticiasRoutes from './noticias.routes.js';
 
 const router = Router();
 
@@ -127,6 +128,7 @@ router.use('/conciliacion-linea-blanca', conciliacionLBRoutes);
 router.use('/flota', flotaRoutes);
 router.use('/planillas-operativas', planillasOperativasRoutes);
 router.use('/cap', capRoutes);
+router.use('/noticias', noticiasRoutes);
 
 // Endpoint seguro: devuelve la API key de Gemini del backend al frontend autenticado
 router.get('/config/gemini-key', (req: any, res) => {
