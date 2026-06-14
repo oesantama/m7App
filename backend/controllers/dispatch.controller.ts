@@ -1459,3 +1459,99 @@ export const getApprovalBatchByCode = async (req: Request, res: Response) => {
     }
 };
 
+
+export const getUnifiedHistory = async (req: Request, res: Response) => {
+    const { invoiceId, driverId, vehicleId, dateFrom, dateTo, page = '1', limit = '50' } = req.query as Record<string, string>;
+    
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let idx = 1;
+
+    if (invoiceId)  { conditions.push(`ri.invoice_id ILIKE $${idx++}`);  params.push(`%${invoiceId}%`); }
+    if (req.query.documentL) { conditions.push(`(doc.id ILIKE $${idx} OR doc.external_doc_id ILIKE $${idx})`); params.push(`%${req.query.documentL}%`); idx++; }
+    if (driverId)   { conditions.push(`r.driver_id::text = $${idx++}`);        params.push(driverId); }
+    if (vehicleId)  { conditions.push(`r.vehicle_id::text = $${idx++}`);       params.push(vehicleId); }
+    if (dateFrom)   { conditions.push(`r.created_at >= $${idx++}`);      params.push(dateFrom); }
+    if (dateTo)     { conditions.push(`r.created_at <= $${idx++}`);      params.push(dateTo); }
+
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    try {
+        const query = `
+            SELECT 
+                ri.route_id::text AS operation_id,
+                ri.invoice_id,
+                r.driver_id,
+                d.name AS driver_name,
+                r.vehicle_id,
+                v.plate AS vehicle_plate,
+                r.created_at AS route_created_at,
+                e.name AS status_name,
+                COALESCE(doc.id, ri.invoice_id) AS documento_l,
+                MAX(di.customer_name) AS client_name,
+                MAX(di.address) AS address,
+                MAX(di.city) AS city
+            FROM route_invoices ri
+            JOIN routes r ON r.id::text = ri.route_id::text
+            LEFT JOIN drivers d ON d.id::text = r.driver_id::text
+            LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
+            LEFT JOIN estados e ON e.id::text = r.status_id::text
+            LEFT JOIN (
+                SELECT 
+                    TRIM(COALESCE(NULLIF(invoice,''), order_number)) AS invoice_number,
+                    MAX(customer_name) AS customer_name,
+                    MAX(address) AS address,
+                    MAX(city) AS city,
+                    MAX(document_id) AS document_id
+                FROM document_items
+                GROUP BY TRIM(COALESCE(NULLIF(invoice,''), order_number))
+            ) di ON di.invoice_number = ri.invoice_id
+            LEFT JOIN documents_l doc ON doc.id = di.document_id OR ri.invoice_id = doc.id::text OR ri.invoice_id = doc.external_doc_id
+            LEFT JOIN clients c ON c.id::text = doc.client_id::text
+            ${where}
+            GROUP BY ri.route_id, ri.invoice_id, r.driver_id, d.name, r.vehicle_id, v.plate, r.created_at, e.name, COALESCE(doc.id, ri.invoice_id)
+            ORDER BY r.created_at DESC
+            LIMIT $${idx} OFFSET $${idx + 1}
+        `;
+
+        const countQuery = `
+            SELECT COUNT(*) 
+            FROM route_invoices ri
+            JOIN routes r ON r.id::text = ri.route_id::text
+            LEFT JOIN (
+                SELECT 
+                    TRIM(COALESCE(NULLIF(invoice,''), order_number)) AS invoice_number,
+                    MAX(document_id) AS document_id
+                FROM document_items
+                GROUP BY TRIM(COALESCE(NULLIF(invoice,''), order_number))
+            ) di ON di.invoice_number = ri.invoice_id
+            LEFT JOIN documents_l doc ON doc.id = di.document_id OR ri.invoice_id = doc.id::text OR ri.invoice_id = doc.external_doc_id
+            ${where}
+        `;
+
+        const [dataRes, countRes] = await Promise.all([
+            pool.query(query, [...params, parseInt(limit), offset]),
+            pool.query(countQuery, params)
+        ]);
+
+        res.json({
+            success: true,
+            data: dataRes.rows,
+            total: parseInt(countRes.rows[0].count)
+        });
+    } catch (err: any) {
+        console.error('[UNIFIED-HISTORY-ERR]', err);
+        res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+export const getHistoryFiltersData = async (req: Request, res: Response) => {
+    try {
+        const dRes = await pool.query(`SELECT DISTINCT d.id, d.name FROM assignments a JOIN drivers d ON d.id::text = a.driver_id::text`);
+        const vRes = await pool.query(`SELECT DISTINCT v.id, v.plate FROM assignments a JOIN vehicles v ON v.id::text = a.vehicle_id::text`);
+        res.json({ success: true, drivers: dRes.rows, vehicles: vRes.rows });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+};

@@ -127,21 +127,7 @@ const ConsultaNovedadesDrive: React.FC<Props> = ({ user, clientId, clients }) =>
     <div className="p-3 sm:p-4 md:p-6 h-full flex flex-col bg-slate-50 overflow-hidden">
       <div className="max-w-full mx-auto w-full flex flex-col h-full space-y-4 animate-in fade-in duration-500">
         
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-emerald-600 text-white rounded-2xl flex items-center justify-center shadow-lg border border-emerald-500 ring-4 ring-emerald-500/20 shrink-0">
-              <Icons.Upload className="w-6 h-6" />
-            </div>
-            <div>
-              <h2 className="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none">Consultas Drive</h2>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                Historial de Novedades enviadas
-              </p>
-            </div>
-          </div>
-        </div>
+        {/* Header removed to optimize visual space */}
 
         {/* Filters */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-end shrink-0">

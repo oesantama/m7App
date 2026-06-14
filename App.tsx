@@ -90,6 +90,8 @@ const InformesGerenciales = lazyWithRetry(() => import('./components/Logistics/I
 const InformesFlota = lazyWithRetry(() => import('./components/Logistics/InformesFlota'));
 const OperacionesFlotaManual = lazyWithRetry(() => import('./components/OperacionExito/OperacionesFlotaManual'));
 const FormatosTransportes = lazyWithRetry(() => import('./components/AdminCenter/FormatosTransportes'));
+const MaestrasDogama = lazyWithRetry(() => import('./components/Dogama/MaestrasDogama'));
+const CitasDespachosCarga = lazyWithRetry(() => import('./components/Dogama/CitasDespachosCarga'));
 
 // Import Admin Module
 const AdminDBManager = lazyWithRetry(() => import('./pages/AdminDBManager'));
@@ -1059,6 +1061,18 @@ const App: React.FC = () => {
         return (
           <React.Suspense fallback={<div className="p-10">Cargando Operaciones Flota...</div>}>
             <OperacionesFlotaManual user={user!} />
+          </React.Suspense>
+        );
+      case 'maestras-dogama':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Maestras Dogama...</div>}>
+            <MaestrasDogama user={user!} />
+          </React.Suspense>
+        );
+      case 'citas-despacho-carga':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Citas, Despacho y Carga...</div>}>
+            <CitasDespachosCarga user={user!} />
           </React.Suspense>
         );
       case 'validacion-conciliaciones':

@@ -6,6 +6,9 @@ export interface ColumnDef<T> {
   header: string;
   key: keyof T | string;
   sortable?: boolean;
+  noWrap?: boolean;
+  minWidth?: string;
+  maxWidth?: string;
   render?: (row: T) => React.ReactNode;
   exportRender?: (row: T) => any;
 }
@@ -235,9 +238,10 @@ export function DataTable<T extends Record<string, any>>({
                   <th
                     key={String(col.key)}
                     onClick={() => isSortable && handleSort(col.key as string)}
-                    className={`px-6 py-4.5 text-xs font-black tracking-widest uppercase border-b border-slate-800 ${
+                    className={`px-6 py-4.5 text-xs font-black tracking-widest uppercase border-b border-slate-800 whitespace-nowrap ${
                       isSortable ? 'cursor-pointer hover:bg-slate-800/55 transition-colors' : ''
                     }`}
+                    style={col.minWidth ? { minWidth: col.minWidth } : undefined}
                   >
                     <div className="flex items-center gap-1.5">
                       <span>{col.header}</span>
@@ -276,7 +280,11 @@ export function DataTable<T extends Record<string, any>>({
                         return (
                           <td
                             key={String(col.key)}
-                            className="px-6 py-4 text-sm text-slate-600 font-medium whitespace-nowrap"
+                            className={`px-6 py-4 text-sm text-slate-600 font-medium align-top ${col.noWrap ? 'whitespace-nowrap' : 'break-words'}`}
+                            style={{
+                              ...(col.minWidth ? { minWidth: col.minWidth } : {}),
+                              ...(col.maxWidth ? { maxWidth: col.maxWidth, wordBreak: 'break-word' } : {}),
+                            }}
                           >
                             {col.render ? (
                               col.render(row)

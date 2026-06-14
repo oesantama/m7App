@@ -174,6 +174,13 @@ export const api = {
     const qs = new URLSearchParams(params).toString();
     return fetchJson(`${API_URL}/dispatch/delivery-history${qs ? '?' + qs : ''}`);
   },
+  getUnifiedHistory(params: Record<string, string> = {}) {
+    const qs = new URLSearchParams(params).toString();
+    return fetchJson(`${API_URL}/dispatch/unified-history${qs ? '?' + qs : ''}`);
+  },
+  getHistoryFiltersData() {
+    return fetchJson(`${API_URL}/dispatch/history-filters-data?_t=${Date.now()}`);
+  },
   getReturnHistory(params: Record<string, string> = {}) {
     const qs = new URLSearchParams(params).toString();
     return fetchJson(`${API_URL}/dispatch/return-history${qs ? '?' + qs : ''}`);
@@ -1738,4 +1745,60 @@ export const api = {
   noticiasStreamUrl: (id: number) => `${API_URL}/noticias/${id}/stream`,
   noticiasPublicStreamUrl: (id: number) => `${API_URL}/noticias/public/${id}/stream`,
   noticiasGetPublicById: (id: number) => fetchJson(`${API_URL}/noticias/public/${id}`),
+
+  // ── DOGAMA ────────────────────────────────────────────────────────────────
+  dogamaGetConfeccionistas: () => fetchJson(`${API_URL}/dogama/confeccionistas`),
+  dogamaCreateConfeccionista: (data: any) => fetchJson(`${API_URL}/dogama/confeccionistas`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+  }),
+  dogamaBulkConfeccionistas: (rows: any[], usuariocreacion: string) =>
+    fetchJson(`${API_URL}/dogama/confeccionistas/bulk`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rows, usuariocreacion }),
+    }),
+  dogamaUpdateConfeccionista: (id: number, data: any) =>
+    fetchJson(`${API_URL}/dogama/confeccionistas/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    }),
+  dogamaDeleteConfeccionista: (id: number) =>
+    fetchJson(`${API_URL}/dogama/confeccionistas/${id}`, { method: 'DELETE' }),
+
+  // Catálogos genéricos
+  dogamaGetCatalog: (table: string) => fetchJson(`${API_URL}/dogama/catalog/${table}`),
+  dogamaCreateCatalogItem: (table: string, data: any) =>
+    fetchJson(`${API_URL}/dogama/catalog/${table}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+  dogamaBulkCatalog: (table: string, rows: any[], usuariocreacion: string) =>
+    fetchJson(`${API_URL}/dogama/catalog/${table}/bulk`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows, usuariocreacion }) }),
+  dogamaUpdateCatalogItem: (table: string, id: number, data: any) =>
+    fetchJson(`${API_URL}/dogama/catalog/${table}/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+  dogamaDeleteCatalogItem: (table: string, id: number) =>
+    fetchJson(`${API_URL}/dogama/catalog/${table}/${id}`, { method: 'DELETE' }),
+
+  // Email OAuth
+  dogamaGetEmailConfig: () => fetchJson(`${API_URL}/dogama/email-config`),
+  dogamaEmailInitUrl: (provider: 'gmail' | 'outlook') => `${API_URL}/dogama/email-config/${provider}/init`,
+  dogamaDeleteEmailConfig: (provider: string) => fetchJson(`${API_URL}/dogama/email-config/${provider}`, { method: 'DELETE' }),
+  dogamaTestEmail: (provider: string) => fetchJson(`${API_URL}/dogama/email-config/${provider}/test`, { method: 'POST' }),
+
+  // Despachos
+  dogamaGetDespachos: () => fetchJson(`${API_URL}/dogama/despachos`),
+  dogamaBulkDespachos: (rows: any[], usuariocreacion: string) =>
+    fetchJson(`${API_URL}/dogama/despachos/bulk`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows, usuariocreacion }) }),
+  dogamaUpdateDespachoEstado: (id: number, estado: string) =>
+    fetchJson(`${API_URL}/dogama/despachos/${id}/estado`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado }) }),
+  dogamaDeleteDespacho: (id: number) => fetchJson(`${API_URL}/dogama/despachos/${id}`, { method: 'DELETE' }),
+
+  // Citas / Recogidas
+  dogamaGetCitas: () => fetchJson(`${API_URL}/dogama/citas`),
+  dogamaBulkCitas: (rows: any[], usuariocreacion: string) =>
+    fetchJson(`${API_URL}/dogama/citas/bulk`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows, usuariocreacion }) }),
+  dogamaUpdateCitaEstado: (id: number, estado: string) =>
+    fetchJson(`${API_URL}/dogama/citas/${id}/estado`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado }) }),
+  dogamaPatchCita: (id: number, data: Record<string, any>) =>
+    fetchJson(`${API_URL}/dogama/citas/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+  dogamaDeleteCita: (id: number) => fetchJson(`${API_URL}/dogama/citas/${id}`, { method: 'DELETE' }),
+
+  dogamaGetProveedores: () => fetchJson(`${API_URL}/dogama/catalog/dogama_proveedores`),
+  dogamaCreateProveedor: (descripcion: string, usuariocreacion: string) =>
+    fetchJson(`${API_URL}/dogama/catalog/dogama_proveedores`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ descripcion, estado: 'activo', usuariocreacion }) }),
 };

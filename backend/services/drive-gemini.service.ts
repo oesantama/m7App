@@ -48,7 +48,7 @@ export const syncDriveCumplidos = async () => {
                   SELECT 1 FROM registros_logistica rl 
                   WHERE rl.archivo = d.file_name
               )
-            LIMIT 15
+            LIMIT 5
         `;
         const { rows: missingDocs } = await pool.query(query);
 
@@ -195,18 +195,26 @@ Campos exactos por cada fila:
                 failedCount++;
                 lastFileError = err.message || 'Error desconocido';
                 console.error(`[M7-CRON] Error procesando ${doc.file_name}:`, lastFileError);
-                if (lastFileError.includes('429')) {
-                    keyIndex++; // Rotar llave si hay límite de cuota
-                }
             } finally {
                 processedCount++;
                 // Borrar archivo temporal
                 if (fs.existsSync(localPath)) {
                     fs.unlinkSync(localPath);
                 }
-                // Pausa para evitar rate limits
-                await new Promise(r => setTimeout(r, 4000));
             }
+            
+            // Manejar error 429 de forma segura
+            if (lastFileError && lastFileError.includes('429')) {
+                keyIndex++; // Rotar llave si hay límite de cuota
+                if (keyIndex >= keys.length) {
+                    console.warn('[M7-CRON] Se agotaron todas las API Keys por límite de cuota. Abortando lote...');
+                    errorMessage = 'Cuota Gemini excedida (429). Pausado hasta el próximo ciclo.';
+                    break; // Salir del bucle for, no seguir intentando
+                }
+            }
+
+            // Pausa para evitar rate limits (si no hubo break)
+            await new Promise(r => setTimeout(r, 4000));
         }
 
         details = `Procesados: ${processedCount}/${missingDocs.length}. Errores individuales: ${failedCount}. Registros extraídos: ${savedCount}`;

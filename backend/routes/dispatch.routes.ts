@@ -22,6 +22,8 @@ import {
     createApprovalBatch,
     getApprovalBatches,
     getApprovalBatchByCode,
+    getUnifiedHistory,
+    getHistoryFiltersData
 } from '../controllers/dispatch.controller.js';
 
 const router = Router();
@@ -36,6 +38,8 @@ router.get('/invoice-pending-signatures/:invoiceId', getInvoicePendingSignatures
 router.post('/confirm-delivery', confirmDelivery);
 router.get('/delivery-history', getDeliveryHistory);
 router.get('/return-history', getReturnHistory);
+router.get('/unified-history', getUnifiedHistory);
+router.get('/history-filters-data', getHistoryFiltersData);
 
 // Soportes de pago
 router.post('/voucher', uploadVoucher);

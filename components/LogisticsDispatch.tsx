@@ -218,7 +218,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [historyLoading, setHistoryLoading] = useState(false);
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [historyFilters, setHistoryFilters] = useState({
-        invoiceId: '', driverId: '', vehicleId: '', dateFrom: '', dateTo: '', deliveryType: '', status: ''
+        invoiceId: '', documentL: '', driverId: '', vehicleId: '', dateFrom: '', dateTo: '', deliveryType: '', status: ''
     });
 
     // ── Load filtered clients via API (same pattern as other pages) ──────────
@@ -1875,19 +1875,13 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         try {
             const filters: Record<string, string> = {};
             if (historyFilters.invoiceId)    filters.invoiceId    = historyFilters.invoiceId;
+            if (historyFilters.documentL)    filters.documentL    = historyFilters.documentL;
             if (historyFilters.driverId)     filters.driverId     = historyFilters.driverId;
             if (historyFilters.vehicleId)    filters.vehicleId    = historyFilters.vehicleId;
             if (historyFilters.dateFrom)     filters.dateFrom     = historyFilters.dateFrom;
             if (historyFilters.dateTo)       filters.dateTo       = historyFilters.dateTo;
-            if (historyTab === 'ENTREGAS' && historyFilters.deliveryType)
-                filters.deliveryType = historyFilters.deliveryType;
-            if (historyTab === 'DEVOLUCIONES' && historyFilters.status)
-                filters.status = historyFilters.status;
 
-            const res = historyTab === 'ENTREGAS'
-                ? await api.getDeliveryHistory(filters)
-                : await api.getReturnHistory(filters);
-
+            const res = await api.getUnifiedHistory(filters);
             setHistoryData(res.data || []);
         } catch (e: any) {
             toast.error(e.message || 'Error al cargar historial');
@@ -1979,13 +1973,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     >
                         <Icons.History className="w-3 h-3 opacity-60 group-hover:opacity-100" />
                         <span>Historial</span>
-                    </button>
-                    <button
-                        onClick={() => setShowReturnsModal(true)}
-                        className="flex items-center gap-2 px-3 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 rounded-lg border border-rose-500/20 text-[8px] font-black uppercase tracking-widest transition-all group"
-                    >
-                        <Icons.Package className="w-3 h-3 opacity-80 group-hover:opacity-100" />
-                        <span>Devoluciones</span>
                     </button>
                     <button 
                         onClick={() => {
@@ -3293,13 +3280,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     user={user}
                 />
             )} */}
-
-            {/* MODAL: CONTROL DE DEVOLUCIONES */}
-            <ReturnsControlModal
-                isOpen={showReturnsModal}
-                onClose={() => setShowReturnsModal(false)}
-                user={user}
-            />
         </>
     );
 };

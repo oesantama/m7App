@@ -282,85 +282,90 @@ async function buildNovedadesPdf(doc: any, news: any[]): Promise<Buffer> {
 }
 
 // ─── POST /inventory-news/save-to-drive ──────────────────────────────────────
+export const processAndUploadNovedad = async (docId: string, clientName: string, driveDate?: string, userId: string = 'SYSTEM') => {
+    const docRes = await pool.query('SELECT * FROM documents_l WHERE id = $1', [docId]);
+    if (docRes.rows.length === 0) throw new Error('Documento no encontrado');
+    const doc = docRes.rows[0];
+
+    const newsRes = await pool.query(`
+        SELECT n.*,
+               COALESCE(a.sku, n.article_id, 'S/SKU') as article_sku,
+               COALESCE(a.name, n.observation, 'SIN NOMBRE') as article_name
+        FROM inventory_news n
+        LEFT JOIN articles a ON (
+            TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.id AS TEXT))) OR
+            TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.sku AS TEXT)))
+        )
+        WHERE n.document_id = $1 AND n.created_at >= NOW() - INTERVAL '30 days'
+        ORDER BY n.created_at ASC
+    `, [docId]);
+    const news = newsRes.rows;
+    if (news.length === 0) throw new Error('No hay novedades para guardar');
+
+    const ref = driveDate ? new Date(`${driveDate}T12:00:00`) : new Date();
+    const year  = ref.getFullYear();
+    const month = MESES_NOV[ref.getMonth()].toUpperCase();
+    const day   = `DIA ${String(ref.getDate()).padStart(2, '0')}`;
+    const cleanClient = clientName.replace(/[^a-zA-Z0-9 ()-]/g, '').trim();
+    const externalId  = (doc.external_doc_id || doc.externalDocId || docId).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const fileName    = `NOVEDAD_${externalId}.pdf`;
+    const drivePath   = `NOVEDADES MILLA 7/${year}/${cleanClient}/${month}/${day}`;
+    const remoteFile  = `gdrive_cumplidos:${drivePath}/${fileName}`;
+    const tmpPath     = path.join('/tmp', `novedad_${Date.now()}_${fileName}`);
+
+    const pdfBuffer = await buildNovedadesPdf(doc, news);
+    fs.writeFileSync(tmpPath, pdfBuffer);
+
+    // Crear carpeta en Drive
+    await new Promise<void>(resolve => {
+        exec(`rclone mkdir "gdrive_cumplidos:${drivePath}"`, (err) => {
+            if (err) console.error('[NOV-DRIVE] mkdir error:', err);
+            resolve();
+        });
+    });
+
+    // Si el archivo ya existe lo elimina (actualización)
+    const existsOutput = await new Promise<string>(resolve => {
+        exec(`rclone ls "${remoteFile}"`, (_, stdout) => resolve(stdout || ''));
+    });
+    if (existsOutput.trim()) {
+        await new Promise<void>(resolve => {
+            exec(`rclone deletefile "${remoteFile}"`, () => resolve());
+        });
+        console.log(`[NOV-DRIVE] Archivo existente eliminado: ${remoteFile}`);
+    }
+
+    // Subir PDF
+    await new Promise<void>((resolve, reject) => {
+        exec(`rclone copyto "${tmpPath}" "${remoteFile}"`, (err) => {
+            if (err) { console.error('[NOV-DRIVE] upload error:', err); reject(err); } else resolve();
+        });
+    });
+
+    // Obtener link público
+    const driveLink = await new Promise<string>(resolve => {
+        exec(`rclone link "${remoteFile}"`, (_, stdout) => resolve((stdout || '').trim()));
+    });
+
+    await pool.query(
+        `INSERT INTO document_drive_logs (user_id, client_id, file_name, drive_path, drive_link, category, folder_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [userId, doc.client_id || doc.clientId || null, fileName, drivePath, driveLink, 'NOVEDADES MILLA 7', driveDate || null]
+    );
+
+    fs.unlink(tmpPath, () => {});
+    console.log(`[NOV-DRIVE] Guardado: ${remoteFile} | Link: ${driveLink}`);
+    return { fileName, driveLink, drivePath };
+};
+
 export const saveNovedadToDrive = async (req: Request, res: Response) => {
     const { docId, clientName, driveDate } = req.body;
     if (!docId || !clientName) return res.status(400).json({ error: 'docId y clientName son requeridos' });
 
     try {
-        const docRes = await pool.query('SELECT * FROM documents_l WHERE id = $1', [docId]);
-        if (docRes.rows.length === 0) return res.status(404).json({ error: 'Documento no encontrado' });
-        const doc = docRes.rows[0];
-
-        const newsRes = await pool.query(`
-            SELECT n.*,
-                   COALESCE(a.sku, n.article_id, 'S/SKU') as article_sku,
-                   COALESCE(a.name, n.observation, 'SIN NOMBRE') as article_name
-            FROM inventory_news n
-            LEFT JOIN articles a ON (
-                TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.id AS TEXT))) OR
-                TRIM(UPPER(CAST(n.article_id AS TEXT))) = TRIM(UPPER(CAST(a.sku AS TEXT)))
-            )
-            WHERE n.document_id = $1 AND n.created_at >= NOW() - INTERVAL '30 days'
-            ORDER BY n.created_at ASC
-        `, [docId]);
-        const news = newsRes.rows;
-        if (news.length === 0) return res.status(400).json({ error: 'No hay novedades para guardar' });
-
-        const ref = driveDate ? new Date(`${driveDate}T12:00:00`) : new Date();
-        const year  = ref.getFullYear();
-        const month = MESES_NOV[ref.getMonth()].toUpperCase();
-        const day   = `DIA ${String(ref.getDate()).padStart(2, '0')}`;
-        const cleanClient = clientName.replace(/[^a-zA-Z0-9 ()-]/g, '').trim();
-        const externalId  = (doc.external_doc_id || doc.externalDocId || docId).replace(/[^a-zA-Z0-9_-]/g, '_');
-        const fileName    = `NOVEDAD_${externalId}.pdf`;
-        const drivePath   = `NOVEDADES MILLA 7/${year}/${cleanClient}/${month}/${day}`;
-        const remoteFile  = `gdrive_cumplidos:${drivePath}/${fileName}`;
-        const tmpPath     = path.join('/tmp', `novedad_${Date.now()}_${fileName}`);
-
-        const pdfBuffer = await buildNovedadesPdf(doc, news);
-        fs.writeFileSync(tmpPath, pdfBuffer);
-
-        // Crear carpeta en Drive
-        await new Promise<void>(resolve => {
-            exec(`rclone mkdir "gdrive_cumplidos:${drivePath}"`, (err) => {
-                if (err) console.error('[NOV-DRIVE] mkdir error:', err);
-                resolve();
-            });
-        });
-
-        // Si el archivo ya existe lo elimina (actualización)
-        const existsOutput = await new Promise<string>(resolve => {
-            exec(`rclone ls "${remoteFile}"`, (_, stdout) => resolve(stdout || ''));
-        });
-        if (existsOutput.trim()) {
-            await new Promise<void>(resolve => {
-                exec(`rclone deletefile "${remoteFile}"`, () => resolve());
-            });
-            console.log(`[NOV-DRIVE] Archivo existente eliminado: ${remoteFile}`);
-        }
-
-        // Subir PDF
-        await new Promise<void>((resolve, reject) => {
-            exec(`rclone copyto "${tmpPath}" "${remoteFile}"`, (err) => {
-                if (err) { console.error('[NOV-DRIVE] upload error:', err); reject(err); } else resolve();
-            });
-        });
-
-        // Obtener link público
-        const driveLink = await new Promise<string>(resolve => {
-            exec(`rclone link "${remoteFile}"`, (_, stdout) => resolve((stdout || '').trim()));
-        });
-
         const userId = (req as any).user?.id || 'SYSTEM';
-        await pool.query(
-            `INSERT INTO document_drive_logs (user_id, client_id, file_name, drive_path, drive_link, category, folder_date)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [userId, doc.client_id || doc.clientId || null, fileName, drivePath, driveLink, 'NOVEDADES MILLA 7', driveDate || null]
-        );
-
-        fs.unlink(tmpPath, () => {});
-        console.log(`[NOV-DRIVE] Guardado: ${remoteFile} | Link: ${driveLink}`);
-        res.json({ success: true, message: `Novedad guardada en Drive: ${fileName}`, driveLink, drivePath });
+        const result = await processAndUploadNovedad(docId, clientName, driveDate, userId);
+        res.json({ success: true, message: `Novedad guardada en Drive: ${result.fileName}`, driveLink: result.driveLink, drivePath: result.drivePath });
     } catch (err: any) {
         console.error('[NOV-DRIVE-ERR]', err.message);
         res.status(500).json({ error: err.message || 'Error al guardar en Drive' });

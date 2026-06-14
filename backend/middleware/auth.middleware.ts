@@ -42,6 +42,8 @@ const ID_MAP: Record<string, string> = {
     'WHATSAPP': 'PAG-07',
     'CAPACITACIONES': 'PAG-32',
     'NOTICIAS': 'PAG-63',
+    'MAESTRAS_DOGAMA': 'PAG-64',
+    'CITAS_DESPACHO_CARGA': 'PAG-65',
     'PAG-33': 'PAG-33',
     'PAG-35': 'PAG-35',
     'CONCILIACION': 'PAG-36',

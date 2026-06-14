@@ -23,6 +23,19 @@ function subtractBusinessDays(fromDate: Date, businessDays: number): Date {
 }
 
 /**
+ * Formatea una fecha a formato YYYY/MM/DD local
+ */
+function formatDateYYYYMMDD(dateVal: any): string {
+    if (!dateVal) return 'S/I';
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return 'S/I';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}/${m}/${day}`;
+}
+
+/**
  * Ejecuta una función y registra el resultado en la tabla cron_logs.
  */
 async function executeWithCronLog(taskName: string, taskFunction: () => Promise<any>) {
@@ -170,7 +183,7 @@ export const runFacturacionPendienteIndividual = async (): Promise<string[]> => 
             
             const excelData = userManifests.map(r => ({
                 'Manifiesto': r.manifest_number,
-                'Fecha Manifiesto': r.manifest_date ? new Date(r.manifest_date).toLocaleDateString() : 'S/I',
+                'Fecha Manifiesto': formatDateYYYYMMDD(r.manifest_date),
                 'Cliente': r.client_name,
                 'Estado': r.manifest_status ? String(r.manifest_status).trim() : 'S/I',
                 'Placa': r.plate ? String(r.plate).trim() : 'S/I',
@@ -455,7 +468,7 @@ export const runFacturacionPendienteGeneral = async (): Promise<string[]> => {
 
         const excelData = reportRes.rows.map(r => ({
             'Manifiesto': r.manifest_number,
-            'Fecha Manifiesto': r.manifest_date ? new Date(r.manifest_date).toLocaleDateString() : 'S/I',
+            'Fecha Manifiesto': formatDateYYYYMMDD(r.manifest_date),
             'Cliente': r.client_name,
             'Estado': r.manifest_status ? String(r.manifest_status).trim() : 'S/I',
             'Valor Venta': Number(r.venta) || 0
@@ -567,10 +580,13 @@ export const validateMissingNovedadesDrive = async (): Promise<string[]> => {
     logs.push(`[${new Date().toLocaleString()}] Iniciando validación de novedades no subidas a Drive...`);
     try {
         const { sendEmail } = await import('./notification.service.js');
+        const { processAndUploadNovedad } = await import('../controllers/inventory-news.controller.js');
+        
         const res = await pool.query(`
-            SELECT DISTINCT d.id as doc_id, d.external_doc_id, d.client_id, d.created_at
+            SELECT DISTINCT d.id as doc_id, d.external_doc_id, d.client_id, d.created_at, c.name as client_name
             FROM inventory_news n
             JOIN documents_l d ON n.document_id = d.id
+            LEFT JOIN clients c ON d.client_id = c.id
             WHERE n.created_at >= NOW() - INTERVAL '30 days'
               AND NOT EXISTS (
                   SELECT 1 FROM document_drive_logs log 
@@ -584,21 +600,34 @@ export const validateMissingNovedadesDrive = async (): Promise<string[]> => {
             return logs;
         }
 
-        logs.push(`Se encontraron ${res.rowCount} documentos con novedades que NO tienen registro en Drive.`);
+        logs.push(`Se encontraron ${res.rowCount} documentos con novedades que NO tienen registro en Drive. Iniciando subida automática...`);
         
-        // Aquí enviamos una alerta o podríamos subirlos automáticamente.
-        // Por ahora enviamos alerta al administrador.
-        let htmlBody = `<h3>Novedades pendientes por subir a Drive</h3>
-            <p>Se encontraron ${res.rowCount} documentos con novedades en los últimos 30 días que no tienen registro de subida a Drive.</p>
+        let successCount = 0;
+        let failCount = 0;
+        let htmlBody = `<h3>Novedades procesadas automáticamente por el Cron</h3>
+            <p>Se encontraron ${res.rowCount} documentos con novedades en los últimos 30 días que no tenían registro. A continuación, el detalle del procesamiento automático:</p>
             <ul>`;
         
-        res.rows.forEach(r => {
-            htmlBody += `<li>Documento ID: ${r.doc_id} | Ref: ${r.external_doc_id} | Fecha: ${new Date(r.created_at).toLocaleDateString()}</li>`;
-        });
-        htmlBody += `</ul>`;
+        for (const r of res.rows) {
+            const driveDate = r.created_at ? new Date(r.created_at).toISOString().split('T')[0] : undefined;
+            const clientName = r.client_name || r.client_id || 'SIN_CLIENTE';
+            try {
+                const result = await processAndUploadNovedad(r.doc_id, clientName, driveDate, 'CRON_SYSTEM');
+                htmlBody += `<li>✅ <b>${r.external_doc_id}</b>: Subido con éxito. <a href="${result.driveLink}">Ver en Drive</a></li>`;
+                successCount++;
+            } catch (upErr: any) {
+                console.error(`[CRON-NOV] Error subiendo ${r.external_doc_id}:`, upErr);
+                htmlBody += `<li>❌ <b>${r.external_doc_id}</b>: Error al subir. (${upErr.message})</li>`;
+                failCount++;
+            }
+            // Pausa pequeña para no saturar rclone/DB
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+        htmlBody += `</ul><p>Total procesados: ${successCount} éxitos, ${failCount} errores.</p>`;
 
-        await sendEmail('directorti@millasiete.com', 'Alerta: Novedades no subidas a Drive', htmlBody);
-        logs.push(`Alerta enviada a directorti@millasiete.com.`);
+        logs.push(`Proceso completado. Éxitos: ${successCount}. Errores: ${failCount}.`);
+        await sendEmail('directorti@millasiete.com', 'Reporte: Auto-Subida de Novedades a Drive', htmlBody);
+        logs.push(`Reporte enviado a directorti@millasiete.com.`);
     } catch (err: any) {
         logs.push(`ERROR CRÍTICO: ${err.message}`);
     }
