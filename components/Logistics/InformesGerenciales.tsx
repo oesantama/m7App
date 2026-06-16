@@ -2461,9 +2461,7 @@ export const InformesGerenciales: React.FC = () => {
                     const monthsSet = new Set<string>();
 
                     pendingRows.forEach(r => {
-                      const doc = r.client_document ? String(r.client_document).trim().toUpperCase() : 'S/I';
-                      const match = provClientes.find(pc => String(pc.documento).trim().toUpperCase() === doc);
-                      const clientName = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
+                      const clientName = r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I';
 
                       let d = new Date(r.manifest_date);
                       if (isNaN(d.getTime())) d = new Date(); // fallback
