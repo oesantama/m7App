@@ -118,10 +118,10 @@ export const uploadReports = async (req: Request, res: Response) => {
       const isTdm = clientUpper.includes('TDM') || clientDoc.includes('890901352');
 
       if (isAjover) {
-        if (rawOrigin.includes('ESTRELLA')) {
-          clientName = 'AJOVER M7_BODEGA36';
-        } else if (rawOrigin.includes('CALI')) {
+        if (rawOrigin.includes('CALI')) {
           clientName = 'AJOVER CALI M7 LINA';
+        } else {
+          clientName = 'AJOVER M7_BODEGA36';
         }
       } else if (isTdm) {
         if (rawOrigin.includes('ESTRELLA')) {

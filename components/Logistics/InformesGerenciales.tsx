@@ -558,13 +558,13 @@ export const InformesGerenciales: React.FC = () => {
           const isTdm = clientUpper.includes('TDM') || docVal.includes('890901352');
 
           if (isAjover) {
-            if (originUpper.includes('ESTRELLA')) {
-              clientName = 'AJOVER M7_BODEGA36';
+            if (originUpper.includes('CALI')) {
+              clientName = 'AJOVER CALI M7 LINA';
               row[clientKey] = clientName;
               row['Nombre Cliente'] = clientName;
               row.clientName = clientName;
-            } else if (originUpper.includes('CALI')) {
-              clientName = 'AJOVER CALI M7 LINA';
+            } else {
+              clientName = 'AJOVER M7_BODEGA36';
               row[clientKey] = clientName;
               row['Nombre Cliente'] = clientName;
               row.clientName = clientName;
