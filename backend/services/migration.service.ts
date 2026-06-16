@@ -231,7 +231,8 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
     'manifest_observations', 'manifest_status', 'manifest_date', 'plate', 
     'client_name', 'total_value_cxc_final', 'total_value_cxp_final', 
     'invoice_cxc', 'receipt', 'invoice_date', 'total_cxc', 'egress', 
-    'cxp_date', 'total_cxp', 'created_by', 'created_at', 'updated_at', 'client_document'
+    'cxp_date', 'total_cxp', 'created_by', 'created_at', 'updated_at', 'client_document',
+    'origin', 'destination'
   ]
 };
 
