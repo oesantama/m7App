@@ -21,6 +21,18 @@ interface DataTableProps<T> {
   excelSheetName?: string;
   onExportExcel?: (exportRows: Record<string, any>[], sortedData: T[]) => void;
   renderExpandedRow?: (row: T) => React.ReactNode;
+  
+  // Opciones de Server-Side
+  serverSide?: boolean;
+  totalRows?: number;
+  currentPage?: number;
+  pageSize?: number | 'all';
+  onPageChange?: (page: number) => void;
+  onPageSizeChange?: (size: number | 'all') => void;
+  onSort?: (key: string, direction: 'asc' | 'desc') => void;
+  onSearch?: (term: string) => void;
+  loading?: boolean;
+  hideTopControls?: boolean;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -31,6 +43,16 @@ export function DataTable<T extends Record<string, any>>({
   excelSheetName = 'Datos',
   onExportExcel,
   renderExpandedRow,
+  serverSide = false,
+  totalRows,
+  currentPage: externalCurrentPage,
+  pageSize: externalPageSize,
+  onPageChange,
+  onPageSizeChange,
+  onSort,
+  onSearch,
+  loading = false,
+  hideTopControls = false,
 }: DataTableProps<T>) {
   // Búsqueda
   const [searchTerm, setSearchTerm] = useState('');
@@ -43,8 +65,13 @@ export function DataTable<T extends Record<string, any>>({
   const [pageSize, setPageSize] = useState<number | 'all'>(5);
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Estado real usando props externos si existen
+  const actualCurrentPage = serverSide && externalCurrentPage !== undefined ? externalCurrentPage : currentPage;
+  const actualPageSize = serverSide && externalPageSize !== undefined ? externalPageSize : pageSize;
+
   // 1. Filtrar los datos basados en la búsqueda
   const filteredData = useMemo(() => {
+    if (serverSide) return data; // Si es serverSide, los datos ya vienen filtrados
     if (!searchTerm.trim()) return data;
     const lowerSearch = searchTerm.toLowerCase();
 
@@ -54,10 +81,11 @@ export function DataTable<T extends Record<string, any>>({
         return String(val).toLowerCase().includes(lowerSearch);
       });
     });
-  }, [data, searchTerm]);
+  }, [data, searchTerm, serverSide]);
 
   // 2. Ordenar los datos filtrados
   const sortedData = useMemo(() => {
+    if (serverSide) return filteredData; // Si es serverSide, los datos ya vienen ordenados
     if (!sortKey) return filteredData;
 
     const sorted = [...filteredData];
@@ -90,41 +118,51 @@ export function DataTable<T extends Record<string, any>>({
     });
 
     return sorted;
-  }, [filteredData, sortKey, sortDirection]);
+  }, [filteredData, sortKey, sortDirection, serverSide]);
 
   // 3. Paginación de los datos ordenados
   const paginatedData = useMemo(() => {
-    if (pageSize === 'all') return sortedData;
-    const startIndex = (currentPage - 1) * pageSize;
-    return sortedData.slice(startIndex, startIndex + pageSize);
-  }, [sortedData, currentPage, pageSize]);
+    if (serverSide) return sortedData; // Si es serverSide, los datos ya vienen paginados
+    if (actualPageSize === 'all') return sortedData;
+    const startIndex = (actualCurrentPage - 1) * actualPageSize;
+    return sortedData.slice(startIndex, startIndex + actualPageSize);
+  }, [sortedData, actualCurrentPage, actualPageSize, serverSide]);
 
   // Calcular el total de páginas
   const totalPages = useMemo(() => {
-    if (pageSize === 'all') return 1;
-    return Math.ceil(sortedData.length / pageSize) || 1;
-  }, [sortedData.length, pageSize]);
+    if (actualPageSize === 'all') return 1;
+    if (serverSide && totalRows !== undefined) return Math.ceil(totalRows / (actualPageSize as number)) || 1;
+    return Math.ceil(sortedData.length / (actualPageSize as number)) || 1;
+  }, [sortedData.length, actualPageSize, serverSide, totalRows]);
 
   // Asegurar que la página actual no quede huérfana al cambiar el tamaño de página o búsqueda
   React.useEffect(() => {
-    if (currentPage > totalPages) {
+    if (!serverSide && actualCurrentPage > totalPages) {
       setCurrentPage(totalPages);
     }
-  }, [totalPages, currentPage]);
+  }, [totalPages, actualCurrentPage, serverSide]);
 
   // Manejar el cambio de orden al hacer clic en las cabeceras
   const handleSort = (key: string) => {
+    let newDirection: 'asc' | 'desc' = 'asc';
+    let newKey: string | null = key;
+
     if (sortKey === key) {
       if (sortDirection === 'asc') {
-        setSortDirection('desc');
+        newDirection = 'desc';
       } else {
-        setSortKey(null);
+        newKey = null;
       }
-    } else {
-      setSortKey(key);
-      setSortDirection('asc');
     }
-    setCurrentPage(1);
+
+    setSortKey(newKey);
+    setSortDirection(newDirection);
+
+    if (serverSide) {
+      if (onSort) onSort(newKey || '', newDirection);
+    } else {
+      setCurrentPage(1);
+    }
   };
 
   // Exportación a Excel genérica
@@ -192,7 +230,8 @@ export function DataTable<T extends Record<string, any>>({
   return (
     <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 p-6 md:p-8 animate-in fade-in duration-500">
       {/* Controles de Búsqueda, Acciones y Exportar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      {!hideTopControls && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="relative flex-1 max-w-md group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors w-5 h-5" />
           <input
@@ -200,8 +239,13 @@ export function DataTable<T extends Record<string, any>>({
             placeholder={searchPlaceholder}
             value={searchTerm}
             onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1);
+              const val = e.target.value;
+              setSearchTerm(val);
+              if (serverSide && onSearch) {
+                onSearch(val);
+              } else {
+                setCurrentPage(1);
+              }
             }}
             className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all"
           />
@@ -212,7 +256,7 @@ export function DataTable<T extends Record<string, any>>({
           <div className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl flex items-center gap-2">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total:</span>
             <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-black">
-              {sortedData.length}
+              {serverSide && totalRows !== undefined ? totalRows : sortedData.length}
             </span>
           </div>
 
@@ -225,6 +269,7 @@ export function DataTable<T extends Record<string, any>>({
           </button>
         </div>
       </div>
+      )}
 
       {/* Contenedor de la Tabla */}
       <div className="overflow-x-auto rounded-3xl border border-slate-100">
@@ -264,7 +309,16 @@ export function DataTable<T extends Record<string, any>>({
               })}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-slate-100 relative">
+            {loading && (
+              <tr>
+                <td colSpan={columns.length} className="p-0 border-0 h-1">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-slate-100 overflow-hidden">
+                    <div className="h-full bg-indigo-500 animate-pulse w-1/3"></div>
+                  </div>
+                </td>
+              </tr>
+            )}
             {paginatedData.length > 0 ? (
               paginatedData.map((row, rIdx) => {
                 const rowId = row.id || rIdx;
@@ -329,11 +383,16 @@ export function DataTable<T extends Record<string, any>>({
         <div className="flex items-center gap-3">
           <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ver:</span>
           <select
-            value={pageSize}
+            value={actualPageSize}
             onChange={(e) => {
               const val = e.target.value;
-              setPageSize(val === 'all' ? 'all' : Number(val));
-              setCurrentPage(1);
+              const newSize = val === 'all' ? 'all' : Number(val);
+              setPageSize(newSize);
+              if (serverSide && onPageSizeChange) {
+                onPageSizeChange(newSize);
+              } else {
+                setCurrentPage(1);
+              }
             }}
             className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100 transition-all cursor-pointer"
           >
@@ -347,13 +406,17 @@ export function DataTable<T extends Record<string, any>>({
         </div>
 
         {/* Botones de Navegación de Página */}
-        {pageSize !== 'all' && totalPages > 1 && (
+        {actualPageSize !== 'all' && totalPages > 1 && (
           <div className="flex items-center gap-1.5">
             <button
-              onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
-              disabled={currentPage === 1}
+              onClick={() => {
+                const newPage = Math.max(actualCurrentPage - 1, 1);
+                setCurrentPage(newPage);
+                if (serverSide && onPageChange) onPageChange(newPage);
+              }}
+              disabled={actualCurrentPage === 1}
               className={`p-2.5 rounded-xl border transition-all ${
-                currentPage === 1
+                actualCurrentPage === 1
                   ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed'
                   : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 active:scale-95'
               }`}
@@ -362,14 +425,18 @@ export function DataTable<T extends Record<string, any>>({
             </button>
 
             <span className="px-4 text-xs font-bold text-slate-500">
-              Página {currentPage} de {totalPages}
+              Página {actualCurrentPage} de {totalPages}
             </span>
 
             <button
-              onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
-              disabled={currentPage === totalPages}
+              onClick={() => {
+                const newPage = Math.min(actualCurrentPage + 1, totalPages);
+                setCurrentPage(newPage);
+                if (serverSide && onPageChange) onPageChange(newPage);
+              }}
+              disabled={actualCurrentPage === totalPages}
               className={`p-2.5 rounded-xl border transition-all ${
-                currentPage === totalPages
+                actualCurrentPage === totalPages
                   ? 'bg-slate-50 border-slate-100 text-slate-300 cursor-not-allowed'
                   : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 active:scale-95'
               }`}

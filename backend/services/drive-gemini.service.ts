@@ -88,7 +88,6 @@ export const syncDriveCumplidos = async () => {
             const localPath = path.join(tmpDir, doc.file_name);
             const remotePath = `gdrive_cumplidos:${doc.drive_path}/${doc.file_name}`;
 
-            // Retraso de 4.5 segundos para no saturar la cuota gratuita de Gemini (15 RPM)
             if (i > 0) {
                 console.log(`[M7-CRON] Esperando 4.5s para no exceder cuota de Gemini...`);
                 await new Promise(resolve => setTimeout(resolve, 4500));
@@ -99,11 +98,9 @@ export const syncDriveCumplidos = async () => {
                 console.log(`[M7-CRON] Descargando ${doc.file_name}...`);
                 await execAsync(`rclone copyto "${remotePath}" "${localPath}"`);
 
-                // Leer archivo y convertir a Base64
                 const fileBuffer = fs.readFileSync(localPath);
                 const base64Data = fileBuffer.toString('base64');
 
-                // IA Prompt (El mismo del frontend)
                 const systemPrompt = `
 Eres un asistente experto en extracción de datos tabulares a JSON.
 Analiza esta planilla de despacho y extrae TODOS los registros en formato JSON.
@@ -137,21 +134,48 @@ Campos exactos por cada fila:
 - notas (Extraer observaciones)
 `;
 
-                const genAI = new GoogleGenerativeAI(keys[keyIndex % keys.length]);
-                const modelIA = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+                let fileSuccess = false;
+                let attempts = 0;
+                let matches: any[] = [];
+                
+                while (!fileSuccess && attempts < keys.length) {
+                    try {
+                        const currentKey = keys[keyIndex % keys.length];
+                        const genAI = new GoogleGenerativeAI(currentKey);
+                        const modelIA = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-                console.log(`[M7-CRON] Analizando ${doc.file_name} con IA...`);
-                const result = await modelIA.generateContent([
-                    systemPrompt,
-                    { inlineData: { data: base64Data, mimeType: "application/pdf" } }
-                ]);
-                
-                const responseText = await result.response.text();
-                
-                // Extraer JSON de la respuesta
-                const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-                const parsed = JSON.parse(cleanJsonStr);
-                const matches = parsed.matches || (Array.isArray(parsed) ? parsed : []);
+                        console.log(`[M7-CRON] Analizando ${doc.file_name} con IA (Intento ${attempts + 1})...`);
+                        const result = await modelIA.generateContent([
+                            systemPrompt,
+                            { inlineData: { data: base64Data, mimeType: "application/pdf" } }
+                        ]);
+                        
+                        const responseText = await result.response.text();
+                        const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+                        const parsed = JSON.parse(cleanJsonStr);
+                        matches = parsed.matches || (Array.isArray(parsed) ? parsed : []);
+                        fileSuccess = true;
+                    } catch (apiErr: any) {
+                        lastFileError = apiErr.message || 'Error desconocido';
+                        console.error(`[M7-CRON] Error API procesando ${doc.file_name}:`, lastFileError);
+                        
+                        if (lastFileError.includes('429')) {
+                            console.log(`[M7-CRON] Cuota excedida (429). Rotando llave...`);
+                            keyIndex++;
+                            attempts++;
+                            if (attempts < keys.length) {
+                                await new Promise(r => setTimeout(r, 2000)); // Breve pausa antes de reintentar con nueva llave
+                            }
+                        } else {
+                            // Otro error (ej. JSON parse error), no reintentar
+                            break;
+                        }
+                    }
+                }
+
+                if (!fileSuccess) {
+                    throw new Error(lastFileError);
+                }
 
                 if (Array.isArray(matches) && matches.length > 0) {
                     const client = await pool.connect();
@@ -194,26 +218,21 @@ Campos exactos por cada fila:
             } catch (err: any) {
                 failedCount++;
                 lastFileError = err.message || 'Error desconocido';
-                console.error(`[M7-CRON] Error procesando ${doc.file_name}:`, lastFileError);
+                console.error(`[M7-CRON] Fallo definitivo en ${doc.file_name}:`, lastFileError);
             } finally {
                 processedCount++;
-                // Borrar archivo temporal
                 if (fs.existsSync(localPath)) {
                     fs.unlinkSync(localPath);
                 }
             }
             
-            // Manejar error 429 de forma segura
+            // Si el último error es de cuota y se agotaron los intentos, abortar todo el cron
             if (lastFileError && lastFileError.includes('429')) {
-                keyIndex++; // Rotar llave si hay límite de cuota
-                if (keyIndex >= keys.length) {
-                    console.warn('[M7-CRON] Se agotaron todas las API Keys por límite de cuota. Abortando lote...');
-                    errorMessage = 'Cuota Gemini excedida (429). Pausado hasta el próximo ciclo.';
-                    break; // Salir del bucle for, no seguir intentando
-                }
+                console.warn('[M7-CRON] Se agotaron todas las API Keys por límite de cuota (429). Abortando lote...');
+                errorMessage = 'Cuota Gemini excedida (429) en todas las llaves. Pausado hasta el próximo ciclo.';
+                break;
             }
 
-            // Pausa para evitar rate limits (si no hubo break)
             await new Promise(r => setTimeout(r, 4000));
         }
 
@@ -221,6 +240,8 @@ Campos exactos por cada fila:
         if (failedCount > 0 && !errorMessage) {
             errorMessage = `Último error de archivo: ${lastFileError}`;
             if (savedCount === 0) status = 'ERROR';
+        } else if (errorMessage && errorMessage.includes('429')) {
+            status = 'ERROR';
         }
         console.log('[M7-CRON] Sincronización finalizada.');
 

@@ -72,8 +72,8 @@ export const uploadReports = async (req: Request, res: Response) => {
         manifest_observations, manifest_status, manifest_date, plate,
         client_name, total_value_cxc_final, total_value_cxp_final,
         invoice_cxc, receipt, invoice_date, total_cxc, egress,
-        cxp_date, total_cxp, created_by, updated_at, client_document, city
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, CURRENT_TIMESTAMP, $25, $26)
+        cxp_date, total_cxp, created_by, updated_at, client_document, city, origin
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, CURRENT_TIMESTAMP, $25, $26, $27)
       ON CONFLICT (oc_number) DO UPDATE SET
         oc_status = EXCLUDED.oc_status,
         oc_date = EXCLUDED.oc_date,
@@ -99,6 +99,7 @@ export const uploadReports = async (req: Request, res: Response) => {
         total_cxp = EXCLUDED.total_cxp,
         client_document = EXCLUDED.client_document,
         city = EXCLUDED.city,
+        origin = EXCLUDED.origin,
         updated_at = CURRENT_TIMESTAMP;
     `;
 
@@ -106,6 +107,31 @@ export const uploadReports = async (req: Request, res: Response) => {
     for (const row of records) {
       const oc_number = cleanStr(row.ocNumber || row['Número OC']);
       if (!oc_number) continue; // Skip rows without unique purchase order number
+
+      let clientName = cleanStr(row.clientName || row['Nombre Cliente']);
+      const clientDoc = cleanStr(row.clientDocument || row['Documento Cliente'] || row['NIT Cliente'] || row['Nit Cliente'] || row['NIT cliente'] || row['Documento cliente']);
+      const rawOrigin = cleanStr(row.origin || row['Origen'] || row['origen'] || row['ORIGEN'] || '').toUpperCase();
+      const originDest = cleanStr(row.city || row['Destino'] || row['destino'] || row['DESTINO'] || row['Origen'] || row['origen'] || '').toUpperCase();
+
+      const clientUpper = clientName.toUpperCase();
+      const isAjover = clientUpper.includes('AJOVER') || clientDoc.includes('860013771');
+      const isTdm = clientUpper.includes('TDM') || clientDoc.includes('890901352');
+
+      if (isAjover) {
+        if (rawOrigin.includes('ESTRELLA')) {
+          clientName = 'AJOVER M7_BODEGA36';
+        } else if (rawOrigin.includes('CALI')) {
+          clientName = 'AJOVER CALI M7 LINA';
+        }
+      } else if (isTdm) {
+        if (rawOrigin.includes('ESTRELLA')) {
+          clientName = 'AJOVER_BODEGA10';
+        } else if (rawOrigin.includes('CALI')) {
+          clientName = 'AJOVER CALI DIANA LOBATON';
+        } else if (rawOrigin.includes('GIRARDOTA')) {
+          clientName = 'TDM (PREBEL)';
+        }
+      }
 
       const values = [
         oc_number,
@@ -121,7 +147,7 @@ export const uploadReports = async (req: Request, res: Response) => {
         cleanStr(row.manifestStatus || row['Estado Manifiesto']),
         parseDate(row.manifestDate || row['Fecha Manifiesto']),
         cleanStr(row.plate || row['Placa']),
-        cleanStr(row.clientName || row['Nombre Cliente']),
+        clientName,
         parseNum(row.totalValueCxcFinal || row['Valor Total CXC final']),
         parseNum(row.totalValueCxpFinal || row['Valor Tot CXP final']),
         cleanStr(row.invoiceCxc || row['Factura CXC']),
@@ -132,8 +158,9 @@ export const uploadReports = async (req: Request, res: Response) => {
         parseDate(row.cxpDate || row['Fecha CXP']),
         parseNum(row.totalCxp || row['Total CXP']),
         user,
-        cleanStr(row.clientDocument || row['Documento Cliente'] || row['NIT Cliente'] || row['Nit Cliente'] || row['NIT cliente'] || row['Documento cliente']),
-        cleanStr(row.city || row['Destino'] || row['destino'] || row['DESTINO'] || row['Origen'] || row['origen'] || '').toUpperCase() || null
+        clientDoc,
+        originDest || null,
+        rawOrigin || null
       ];
 
       await client.query(insertQuery, values);
@@ -160,7 +187,7 @@ export const getReports = async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 10;
     const offset = (page - 1) * limit;
 
-    const { ocNumber, manifestNumber, plate, clientName, fromDate, toDate, sortBy, sortDirection } = req.query;
+    const { ocNumber, manifestNumber, plate, clientName, clientNames, fromDate, toDate, sortBy, sortDirection } = req.query;
 
     const conditions: string[] = [];
     const values: any[] = [];
@@ -194,6 +221,14 @@ export const getReports = async (req: Request, res: Response) => {
     if (clientName) {
       conditions.push(`client_name ILIKE $${counter++}`);
       values.push(`%${clientName}%`);
+    }
+    if (clientNames) {
+      const names = (clientNames as string).split(',').filter(n => n.trim() !== '');
+      if (names.length > 0) {
+        const orConditions = names.map(() => `client_name ILIKE $${counter++}`).join(' OR ');
+        conditions.push(`(${orConditions})`);
+        values.push(...names.map(n => `%${n}%`));
+      }
     }
     if (fromDate) {
       conditions.push(`(manifest_date AT TIME ZONE 'America/Bogota')::date >= $${counter++}`);
@@ -379,5 +414,22 @@ export const uploadEgressDates = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Error al actualizar las fechas de egreso', details: err.message });
   } finally {
     client.release();
+  }
+};
+
+export const getManagementClients = async (req: Request, res: Response) => {
+  try {
+    const query = `
+      SELECT DISTINCT client_name 
+      FROM management_orders 
+      WHERE client_name IS NOT NULL AND client_name != ''
+      ORDER BY client_name ASC;
+    `;
+    const result = await pool.query(query);
+    const clients = result.rows.map(row => row.client_name);
+    res.json(clients);
+  } catch (err: any) {
+    console.error('[M7-MGT-CLIENTS-ERR]', err);
+    res.status(500).json({ error: 'Error al obtener los clientes' });
   }
 };

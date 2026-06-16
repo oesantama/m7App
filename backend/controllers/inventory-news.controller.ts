@@ -347,10 +347,11 @@ export const processAndUploadNovedad = async (docId: string, clientName: string,
         exec(`rclone link "${remoteFile}"`, (_, stdout) => resolve((stdout || '').trim()));
     });
 
+    const finalUserId = (userId === 'SYSTEM' || userId === 'CRON_SYSTEM') ? null : userId;
     await pool.query(
         `INSERT INTO document_drive_logs (user_id, client_id, file_name, drive_path, drive_link, category, folder_date)
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [userId, doc.client_id || doc.clientId || null, fileName, drivePath, driveLink, 'NOVEDADES MILLA 7', driveDate || null]
+        [finalUserId, doc.client_id || doc.clientId || null, fileName, drivePath, driveLink, 'NOVEDADES MILLA 7', driveDate || null]
     );
 
     fs.unlink(tmpPath, () => {});

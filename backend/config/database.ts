@@ -1,5 +1,13 @@
-import { Pool } from 'pg';
+import { Pool, types } from 'pg';
 import dotenv from 'dotenv';
+
+// DATE (OID 1082): return raw string "YYYY-MM-DD" to prevent pg from converting
+// it to a JS Date object (which serializes as ISO timestamp with UTC offset).
+types.setTypeParser(1082, (val: string) => val);
+// TIMESTAMP WITHOUT TIME ZONE (OID 1114): return raw string so Colombian local
+// times stored in dogama tables are NOT shifted to UTC by the Node.js TZ offset.
+// Without this, TZ=America/Bogota causes '12:20:22' → 'T17:20:22Z' in JSON.
+types.setTypeParser(1114, (val: string) => val);
 
 dotenv.config();
 

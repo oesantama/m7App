@@ -111,10 +111,11 @@ export const saveCiudad = async (req: Request, res: Response) => {
         [nombre, idDepartamento, estado, usuarioControl || 'System', id]
       );
     } else {
-      await pool.query(
-        `INSERT INTO cfg_ciudades (nombre, id_departamento, estado, usuario_control, fecha_control) VALUES ($1,$2,$3,$4,CURRENT_TIMESTAMP)`,
+      const inserted = await pool.query(
+        `INSERT INTO cfg_ciudades (nombre, id_departamento, estado, usuario_control, fecha_control) VALUES ($1,$2,$3,$4,CURRENT_TIMESTAMP) RETURNING id, nombre`,
         [nombre, idDepartamento, estado, usuarioControl || 'System']
       );
+      return res.json({ success: true, id: inserted.rows[0].id, nombre: inserted.rows[0].nombre });
     }
     res.json({ success: true });
   } catch (err: any) {

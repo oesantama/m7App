@@ -3,7 +3,7 @@ import {
   Upload, X, Search, Calendar, Filter, 
   CheckCircle2, RefreshCw, ChevronLeft, ChevronRight, 
   FileSpreadsheet, HelpCircle, BarChart3, ChevronDown, AlertCircle,
-  Download, Eye, Truck, FileText
+  Download, Eye, Truck, FileText, Check
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
@@ -89,6 +89,7 @@ export const InformesGerenciales: React.FC = () => {
   const [provClientes, setProvClientes] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
+  const [managementClients, setManagementClients] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchOnMount = async () => {
@@ -116,6 +117,14 @@ export const InformesGerenciales: React.FC = () => {
       } catch (err) {
         console.error("Error loading clients:", err);
       }
+      try {
+        const mgtClients = await (api as any).getManagementClients();
+        if (Array.isArray(mgtClients)) {
+          setManagementClients(mgtClients);
+        }
+      } catch (err) {
+        console.error("Error loading management clients:", err);
+      }
     };
     fetchOnMount();
   }, []);
@@ -124,7 +133,7 @@ export const InformesGerenciales: React.FC = () => {
   const [rightChartGroupBy, setRightChartGroupBy] = useState<'oc' | 'manifiesto'>('manifiesto');
   const [tdmSearchQuery, setTdmSearchQuery] = useState('');
   const [tdmSortField, setTdmSortField] = useState<
-    'clientName' | 'ventaTotal' | 'ingTerceros' | 'ingresosPropios' | 'int' | 'participation' | 'invoicedSameMonthVal' | 'invoicedSameMonthPct' | 'averagePaymentDays' | 'workedDaysCount' | 'totalVehicleUtilizations' | 'averageVehiclesPerDay' | 'averageRecDays' | 'averageEgrDays' | 'averageManRecDays' | 'receivedValue' | 'receivedPct'
+    'clientName' | 'ventaTotal' | 'ingTerceros' | 'ingresosPropios' | 'int' | 'participation' | 'invoicedSameMonthVal' | 'invoicedSameMonthPct' | 'averagePaymentDays' | 'workedDaysCount' | 'totalVehicleUtilizations' | 'averageVehiclesPerDay' | 'averageRecDays' | 'averageEgrDays' | 'averageManRecDays' | 'receivedValue' | 'receivedDiffMonth' | 'receivedPct'
   >('ventaTotal');
   const [tdmSortDirection, setTdmSortDirection] = useState<'asc' | 'desc'>('desc');
 
@@ -210,6 +219,19 @@ export const InformesGerenciales: React.FC = () => {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportRecords, setReportRecords] = useState<ManagementOrder[]>([]);
   const [selectedClientChartName, setSelectedClientChartName] = useState<string | null>(null);
+  const [reportSelectedClients, setReportSelectedClients] = useState<string[]>(['ALL']);
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target as Node)) {
+        setIsClientDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Expanded tree states
   const [expandedOcs, setExpandedOcs] = useState<{ [key: string]: boolean }>({});
@@ -217,8 +239,8 @@ export const InformesGerenciales: React.FC = () => {
   const [expandedManifests, setExpandedManifests] = useState<{ [key: string]: boolean }>({});
   const [expandedClients, setExpandedClients] = useState<{ [key: string]: boolean }>({});
 
-  // Check if dates are fully selected (Both needed to query)
-  const isReportDateRangeComplete = reportFromDate !== '' && reportToDate !== '';
+  // Check if dates or clients are selected to allow query
+  const canGenerateReport = (reportFromDate !== '' && reportToDate !== '') || (reportSelectedClients.length > 0 && !reportSelectedClients.includes('ALL'));
 
   // 25 columns configuration mapping for general import, receipts and egresses
   const columnsConfig = [
@@ -298,8 +320,8 @@ export const InformesGerenciales: React.FC = () => {
 
   // Hierarchical Report Generator (Both States and Clients trees in one pass)
   const generateReport = async () => {
-    if (!isReportDateRangeComplete) {
-      return; // Hold execution as requested until both date bounds are selected
+    if (!canGenerateReport) {
+      return; // Hold execution as requested until valid bounds are selected
     }
 
     setReportLoading(true);
@@ -308,7 +330,8 @@ export const InformesGerenciales: React.FC = () => {
         page: 1,
         limit: 50000,
         fromDate: reportFromDate,
-        toDate: reportToDate
+        toDate: reportToDate,
+        clientNames: reportSelectedClients.includes('ALL') ? undefined : reportSelectedClients.join(',')
       });
 
       const recordsList: ManagementOrder[] = res.records || [];
@@ -406,12 +429,7 @@ export const InformesGerenciales: React.FC = () => {
     }
   };
 
-  // Re-generate report only when dates are fully selected and changed
-  useEffect(() => {
-    if (activeTab === 'informes') {
-      generateReport();
-    }
-  }, [activeTab, reportFromDate, reportToDate]);
+
 
   // Expanded Tree toggles
   const toggleOc = (ocName: string) => {
@@ -530,20 +548,34 @@ export const InformesGerenciales: React.FC = () => {
           const origenVal = String(row[origenKey] || '').trim();
           const descVal = String(row[descKey] || '').trim();
 
-          if (clientName.toUpperCase() === 'TDM TRANSPORTES S.A.S') {
-            const originUpper = origenVal.toUpperCase();
-            const descLower = descVal.toLowerCase();
+          const clientUpper = clientName.toUpperCase();
+          const originUpper = origenVal.toUpperCase();
+          
+          const docKey = Object.keys(row).find(k => k.toLowerCase() === 'documento cliente' || k.toLowerCase().includes('nit')) || 'Documento Cliente';
+          const docVal = String(row[docKey] || '').trim();
 
-            if (originUpper === 'CALI') {
-              clientName = 'TDM (DIANA - CALI)';
-            } else if (originUpper === 'GIRARDOTA') {
+          const isAjover = clientUpper.includes('AJOVER') || docVal.includes('860013771');
+          const isTdm = clientUpper.includes('TDM') || docVal.includes('890901352');
+
+          if (isAjover) {
+            if (originUpper.includes('ESTRELLA')) {
+              clientName = 'AJOVER M7_BODEGA36';
+              row[clientKey] = clientName;
+              row['Nombre Cliente'] = clientName;
+              row.clientName = clientName;
+            } else if (originUpper.includes('CALI')) {
+              clientName = 'AJOVER CALI M7 LINA';
+              row[clientKey] = clientName;
+              row['Nombre Cliente'] = clientName;
+              row.clientName = clientName;
+            }
+          } else if (isTdm) {
+            if (originUpper.includes('ESTRELLA')) {
+              clientName = 'AJOVER_BODEGA10';
+            } else if (originUpper.includes('CALI')) {
+              clientName = 'AJOVER CALI DIANA LOBATON';
+            } else if (originUpper.includes('GIRARDOTA')) {
               clientName = 'TDM (PREBEL)';
-            } else if (originUpper === 'LA ESTRELLA') {
-              if (descLower.includes('plan normal medellin')) {
-                clientName = 'TDM (MULAS - MEDELLIN)';
-              } else {
-                clientName = 'TDM (BOG 10 - MEDELLIN)';
-              }
             }
             
             row[clientKey] = clientName;
@@ -1004,6 +1036,7 @@ export const InformesGerenciales: React.FC = () => {
         totalManRecDays: number;
         manRecDaysCount: number;
         receivedValue: number;
+        receivedDiffMonth: number;
       } 
     } = {};
 
@@ -1050,7 +1083,8 @@ export const InformesGerenciales: React.FC = () => {
           egrDaysCount: 0,
           totalManRecDays: 0,
           manRecDaysCount: 0,
-          receivedValue: 0
+          receivedValue: 0,
+          receivedDiffMonth: 0
         };
       }
 
@@ -1088,9 +1122,9 @@ export const InformesGerenciales: React.FC = () => {
         clientsMap[client].recDaysCount += 1;
       }
 
-      // 2. prom dias egreso (receipt to egress)
-      if (dRec && dEgr) {
-        const diffMs = dEgr.getTime() - dRec.getTime();
+      // 2. prom dias egreso (manifest to egress) -> Updated per user request
+      if (dMan && dEgr) {
+        const diffMs = dEgr.getTime() - dMan.getTime();
         const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
         clientsMap[client].totalEgrDays += diffDays;
         clientsMap[client].egrDaysCount += 1;
@@ -1105,7 +1139,17 @@ export const InformesGerenciales: React.FC = () => {
       }
 
       if (dRec) {
-        clientsMap[client].receivedValue += ventaRecord;
+        const invStr = r.invoice_cxc ? String(r.invoice_cxc).trim().toUpperCase() : '';
+        const hasInvoice = invStr !== '' && invStr !== '0' && invStr !== 'S/I' && invStr !== 'N/A' && !invStr.includes('SIN FACTURA') && invStr !== 'NO APLICA';
+        if (hasInvoice && dInv && dMan) {
+          if (dMan.getFullYear() === dInv.getFullYear() && dMan.getMonth() === dInv.getMonth()) {
+            clientsMap[client].receivedValue += ventaRecord;
+          } else {
+            clientsMap[client].receivedDiffMonth += ventaRecord;
+          }
+        } else {
+          clientsMap[client].receivedDiffMonth += ventaRecord;
+        }
       }
 
       if (plate) {
@@ -1177,6 +1221,7 @@ export const InformesGerenciales: React.FC = () => {
         averageEgrDays,
         averageManRecDays,
         receivedValue,
+        receivedDiffMonth: node.receivedDiffMonth,
         receivedPct
       };
     }).sort((a, b) => {
@@ -1213,6 +1258,7 @@ export const InformesGerenciales: React.FC = () => {
         totalManRecDays: number;
         manRecDaysCount: number;
         receivedValue: number;
+        receivedDiffMonth: number;
       } 
     } = {};
 
@@ -1252,7 +1298,8 @@ export const InformesGerenciales: React.FC = () => {
           egrDaysCount: 0,
           totalManRecDays: 0,
           manRecDaysCount: 0,
-          receivedValue: 0
+          receivedValue: 0,
+          receivedDiffMonth: 0
         };
       }
 
@@ -1290,9 +1337,9 @@ export const InformesGerenciales: React.FC = () => {
         clientsMap[client].recDaysCount += 1;
       }
 
-      // 2. prom dias egreso (receipt to egress)
-      if (dRec && dEgr) {
-        const diffMs = dEgr.getTime() - dRec.getTime();
+      // 2. prom dias egreso (manifest to egress) -> Updated per user request
+      if (dMan && dEgr) {
+        const diffMs = dEgr.getTime() - dMan.getTime();
         const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
         clientsMap[client].totalEgrDays += diffDays;
         clientsMap[client].egrDaysCount += 1;
@@ -1307,7 +1354,17 @@ export const InformesGerenciales: React.FC = () => {
       }
 
       if (dRec) {
-        clientsMap[client].receivedValue += ventaRecord;
+        const invStr = r.invoice_cxc ? String(r.invoice_cxc).trim().toUpperCase() : '';
+        const hasInvoice = invStr !== '' && invStr !== '0' && invStr !== 'S/I' && invStr !== 'N/A' && !invStr.includes('SIN FACTURA') && invStr !== 'NO APLICA';
+        if (hasInvoice && dInv && dMan) {
+          if (dMan.getFullYear() === dInv.getFullYear() && dMan.getMonth() === dInv.getMonth()) {
+            clientsMap[client].receivedValue += ventaRecord;
+          } else {
+            clientsMap[client].receivedDiffMonth += ventaRecord;
+          }
+        } else {
+          clientsMap[client].receivedDiffMonth += ventaRecord;
+        }
       }
 
       if (plate) {
@@ -1379,6 +1436,7 @@ export const InformesGerenciales: React.FC = () => {
         averageEgrDays,
         averageManRecDays,
         receivedValue,
+        receivedDiffMonth: node.receivedDiffMonth,
         receivedPct
       };
     }).sort((a, b) => {
@@ -2228,23 +2286,78 @@ export const InformesGerenciales: React.FC = () => {
                 />
               </div>
 
-              {isReportDateRangeComplete && (
+              <div className="flex flex-col space-y-1 relative" ref={clientDropdownRef}>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Cliente(s)</span>
+                
+                <div 
+                  onClick={() => setIsClientDropdownOpen(!isClientDropdownOpen)}
+                  className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-[10px] font-black text-slate-700 cursor-pointer min-w-[250px] h-[36px] flex justify-between items-center transition-colors hover:bg-slate-100"
+                >
+                  <span className="truncate max-w-[200px]">
+                    {reportSelectedClients.includes('ALL') 
+                      ? 'TODOS LOS CLIENTES' 
+                      : `${reportSelectedClients.length} SELECCIONADO(S)`}
+                  </span>
+                  <ChevronDown size={14} className={`text-slate-400 transition-transform ${isClientDropdownOpen ? 'rotate-180' : ''}`} />
+                </div>
+                
+                {isClientDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-1 w-full max-h-[300px] overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-2 custom-scrollbar">
+                    <div 
+                      onClick={() => setReportSelectedClients(['ALL'])}
+                      className={`px-4 py-2.5 text-[10px] font-black cursor-pointer hover:bg-slate-50 flex items-center gap-2.5 transition-colors ${reportSelectedClients.includes('ALL') ? 'text-indigo-600 bg-indigo-50/50' : 'text-slate-600'}`}
+                    >
+                      <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-colors ${reportSelectedClients.includes('ALL') ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
+                        {reportSelectedClients.includes('ALL') && <Check size={10} className="text-white" />}
+                      </div>
+                      TODOS
+                    </div>
+                    {managementClients.map((c, i) => {
+                      const isSelected = reportSelectedClients.includes(c);
+                      return (
+                        <div 
+                          key={i}
+                          onClick={() => {
+                            if (reportSelectedClients.includes('ALL')) {
+                              setReportSelectedClients([c]);
+                            } else if (isSelected) {
+                              const newSel = reportSelectedClients.filter(v => v !== c);
+                              setReportSelectedClients(newSel.length === 0 ? ['ALL'] : newSel);
+                            } else {
+                              setReportSelectedClients([...reportSelectedClients, c]);
+                            }
+                          }}
+                          className={`px-4 py-2.5 text-[10px] font-black cursor-pointer hover:bg-slate-50 flex items-center gap-2.5 transition-colors ${isSelected ? 'text-indigo-600 bg-indigo-50/50' : 'text-slate-600'}`}
+                        >
+                          <div className={`w-3.5 h-3.5 flex-shrink-0 rounded flex items-center justify-center border transition-colors ${isSelected ? 'bg-indigo-600 border-indigo-600' : 'border-slate-300'}`}>
+                            {isSelected && <Check size={10} className="text-white" />}
+                          </div>
+                          <span className="truncate">{c}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {canGenerateReport && (
                 <button
                   type="button"
                   onClick={() => {
                     setReportFromDate('');
                     setReportToDate('');
+                    setReportSelectedClients(['ALL']);
                   }}
                   className="self-end bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all"
                 >
-                  Limpiar Rango
+                  Limpiar Filtros
                 </button>
               )}
             </div>
 
             <button
               onClick={generateReport}
-              disabled={reportLoading || !isReportDateRangeComplete}
+              disabled={reportLoading || !canGenerateReport}
               className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-indigo-600/15 self-stretch md:self-auto justify-center transition-all disabled:opacity-40"
             >
               <RefreshCw className={reportLoading ? 'animate-spin' : ''} size={14} />
@@ -2253,15 +2366,15 @@ export const InformesGerenciales: React.FC = () => {
           </div>
 
           {/* RENDER BODY ONLY WHEN DATE RANGE IS SELECTED AS REQUESTED */}
-          {!isReportDateRangeComplete ? (
+          {!canGenerateReport ? (
             <div className="bg-white border border-slate-200/80 rounded-3xl p-20 text-center shadow-sm">
               <div className="flex flex-col items-center justify-center space-y-4 max-w-md mx-auto">
                 <div className="p-4 bg-indigo-50 text-indigo-600 rounded-full">
                   <Calendar size={32} />
                 </div>
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Selección de Rango de Fechas Obligatoria</h3>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wider">Selección de Filtros Requerida</h3>
                 <p className="text-xs text-slate-400 leading-relaxed">
-                  Para optimizar las consultas y evitar la carga accidental de miles de registros, **debe seleccionar tanto la Fecha Inicial como la Fecha Final** para ejecutar el consolidado gerencial.
+                  Para optimizar las consultas, **debe seleccionar tanto la Fecha Inicial como la Fecha Final** o **seleccionar uno o más clientes** para ejecutar el consolidado gerencial.
                 </p>
               </div>
             </div>
@@ -2282,293 +2395,6 @@ export const InformesGerenciales: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {(() => {
-                const ocBarData = getOcBarDataByMonth();
-                const clientBarData = getDynamicClientBarData(rightChartGroupBy, rightChartLimit);
-                return (
-                  <>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    
-                    {/* Chart 1: Estado Manifiesto distribution (Grouped by Month) */}
-                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col">
-                      <div className="border-b border-slate-100 pb-3 mb-3">
-                        <span className="text-[9px] font-black tracking-widest text-indigo-600 uppercase font-mono">Volúmenes Mensuales</span>
-                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 mt-0.5">ESTADO DE MANIFIESTO POR MES - Total: {reportRecords.length.toLocaleString()}</h3>
-                      </div>
-
-                      {/* Dynamic Title Badges for Left Chart */}
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {(() => {
-                          const totals: { [st: string]: number } = {};
-                          let grandTotal = 0;
-                          reportRecords.forEach(r => {
-                            const st = r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : 'S/I';
-                            totals[st] = (totals[st] || 0) + 1;
-                            grandTotal++;
-                          });
-                          return Object.entries(totals).map(([status, count]) => {
-                            const pct = grandTotal > 0 ? ((count / grandTotal) * 100).toFixed(1) : '0.0';
-                            return (
-                              <div key={status} className="px-2.5 py-1 bg-slate-50 border border-slate-200/60 rounded-lg text-[9px] font-black uppercase font-mono flex items-center gap-1.5 shadow-xs">
-                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                                <span className="text-slate-500">{status}:</span>
-                                <span className="text-indigo-600">{count.toLocaleString()} ({pct}%)</span>
-                              </div>
-                            );
-                          });
-                        })()}
-                      </div>
-
-                      <ResponsiveContainer width="100%" height={260}>
-                        <BarChart data={ocBarData.data} margin={{ top: 15 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                          <XAxis dataKey="month" stroke="#94a3b8" fontSize={9} tickLine={false} />
-                          <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} />
-                          <Tooltip 
-                            contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '10px' }} 
-                            itemStyle={{ color: '#fff' }}
-                          />
-                          <Legend 
-                            verticalAlign="bottom" 
-                            height={36} 
-                            iconType="circle"
-                            formatter={(value) => <span className="text-[9px] font-black text-slate-500 uppercase">{value}</span>}
-                          />
-                          {ocBarData.statuses.map((status, index) => (
-                            <Bar key={status} dataKey={status} fill={CHART_COLORS[index % CHART_COLORS.length]} radius={[4, 4, 0, 0]}>
-                              <LabelList dataKey={status} position="top" fill="#475569" fontSize={8} fontWeight="bold" formatter={(val) => Number(val) > 0 ? val : ''} />
-                            </Bar>
-                          ))}
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-
-                    {/* Chart 2: States per Client */}
-                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm overflow-hidden flex flex-col">
-                      <div className="border-b border-slate-100 pb-3 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                          <span className="text-[9px] font-black tracking-widest text-violet-600 uppercase font-mono">Volúmenes de Clientes</span>
-                          <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 mt-0.5">ESTADO DE MANIFIESTO por Cliente - Total: {reportRecords.length.toLocaleString()}</h3>
-                        </div>
-                        
-                        {/* Interactive Dimension & limit Switchers */}
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/80 shadow-xs">
-                            <button
-                              type="button"
-                              onClick={() => setRightChartGroupBy('manifiesto')}
-                              className={`px-2 py-1 text-[9px] font-black uppercase tracking-wide rounded-md transition-all ${
-                                rightChartGroupBy === 'manifiesto' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400 hover:text-slate-600'
-                              }`}
-                            >
-                              Manifiesto
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setRightChartGroupBy('oc')}
-                              className={`px-2 py-1 text-[9px] font-black uppercase tracking-wide rounded-md transition-all ${
-                                rightChartGroupBy === 'oc' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400 hover:text-slate-600'
-                              }`}
-                            >
-                              OC
-                            </button>
-                          </div>
-
-                          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/80 shadow-xs">
-                            <button
-                              type="button"
-                              onClick={() => setRightChartLimit('top10')}
-                              className={`px-2 py-1 text-[9px] font-black uppercase tracking-wide rounded-md transition-all ${
-                                rightChartLimit === 'top10' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400 hover:text-slate-600'
-                              }`}
-                            >
-                              Top 10
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setRightChartLimit('all')}
-                              className={`px-2 py-1 text-[9px] font-black uppercase tracking-wide rounded-md transition-all ${
-                                rightChartLimit === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400 hover:text-slate-600'
-                              }`}
-                            >
-                              Todos
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Dynamic Title Badges for Right Chart */}
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        {(() => {
-                          const totals: { [st: string]: number } = {};
-                          let grandTotal = 0;
-                          reportRecords.forEach(r => {
-                            const st = rightChartGroupBy === 'oc'
-                              ? (r.oc_status ? String(r.oc_status).trim().toUpperCase() : 'S/I')
-                              : (r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : 'S/I');
-                            totals[st] = (totals[st] || 0) + 1;
-                            grandTotal++;
-                          });
-                          return Object.entries(totals).map(([status, count]) => {
-                            const pct = grandTotal > 0 ? ((count / grandTotal) * 100).toFixed(1) : '0.0';
-                            return (
-                              <div key={status} className="px-2.5 py-1 bg-slate-50 border border-slate-200/60 rounded-lg text-[9px] font-black uppercase font-mono flex items-center gap-1.5 shadow-xs">
-                                <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
-                                <span className="text-slate-500">{status}:</span>
-                                <span className="text-violet-600">{count.toLocaleString()} ({pct}%)</span>
-                              </div>
-                            );
-                          });
-                        })()}
-                      </div>
-
-                      <div className="flex-1 overflow-x-auto">
-                        <div className={`${rightChartLimit === 'all' ? 'min-w-[2000px]' : 'w-full'} h-[280px]`}>
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart 
-                              data={clientBarData.data} 
-                              margin={{ bottom: 45 }}
-                              onClick={(state) => {
-                                if (state && state.activeLabel) {
-                                  setSelectedClientChartName(String(state.activeLabel));
-                                }
-                              }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                              <XAxis dataKey="client" stroke="#94a3b8" fontSize={8} tickLine={false} angle={-35} textAnchor="end" interval={0} style={{ cursor: 'pointer' }} />
-                              <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} />
-                              <Tooltip 
-                                contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '10px' }} 
-                                itemStyle={{ color: '#fff' }}
-                              />
-                              <Legend 
-                                verticalAlign="top" 
-                                height={36} 
-                                iconType="circle"
-                                formatter={(value) => <span className="text-[9px] font-black text-slate-500 uppercase">{value}</span>}
-                              />
-                              {clientBarData.statuses.map((status, index) => (
-                                <Bar 
-                                  key={status} 
-                                  dataKey={status} 
-                                  fill={CHART_COLORS[index % CHART_COLORS.length]} 
-                                  stackId="a"
-                                  style={{ cursor: 'pointer' }}
-                                >
-                                  <LabelList dataKey={status} position="inside" fill="#fff" fontSize={8} fontWeight="black" formatter={(val) => Number(val) > 0 ? val : ''} />
-                                </Bar>
-                              ))}
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    </div>
-
-                  </div>
-
-                  {/* Interactive Legend/Details Panel when a client is clicked */}
-                  {selectedClientChartName && (
-                    <div className="border border-violet-100 bg-violet-50/30 rounded-2xl p-6 shadow-sm animate-fadeIn">
-                      <div className="flex items-center justify-between border-b border-violet-100 pb-3 mb-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="p-2 bg-violet-600 text-white rounded-xl shadow-xs">
-                            <FileSpreadsheet size={18} />
-                          </div>
-                          <div>
-                            <span className="text-[9px] font-bold tracking-widest text-violet-600 uppercase font-mono">Detalle de Cliente Seleccionado</span>
-                            <h4 className="text-sm font-black uppercase text-slate-800">{selectedClientChartName}</h4>
-                          </div>
-                        </div>
-                        <button 
-                          type="button"
-                          onClick={() => setSelectedClientChartName(null)}
-                          className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all text-xs font-bold font-mono"
-                        >
-                          CERRAR ✕
-                        </button>
-                      </div>
-
-                      {/* Financial and Operating TDM Metrics (Sleek Grid) */}
-                      {(() => {
-                        const clientTdmData = getClientTdmTableData().find(
-                          x => x.clientName === selectedClientChartName
-                        );
-                        
-                        // Filter client's records for active statuses
-                        const clientRecords = reportRecords.filter(
-                          r => r.client_name?.trim().toUpperCase() === selectedClientChartName
-                        );
-                        
-                        const clientStatusTotals: { [st: string]: number } = {};
-                        clientRecords.forEach(r => {
-                          const st = rightChartGroupBy === 'oc'
-                            ? (r.oc_status ? String(r.oc_status).trim().toUpperCase() : 'S/I')
-                            : (r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : 'S/I');
-                          clientStatusTotals[st] = (clientStatusTotals[st] || 0) + 1;
-                        });
-
-                        return (
-                          <div className="flex flex-col gap-5">
-                            {/* Metrics Row */}
-                            {clientTdmData ? (
-                              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
-                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Venta Total</span>
-                                  <span className="text-xs font-black text-slate-800 block mt-0.5">{formatMoney(clientTdmData.ventaTotal)}</span>
-                                </div>
-                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
-                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Ing. Terceros</span>
-                                  <span className="text-xs font-black text-rose-600 block mt-0.5">{formatMoney(clientTdmData.ingTerceros)}</span>
-                                </div>
-                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
-                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Ing. Propios</span>
-                                  <span className="text-xs font-black text-emerald-600 block mt-0.5">{formatMoney(clientTdmData.ingresosPropios)}</span>
-                                </div>
-                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
-                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">INT (%)</span>
-                                  <span className="text-xs font-black text-indigo-600 block mt-0.5">{clientTdmData.int.toFixed(1)}%</span>
-                                </div>
-                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
-                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Días Lab.</span>
-                                  <span className="text-xs font-black text-slate-700 block mt-0.5">{clientTdmData.workedDaysCount} días</span>
-                                </div>
-                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
-                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Veh. Utilizados</span>
-                                  <span className="text-xs font-black text-slate-700 block mt-0.5">{clientTdmData.totalVehicleUtilizations}</span>
-                                </div>
-                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs col-span-2 lg:col-span-1">
-                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Promedio/Día</span>
-                                  <span className="text-xs font-black text-violet-600 block mt-0.5">{clientTdmData.averageVehiclesPerDay.toFixed(1)} veh/día</span>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="text-slate-400 text-[10px] italic">No hay datos financieros consolidados para este cliente (estatus anulado o sin transacciones válidas).</div>
-                            )}
-
-                            {/* Status Badges Row */}
-                            <div>
-                              <span className="text-[8px] font-bold text-slate-400 block uppercase mb-2">ESTADO DE MANIFIESTO ({rightChartGroupBy.toUpperCase()})</span>
-                              <div className="flex flex-wrap gap-2">
-                                {Object.entries(clientStatusTotals).map(([st, count]) => {
-                                  const pct = clientRecords.length > 0 ? ((count / clientRecords.length) * 100).toFixed(1) : '0.0';
-                                  return (
-                                    <div key={st} className="px-3.5 py-2 bg-white border border-slate-100 rounded-xl text-[10px] font-black uppercase font-mono flex items-center gap-2 shadow-2xs">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-violet-600 animate-pulse" />
-                                      <span className="text-slate-500">{st}:</span>
-                                      <span className="text-slate-800">{count} ({pct}%)</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </>
-              );
-            })()}
 
               {/* SUB-REPORT TAB SYSTEM SWITCHER */}
               <div className="flex border-b border-slate-200 bg-white p-1 rounded-xl gap-1 shadow-sm">
@@ -3260,6 +3086,293 @@ export const InformesGerenciales: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-8 animate-in fade-in duration-300">
+              {(() => {
+                const ocBarData = getOcBarDataByMonth();
+                const clientBarData = getDynamicClientBarData(rightChartGroupBy, rightChartLimit);
+                return (
+                  <>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    {/* Chart 1: Estado Manifiesto distribution (Grouped by Month) */}
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col">
+                      <div className="border-b border-slate-100 pb-3 mb-3">
+                        <span className="text-[9px] font-black tracking-widest text-indigo-600 uppercase font-mono">Volúmenes Mensuales</span>
+                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 mt-0.5">ESTADO DE MANIFIESTO POR MES - Total: {reportRecords.length.toLocaleString()}</h3>
+                      </div>
+
+                      {/* Dynamic Title Badges for Left Chart */}
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {(() => {
+                          const totals: { [st: string]: number } = {};
+                          let grandTotal = 0;
+                          reportRecords.forEach(r => {
+                            const st = r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : 'S/I';
+                            totals[st] = (totals[st] || 0) + 1;
+                            grandTotal++;
+                          });
+                          return Object.entries(totals).map(([status, count]) => {
+                            const pct = grandTotal > 0 ? ((count / grandTotal) * 100).toFixed(1) : '0.0';
+                            return (
+                              <div key={status} className="px-2.5 py-1 bg-slate-50 border border-slate-200/60 rounded-lg text-[9px] font-black uppercase font-mono flex items-center gap-1.5 shadow-xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
+                                <span className="text-slate-500">{status}:</span>
+                                <span className="text-indigo-600">{count.toLocaleString()} ({pct}%)</span>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+
+                      <ResponsiveContainer width="100%" height={260}>
+                        <BarChart data={ocBarData.data} margin={{ top: 15 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis dataKey="month" stroke="#94a3b8" fontSize={9} tickLine={false} />
+                          <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '10px' }} 
+                            itemStyle={{ color: '#fff' }}
+                          />
+                          <Legend 
+                            verticalAlign="bottom" 
+                            height={36} 
+                            iconType="circle"
+                            formatter={(value) => <span className="text-[9px] font-black text-slate-500 uppercase">{value}</span>}
+                          />
+                          {ocBarData.statuses.map((status, index) => (
+                            <Bar key={status} dataKey={status} fill={CHART_COLORS[index % CHART_COLORS.length]} radius={[4, 4, 0, 0]}>
+                              <LabelList dataKey={status} position="top" fill="#475569" fontSize={8} fontWeight="bold" formatter={(val) => Number(val) > 0 ? val : ''} />
+                            </Bar>
+                          ))}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Chart 2: States per Client */}
+                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm overflow-hidden flex flex-col">
+                      <div className="border-b border-slate-100 pb-3 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <span className="text-[9px] font-black tracking-widest text-violet-600 uppercase font-mono">Volúmenes de Clientes</span>
+                          <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 mt-0.5">ESTADO DE MANIFIESTO por Cliente - Total: {reportRecords.length.toLocaleString()}</h3>
+                        </div>
+                        
+                        {/* Interactive Dimension & limit Switchers */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/80 shadow-xs">
+                            <button
+                              type="button"
+                              onClick={() => setRightChartGroupBy('manifiesto')}
+                              className={`px-2 py-1 text-[9px] font-black uppercase tracking-wide rounded-md transition-all ${
+                                rightChartGroupBy === 'manifiesto' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400 hover:text-slate-600'
+                              }`}
+                            >
+                              Manifiesto
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRightChartGroupBy('oc')}
+                              className={`px-2 py-1 text-[9px] font-black uppercase tracking-wide rounded-md transition-all ${
+                                rightChartGroupBy === 'oc' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400 hover:text-slate-600'
+                              }`}
+                            >
+                              OC
+                            </button>
+                          </div>
+
+                          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/80 shadow-xs">
+                            <button
+                              type="button"
+                              onClick={() => setRightChartLimit('top10')}
+                              className={`px-2 py-1 text-[9px] font-black uppercase tracking-wide rounded-md transition-all ${
+                                rightChartLimit === 'top10' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400 hover:text-slate-600'
+                              }`}
+                            >
+                              Top 10
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRightChartLimit('all')}
+                              className={`px-2 py-1 text-[9px] font-black uppercase tracking-wide rounded-md transition-all ${
+                                rightChartLimit === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-400 hover:text-slate-600'
+                              }`}
+                            >
+                              Todos
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Dynamic Title Badges for Right Chart */}
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {(() => {
+                          const totals: { [st: string]: number } = {};
+                          let grandTotal = 0;
+                          reportRecords.forEach(r => {
+                            const st = rightChartGroupBy === 'oc'
+                              ? (r.oc_status ? String(r.oc_status).trim().toUpperCase() : 'S/I')
+                              : (r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : 'S/I');
+                            totals[st] = (totals[st] || 0) + 1;
+                            grandTotal++;
+                          });
+                          return Object.entries(totals).map(([status, count]) => {
+                            const pct = grandTotal > 0 ? ((count / grandTotal) * 100).toFixed(1) : '0.0';
+                            return (
+                              <div key={status} className="px-2.5 py-1 bg-slate-50 border border-slate-200/60 rounded-lg text-[9px] font-black uppercase font-mono flex items-center gap-1.5 shadow-xs">
+                                <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse" />
+                                <span className="text-slate-500">{status}:</span>
+                                <span className="text-violet-600">{count.toLocaleString()} ({pct}%)</span>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+
+                      <div className="flex-1 overflow-x-auto">
+                        <div className={`${rightChartLimit === 'all' ? 'min-w-[2000px]' : 'w-full'} h-[280px]`}>
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart 
+                              data={clientBarData.data} 
+                              margin={{ bottom: 45 }}
+                              onClick={(state) => {
+                                if (state && state.activeLabel) {
+                                  setSelectedClientChartName(String(state.activeLabel));
+                                }
+                              }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                              <XAxis dataKey="client" stroke="#94a3b8" fontSize={8} tickLine={false} angle={-35} textAnchor="end" interval={0} style={{ cursor: 'pointer' }} />
+                              <YAxis stroke="#94a3b8" fontSize={9} tickLine={false} />
+                              <Tooltip 
+                                contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '12px', color: '#fff', fontSize: '10px' }} 
+                                itemStyle={{ color: '#fff' }}
+                              />
+                              <Legend 
+                                verticalAlign="top" 
+                                height={36} 
+                                iconType="circle"
+                                formatter={(value) => <span className="text-[9px] font-black text-slate-500 uppercase">{value}</span>}
+                              />
+                              {clientBarData.statuses.map((status, index) => (
+                                <Bar 
+                                  key={status} 
+                                  dataKey={status} 
+                                  fill={CHART_COLORS[index % CHART_COLORS.length]} 
+                                  stackId="a"
+                                  style={{ cursor: 'pointer' }}
+                                >
+                                  <LabelList dataKey={status} position="inside" fill="#fff" fontSize={8} fontWeight="black" formatter={(val) => Number(val) > 0 ? val : ''} />
+                                </Bar>
+                              ))}
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Interactive Legend/Details Panel when a client is clicked */}
+                  {selectedClientChartName && (
+                    <div className="border border-violet-100 bg-violet-50/30 rounded-2xl p-6 shadow-sm animate-fadeIn">
+                      <div className="flex items-center justify-between border-b border-violet-100 pb-3 mb-4">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-2 bg-violet-600 text-white rounded-xl shadow-xs">
+                            <FileSpreadsheet size={18} />
+                          </div>
+                          <div>
+                            <span className="text-[9px] font-bold tracking-widest text-violet-600 uppercase font-mono">Detalle de Cliente Seleccionado</span>
+                            <h4 className="text-sm font-black uppercase text-slate-800">{selectedClientChartName}</h4>
+                          </div>
+                        </div>
+                        <button 
+                          type="button"
+                          onClick={() => setSelectedClientChartName(null)}
+                          className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all text-xs font-bold font-mono"
+                        >
+                          CERRAR ✕
+                        </button>
+                      </div>
+
+                      {/* Financial and Operating TDM Metrics (Sleek Grid) */}
+                      {(() => {
+                        const clientTdmData = getClientTdmTableData().find(
+                          x => x.clientName === selectedClientChartName
+                        );
+                        
+                        // Filter client's records for active statuses
+                        const clientRecords = reportRecords.filter(
+                          r => r.client_name?.trim().toUpperCase() === selectedClientChartName
+                        );
+                        
+                        const clientStatusTotals: { [st: string]: number } = {};
+                        clientRecords.forEach(r => {
+                          const st = rightChartGroupBy === 'oc'
+                            ? (r.oc_status ? String(r.oc_status).trim().toUpperCase() : 'S/I')
+                            : (r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : 'S/I');
+                          clientStatusTotals[st] = (clientStatusTotals[st] || 0) + 1;
+                        });
+
+                        return (
+                          <div className="flex flex-col gap-5">
+                            {/* Metrics Row */}
+                            {clientTdmData ? (
+                              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
+                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Venta Total</span>
+                                  <span className="text-xs font-black text-slate-800 block mt-0.5">{formatMoney(clientTdmData.ventaTotal)}</span>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
+                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Ing. Terceros</span>
+                                  <span className="text-xs font-black text-rose-600 block mt-0.5">{formatMoney(clientTdmData.ingTerceros)}</span>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
+                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Ing. Propios</span>
+                                  <span className="text-xs font-black text-emerald-600 block mt-0.5">{formatMoney(clientTdmData.ingresosPropios)}</span>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
+                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">INT (%)</span>
+                                  <span className="text-xs font-black text-indigo-600 block mt-0.5">{clientTdmData.int.toFixed(1)}%</span>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
+                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Días Lab.</span>
+                                  <span className="text-xs font-black text-slate-700 block mt-0.5">{clientTdmData.workedDaysCount} días</span>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs">
+                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Veh. Utilizados</span>
+                                  <span className="text-xs font-black text-slate-700 block mt-0.5">{clientTdmData.totalVehicleUtilizations}</span>
+                                </div>
+                                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-2xs col-span-2 lg:col-span-1">
+                                  <span className="text-[8px] font-bold text-slate-400 block uppercase">Promedio/Día</span>
+                                  <span className="text-xs font-black text-violet-600 block mt-0.5">{clientTdmData.averageVehiclesPerDay.toFixed(1)} veh/día</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-slate-400 text-[10px] italic">No hay datos financieros consolidados para este cliente (estatus anulado o sin transacciones válidas).</div>
+                            )}
+
+                            {/* Status Badges Row */}
+                            <div>
+                              <span className="text-[8px] font-bold text-slate-400 block uppercase mb-2">ESTADO DE MANIFIESTO ({rightChartGroupBy.toUpperCase()})</span>
+                              <div className="flex flex-wrap gap-2">
+                                {Object.entries(clientStatusTotals).map(([st, count]) => {
+                                  const pct = clientRecords.length > 0 ? ((count / clientRecords.length) * 100).toFixed(1) : '0.0';
+                                  return (
+                                    <div key={st} className="px-3.5 py-2 bg-white border border-slate-100 rounded-xl text-[10px] font-black uppercase font-mono flex items-center gap-2 shadow-2xs">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-violet-600 animate-pulse" />
+                                      <span className="text-slate-500">{st}:</span>
+                                      <span className="text-slate-800">{count} ({pct}%)</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
                   {(() => {
                     const rawGeneralData = getGeneralTdmTableData();
                     const filteredGeneralData = tdmSearchQuery.trim() === ''
@@ -3282,6 +3395,7 @@ export const InformesGerenciales: React.FC = () => {
                     const overallGeneralAverageEgrDays = filteredGeneralData.reduce((sum, i) => sum + (i.totalEgrDays || 0), 0) / filteredGeneralData.reduce((sum, i) => sum + (i.egrDaysCount || 0), 0) || 0;
                     const overallGeneralAverageManRecDays = filteredGeneralData.reduce((sum, i) => sum + (i.totalManRecDays || 0), 0) / filteredGeneralData.reduce((sum, i) => sum + (i.manRecDaysCount || 0), 0) || 0;
                     const totalGeneralReceivedValueVal = filteredGeneralData.reduce((sum, item) => sum + (item.receivedValue || 0), 0);
+                    const totalGeneralReceivedDiffMonthVal = filteredGeneralData.reduce((sum, item) => sum + (item.receivedDiffMonth || 0), 0);
                     const overallGeneralReceivedPct = totalGeneralVenta > 0 ? (totalGeneralReceivedValueVal / totalGeneralVenta) * 100 : 0;
 
                     const allGeneralPlates = new Set<string>();
@@ -3319,6 +3433,7 @@ export const InformesGerenciales: React.FC = () => {
                     const overallSummaryAverageEgrDays = filteredSummaryData.reduce((sum, i) => sum + (i.totalEgrDays || 0), 0) / filteredSummaryData.reduce((sum, i) => sum + (i.egrDaysCount || 0), 0) || 0;
                     const overallSummaryAverageManRecDays = filteredSummaryData.reduce((sum, i) => sum + (i.totalManRecDays || 0), 0) / filteredSummaryData.reduce((sum, i) => sum + (i.manRecDaysCount || 0), 0) || 0;
                     const totalSummaryReceivedValueVal = filteredSummaryData.reduce((sum, item) => sum + (item.receivedValue || 0), 0);
+                    const totalSummaryReceivedDiffMonthVal = filteredSummaryData.reduce((sum, item) => sum + (item.receivedDiffMonth || 0), 0);
                     const overallSummaryReceivedPct = totalSummaryVenta > 0 ? (totalSummaryReceivedValueVal / totalSummaryVenta) * 100 : 0;
 
                     const allSummaryPlates = new Set<string>();
@@ -3407,11 +3522,11 @@ export const InformesGerenciales: React.FC = () => {
                             </div>
                           ) : (
                             <div className="flex flex-col gap-8 p-6">
-                              <div className="overflow-x-auto custom-scrollbar">
+                              <div className="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar relative">
                                 <table className="w-full text-left border-collapse">
                                 <thead>
-                                  <tr className="border-b border-blue-100/80 bg-blue-50/70 text-[9px] font-black uppercase tracking-wider text-blue-800">
-                                    <th onClick={() => handleTdmSort('clientName')} className="p-3.5 cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                  <tr className="border-b border-blue-200 bg-blue-50 text-[9px] font-black uppercase tracking-wider text-blue-800 sticky top-0 z-20 shadow-sm">
+                                    <th onClick={() => handleTdmSort('clientName')} className="p-3.5 cursor-pointer hover:bg-blue-100 select-none transition-colors sticky left-0 z-30 bg-blue-50 border-r border-blue-100/50">
                                       <div className="flex items-center gap-1">
                                         <span>Cliente</span>
                                         {tdmSortField === 'clientName' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
@@ -3459,34 +3574,40 @@ export const InformesGerenciales: React.FC = () => {
                                         {tdmSortField === 'invoicedSameMonthPct' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averagePaymentDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
-                                      <div className="flex items-center justify-end gap-1">
-                                        <span>prom dia fact</span>
+                                    <th onClick={() => handleTdmSort('averagePaymentDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Factura (Fecha Factura - Fecha Manifiesto)">
+                                      <div className="flex flex-col items-end justify-center gap-1">
+                                        <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dia fact <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averagePaymentDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averageRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
-                                      <div className="flex items-center justify-end gap-1">
-                                        <span>prom dias rec</span>
+                                    <th onClick={() => handleTdmSort('averageRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Factura hasta Recibo (Fecha Recibo - Fecha Factura)">
+                                      <div className="flex flex-col items-end justify-center gap-1">
+                                        <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dias rec <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averageRecDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averageEgrDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
-                                      <div className="flex items-center justify-end gap-1">
-                                        <span>prom dias egreso</span>
+                                    <th onClick={() => handleTdmSort('averageEgrDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Egreso (Fecha Egreso - Fecha Manifiesto)">
+                                      <div className="flex flex-col items-end justify-center gap-1">
+                                        <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dias egreso <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averageEgrDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averageManRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
-                                      <div className="flex items-center justify-end gap-1">
-                                        <span>prom dia man recibido</span>
+                                    <th onClick={() => handleTdmSort('averageManRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Recibo (Fecha Recibo - Fecha Manifiesto)">
+                                      <div className="flex flex-col items-end justify-center gap-1">
+                                        <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dia man recibido <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averageManRecDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
                                     </th>
                                     <th onClick={() => handleTdmSort('receivedValue')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
-                                        <span>Vl Recibido</span>
+                                        <span>Vl Rec Mismo Mes</span>
                                         {tdmSortField === 'receivedValue' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('receivedDiffMonth')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Vl Rec Dif Mes</span>
+                                        {tdmSortField === 'receivedDiffMonth' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
                                     </th>
                                     <th onClick={() => handleTdmSort('receivedPct')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
@@ -3517,8 +3638,8 @@ export const InformesGerenciales: React.FC = () => {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
                                   {filteredGeneralData.map((row, index) => (
-                                    <tr key={index} className="hover:bg-slate-50/40 transition-colors">
-                                      <td className="p-3.5 font-bold text-slate-800 uppercase tracking-tight">{row.clientName}</td>
+                                    <tr key={index} className="group hover:bg-slate-50/60 transition-colors">
+                                      <td className="p-3.5 font-bold text-slate-800 uppercase tracking-tight sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors border-r border-slate-100 shadow-[1px_0_3px_rgba(0,0,0,0.02)]">{row.clientName}</td>
                                       <td className="p-3.5 text-right font-mono font-bold text-slate-900">
                                         {row.ventaTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
                                       </td>
@@ -3567,6 +3688,9 @@ export const InformesGerenciales: React.FC = () => {
                                       <td className="p-3.5 text-right font-mono font-bold text-slate-900">
                                         {row.receivedValue.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
                                       </td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-amber-700">
+                                        {row.receivedDiffMonth.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                      </td>
                                       <td className="p-3.5 text-right font-mono font-black">
                                         <span className={`px-2 py-0.5 rounded text-[10px] ${row.receivedPct < 60 ? 'bg-amber-50 text-amber-700 font-bold' : 'bg-emerald-50 text-emerald-600'}`}>
                                           {row.receivedPct.toFixed(1)}%
@@ -3579,8 +3703,8 @@ export const InformesGerenciales: React.FC = () => {
                                   ))}
 
                                   {/* Grand Total Row */}
-                                  <tr className="bg-slate-100/50 border-t-2 border-slate-200 font-black text-slate-900">
-                                    <td className="p-3.5 text-[10px] uppercase tracking-wider">Total General</td>
+                                  <tr className="bg-slate-100 border-t-2 border-slate-200 font-black text-slate-900 sticky bottom-0 z-20 shadow-[0_-2px_4px_rgba(0,0,0,0.02)] group">
+                                    <td className="p-3.5 text-[10px] uppercase tracking-wider sticky left-0 z-30 bg-slate-100 border-r border-slate-200/60">Total General</td>
                                     <td className="p-3.5 text-right font-mono font-bold text-slate-950">
                                       {totalGeneralVenta.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
                                     </td>
@@ -3616,6 +3740,9 @@ export const InformesGerenciales: React.FC = () => {
                                     </td>
                                     <td className="p-3.5 text-right font-mono font-bold text-slate-950 font-black">
                                       {totalGeneralReceivedValueVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono font-bold text-amber-800 font-black">
+                                      {totalGeneralReceivedDiffMonthVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
                                     </td>
                                     <td className="p-3.5 text-right font-mono text-slate-950 font-black">
                                       <span className="px-2.5 py-0.5 bg-indigo-100 rounded text-[10px] font-black font-mono">
@@ -3697,11 +3824,11 @@ export const InformesGerenciales: React.FC = () => {
                             </div>
                           ) : (
                             <div className="flex flex-col gap-8 p-6">
-                              <div className="overflow-x-auto custom-scrollbar">
+                              <div className="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar relative">
                                 <table className="w-full text-left border-collapse">
                                 <thead>
-                                  <tr className="border-b border-blue-100/80 bg-blue-50/70 text-[9px] font-black uppercase tracking-wider text-blue-800">
-                                    <th onClick={() => handleTdmSort('clientName')} className="p-3.5 cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                  <tr className="border-b border-blue-200 bg-blue-50 text-[9px] font-black uppercase tracking-wider text-blue-800 sticky top-0 z-20 shadow-sm">
+                                    <th onClick={() => handleTdmSort('clientName')} className="p-3.5 cursor-pointer hover:bg-blue-100 select-none transition-colors sticky left-0 z-30 bg-blue-50 border-r border-blue-100/50">
                                       <div className="flex items-center gap-1">
                                         <span>Cliente</span>
                                         {tdmSortField === 'clientName' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
@@ -3749,34 +3876,40 @@ export const InformesGerenciales: React.FC = () => {
                                         {tdmSortField === 'invoicedSameMonthPct' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averagePaymentDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
-                                      <div className="flex items-center justify-end gap-1">
-                                        <span>prom dia fact</span>
+                                    <th onClick={() => handleTdmSort('averagePaymentDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Factura (Fecha Factura - Fecha Manifiesto)">
+                                      <div className="flex flex-col items-end justify-center gap-1">
+                                        <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dia fact <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averagePaymentDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averageRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
-                                      <div className="flex items-center justify-end gap-1">
-                                        <span>prom dias rec</span>
+                                    <th onClick={() => handleTdmSort('averageRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Factura hasta Recibo (Fecha Recibo - Fecha Factura)">
+                                      <div className="flex flex-col items-end justify-center gap-1">
+                                        <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dias rec <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averageRecDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averageEgrDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
-                                      <div className="flex items-center justify-end gap-1">
-                                        <span>prom dias egreso</span>
+                                    <th onClick={() => handleTdmSort('averageEgrDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Egreso (Fecha Egreso - Fecha Manifiesto)">
+                                      <div className="flex flex-col items-end justify-center gap-1">
+                                        <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dias egreso <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averageEgrDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averageManRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
-                                      <div className="flex items-center justify-end gap-1">
-                                        <span>prom dia man recibido</span>
+                                    <th onClick={() => handleTdmSort('averageManRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Recibo (Fecha Recibo - Fecha Manifiesto)">
+                                      <div className="flex flex-col items-end justify-center gap-1">
+                                        <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dia man recibido <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averageManRecDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
                                     </th>
                                     <th onClick={() => handleTdmSort('receivedValue')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
-                                        <span>Vl Recibido</span>
+                                        <span>Vl Rec Mismo Mes</span>
                                         {tdmSortField === 'receivedValue' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      </div>
+                                    </th>
+                                    <th onClick={() => handleTdmSort('receivedDiffMonth')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span>Vl Rec Dif Mes</span>
+                                        {tdmSortField === 'receivedDiffMonth' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
                                     </th>
                                     <th onClick={() => handleTdmSort('receivedPct')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
@@ -3807,8 +3940,8 @@ export const InformesGerenciales: React.FC = () => {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
                                   {filteredSummaryData.map((row, index) => (
-                                    <tr key={index} className="hover:bg-slate-50/40 transition-colors">
-                                      <td className="p-3.5 font-bold text-slate-800 uppercase tracking-tight">{row.clientName}</td>
+                                    <tr key={index} className="group hover:bg-slate-50/60 transition-colors">
+                                      <td className="p-3.5 font-bold text-slate-800 uppercase tracking-tight sticky left-0 z-10 bg-white group-hover:bg-slate-50 transition-colors border-r border-slate-100 shadow-[1px_0_3px_rgba(0,0,0,0.02)]">{row.clientName}</td>
                                       <td className="p-3.5 text-right font-mono font-bold text-slate-900">
                                         {row.ventaTotal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
                                       </td>
@@ -3857,6 +3990,9 @@ export const InformesGerenciales: React.FC = () => {
                                       <td className="p-3.5 text-right font-mono font-bold text-slate-900">
                                         {row.receivedValue.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
                                       </td>
+                                      <td className="p-3.5 text-right font-mono font-bold text-amber-700">
+                                        {row.receivedDiffMonth.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                      </td>
                                       <td className="p-3.5 text-right font-mono font-black">
                                         <span className={`px-2 py-0.5 rounded text-[10px] ${row.receivedPct < 60 ? 'bg-amber-50 text-amber-700 font-bold' : 'bg-emerald-50 text-emerald-600'}`}>
                                           {row.receivedPct.toFixed(1)}%
@@ -3869,8 +4005,8 @@ export const InformesGerenciales: React.FC = () => {
                                   ))}
 
                                   {/* Grand Total Row */}
-                                  <tr className="bg-slate-100/50 border-t-2 border-slate-200 font-black text-slate-900">
-                                    <td className="p-3.5 text-[10px] uppercase tracking-wider">Total General</td>
+                                  <tr className="bg-slate-100 border-t-2 border-slate-200 font-black text-slate-900 sticky bottom-0 z-20 shadow-[0_-2px_4px_rgba(0,0,0,0.02)] group">
+                                    <td className="p-3.5 text-[10px] uppercase tracking-wider sticky left-0 z-30 bg-slate-100 border-r border-slate-200/60">Total General</td>
                                     <td className="p-3.5 text-right font-mono font-bold text-slate-950">
                                       {totalSummaryVenta.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
                                     </td>
@@ -3906,6 +4042,9 @@ export const InformesGerenciales: React.FC = () => {
                                     </td>
                                     <td className="p-3.5 text-right font-mono font-bold text-slate-950 font-black">
                                       {totalSummaryReceivedValueVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
+                                    </td>
+                                    <td className="p-3.5 text-right font-mono font-bold text-amber-800 font-black">
+                                      {totalSummaryReceivedDiffMonthVal.toLocaleString('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 })}
                                     </td>
                                     <td className="p-3.5 text-right font-mono text-slate-950 font-black">
                                       <span className="px-2.5 py-0.5 bg-indigo-100 rounded text-[10px] font-black font-mono">
@@ -4043,98 +4182,25 @@ export const InformesGerenciales: React.FC = () => {
           </div>
 
           {/* MAIN RESULTS DATA TABLE */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/60 border-b border-slate-200/80">
-                    {columnsConfig.map((col) => (
-                      <th 
-                        key={col.key}
-                        onClick={() => handleConsultasSort(col.key)}
-                        className={`p-4 text-[10px] font-black uppercase tracking-widest text-slate-400 cursor-pointer hover:bg-slate-100 select-none transition-colors whitespace-nowrap ${
-                          col.align === 'right' ? 'text-right' : 'text-left'
-                        }`}
-                      >
-                        <div className={`flex items-center gap-1 ${col.align === 'right' ? 'justify-end' : 'justify-start'}`}>
-                          <span>{col.label}</span>
-                          {consultasSortField === col.key && (
-                            <span className="text-indigo-600 font-bold text-[8px]">{consultasSortDirection === 'asc' ? '▲' : '▼'}</span>
-                          )}
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={columnsConfig.length} className="p-12 text-center">
-                        <div className="flex flex-col items-center justify-center space-y-3">
-                          <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent animate-spin rounded-full"></div>
-                          <span className="text-xs font-black uppercase tracking-widest text-slate-400">Cargando registros...</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : records.length === 0 ? (
-                    <tr>
-                      <td colSpan={columnsConfig.length} className="p-12 text-center">
-                        <div className="flex flex-col items-center justify-center space-y-2 text-slate-400">
-                          <FileSpreadsheet size={32} className="stroke-1 animate-pulse" />
-                          <span className="text-xs font-black uppercase tracking-wider">No se encontraron registros</span>
-                          <p className="text-[10px] text-slate-400">Asegúrate de cambiar las fechas de consulta o importar información en la pestaña "Cargar Información".</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    records.map((row) => (
-                      <tr key={row.oc_number} className="hover:bg-slate-50/50 transition-all text-xs font-medium text-slate-700">
-                        {columnsConfig.map((col) => (
-                          <td 
-                            key={col.key} 
-                            className={`p-4 whitespace-nowrap ${
-                              col.align === 'right' ? 'text-right' : 'text-left'
-                            }`}
-                          >
-                            {col.render(row)}
-                          </td>
-                        ))}
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {/* PAGINATION PANEL */}
-            {total > limit && (
-              <div className="flex items-center justify-between border-t border-slate-200/80 px-4 py-3.5 bg-slate-50/40">
-                <span className="text-xs text-slate-500 font-bold">
-                  Mostrando <span className="text-slate-800">{(page - 1) * limit + 1}</span> a <span className="text-slate-800">{Math.min(page * limit, total)}</span> de <span className="text-slate-800">{total}</span> registros
-                </span>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setPage(p => Math.max(p - 1, 1))}
-                    disabled={page === 1}
-                    className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent"
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                  <span className="text-xs font-black px-3 py-1 bg-white border border-slate-200 rounded-lg text-slate-800">
-                    {page}
-                  </span>
-                  <button
-                    onClick={() => setPage(p => Math.min(p + 1, Math.ceil(total / limit)))}
-                    disabled={page >= Math.ceil(total / limit)}
-                    className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:hover:bg-transparent"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+          <DataTable
+            columns={columnsConfig.map(c => ({
+              header: c.label,
+              key: c.key,
+              render: (row) => c.render(row as ManagementOrder)
+            }))}
+            data={records}
+            serverSide={true}
+            totalRows={total}
+            currentPage={page}
+            pageSize={limit}
+            onPageChange={setPage}
+            onPageSizeChange={(newSize) => setLimit(newSize as number)}
+            onSort={(key, dir) => {
+              handleConsultasSort(key);
+            }}
+            loading={loading}
+            hideTopControls={true}
+          />
         </div>
       )}
 

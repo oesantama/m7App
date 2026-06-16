@@ -13,6 +13,7 @@ router.use(authenticateToken);
 router.get('/confeccionistas', requirePermission('MAESTRAS_DOGAMA', 'view'), dogama.getConfeccionistas);
 router.post('/confeccionistas', requirePermission('MAESTRAS_DOGAMA', 'create'), dogama.createConfeccionista);
 router.post('/confeccionistas/bulk', requirePermission('MAESTRAS_DOGAMA', 'create'), dogama.bulkCreateConfeccionistas);
+router.post('/confeccionistas/resolve-ciudad', requirePermission('MAESTRAS_DOGAMA', 'edit'), dogama.resolveCiudadBulk);
 router.put('/confeccionistas/:id', requirePermission('MAESTRAS_DOGAMA', 'edit'), dogama.updateConfeccionista);
 router.delete('/confeccionistas/:id', requirePermission('MAESTRAS_DOGAMA', 'delete'), dogama.deleteConfeccionista);
 
@@ -42,5 +43,12 @@ router.post('/citas/bulk', requirePermission('CITAS_DESPACHO_CARGA', 'create'), 
 router.put('/citas/:id/estado', requirePermission('CITAS_DESPACHO_CARGA', 'edit'), dogama.updateCitaEstado);
 router.patch('/citas/:id', requirePermission('CITAS_DESPACHO_CARGA', 'edit'), dogama.patchCita);
 router.delete('/citas/:id', requirePermission('CITAS_DESPACHO_CARGA', 'delete'), dogama.deleteCita);
+
+// ── Asignaciones activas de flota ─────────────────────────────────────────────
+router.get('/fleet-assignments', requirePermission('CITAS_DESPACHO_CARGA', 'view'), dogama.getActiveFleetAssignments);
+
+// ── Planillas Historial ───────────────────────────────────────────────────────
+router.get('/planillas',  requirePermission('CITAS_DESPACHO_CARGA', 'view'),   dogama.getPlanillasHistorial);
+router.post('/planillas', requirePermission('CITAS_DESPACHO_CARGA', 'create'), dogama.createPlanillaHistorial);
 
 export default router;

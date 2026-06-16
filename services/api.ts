@@ -181,6 +181,9 @@ export const api = {
   getHistoryFiltersData() {
     return fetchJson(`${API_URL}/dispatch/history-filters-data?_t=${Date.now()}`);
   },
+  getManagementClients() {
+    return fetchJson(`${API_URL}/management-reports/clients?_t=${Date.now()}`);
+  },
   getReturnHistory(params: Record<string, string> = {}) {
     const qs = new URLSearchParams(params).toString();
     return fetchJson(`${API_URL}/dispatch/return-history${qs ? '?' + qs : ''}`);
@@ -1202,6 +1205,7 @@ export const api = {
     manifestNumber?: string;
     plate?: string;
     clientName?: string;
+    clientNames?: string;
     fromDate?: string;
     toDate?: string;
     sortBy?: string;
@@ -1214,6 +1218,7 @@ export const api = {
     if (params.manifestNumber) qs.append('manifestNumber', params.manifestNumber);
     if (params.plate) qs.append('plate', params.plate);
     if (params.clientName) qs.append('clientName', params.clientName);
+    if (params.clientNames) qs.append('clientNames', params.clientNames);
     if (params.fromDate) qs.append('fromDate', params.fromDate);
     if (params.toDate) qs.append('toDate', params.toDate);
     if (params.sortBy) qs.append('sortBy', params.sortBy);
@@ -1762,6 +1767,8 @@ export const api = {
     }),
   dogamaDeleteConfeccionista: (id: number) =>
     fetchJson(`${API_URL}/dogama/confeccionistas/${id}`, { method: 'DELETE' }),
+  dogamaResolveCiudadBulk: (ciudad_text: string, ciudad_id: number) =>
+    fetchJson(`${API_URL}/dogama/confeccionistas/resolve-ciudad`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ciudad_text, ciudad_id }) }),
 
   // Catálogos genéricos
   dogamaGetCatalog: (table: string) => fetchJson(`${API_URL}/dogama/catalog/${table}`),
@@ -1780,25 +1787,48 @@ export const api = {
   dogamaDeleteEmailConfig: (provider: string) => fetchJson(`${API_URL}/dogama/email-config/${provider}`, { method: 'DELETE' }),
   dogamaTestEmail: (provider: string) => fetchJson(`${API_URL}/dogama/email-config/${provider}/test`, { method: 'POST' }),
 
+  dogamaGetFleetAssignments: () => fetchJson(`${API_URL}/dogama/fleet-assignments`),
+
   // Despachos
-  dogamaGetDespachos: () => fetchJson(`${API_URL}/dogama/despachos`),
+  dogamaGetDespachos: (assignable?: boolean) => fetchJson(`${API_URL}/dogama/despachos${assignable ? '?assignable=true' : ''}`),
   dogamaBulkDespachos: (rows: any[], usuariocreacion: string) =>
     fetchJson(`${API_URL}/dogama/despachos/bulk`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows, usuariocreacion }) }),
-  dogamaUpdateDespachoEstado: (id: number, estado: string) =>
-    fetchJson(`${API_URL}/dogama/despachos/${id}/estado`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado }) }),
+  dogamaUpdateDespachoEstado: (id: number, estado_id: string) =>
+    fetchJson(`${API_URL}/dogama/despachos/${id}/estado`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado_id }) }),
   dogamaDeleteDespacho: (id: number) => fetchJson(`${API_URL}/dogama/despachos/${id}`, { method: 'DELETE' }),
 
   // Citas / Recogidas
-  dogamaGetCitas: () => fetchJson(`${API_URL}/dogama/citas`),
+  dogamaGetCitas: (assignable?: boolean) => fetchJson(`${API_URL}/dogama/citas${assignable ? '?assignable=true' : ''}`),
   dogamaBulkCitas: (rows: any[], usuariocreacion: string) =>
     fetchJson(`${API_URL}/dogama/citas/bulk`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rows, usuariocreacion }) }),
-  dogamaUpdateCitaEstado: (id: number, estado: string) =>
-    fetchJson(`${API_URL}/dogama/citas/${id}/estado`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado }) }),
+  dogamaUpdateCitaEstado: (id: number, estado_id: string) =>
+    fetchJson(`${API_URL}/dogama/citas/${id}/estado`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado_id }) }),
   dogamaPatchCita: (id: number, data: Record<string, any>) =>
     fetchJson(`${API_URL}/dogama/citas/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
   dogamaDeleteCita: (id: number) => fetchJson(`${API_URL}/dogama/citas/${id}`, { method: 'DELETE' }),
 
-  dogamaGetProveedores: () => fetchJson(`${API_URL}/dogama/catalog/dogama_proveedores`),
-  dogamaCreateProveedor: (descripcion: string, usuariocreacion: string) =>
-    fetchJson(`${API_URL}/dogama/catalog/dogama_proveedores`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ descripcion, estado: 'activo', usuariocreacion }) }),
+  // ── Planillas Historial ─────────────────────────────────────────────────────
+  dogamaGetPlanillasHistorial: (filters?: { placa?: string; fecha?: string; confeccionista?: string }) => {
+    const p = new URLSearchParams();
+    if (filters?.placa)         p.set('placa', filters.placa);
+    if (filters?.fecha)         p.set('fecha', filters.fecha);
+    if (filters?.confeccionista) p.set('confeccionista', filters.confeccionista);
+    const qs = p.toString();
+    return fetchJson(`${API_URL}/dogama/planillas${qs ? '?' + qs : ''}`);
+  },
+  dogamaCreatePlanillaHistorial: (body: {
+    vehicle_id: string;
+    remesa?: string | null;
+    manifiesto?: string | null;
+    valor_cxc?: number | null;
+    valor_cxp?: number | null;
+    items: Array<{ tipo: 'despacho' | 'cita'; id: number }>;
+    usuario_creacion?: string;
+  }) =>
+    fetchJson(`${API_URL}/dogama/planillas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+
 };

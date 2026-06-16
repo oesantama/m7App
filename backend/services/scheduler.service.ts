@@ -283,6 +283,11 @@ export const runFacturacionPendienteIndividual = async (): Promise<string[]> => 
 export const initScheduler = () => {
     console.log('[M7-SCHEDULER] Inicializando Motor de Tareas Programadas...');
 
+    if (process.env.NODE_ENV !== 'production') {
+        console.log('[M7-SCHEDULER] Entorno no es de producción (NODE_ENV no es production). Cron jobs desactivados.');
+        return;
+    }
+
     // Limpieza de Novedades: se eliminan registros con más de 5 días hábiles (L-V).
     // Corre diariamente a la 1:00 AM hora Colombia.
     cron.schedule('0 1 * * *', async () => {

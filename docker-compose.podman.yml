@@ -12,6 +12,7 @@ services:
       - TZ=America/Bogota
       - PORT=8080
       - DATABASE_URL=postgres://m7_admin:m7_master_password@postgres-podman:5432/m7_logistica
+      - NODE_OPTIONS=--max-http-header-size=65536
     volumes:
       - ./backend:/app/backend:z
       - ./types.ts:/app/types.ts:z
@@ -38,11 +39,12 @@ services:
       context: .
       dockerfile: Dockerfile.frontend.dev
     ports:
-      - "5173:5173"
+      - "5174:5173"
     env_file:
       - .env
     environment:
       - VITE_API_URL=http://localhost:8081/api
+      - NODE_OPTIONS=--max-http-header-size=65536
     volumes:
       - ./components:/app/components:z
       - ./pages:/app/pages:z

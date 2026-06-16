@@ -7,9 +7,19 @@ import axios from 'axios';
 
 export const getConfeccionistas = async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM dogama_confeccionistas ORDER BY descripcion_conf ASC'
-    );
+    const result = await pool.query(`
+      SELECT dc.*,
+             e.name     AS estado_nombre,
+             cc.nombre  AS ciudad_nombre,
+             u.name     AS usuario_nombre,
+             ua.name    AS usuario_actualizacion_nombre
+      FROM dogama_confeccionistas dc
+      LEFT JOIN estados      e  ON e.id  = dc.estado_id
+      LEFT JOIN cfg_ciudades cc ON cc.id = dc.ciudad_id
+      LEFT JOIN users        u  ON u.id  = dc.usuariocreacion
+      LEFT JOIN users        ua ON ua.id = dc.usuarioactualizacion
+      ORDER BY dc.descripcion_conf ASC
+    `);
     res.json(result.rows);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -17,18 +27,18 @@ export const getConfeccionistas = async (req: Request, res: Response) => {
 };
 
 export const createConfeccionista = async (req: Request, res: Response) => {
-  const { descripcion_conf, direccion, ciudad, estado, usuariocreacion, telefono, correo } = req.body;
+  const { descripcion_conf, direccion, ciudad, ciudad_id, estado_id, usuariocreacion, telefono, correo } = req.body;
   if (!descripcion_conf) {
     return res.status(400).json({ error: 'descripcion_conf es obligatorio' });
   }
   try {
     const result = await pool.query(
       `INSERT INTO dogama_confeccionistas
-         (descripcion_conf, direccion, ciudad, estado, usuariocreacion, telefono, correo)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
+         (descripcion_conf, direccion, ciudad, ciudad_id, estado_id, usuariocreacion, telefono, correo)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        RETURNING *`,
-      [descripcion_conf.trim(), direccion.trim(), ciudad || null, estado || 'activo',
-       usuariocreacion || null, telefono || null, correo || null]
+      [descripcion_conf.trim(), direccion.trim(), ciudad || null, ciudad_id || null,
+       estado_id || 'EST-01', usuariocreacion || null, telefono || null, correo || null]
     );
     res.status(201).json(result.rows[0]);
   } catch (e: any) {
@@ -50,16 +60,19 @@ export const bulkCreateConfeccionistas = async (req: Request, res: Response) => 
 
   for (const row of rows) {
     const conf = (row.Confeccionista || row.descripcion_conf || '').trim();
-    const dir = (row.direccion || row.Direccion || '').trim();
+    const dir  = (row.direccion || row.Direccion || '').trim();
     if (!conf || !dir) { errors.push({ row, reason: 'Faltan campos requeridos' }); continue; }
+    const ciudad  = (row.CIUDAD   || row.Ciudad   || row.ciudad   || '').trim() || null;
+    const telefono = (row.Telefono || row.telefono || row.TELEFONO || '').trim() || null;
+    const correo  = (row.correo   || row.Correo   || row.email    || '').trim() || null;
     try {
       const r = await pool.query(
         `INSERT INTO dogama_confeccionistas
-           (descripcion_conf, direccion, ciudad, estado, usuariocreacion, correo)
-         VALUES ($1,$2,$3,'activo',$4,$5)
+           (descripcion_conf, direccion, ciudad, telefono, correo, estado_id, usuariocreacion)
+         VALUES ($1,$2,$3,$4,$5,'EST-01',$6)
          ON CONFLICT (descripcion_conf, direccion) DO NOTHING
          RETURNING *`,
-        [conf, dir, row.CIUDAD || row.ciudad || null, usuariocreacion || null, row.correo || row.Correo || null]
+        [conf, dir, ciudad, telefono, correo, usuariocreacion || null]
       );
       if (r.rowCount && r.rowCount > 0) inserted.push(r.rows[0]);
       else duplicates.push({ conf, dir });
@@ -73,13 +86,15 @@ export const bulkCreateConfeccionistas = async (req: Request, res: Response) => 
 
 export const updateConfeccionista = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { descripcion_conf, direccion, ciudad, estado, telefono, correo } = req.body;
+  const { descripcion_conf, direccion, ciudad, ciudad_id, estado_id, telefono, correo, usuarioactualizacion } = req.body;
   try {
     const result = await pool.query(
       `UPDATE dogama_confeccionistas
-       SET descripcion_conf=$1, direccion=$2, ciudad=$3, estado=$4, telefono=$5, correo=$6
-       WHERE id=$7 RETURNING *`,
-      [descripcion_conf, direccion, ciudad || null, estado || 'activo', telefono || null, correo || null, id]
+       SET descripcion_conf=$1, direccion=$2, ciudad=$3, ciudad_id=$4, estado_id=$5, telefono=$6, correo=$7,
+           fecha_actualizacion=(NOW() AT TIME ZONE 'America/Bogota'), usuarioactualizacion=$8
+       WHERE id=$9 RETURNING *`,
+      [descripcion_conf, direccion, ciudad || null, ciudad_id || null,
+       estado_id || 'EST-01', telefono || null, correo || null, usuarioactualizacion || null, id]
     );
     if (result.rowCount === 0) return res.status(404).json({ error: 'No encontrado' });
     res.json(result.rows[0]);
@@ -100,10 +115,24 @@ export const deleteConfeccionista = async (req: Request, res: Response) => {
   }
 };
 
-// ── CATÁLOGOS GENÉRICOS (Marcas + Tipos Prenda) ───────────────────────────────
-type CatalogTable = 'dogama_marcas' | 'dogama_tipos_prenda' | 'dogama_proveedores' | 'dogama_tipos_oc';
+export const resolveCiudadBulk = async (req: Request, res: Response) => {
+  const { ciudad_text, ciudad_id } = req.body;
+  if (!ciudad_text || !ciudad_id) return res.status(400).json({ error: 'ciudad_text y ciudad_id son requeridos' });
+  try {
+    const r = await pool.query(
+      `UPDATE dogama_confeccionistas SET ciudad_id=$1 WHERE UPPER(TRIM(ciudad))=UPPER(TRIM($2)) AND ciudad_id IS NULL`,
+      [ciudad_id, ciudad_text]
+    );
+    res.json({ updated: r.rowCount });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
 
-const ALLOWED_TABLES: CatalogTable[] = ['dogama_marcas', 'dogama_tipos_prenda', 'dogama_proveedores', 'dogama_tipos_oc'];
+// ── CATÁLOGOS GENÉRICOS (Marcas + Tipos Prenda) ───────────────────────────────
+type CatalogTable = 'dogama_marcas' | 'dogama_tipos_prenda' | 'dogama_tipos_oc';
+
+const ALLOWED_TABLES: CatalogTable[] = ['dogama_marcas', 'dogama_tipos_prenda', 'dogama_tipos_oc'];
 
 const assertTable = (t: string): t is CatalogTable => ALLOWED_TABLES.includes(t as any);
 
@@ -111,7 +140,14 @@ export const getCatalog = async (req: Request, res: Response) => {
   const table = req.params.table as string;
   if (!assertTable(table)) return res.status(400).json({ error: 'Tabla no válida' });
   try {
-    const r = await pool.query(`SELECT * FROM ${table} ORDER BY descripcion ASC`);
+    const r = await pool.query(
+      `SELECT t.*, e.name AS estado_nombre, u.name AS usuario_nombre, ua.name AS usuario_actualizacion_nombre
+       FROM ${table} t
+       LEFT JOIN estados e  ON e.id  = t.estado_id
+       LEFT JOIN users   u  ON u.id  = t.usuariocreacion
+       LEFT JOIN users   ua ON ua.id = t.usuarioactualizacion
+       ORDER BY t.descripcion ASC`
+    );
     res.json(r.rows);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 };
@@ -119,12 +155,13 @@ export const getCatalog = async (req: Request, res: Response) => {
 export const createCatalogItem = async (req: Request, res: Response) => {
   const table = req.params.table as string;
   if (!assertTable(table)) return res.status(400).json({ error: 'Tabla no válida' });
-  const { descripcion, estado, usuariocreacion } = req.body;
+  const { descripcion, estado_id, usuariocreacion } = req.body;
   if (!descripcion?.trim()) return res.status(400).json({ error: 'descripcion es obligatorio' });
+  const estadoId = estado_id || 'EST-01';
   try {
     const r = await pool.query(
-      `INSERT INTO ${table} (descripcion, estado, usuariocreacion) VALUES ($1,$2,$3) RETURNING *`,
-      [descripcion.trim(), estado || 'activo', usuariocreacion || null]
+      `INSERT INTO ${table} (descripcion, estado_id, usuariocreacion) VALUES ($1,$2,$3) RETURNING *`,
+      [descripcion.trim(), estadoId, usuariocreacion || null]
     );
     res.status(201).json(r.rows[0]);
   } catch (e: any) {
@@ -144,7 +181,7 @@ export const bulkCreateCatalog = async (req: Request, res: Response) => {
     if (!desc) { errors++; continue; }
     try {
       const r = await pool.query(
-        `INSERT INTO ${table} (descripcion, estado, usuariocreacion) VALUES ($1,'activo',$2) ON CONFLICT (descripcion) DO NOTHING RETURNING id`,
+        `INSERT INTO ${table} (descripcion, estado_id, usuariocreacion) VALUES ($1,'EST-01',$2) ON CONFLICT (descripcion) DO NOTHING RETURNING id`,
         [desc, usuariocreacion || null]
       );
       if (r.rowCount && r.rowCount > 0) inserted++; else duplicates++;
@@ -157,11 +194,13 @@ export const updateCatalogItem = async (req: Request, res: Response) => {
   const table = req.params.table as string;
   if (!assertTable(table)) return res.status(400).json({ error: 'Tabla no válida' });
   const { id } = req.params;
-  const { descripcion, estado } = req.body;
+  const { descripcion, estado_id, usuarioactualizacion } = req.body;
   try {
     const r = await pool.query(
-      `UPDATE ${table} SET descripcion=$1, estado=$2 WHERE id=$3 RETURNING *`,
-      [descripcion, estado || 'activo', id]
+      `UPDATE ${table} SET descripcion=$1, estado_id=$2,
+           fecha_actualizacion=(NOW() AT TIME ZONE 'America/Bogota'), usuarioactualizacion=$3
+       WHERE id=$4 RETURNING *`,
+      [descripcion, estado_id || 'EST-01', usuarioactualizacion || null, id]
     );
     if (r.rowCount === 0) return res.status(404).json({ error: 'No encontrado' });
     res.json(r.rows[0]);
@@ -188,33 +227,24 @@ const DESPACHOS_SELECT = `
   SELECT
     d.*,
     dc.descripcion_conf AS confeccionista_nombre,
-    dm.descripcion       AS marca_nombre,
-    dtp.descripcion      AS tipo_prenda_nombre
+    COALESCE(dm.descripcion, d.marca_txt) AS marca_nombre,
+    dtp.descripcion      AS tipo_prenda_nombre,
+    e.name               AS estado_nombre
   FROM dogama_despachos d
-  LEFT JOIN dogama_confeccionistas dc ON dc.id = d.confeccionista_id
-  LEFT JOIN dogama_marcas          dm ON dm.id = d.marca_id
+  LEFT JOIN dogama_confeccionistas dc  ON dc.id  = d.confeccionista_id
+  LEFT JOIN dogama_marcas          dm  ON dm.id  = d.marca_id
   LEFT JOIN dogama_tipos_prenda    dtp ON dtp.id = d.tipo_prenda_id
+  LEFT JOIN estados                e   ON e.id   = d.estado_id
 `;
 
 export const getDespachos = async (req: Request, res: Response) => {
+  const assignable = req.query.assignable === 'true';
+  const where = assignable ? `WHERE d.estado_id <> 'EST-10'` : '';
   try {
-    const result = await pool.query(`${DESPACHOS_SELECT} ORDER BY d.fecha DESC, d.id DESC LIMIT 2000`);
+    const result = await pool.query(`${DESPACHOS_SELECT} ${where} ORDER BY d.fecha DESC, d.id DESC LIMIT 2000`);
     res.json(result.rows);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 };
-
-async function resolveIds(pool: any, confTxt: string, marcaTxt: string, tipoPrendaTxt: string) {
-  const [confRes, marcaRes, tipoRes] = await Promise.all([
-    confTxt ? pool.query('SELECT id FROM dogama_confeccionistas WHERE LOWER(TRIM(descripcion_conf))=LOWER(TRIM($1)) LIMIT 1', [confTxt]) : Promise.resolve({ rows: [] }),
-    marcaTxt ? pool.query('SELECT id FROM dogama_marcas WHERE LOWER(TRIM(descripcion))=LOWER(TRIM($1)) LIMIT 1', [marcaTxt]) : Promise.resolve({ rows: [] }),
-    tipoPrendaTxt ? pool.query('SELECT id FROM dogama_tipos_prenda WHERE LOWER(TRIM(descripcion))=LOWER(TRIM($1)) LIMIT 1', [tipoPrendaTxt]) : Promise.resolve({ rows: [] }),
-  ]);
-  return {
-    confId: confRes.rows[0]?.id || null,
-    marcaId: marcaRes.rows[0]?.id || null,
-    tipoId: tipoRes.rows[0]?.id || null,
-  };
-}
 
 export const bulkCreateDespachos = async (req: Request, res: Response) => {
   const { rows, usuariocreacion } = req.body;
@@ -224,35 +254,29 @@ export const bulkCreateDespachos = async (req: Request, res: Response) => {
   let inserted = 0; let duplicates = 0; let errors = 0;
 
   for (const row of rows) {
-    const confTxt   = (row.confeccionista_txt || '').trim();
-    const marcaTxt  = (row.marca_txt || '').trim();
-    const tipoPTxt  = (row.tipo_prenda_txt || '').trim();
-
     try {
-      const { confId, marcaId, tipoId } = await resolveIds(pool, confTxt, marcaTxt, tipoPTxt);
-
       const r = await pool.query(
         `INSERT INTO dogama_despachos
-           (fecha, orden_cargue, confeccionista_id, confeccionista_txt, orden_servicio,
+           (fecha, orden_cargue, confeccionista_id, orden_servicio,
             marca_id, marca_txt, referencia, lote, unidades,
-            tipo_prenda_id, tipo_prenda_txt, estado, usuario_creacion)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'pendiente',$13)
+            tipo_prenda_id, estado_id, usuario_creacion)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'EST-03',$11)
          ON CONFLICT ON CONSTRAINT uq_despacho DO NOTHING
          RETURNING id`,
         [
           row.fecha || null,
           row.orden_cargue || null,
-          confId, confTxt,
+          row.confeccionista_id || null,
           row.orden_servicio || null,
-          marcaId, marcaTxt,
+          row.marca_id || null,
+          row.marca_txt || null,
           row.referencia || null,
           row.lote || null,
           row.unidades ? Number(row.unidades) : null,
-          tipoId, tipoPTxt,
+          row.tipo_prenda_id || null,
           usuariocreacion || null,
         ]
       );
-
       if (r.rowCount && r.rowCount > 0) inserted++; else duplicates++;
     } catch { errors++; }
   }
@@ -262,10 +286,10 @@ export const bulkCreateDespachos = async (req: Request, res: Response) => {
 
 export const updateDespachoEstado = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { estado } = req.body;
+  const { estado_id } = req.body;
   try {
     const r = await pool.query(
-      'UPDATE dogama_despachos SET estado=$1 WHERE id=$2 RETURNING *', [estado, id]
+      'UPDATE dogama_despachos SET estado_id=$1 WHERE id=$2 RETURNING *', [estado_id, id]
     );
     if (r.rowCount === 0) return res.status(404).json({ error: 'No encontrado' });
     res.json(r.rows[0]);
@@ -288,16 +312,20 @@ const CITAS_SELECT = `
     c.*,
     dm.descripcion       AS marca_nombre,
     dc.descripcion_conf  AS proveedor_nombre,
-    doc.descripcion      AS tipo_oc_nombre
+    doc.descripcion      AS tipo_oc_nombre,
+    e.name               AS estado_nombre
   FROM dogama_citas_recogidas c
   LEFT JOIN dogama_marcas          dm  ON dm.id  = c.marca_id
   LEFT JOIN dogama_confeccionistas dc  ON dc.id  = c.proveedor_id
   LEFT JOIN dogama_tipos_oc        doc ON doc.id = c.tipo_oc_id
+  LEFT JOIN estados                e   ON e.id   = c.estado_id
 `;
 
 export const getCitasRecogidas = async (req: Request, res: Response) => {
+  const assignable = req.query.assignable === 'true';
+  const where = assignable ? `WHERE c.estado_id <> 'EST-10'` : '';
   try {
-    const result = await pool.query(`${CITAS_SELECT} ORDER BY c.fecha DESC, c.id DESC LIMIT 2000`);
+    const result = await pool.query(`${CITAS_SELECT} ${where} ORDER BY c.fecha DESC, c.id DESC LIMIT 2000`);
     res.json(result.rows);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 };
@@ -310,32 +338,14 @@ export const bulkCreateCitas = async (req: Request, res: Response) => {
   let inserted = 0; let duplicates = 0; let errors = 0;
 
   for (const row of rows) {
-    const marcaTxt     = (row.marca_txt || '').trim();
-    const proveedorTxt = (row.proveedor_txt || row.proveedor || '').trim();
-    const tipoOcTxt    = (row.tipo_oc || '').trim();
     try {
-      const [marcaRes, provRes, tipoOcRes] = await Promise.all([
-        marcaTxt
-          ? pool.query('SELECT id FROM dogama_marcas WHERE LOWER(TRIM(descripcion))=LOWER(TRIM($1)) LIMIT 1', [marcaTxt])
-          : Promise.resolve({ rows: [] }),
-        proveedorTxt
-          ? pool.query('SELECT id FROM dogama_confeccionistas WHERE LOWER(TRIM(descripcion_conf))=LOWER(TRIM($1)) LIMIT 1', [proveedorTxt])
-          : Promise.resolve({ rows: [] }),
-        tipoOcTxt
-          ? pool.query('SELECT id FROM dogama_tipos_oc WHERE LOWER(TRIM(descripcion))=LOWER(TRIM($1)) LIMIT 1', [tipoOcTxt])
-          : Promise.resolve({ rows: [] }),
-      ]);
-      const marcaId     = marcaRes.rows[0]?.id || null;
-      const proveedorId = provRes.rows[0]?.id || null;
-      const tipoOcId    = tipoOcRes.rows[0]?.id || null;
-
       const r = await pool.query(
         `INSERT INTO dogama_citas_recogidas
            (fecha, turno, hora_inicio, hora_fin,
-            marca_id, marca_txt, referencia, color, lote,
-            mesa, cantidad, proveedor, proveedor_id, numero_documento,
-            tipo_oc, tipo_oc_id, estado, usuario_creacion)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pendiente',$17)
+            marca_id, referencia, color, lote,
+            mesa, cantidad, proveedor_id, numero_documento,
+            tipo_oc_id, estado_id, usuario_creacion)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'EST-03',$14)
          ON CONFLICT ON CONSTRAINT uq_cita DO NOTHING
          RETURNING id`,
         [
@@ -343,21 +353,18 @@ export const bulkCreateCitas = async (req: Request, res: Response) => {
           row.turno || null,
           row.hora_inicio || null,
           row.hora_fin || null,
-          marcaId, marcaTxt,
+          row.marca_id || null,
           row.referencia || null,
           row.color || null,
           row.lote || null,
           row.mesa != null ? Number(row.mesa) : null,
           row.cantidad != null ? Number(row.cantidad) : null,
-          proveedorTxt || null,
-          proveedorId,
+          row.proveedor_id || null,
           row.numero_documento || null,
-          tipoOcTxt || null,
-          tipoOcId,
+          row.tipo_oc_id || null,
           usuariocreacion || null,
         ]
       );
-
       if (r.rowCount && r.rowCount > 0) inserted++; else duplicates++;
     } catch { errors++; }
   }
@@ -367,10 +374,10 @@ export const bulkCreateCitas = async (req: Request, res: Response) => {
 
 export const updateCitaEstado = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { estado } = req.body;
+  const { estado_id } = req.body;
   try {
     const r = await pool.query(
-      'UPDATE dogama_citas_recogidas SET estado=$1 WHERE id=$2 RETURNING *', [estado, id]
+      'UPDATE dogama_citas_recogidas SET estado_id=$1 WHERE id=$2 RETURNING *', [estado_id, id]
     );
     if (r.rowCount === 0) return res.status(404).json({ error: 'No encontrado' });
     res.json(r.rows[0]);
@@ -379,7 +386,7 @@ export const updateCitaEstado = async (req: Request, res: Response) => {
 
 export const patchCita = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const ALLOWED = ['estado', 'hora_inicio', 'hora_fin', 'turno', 'tipo_oc', 'tipo_oc_id'];
+  const ALLOWED = ['estado_id', 'hora_inicio', 'hora_fin', 'turno', 'tipo_oc_id'];
   const entries = Object.entries(req.body).filter(([k]) => ALLOWED.includes(k));
   if (entries.length === 0) return res.status(400).json({ error: 'Sin campos válidos para actualizar' });
   const sets = entries.map(([k], i) => `${k}=$${i + 1}`).join(', ');
@@ -562,6 +569,156 @@ export const testEmailSend = async (req: Request, res: Response) => {
     }
 
     res.json({ success: true, message: `Correo de prueba enviado a ${cfg.email}` });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+// ── ASIGNACIONES ACTIVAS DE FLOTA ─────────────────────────────────────────────
+
+export const getActiveFleetAssignments = async (req: Request, res: Response) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        a.id         AS assignment_id,
+        a.vehicle_id,
+        v.plate,
+        v.brand      AS vehicle_brand,
+        a.driver_id,
+        d.name       AS driver_name,
+        a.client_id,
+        cl.name      AS client_name
+      FROM assignments a
+      JOIN vehicles v  ON v.id  = a.vehicle_id
+      JOIN drivers  d  ON d.id  = a.driver_id
+      JOIN clients  cl ON cl.id = a.client_id
+      WHERE a.is_active = true
+      ORDER BY cl.name, v.plate
+    `);
+    res.json(result.rows);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+// ── PLANILLAS HISTORIAL ───────────────────────────────────────────────────────
+
+export const createPlanillaHistorial = async (req: Request, res: Response) => {
+  const { vehicle_id, remesa, manifiesto, valor_cxc, valor_cxp, items, usuario_creacion } = req.body;
+  if (!vehicle_id || !Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'vehicle_id e items son obligatorios' });
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Derive conductor_id and client_id from active fleet assignment
+    const ar = await client.query(
+      `SELECT a.driver_id, a.client_id
+       FROM assignments a
+       WHERE a.vehicle_id = $1 AND a.is_active = true
+       LIMIT 1`,
+      [vehicle_id]
+    );
+    const conductor_id = ar.rows[0]?.driver_id || null;
+    const client_id   = ar.rows[0]?.client_id  || null;
+
+    const inserted: any[] = [];
+    const despIds: number[] = [];
+    const citaIds: number[] = [];
+
+    for (const item of items as Array<{ tipo: 'despacho' | 'cita'; id: number }>) {
+      const r = await client.query(
+        `INSERT INTO dogama_planillas_historial
+           (vehicle_id, conductor_id, client_id, remesa, manifiesto, valor_cxc, valor_cxp,
+            tipo, despacho_id, cita_id, usuario_creacion)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         RETURNING *`,
+        [
+          vehicle_id,
+          conductor_id || null,
+          client_id,
+          remesa     || null,
+          manifiesto || null,
+          valor_cxc  != null ? Number(valor_cxc)  : null,
+          valor_cxp  != null ? Number(valor_cxp)  : null,
+          item.tipo,
+          item.tipo === 'despacho' ? item.id : null,
+          item.tipo === 'cita'     ? item.id : null,
+          usuario_creacion || null,
+        ]
+      );
+      inserted.push(r.rows[0]);
+      if (item.tipo === 'despacho') despIds.push(item.id);
+      else citaIds.push(item.id);
+    }
+
+    if (despIds.length > 0) {
+      await client.query(
+        `UPDATE dogama_despachos SET estado_id='EST-10' WHERE id = ANY($1::int[])`,
+        [despIds]
+      );
+    }
+    if (citaIds.length > 0) {
+      await client.query(
+        `UPDATE dogama_citas_recogidas SET estado_id='EST-10' WHERE id = ANY($1::int[])`,
+        [citaIds]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ inserted: inserted.length, rows: inserted });
+  } catch (e: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+};
+
+export const getPlanillasHistorial = async (req: Request, res: Response) => {
+  const { placa, fecha, confeccionista } = req.query as Record<string, string>;
+  const params: any[] = [];
+  const where: string[] = [];
+
+  // Default to today when no fecha provided
+  const fechaFiltro = fecha || new Date().toLocaleDateString('en-CA');
+  params.push(fechaFiltro);
+  where.push(`ph.fecha = $${params.length}`);
+
+  if (placa) {
+    params.push(`%${placa}%`);
+    where.push(`v.plate ILIKE $${params.length}`);
+  }
+
+  if (confeccionista) {
+    params.push(`%${confeccionista}%`);
+    where.push(`conf.descripcion_conf ILIKE $${params.length}`);
+  }
+
+  const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+  try {
+    const r = await pool.query(`
+      SELECT ph.*,
+             v.plate                      AS placa,
+             v.brand                      AS vehicle_brand,
+             cl.name                      AS client_nombre,
+             d.name                       AS conductor_nombre,
+             u.name                       AS usuario_nombre,
+             conf.descripcion_conf        AS confeccionista_nombre
+      FROM dogama_planillas_historial ph
+      LEFT JOIN vehicles                v    ON v.id    = ph.vehicle_id
+      LEFT JOIN clients                 cl   ON cl.id   = ph.client_id
+      LEFT JOIN drivers                 d    ON d.id    = ph.conductor_id
+      LEFT JOIN users                   u    ON u.id    = ph.usuario_creacion
+      LEFT JOIN dogama_despachos        dd   ON dd.id   = ph.despacho_id  AND ph.tipo = 'despacho'
+      LEFT JOIN dogama_citas_recogidas  dc   ON dc.id   = ph.cita_id      AND ph.tipo = 'cita'
+      LEFT JOIN dogama_confeccionistas  conf ON conf.id = COALESCE(dd.confeccionista_id, dc.proveedor_id)
+      ${whereClause}
+      ORDER BY ph.fecha_creacion DESC
+      LIMIT 500
+    `, params);
+    res.json(r.rows);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

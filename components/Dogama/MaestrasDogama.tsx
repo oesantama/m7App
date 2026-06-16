@@ -8,28 +8,56 @@ import * as XLSX from 'xlsx';
 
 interface Props { user: User; }
 
+interface Ciudad {
+  id: number;
+  nombre: string;
+  id_departamento: number | null;
+  departamento_nombre: string | null;
+}
+
+interface Departamento {
+  id: number;
+  nombre: string;
+}
+
 interface Confeccionista {
   id: number;
   descripcion_conf: string;
   direccion: string;
   ciudad: string | null;
-  estado: string;
+  ciudad_id: number | null;
+  ciudad_nombre: string | null;
+  estado_id: string | null;
+  estado_nombre: string | null;
   usuariocreacion: string | null;
+  usuario_nombre: string | null;
   fecha_creacion: string;
+  usuarioactualizacion: string | null;
+  usuario_actualizacion_nombre: string | null;
+  fecha_actualizacion: string | null;
   telefono: string | null;
   correo: string | null;
 }
 
-const EMPTY_FORM = {
+interface FormState {
+  descripcion_conf: string;
+  direccion: string;
+  ciudad: string;
+  ciudad_id: number | null;
+  estado_id: string;
+  telefono: string;
+  correo: string;
+}
+
+const EMPTY_FORM: FormState = {
   descripcion_conf: '',
   direccion: '',
   ciudad: '',
-  estado: 'activo',
+  ciudad_id: null,
+  estado_id: 'EST-01',
   telefono: '',
   correo: '',
 };
-
-type FormState = typeof EMPTY_FORM;
 
 // ── Utilidades de similitud ───────────────────────────────────────────────────
 const normalize = (s: string) =>
@@ -69,6 +97,8 @@ interface PreviewRow {
   descripcion_conf: string;
   direccion: string;
   ciudad: string;
+  ciudad_id: number | null;
+  telefono: string;
   correo: string;
   status: ImportStatus;
   matchedWith?: string;
@@ -141,9 +171,11 @@ function buildPreviewRows(json: any[], existingDB: Confeccionista[]): PreviewRow
     .map((row, i) => ({
       index: i,
       descripcion_conf: (row.Confeccionista || row.confeccionista || row.descripcion_conf || '').trim(),
-      direccion: (row.Direccion || row.direccion || '').trim(),
+      direccion: (row.Direccion || row.direccion || row.DIRECCION || '').trim(),
       ciudad: (row.CIUDAD || row.Ciudad || row.ciudad || '').trim(),
-      correo: (row.correo || row.Correo || row.email || '').trim(),
+      ciudad_id: null,
+      telefono: (row.Telefono || row.telefono || row.TELEFONO || '').trim(),
+      correo: (row.correo || row.Correo || row.email || row.CORREO || '').trim(),
       status: 'nuevo' as ImportStatus,
       matchedWith: undefined,
       selected: true,
@@ -193,6 +225,159 @@ const downloadTemplate = (filename: string, columns: string[], exampleRow?: Reco
   XLSX.writeFile(wb, filename);
 };
 
+// ── Add Ciudad Dialog ─────────────────────────────────────────────────────────
+function AddCiudadDialog({ prefill, departamentos, onClose, onSaved }: {
+  prefill: string;
+  departamentos: Departamento[];
+  onClose: () => void;
+  onSaved: (id: number, nombre: string) => void;
+}) {
+  const [nombre, setNombre] = React.useState(prefill);
+  const [depId, setDepId] = React.useState<string>('');
+  const [saving, setSaving] = React.useState(false);
+
+  const handleSave = async () => {
+    if (!nombre.trim()) { toast.error('Nombre de ciudad es obligatorio'); return; }
+    if (!depId) { toast.error('Seleccione un departamento'); return; }
+    setSaving(true);
+    try {
+      const r = await api.saveCiudad({ nombre: nombre.trim().toUpperCase(), idDepartamento: Number(depId), estado: 'EST-01', usuarioControl: 'System' });
+      toast.success(`Ciudad "${r.nombre}" creada`);
+      onSaved(r.id, r.nombre);
+    } catch (e: any) { toast.error(e?.message || 'Error al guardar ciudad'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <h3 className="text-base font-black text-slate-800 mb-4 uppercase tracking-wide">Nueva Ciudad</h3>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">Nombre</label>
+            <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
+              className="w-full border border-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">Departamento</label>
+            <select value={depId} onChange={e => setDepId(e.target.value)}
+              className="w-full border border-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition">
+              <option value="">— Seleccionar —</option>
+              {departamentos.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="flex gap-3 mt-5 justify-end">
+          <button onClick={onClose} className="px-5 py-2 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">Cancelar</button>
+          <button onClick={handleSave} disabled={saving}
+            className="px-5 py-2 rounded-2xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition">
+            {saving ? 'Guardando…' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Ciudad Select (used in FormModal) ─────────────────────────────────────────
+function CiudadSelect({ value, rawText, ciudades, departamentos, onChange }: {
+  value: number | null;
+  rawText: string;
+  ciudades: Ciudad[];
+  departamentos: Departamento[];
+  onChange: (id: number | null, nombre: string) => void;
+}) {
+  const [search, setSearch] = React.useState(rawText || '');
+  const [showAdd, setShowAdd] = React.useState(false);
+  const selected = ciudades.find(c => c.id === value);
+
+  const filtered = ciudades.filter(c =>
+    normalize(c.nombre).includes(normalize(search))
+  );
+
+  return (
+    <div>
+      {selected && (
+        <div className="flex items-center gap-2 mb-2">
+          <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-bold">{selected.nombre}</span>
+          <button onClick={() => { onChange(null, search); setSearch(search); }}
+            className="text-slate-400 hover:text-red-500 text-xs font-bold transition">✕</button>
+        </div>
+      )}
+      {!selected && (
+        <div className="space-y-1">
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/></svg>
+            <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar ciudad…"
+              className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300 transition" />
+          </div>
+          {search.length > 0 && (
+            <div className="border border-slate-200 rounded-xl overflow-hidden max-h-36 overflow-y-auto bg-white shadow-sm">
+              {filtered.length === 0 ? (
+                <div className="px-3 py-2 text-xs text-slate-400 text-center">Sin coincidencias</div>
+              ) : filtered.slice(0, 20).map(c => (
+                <button key={c.id} onClick={() => { onChange(c.id, c.nombre); setSearch(c.nombre); }}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 hover:text-indigo-700 transition border-b border-slate-50 last:border-0">
+                  {c.nombre}
+                  {c.departamento_nombre && <span className="ml-1 text-slate-400">({c.departamento_nombre})</span>}
+                </button>
+              ))}
+            </div>
+          )}
+          <button onClick={() => setShowAdd(true)}
+            className="text-xs text-indigo-600 hover:text-indigo-800 font-bold underline transition">
+            + Agregar ciudad nueva
+          </button>
+        </div>
+      )}
+      {showAdd && (
+        <AddCiudadDialog
+          prefill={search}
+          departamentos={departamentos}
+          onClose={() => setShowAdd(false)}
+          onSaved={(id, nombre) => { onChange(id, nombre); setSearch(nombre); setShowAdd(false); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Delete Confirm Dialog ─────────────────────────────────────────────────────
+function DeleteDialog({ name, onConfirm, onCancel }: { name: string; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      onClick={e => { if (e.target === e.currentTarget) onCancel(); }}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-black text-slate-800">Eliminar registro</p>
+            <p className="text-xs text-slate-500 mt-0.5">Esta acción no se puede deshacer</p>
+          </div>
+        </div>
+        <p className="text-sm text-slate-700 mb-6">
+          ¿Desea eliminar <span className="font-bold text-slate-900">"{name}"</span>?
+        </p>
+        <div className="flex gap-3 justify-end">
+          <button onClick={onCancel}
+            className="px-5 py-2 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">
+            Cancelar
+          </button>
+          <button onClick={onConfirm}
+            className="px-5 py-2 rounded-2xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition">
+            Eliminar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Modal Formulario ──────────────────────────────────────────────────────────
 function FormModal({ editing, user, onClose, onSaved }: {
   editing: Confeccionista | null;
@@ -206,13 +391,23 @@ function FormModal({ editing, user, onClose, onSaved }: {
           descripcion_conf: editing.descripcion_conf,
           direccion: editing.direccion,
           ciudad: editing.ciudad || '',
-          estado: editing.estado,
+          ciudad_id: editing.ciudad_id ?? null,
+          estado_id: editing.estado_id ?? 'EST-01',
           telefono: editing.telefono || '',
           correo: editing.correo || '',
         }
       : { ...EMPTY_FORM }
   );
   const [saving, setSaving] = useState(false);
+  const [estados, setEstados] = useState<{ id: string; name: string }[]>([]);
+  const [ciudades, setCiudades] = useState<Ciudad[]>([]);
+  const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
+
+  useEffect(() => {
+    api.getEstados().then((data: any[]) => setEstados(Array.isArray(data) ? data : [])).catch(() => {});
+    api.getCiudades().then((data: any[]) => setCiudades(Array.isArray(data) ? data : [])).catch(() => {});
+    api.getDepartamentos().then((data: any[]) => setDepartamentos(Array.isArray(data) ? data : [])).catch(() => {});
+  }, []);
 
   const handleSave = async () => {
     if (!form.descripcion_conf.trim() || !form.direccion.trim()) {
@@ -221,11 +416,12 @@ function FormModal({ editing, user, onClose, onSaved }: {
     }
     setSaving(true);
     try {
+      const payload = { ...form, ciudad_id: form.ciudad_id || null };
       if (editing) {
-        await api.dogamaUpdateConfeccionista(editing.id, form);
+        await api.dogamaUpdateConfeccionista(editing.id, { ...payload, usuarioactualizacion: user.id });
         toast.success('Confeccionista actualizado');
       } else {
-        await api.dogamaCreateConfeccionista({ ...form, usuariocreacion: user.name || user.email });
+        await api.dogamaCreateConfeccionista({ ...payload, usuariocreacion: user.id });
         toast.success('Confeccionista creado');
       }
       onSaved();
@@ -235,10 +431,9 @@ function FormModal({ editing, user, onClose, onSaved }: {
     } finally { setSaving(false); }
   };
 
-  const fields: [string, keyof FormState, string][] = [
+  const textFields: [string, keyof FormState, string][] = [
     ['Confeccionista *', 'descripcion_conf', 'text'],
     ['Dirección *', 'direccion', 'text'],
-    ['Ciudad', 'ciudad', 'text'],
     ['Teléfono', 'telefono', 'text'],
     ['Correo', 'correo', 'email'],
   ];
@@ -251,26 +446,38 @@ function FormModal({ editing, user, onClose, onSaved }: {
           {editing ? 'Editar Confeccionista' : 'Nuevo Confeccionista'}
         </h3>
         <div className="space-y-3">
-          {fields.map(([label, key, type]) => (
+          {textFields.map(([label, key, type]) => (
             <div key={key}>
               <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">{label}</label>
               <input
                 type={type}
-                value={form[key]}
+                value={form[key] as string ?? ''}
                 onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
                 className="w-full border border-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 transition"
               />
             </div>
           ))}
           <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">Ciudad</label>
+            <CiudadSelect
+              value={form.ciudad_id}
+              rawText={form.ciudad}
+              ciudades={ciudades}
+              departamentos={departamentos}
+              onChange={(id, nombre) => {
+                setForm(f => ({ ...f, ciudad_id: id, ciudad: nombre }));
+                if (id) api.getCiudades().then((data: any[]) => setCiudades(Array.isArray(data) ? data : [])).catch(() => {});
+              }}
+            />
+          </div>
+          <div>
             <label className="block text-xs font-bold text-slate-500 mb-1 uppercase tracking-wide">Estado</label>
             <select
-              value={form.estado}
-              onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}
+              value={form.estado_id}
+              onChange={e => setForm(f => ({ ...f, estado_id: e.target.value }))}
               className="w-full border border-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition"
             >
-              <option value="activo">Activo</option>
-              <option value="inactivo">Inactivo</option>
+              {estados.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
           </div>
         </div>
@@ -290,15 +497,69 @@ function FormModal({ editing, user, onClose, onSaved }: {
 }
 
 type SortDir = 'asc' | 'desc';
-type SortKey = keyof Pick<PreviewRow, 'descripcion_conf' | 'direccion' | 'ciudad' | 'correo' | 'status'>;
+type SortKey = keyof Pick<PreviewRow, 'descripcion_conf' | 'direccion' | 'ciudad' | 'telefono' | 'correo' | 'status'>;
 
 const PREVIEW_COLS: { key: SortKey; label: string }[] = [
   { key: 'descripcion_conf', label: 'Confeccionista' },
   { key: 'direccion', label: 'Dirección' },
   { key: 'ciudad', label: 'Ciudad' },
+  { key: 'telefono', label: 'Teléfono' },
   { key: 'correo', label: 'Correo' },
   { key: 'status', label: 'Estado' },
 ];
+
+// ── Preview Ciudad Resolver (inline en tabla de importación) ──────────────────
+function PreviewCiudadResolver({ rawCiudad, ciudades, onSelect, onAddCity }: {
+  rawCiudad: string;
+  ciudades: Ciudad[];
+  onSelect: (id: number) => void;
+  onAddCity: (raw: string) => void;
+}) {
+  const [search, setSearch] = React.useState(rawCiudad || '');
+  const [open, setOpen] = React.useState(false);
+
+  if (!rawCiudad) return <span className="text-red-400 text-xs font-bold">⚠ Sin ciudad</span>;
+
+  const filtered = ciudades.filter(c => normalize(c.nombre).includes(normalize(search)));
+
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-amber-600 font-bold truncate max-w-[90px]">{rawCiudad}</span>
+        <button onClick={() => setOpen(o => !o)}
+          className="text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 hover:bg-amber-200 rounded font-bold transition whitespace-nowrap">
+          Asignar
+        </button>
+      </div>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-40 bg-white border border-slate-200 rounded-2xl shadow-2xl p-3 w-56">
+          <input autoFocus type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar ciudad…"
+            className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl text-xs mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+          <div className="max-h-36 overflow-y-auto divide-y divide-slate-50">
+            {filtered.length === 0
+              ? <p className="text-xs text-slate-400 text-center py-2">Sin coincidencias</p>
+              : filtered.slice(0, 12).map(c => (
+                  <button key={c.id} onClick={() => { onSelect(c.id); setOpen(false); }}
+                    className="w-full text-left px-2 py-1.5 text-xs hover:bg-indigo-50 hover:text-indigo-700 transition">
+                    {c.nombre}
+                    {c.departamento_nombre && <span className="ml-1 text-slate-400">({c.departamento_nombre})</span>}
+                  </button>
+                ))
+            }
+          </div>
+          <div className="border-t border-slate-100 mt-2 pt-2 flex gap-2">
+            <button onClick={() => { onAddCity(rawCiudad); setOpen(false); }}
+              className="flex-1 text-xs text-indigo-600 font-bold hover:text-indigo-800 transition">
+              + Nueva ciudad
+            </button>
+            <button onClick={() => setOpen(false)} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Modal Preview Excel ───────────────────────────────────────────────────────
 function ImportPreviewModal({ rows, onClose, onConfirm, importing }: {
@@ -316,6 +577,35 @@ function ImportPreviewModal({ rows, onClose, onConfirm, importing }: {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [ciudades, setCiudades] = useState<Ciudad[]>([]);
+  const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
+  const [showAddCity, setShowAddCity] = useState<string | null>(null); // ciudad raw text being added
+  const [validationError, setValidationError] = useState(false);
+
+  // Load cities + auto-resolve on mount
+  React.useEffect(() => {
+    api.getCiudades().then((data: any[]) => {
+      const cs: Ciudad[] = Array.isArray(data) ? data : [];
+      setCiudades(cs);
+      // Auto-resolve: match ciudad text to cfg_ciudades by name
+      if (cs.length > 0) {
+        setItems(prev => prev.map(r => {
+          if (r.ciudad_id || !r.ciudad) return r;
+          const match = cs.find(c => normalize(c.nombre) === normalize(r.ciudad));
+          return match ? { ...r, ciudad_id: match.id } : r;
+        }));
+      }
+    }).catch(() => {});
+    api.getDepartamentos().then((data: any[]) => setDepartamentos(Array.isArray(data) ? data : [])).catch(() => {});
+  }, []);
+
+  // When a ciudad is resolved for one row → auto-resolve all rows with same raw text
+  const resolveCity = (rawCiudad: string, ciudadId: number) => {
+    const norm = normalize(rawCiudad);
+    setItems(prev => prev.map(r =>
+      normalize(r.ciudad) === norm ? { ...r, ciudad_id: ciudadId } : r
+    ));
+  };
 
   const toggle = (idx: number) =>
     setItems(prev => prev.map((r, i) => i === idx ? { ...r, selected: !r.selected } : r));
@@ -350,11 +640,23 @@ function ImportPreviewModal({ rows, onClose, onConfirm, importing }: {
       })
     : filtered;
 
+  const isIncomplete = (r: PreviewRow) => r.selected && (!r.ciudad_id || !r.direccion.trim());
+
   const counts = {
     nuevo: items.filter(r => r.status === 'nuevo').length,
     posible: items.filter(r => r.status === 'posible_duplicado').length,
     exacto: items.filter(r => r.status === 'duplicado_exacto').length,
     selected: items.filter(r => r.selected).length,
+    sinCiudad: items.filter(r => r.selected && !r.ciudad_id).length,
+    sinDir: items.filter(r => r.selected && !r.direccion.trim()).length,
+  };
+
+  const canImport = counts.selected > 0 && counts.sinCiudad === 0 && counts.sinDir === 0;
+
+  const handleImport = () => {
+    if (!canImport) { setValidationError(true); return; }
+    setValidationError(false);
+    onConfirm(items.filter(r => r.selected));
   };
 
   const exportExcel = () => {
@@ -431,36 +733,58 @@ function ImportPreviewModal({ rows, onClose, onConfirm, importing }: {
                       className="rounded cursor-pointer accent-indigo-400" />
                   </th>
                   {PREVIEW_COLS.map(col => (
-                    <th key={col.key}
-                      onClick={() => handleSort(col.key)}
+                    <th key={col.key} onClick={() => handleSort(col.key)}
                       className="px-4 py-4 text-left font-black border-b border-slate-800 cursor-pointer hover:bg-slate-800/50 transition-colors">
                       {col.label}<SortIcon k={col.key} />
                     </th>
                   ))}
+                  <th className="px-4 py-4 text-left font-black border-b border-slate-800 text-amber-400">Ciudad ID *</th>
                   <th className="px-4 py-4 text-left font-black border-b border-slate-800">Coincide con</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {sorted.length === 0 ? (
-                  <tr><td colSpan={7} className="px-6 py-10 text-center text-slate-400 font-medium">Sin resultados</td></tr>
+                  <tr><td colSpan={9} className="px-6 py-10 text-center text-slate-400 font-medium">Sin resultados</td></tr>
                 ) : sorted.map((r, i) => {
                   const globalIdx = items.indexOf(r);
+                  const incomplete = isIncomplete(r);
                   return (
-                    <tr key={i} className={`transition-colors hover:bg-slate-50/70 ${!r.selected ? 'opacity-40' : ''}`}>
+                    <tr key={i} className={`transition-colors ${incomplete ? 'bg-red-50 border-l-2 border-red-400' : !r.selected ? 'opacity-40' : 'hover:bg-slate-50/70'}`}>
                       <td className="px-3 py-3 text-center">
-                        <input type="checkbox" checked={r.selected}
-                          disabled={isBlocked(r)}
+                        <input type="checkbox" checked={r.selected} disabled={isBlocked(r)}
                           onChange={() => toggle(globalIdx)}
                           className="rounded cursor-pointer disabled:cursor-not-allowed accent-indigo-500" />
                       </td>
                       <td className="px-4 py-3 font-semibold text-slate-800 break-words min-w-[120px]">{r.descripcion_conf}</td>
-                      <td className="px-4 py-3 text-slate-600 break-words min-w-[140px]">{r.direccion}</td>
-                      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{r.ciudad || '—'}</td>
+                      <td className={`px-4 py-3 break-words min-w-[130px] ${!r.direccion.trim() && r.selected ? 'text-red-500 font-bold' : 'text-slate-600'}`}>
+                        {r.direccion || <span className="text-red-400 text-xs font-bold">⚠ Requerida</span>}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500 whitespace-nowrap text-xs">{r.ciudad || '—'}</td>
+                      <td className="px-4 py-3 text-slate-500 whitespace-nowrap text-xs">{r.telefono || '—'}</td>
                       <td className="px-4 py-3 text-xs text-slate-500 break-words min-w-[120px]">{r.correo || '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ${STATUS_LABELS[r.status].cls}`}>
                           {STATUS_LABELS[r.status].label}
                         </span>
+                      </td>
+                      {/* Ciudad ID resolver */}
+                      <td className="px-3 py-2 min-w-[180px]">
+                        {r.ciudad_id ? (
+                          <div className="flex items-center gap-1">
+                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold">
+                              {ciudades.find(c => c.id === r.ciudad_id)?.nombre || `ID:${r.ciudad_id}`}
+                            </span>
+                            <button onClick={() => setItems(prev => prev.map((x, xi) => xi === globalIdx ? { ...x, ciudad_id: null } : x))}
+                              className="text-slate-300 hover:text-red-400 text-xs transition">✕</button>
+                          </div>
+                        ) : (
+                          <PreviewCiudadResolver
+                            rawCiudad={r.ciudad}
+                            ciudades={ciudades}
+                            onSelect={id => resolveCity(r.ciudad, id)}
+                            onAddCity={raw => setShowAddCity(raw)}
+                          />
+                        )}
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-400 italic break-words min-w-[120px]">{r.matchedWith || '—'}</td>
                     </tr>
@@ -471,19 +795,139 @@ function ImportPreviewModal({ rows, onClose, onConfirm, importing }: {
           </div>
         </div>
 
+        {/* Validation warning */}
+        {validationError && (counts.sinCiudad > 0 || counts.sinDir > 0) && (
+          <div className="mx-6 mb-2 px-4 py-2 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-700 font-bold">
+            ⚠ Faltan datos en registros seleccionados:
+            {counts.sinCiudad > 0 && <span className="ml-2">{counts.sinCiudad} sin ciudad asignada</span>}
+            {counts.sinDir > 0 && <span className="ml-2">{counts.sinDir} sin dirección</span>}
+            . Asígnelos o deselecciónelos para continuar.
+          </div>
+        )}
+
         {/* Footer */}
         <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-3">
           <button onClick={onClose} disabled={importing}
             className="px-5 py-2 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition">
             Cancelar
           </button>
-          <button onClick={() => onConfirm(items.filter(r => r.selected))}
-            disabled={importing || counts.selected === 0}
-            className="px-5 py-2 rounded-2xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 disabled:opacity-50 transition">
-            {importing ? 'Importando…' : `Importar ${counts.selected} registros`}
+          <button onClick={handleImport} disabled={importing || counts.selected === 0}
+            className={`px-5 py-2 rounded-2xl text-sm font-bold transition disabled:opacity-50 ${canImport ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-red-100 text-red-700 hover:bg-red-200'}`}>
+            {importing ? 'Importando…' : canImport ? `Importar ${counts.selected} registros` : `⚠ Completar datos (${(counts.sinCiudad + counts.sinDir)} pendientes)`}
           </button>
         </div>
+
+        {/* AddCiudadDialog desde preview */}
+        {showAddCity && (
+          <AddCiudadDialog
+            prefill={showAddCity}
+            departamentos={departamentos}
+            onClose={() => setShowAddCity(null)}
+            onSaved={(id, nombre) => {
+              setCiudades(prev => [...prev, { id, nombre, id_departamento: null, departamento_nombre: null }]);
+              resolveCity(showAddCity, id);
+              setShowAddCity(null);
+              toast.success(`Ciudad "${nombre}" creada y asignada`);
+            }}
+          />
+        )}
       </div>
+    </div>
+  );
+}
+
+// ── Ciudad Cell (inline resolver for table rows with no ciudad_id) ─────────────
+function CiudadCell({ row, ciudades, departamentos, onResolved }: {
+  row: Confeccionista;
+  ciudades: Ciudad[];
+  departamentos: Departamento[];
+  onResolved: () => void;
+}) {
+  const [search, setSearch] = React.useState(row.ciudad || '');
+  const [open, setOpen] = React.useState(false);
+  const [showAdd, setShowAdd] = React.useState(false);
+  const [saving, setSaving] = React.useState(false);
+
+  if (row.ciudad_id) {
+    return <span className="text-slate-700">{row.ciudad_nombre || row.ciudad || '—'}</span>;
+  }
+  if (!row.ciudad) {
+    return <span className="text-slate-300 text-xs">—</span>;
+  }
+
+  const filtered = ciudades.filter(c =>
+    normalize(c.nombre).includes(normalize(search))
+  );
+
+  const handleSelect = async (ciudadId: number, ciudadNombre: string) => {
+    setSaving(true);
+    try {
+      await api.dogamaUpdateConfeccionista(row.id, {
+        descripcion_conf: row.descripcion_conf,
+        direccion: row.direccion,
+        ciudad: row.ciudad,
+        ciudad_id: ciudadId,
+        estado_id: row.estado_id || 'EST-01',
+        telefono: row.telefono,
+        correo: row.correo,
+        usuarioactualizacion: 'System',
+      });
+      await api.dogamaResolveCiudadBulk(row.ciudad!, ciudadId);
+      toast.success(`Ciudad asignada: ${ciudadNombre}`);
+      onResolved();
+    } catch { toast.error('Error al asignar ciudad'); }
+    finally { setSaving(false); setOpen(false); }
+  };
+
+  const handleNewCiudad = async (id: number, nombre: string) => {
+    setShowAdd(false);
+    await handleSelect(id, nombre);
+  };
+
+  return (
+    <div className="relative min-w-[160px]">
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded">{row.ciudad}</span>
+        <button onClick={() => setOpen(o => !o)} disabled={saving}
+          className="text-xs text-indigo-600 hover:text-indigo-800 font-bold border border-indigo-200 rounded px-1.5 py-0.5 transition hover:bg-indigo-50 disabled:opacity-40">
+          {saving ? '…' : 'Asignar'}
+        </button>
+      </div>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-30 bg-white border border-slate-200 rounded-2xl shadow-xl p-3 min-w-[220px]">
+          <div className="relative mb-2">
+            <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/></svg>
+            <input autoFocus type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar ciudad…"
+              className="w-full pl-7 pr-2 py-1.5 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300 transition" />
+          </div>
+          <div className="max-h-40 overflow-y-auto divide-y divide-slate-50">
+            {filtered.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-2">Sin coincidencias</p>
+            ) : filtered.slice(0, 15).map(c => (
+              <button key={c.id} onClick={() => handleSelect(c.id, c.nombre)}
+                className="w-full text-left px-2 py-1.5 text-xs hover:bg-indigo-50 hover:text-indigo-700 transition">
+                {c.nombre}
+                {c.departamento_nombre && <span className="ml-1 text-slate-400 text-[10px]">({c.departamento_nombre})</span>}
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 pt-2 border-t border-slate-100 flex gap-2">
+            <button onClick={() => { setShowAdd(true); setOpen(false); }}
+              className="flex-1 text-xs text-indigo-600 font-bold hover:text-indigo-800 transition text-center">
+              + Agregar ciudad
+            </button>
+            <button onClick={() => setOpen(false)} className="text-xs text-slate-400 hover:text-slate-600 transition">✕</button>
+          </div>
+        </div>
+      )}
+      {showAdd && (
+        <AddCiudadDialog
+          prefill={row.ciudad || ''}
+          departamentos={departamentos}
+          onClose={() => setShowAdd(false)}
+          onSaved={handleNewCiudad}
+        />
+      )}
     </div>
   );
 }
@@ -493,13 +937,21 @@ function ConfeccionistasTab({ user }: { user: User }) {
   const [rows, setRows] = useState<Confeccionista[]>([]);
   const [loading, setLoading] = useState(true);
   const [formModal, setFormModal] = useState<{ open: boolean; editing: Confeccionista | null }>({ open: false, editing: null });
+  const [deleteTarget, setDeleteTarget] = useState<Confeccionista | null>(null);
   const [previewRows, setPreviewRows] = useState<PreviewRow[] | null>(null);
   const [importing, setImporting] = useState(false);
+  const [ciudades, setCiudades] = useState<Ciudad[]>([]);
+  const [departamentos, setDepartamentos] = useState<Departamento[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const canCreate = hasPermission(user, 'MAESTRAS_DOGAMA', 'create');
   const canEdit = hasPermission(user, 'MAESTRAS_DOGAMA', 'edit');
   const canDelete = hasPermission(user, 'MAESTRAS_DOGAMA', 'delete');
+
+  const loadCiudades = () => {
+    api.getCiudades().then((data: any[]) => setCiudades(Array.isArray(data) ? data : [])).catch(() => {});
+    api.getDepartamentos().then((data: any[]) => setDepartamentos(Array.isArray(data) ? data : [])).catch(() => {});
+  };
 
   const load = async () => {
     setLoading(true);
@@ -508,13 +960,15 @@ function ConfeccionistasTab({ user }: { user: User }) {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); loadCiudades(); }, []);
 
-  const handleDelete = async (r: Confeccionista) => {
-    if (!confirm(`¿Eliminar "${r.descripcion_conf}"?`)) return;
+  const handleDelete = async (r: Confeccionista) => setDeleteTarget(r);
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await api.dogamaDeleteConfeccionista(r.id);
+      await api.dogamaDeleteConfeccionista(deleteTarget.id);
       toast.success('Eliminado');
+      setDeleteTarget(null);
       load();
     } catch { toast.error('Error al eliminar'); }
   };
@@ -546,9 +1000,10 @@ function ConfeccionistasTab({ user }: { user: User }) {
         Confeccionista: r.descripcion_conf,
         direccion: r.direccion,
         CIUDAD: r.ciudad,
+        Telefono: r.telefono,
         correo: r.correo,
       }));
-      const result = await api.dogamaBulkConfeccionistas(toImport, user.name || user.email);
+      const result = await api.dogamaBulkConfeccionistas(toImport, user.id);
       toast.success(`Importados: ${result.inserted}${result.duplicates > 0 ? ` | Duplicados ignorados: ${result.duplicates}` : ''}${result.errors > 0 ? ` | Errores: ${result.errors}` : ''}`);
       setPreviewRows(null);
       load();
@@ -563,20 +1018,41 @@ function ConfeccionistasTab({ user }: { user: User }) {
       render: r => <span className="font-semibold text-slate-800">{r.descripcion_conf}</span> },
     { header: 'Dirección', key: 'direccion', sortable: true, minWidth: '160px',
       render: r => <span className="text-slate-600">{r.direccion}</span> },
-    { header: 'Ciudad', key: 'ciudad', sortable: true, noWrap: true },
+    { header: 'Ciudad', key: 'ciudad_nombre', sortable: true, noWrap: false,
+      render: r => (
+        <CiudadCell
+          row={r}
+          ciudades={ciudades}
+          departamentos={departamentos}
+          onResolved={() => { load(); loadCiudades(); }}
+        />
+      )},
     { header: 'Teléfono', key: 'telefono', sortable: false, noWrap: true },
     { header: 'Correo', key: 'correo', sortable: false, minWidth: '160px',
       render: r => <span className="text-xs text-slate-500">{r.correo || '—'}</span> },
-    { header: 'Estado', key: 'estado', sortable: true,
-      render: r => (
-        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${r.estado === 'activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-          {r.estado}
-        </span>
-      )},
+    { header: 'Estado', key: 'estado_nombre', sortable: true,
+      render: r => {
+        const isActive = r.estado_id === 'EST-01';
+        return (
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+            {r.estado_nombre ?? '—'}
+          </span>
+        );
+      }},
     { header: 'Creado por', key: 'usuariocreacion', sortable: false,
-      render: r => <span className="text-xs text-slate-400">{r.usuariocreacion || '—'}</span> },
-    { header: 'Fecha', key: 'fecha_creacion', sortable: true,
-      render: r => <span className="text-xs text-slate-400">{r.fecha_creacion ? new Date(r.fecha_creacion).toLocaleDateString('es-CO') : '—'}</span> },
+      render: r => (
+        <div className="text-xs text-slate-400 leading-tight">
+          <div>{r.usuario_nombre ?? r.usuariocreacion ?? '—'}</div>
+          <div className="text-slate-300">{r.fecha_creacion ? r.fecha_creacion.slice(0, 16).replace('T', ' ') : '—'}</div>
+        </div>
+      ) },
+    { header: 'Actualizado por', key: 'usuarioactualizacion', sortable: false,
+      render: r => r.fecha_actualizacion ? (
+        <div className="text-xs text-slate-400 leading-tight">
+          <div>{r.usuario_actualizacion_nombre ?? r.usuarioactualizacion ?? '—'}</div>
+          <div className="text-slate-300">{r.fecha_actualizacion.slice(0, 16).replace('T', ' ')}</div>
+        </div>
+      ) : <span className="text-slate-200 text-xs">—</span> },
     ...(canEdit || canDelete ? [{
       header: 'Acciones',
       key: 'acciones' as keyof Confeccionista,
@@ -614,8 +1090,8 @@ function ConfeccionistasTab({ user }: { user: User }) {
         )}
         <button
           onClick={() => downloadTemplate('formato_confeccionistas.xlsx',
-            ['Confeccionista', 'direccion', 'correo', 'CIUDAD'],
-            { Confeccionista: 'EJEMPLO SAS', direccion: 'CR 45 # 80-12', correo: 'ejemplo@correo.com', CIUDAD: 'MEDELLÍN' })}
+            ['Confeccionista', 'direccion', 'CIUDAD', 'Telefono', 'correo'],
+            { Confeccionista: 'EJEMPLO SAS', direccion: 'CR 45 # 80-12', CIUDAD: 'MEDELLÍN', Telefono: '3001234567', correo: 'ejemplo@correo.com' })}
           className="px-5 py-2.5 rounded-2xl text-sm font-black bg-slate-100 hover:bg-slate-200 text-slate-700 transition shadow-sm">
           📄 Ver Formato
         </button>
@@ -652,12 +1128,20 @@ function ConfeccionistasTab({ user }: { user: User }) {
           importing={importing}
         />
       )}
+
+      {deleteTarget && (
+        <DeleteDialog
+          name={deleteTarget.descripcion_conf}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </div>
   );
 }
 
 // ── Tab Catálogo Genérico (Marcas + Tipos Prenda) ─────────────────────────────
-interface CatalogItem { id: number; descripcion: string; estado: string; fecha_creacion: string; usuariocreacion: string | null; }
+interface CatalogItem { id: number; descripcion: string; estado_id: string | null; estado_nombre: string | null; fecha_creacion: string; usuariocreacion: string | null; usuario_nombre: string | null; usuarioactualizacion: string | null; usuario_actualizacion_nombre: string | null; fecha_actualizacion: string | null; }
 type CatalogRowStatus = 'nuevo' | 'ya_existe' | 'duplicado_archivo';
 
 interface CatalogPreviewRow { index: number; descripcion: string; status: CatalogRowStatus; selected: boolean; }
@@ -824,10 +1308,13 @@ function CatalogTab({ user, table, label }: { user: User; table: string; label: 
   const [rows, setRows] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<{ open: boolean; editing: CatalogItem | null }>({ open: false, editing: null });
-  const [form, setForm] = useState({ descripcion: '', estado: 'activo' });
+  const [form, setForm] = useState({ descripcion: '', estado_id: 'EST-01' });
+  const [estados, setEstados] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => { api.getEstados().then((d: any[]) => setEstados(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
   const [saving, setSaving] = useState(false);
   const [previewRows, setPreviewRows] = useState<CatalogPreviewRow[] | null>(null);
   const [importing, setImporting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<CatalogItem | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const canCreate = hasPermission(user, 'MAESTRAS_DOGAMA', 'create');
@@ -842,18 +1329,18 @@ function CatalogTab({ user, table, label }: { user: User; table: string; label: 
   };
   useEffect(() => { load(); }, [table]);
 
-  const openNew = () => { setForm({ descripcion: '', estado: 'activo' }); setModal({ open: true, editing: null }); };
-  const openEdit = (r: CatalogItem) => { setForm({ descripcion: r.descripcion, estado: r.estado }); setModal({ open: true, editing: r }); };
+  const openNew = () => { setForm({ descripcion: '', estado_id: 'EST-01' }); setModal({ open: true, editing: null }); };
+  const openEdit = (r: CatalogItem) => { setForm({ descripcion: r.descripcion, estado_id: r.estado_id ?? 'EST-01' }); setModal({ open: true, editing: r }); };
 
   const handleSave = async () => {
     if (!form.descripcion.trim()) { toast.error('Descripción es obligatoria'); return; }
     setSaving(true);
     try {
       if (modal.editing) {
-        await api.dogamaUpdateCatalogItem(table, modal.editing.id, form);
+        await api.dogamaUpdateCatalogItem(table, modal.editing.id, { ...form, usuarioactualizacion: user.id });
         toast.success('Actualizado');
       } else {
-        await api.dogamaCreateCatalogItem(table, { ...form, usuariocreacion: user.name || user.email });
+        await api.dogamaCreateCatalogItem(table, { ...form, usuariocreacion: user.id });
         toast.success('Creado');
       }
       setModal({ open: false, editing: null }); load();
@@ -861,9 +1348,10 @@ function CatalogTab({ user, table, label }: { user: User; table: string; label: 
     finally { setSaving(false); }
   };
 
-  const handleDelete = async (r: CatalogItem) => {
-    if (!confirm(`¿Eliminar "${r.descripcion}"?`)) return;
-    try { await api.dogamaDeleteCatalogItem(table, r.id); toast.success('Eliminado'); load(); }
+  const handleDelete = (r: CatalogItem) => setDeleteTarget(r);
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try { await api.dogamaDeleteCatalogItem(table, deleteTarget.id); toast.success('Eliminado'); setDeleteTarget(null); load(); }
     catch { toast.error('Error al eliminar'); }
   };
 
@@ -884,7 +1372,7 @@ function CatalogTab({ user, table, label }: { user: User; table: string; label: 
     if (!selected.length) return;
     setImporting(true);
     try {
-      const r = await api.dogamaBulkCatalog(table, selected.map(s => ({ descripcion: s.descripcion })), user.name || user.email);
+      const r = await api.dogamaBulkCatalog(table, selected.map(s => ({ descripcion: s.descripcion })), user.id);
       toast.success(`Importados: ${r.inserted}${r.duplicates > 0 ? ` | Ya existían: ${r.duplicates}` : ''}${r.errors > 0 ? ` | Errores: ${r.errors}` : ''}`);
       setPreviewRows(null); load();
     } catch (e: any) { toast.error(e?.message || 'Error al importar'); }
@@ -894,11 +1382,25 @@ function CatalogTab({ user, table, label }: { user: User; table: string; label: 
   const columns: ColumnDef<CatalogItem>[] = [
     { header: '#', key: 'id', sortable: true, render: r => <span className="text-slate-400 text-xs">{r.id}</span> },
     { header: 'Descripción', key: 'descripcion', sortable: true, render: r => <span className="font-semibold text-slate-800">{r.descripcion}</span> },
-    { header: 'Estado', key: 'estado', sortable: true, render: r => (
-      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${r.estado === 'activo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{r.estado}</span>
+    { header: 'Estado', key: 'estado_id', sortable: true, render: r => (
+      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${r.estado_id === 'EST-01' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+        {r.estado_nombre ?? '—'}
+      </span>
     )},
-    { header: 'Creado por', key: 'usuariocreacion', sortable: false, render: r => <span className="text-xs text-slate-400">{r.usuariocreacion || '—'}</span> },
-    { header: 'Fecha', key: 'fecha_creacion', sortable: true, render: r => <span className="text-xs text-slate-400">{r.fecha_creacion ? new Date(r.fecha_creacion).toLocaleDateString('es-CO') : '—'}</span> },
+    { header: 'Creado por', key: 'usuariocreacion', sortable: false,
+      render: r => (
+        <div className="text-xs text-slate-400 leading-tight">
+          <div>{r.usuario_nombre ?? r.usuariocreacion ?? '—'}</div>
+          <div className="text-slate-300">{r.fecha_creacion ? r.fecha_creacion.slice(0, 16).replace('T', ' ') : '—'}</div>
+        </div>
+      ) },
+    { header: 'Actualizado por', key: 'usuarioactualizacion', sortable: false,
+      render: r => r.fecha_actualizacion ? (
+        <div className="text-xs text-slate-400 leading-tight">
+          <div>{r.usuario_actualizacion_nombre ?? r.usuarioactualizacion ?? '—'}</div>
+          <div className="text-slate-300">{r.fecha_actualizacion.slice(0, 16).replace('T', ' ')}</div>
+        </div>
+      ) : <span className="text-slate-200 text-xs">—</span> },
     ...(canEdit || canDelete ? [{
       header: 'Acciones', key: 'acciones' as keyof CatalogItem, sortable: false,
       render: (r: CatalogItem) => (
@@ -947,10 +1449,9 @@ function CatalogTab({ user, table, label }: { user: User; table: string; label: 
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Estado</label>
-                <select value={form.estado} onChange={e => setForm(f => ({ ...f, estado: e.target.value }))}
+                <select value={form.estado_id} onChange={e => setForm(f => ({ ...f, estado_id: e.target.value }))}
                   className="w-full border border-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition">
-                  <option value="activo">Activo</option>
-                  <option value="inactivo">Inactivo</option>
+                  {estados.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </select>
               </div>
             </div>
@@ -962,6 +1463,14 @@ function CatalogTab({ user, table, label }: { user: User; table: string; label: 
             </div>
           </div>
         </div>
+      )}
+
+      {deleteTarget && (
+        <DeleteDialog
+          name={deleteTarget.descripcion}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
       )}
     </div>
   );
