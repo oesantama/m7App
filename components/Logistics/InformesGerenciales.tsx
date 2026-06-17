@@ -176,102 +176,116 @@ export const InformesGerenciales: React.FC = () => {
       return;
     }
     setPdfGenerating(true);
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const margin = 10;
-    let yPos = 10;
 
-    try {
-      // Add Logo
-      pdf.addImage(LOGO_MILLA_SIETE, 'PNG', margin, yPos, 40, 15);
-      yPos += 20;
+    // Wait for React to re-render the hidden tabs before capturing
+    setTimeout(async () => {
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      let yPos = 10;
 
-      // Add Title
-      const currentTitle = pdfTitleRef.current || 'Informe Gerencial';
-      pdf.setFontSize(16);
-      pdf.setFont('helvetica', 'bold');
-      const titleWidth = pdf.getTextWidth(currentTitle);
-      pdf.text(currentTitle, (pageWidth - titleWidth) / 2, yPos);
-      yPos += 8;
+      try {
+        // Add Logo
+        pdf.addImage(LOGO_MILLA_SIETE, 'PNG', margin, yPos, 40, 15);
+        yPos += 20;
 
-      // Add Metadata (Dates and Clients)
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`Fecha Desde: ${reportFromDate || 'N/A'} - Fecha Hasta: ${reportToDate || 'N/A'}`, margin, yPos);
-      yPos += 6;
-      const clientText = reportSelectedClients.includes('ALL') ? 'Todos los Clientes' : reportSelectedClients.join(', ');
-      const truncatedClientText = clientText.length > 100 ? clientText.substring(0, 97) + '...' : clientText;
-      pdf.text(`Clientes: ${truncatedClientText}`, margin, yPos);
-      yPos += 15;
+        // Add Title
+        const currentTitle = pdfTitleRef.current || 'Informe Gerencial';
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        const titleWidth = pdf.getTextWidth(currentTitle);
+        pdf.text(currentTitle, (pageWidth - titleWidth) / 2, yPos);
+        yPos += 8;
 
-      // Add sections
-      for (const sectionId of pdfSelectedSections) {
-        const element = document.getElementById(sectionId);
-        if (!element) continue;
+        // Add Metadata (Dates and Clients)
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(`Fecha Desde: ${reportFromDate || 'N/A'} - Fecha Hasta: ${reportToDate || 'N/A'}`, margin, yPos);
+        yPos += 6;
+        const clientText = reportSelectedClients.includes('ALL') ? 'Todos los Clientes' : reportSelectedClients.join(', ');
+        const splitClientText = pdf.splitTextToSize(`Clientes: ${clientText}`, pageWidth - (margin * 2));
+        pdf.text(splitClientText, margin, yPos);
+        yPos += (splitClientText.length * 5) + 10;
 
-        const scrollables = Array.from(element.querySelectorAll('.overflow-y-auto, .overflow-x-auto, .overflow-hidden, .max-h-\\[65vh\\], .custom-scrollbar')) as HTMLElement[];
-        scrollables.push(element);
+        // Add sections
+        for (const sectionId of pdfSelectedSections) {
+          const element = document.getElementById(sectionId);
+          if (!element) continue;
 
-        const originalStyles = scrollables.map(el => ({
-          el,
-          maxHeight: el.style.maxHeight,
-          overflow: el.style.overflow,
-          overflowX: el.style.overflowX,
-          overflowY: el.style.overflowY,
-          height: el.style.height,
-          width: el.style.width
-        }));
+          const scrollables = Array.from(element.querySelectorAll('.overflow-y-auto, .overflow-x-auto, .overflow-hidden, .max-h-\\[65vh\\], .custom-scrollbar')) as HTMLElement[];
+          scrollables.push(element);
 
-        scrollables.forEach(el => {
-          el.style.maxHeight = 'none';
-          el.style.overflow = 'visible';
-          el.style.overflowX = 'visible';
-          el.style.overflowY = 'visible';
-          el.style.height = 'auto';
-          if (el.className.includes('overflow-x-auto') || el === element) {
-            el.style.width = 'max-content';
+          const originalStyles = scrollables.map(el => ({
+            el,
+            maxHeight: el.style.maxHeight,
+            overflow: el.style.overflow,
+            overflowX: el.style.overflowX,
+            overflowY: el.style.overflowY,
+            height: el.style.height,
+            width: el.style.width
+          }));
+
+          scrollables.forEach(el => {
+            el.style.maxHeight = 'none';
+            el.style.overflow = 'visible';
+            el.style.overflowX = 'visible';
+            el.style.overflowY = 'visible';
+            el.style.height = 'auto';
+            if (el.className.includes('overflow-x-auto') || el === element) {
+              el.style.width = 'max-content';
+            }
+          });
+
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          const dataUrl = await htmlToImage.toPng(element, {
+            backgroundColor: '#ffffff',
+            pixelRatio: 2,
+          });
+
+          originalStyles.forEach(({ el, maxHeight, overflow, overflowX, overflowY, height, width }) => {
+            el.style.maxHeight = maxHeight;
+            el.style.overflow = overflow;
+            el.style.overflowX = overflowX;
+            el.style.overflowY = overflowY;
+            el.style.height = height;
+            el.style.width = width;
+          });
+
+          const imgProps = pdf.getImageProperties(dataUrl);
+          let imgWidth = pageWidth - (margin * 2);
+          let imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
+          // Scale down if it exceeds the max available height on a full page
+          const maxAvailableHeight = pageHeight - (margin * 2);
+          if (imgHeight > maxAvailableHeight) {
+            imgHeight = maxAvailableHeight;
+            imgWidth = (imgProps.width * imgHeight) / imgProps.height;
           }
-        });
 
-        await new Promise(resolve => setTimeout(resolve, 100));
+          if (yPos + imgHeight > pageHeight - margin) {
+            pdf.addPage();
+            yPos = margin;
+          }
 
-        const dataUrl = await htmlToImage.toPng(element, {
-          backgroundColor: '#ffffff',
-          pixelRatio: 2,
-        });
+          // Center the scaled image if its width is smaller than the full width
+          const xPos = margin + ((pageWidth - (margin * 2) - imgWidth) / 2);
 
-        originalStyles.forEach(({ el, maxHeight, overflow, overflowX, overflowY, height, width }) => {
-          el.style.maxHeight = maxHeight;
-          el.style.overflow = overflow;
-          el.style.overflowX = overflowX;
-          el.style.overflowY = overflowY;
-          el.style.height = height;
-          el.style.width = width;
-        });
-
-        const imgProps = pdf.getImageProperties(dataUrl);
-        const imgWidth = pageWidth - (margin * 2);
-        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
-
-        if (yPos + imgHeight > pageHeight - margin) {
-          pdf.addPage();
-          yPos = margin;
+          pdf.addImage(dataUrl, 'PNG', xPos, yPos, imgWidth, imgHeight);
+          yPos += imgHeight + 10;
         }
 
-        pdf.addImage(dataUrl, 'PNG', margin, yPos, imgWidth, imgHeight);
-        yPos += imgHeight + 10;
+        pdf.save(`${currentTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`);
+        toast.success('Informe generado exitosamente');
+        setIsPdfModalOpen(false);
+      } catch (error) {
+        console.error('Error generando PDF:', error);
+        toast.error('Ocurrió un error al generar el PDF');
+      } finally {
+        setPdfGenerating(false);
       }
-
-      pdf.save(`${currentTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`);
-      toast.success('Informe generado exitosamente');
-      setIsPdfModalOpen(false);
-    } catch (error) {
-      console.error('Error generando PDF:', error);
-      toast.error('Ocurrió un error al generar el PDF');
-    } finally {
-      setPdfGenerating(false);
-    }
+    }, 400); // Wait 400ms to guarantee React layout flushes correctly
   };
 
   useEffect(() => {
