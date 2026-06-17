@@ -78,6 +78,7 @@ const PublicCapacitacion: React.FC<PublicCapacitacionProps> = ({ embeddedCapId, 
   const [intentoId, setIntentoId] = useState<number | null>(null);
   const [pregIdx, setPregIdx] = useState(0);
   const [respuestas, setRespuestas] = useState<Record<number, number[]>>({});
+  const [asociacionMatches, setAsociacionMatches] = useState<Record<number, Record<number, string>>>({});
   const [showRetro, setShowRetro] = useState(false);
   const [timerSecs, setTimerSecs] = useState<number | null>(null);
   const [tiempoUsado, setTiempoUsado] = useState(0);
@@ -133,6 +134,7 @@ const PublicCapacitacion: React.FC<PublicCapacitacionProps> = ({ embeddedCapId, 
       setIntentoId(result.intento_id);
       setPregIdx(0);
       setRespuestas({});
+      setAsociacionMatches({});
       setShowRetro(false);
       startTimeRef.current = Date.now();
 
@@ -226,11 +228,28 @@ const PublicCapacitacion: React.FC<PublicCapacitacionProps> = ({ embeddedCapId, 
     const tipo = pregActual.tipo;
     setRespuestas(prev => {
       const cur = prev[pregActual.id] || [];
-      if (tipo === 'seleccion_unica' || tipo === 'falso_verdadero' || tipo === 'imagen_opciones') {
+      if (tipo === 'seleccion_unica' || tipo === 'falso_verdadero') {
         return { ...prev, [pregActual.id]: [opcionId] };
       }
       if (cur.includes(opcionId)) return { ...prev, [pregActual.id]: cur.filter(id => id !== opcionId) };
       return { ...prev, [pregActual.id]: [...cur, opcionId] };
+    });
+  };
+
+  const handleAsociacionMatch = (opcionId: number, matchText: string) => {
+    if (!pregActual) return;
+    setAsociacionMatches(prev => {
+      const curPreg = prev[pregActual.id] || {};
+      const newMatches = { ...curPreg, [opcionId]: matchText };
+      
+      // Update respuestas array implicitly based on correct matches
+      const correctIds = pregActual.opciones
+        .filter(o => newMatches[o.id] === o.imagen_url)
+        .map(o => o.id);
+        
+      setRespuestas(rPrev => ({ ...rPrev, [pregActual.id]: correctIds }));
+      
+      return { ...prev, [pregActual.id]: newMatches };
     });
   };
 
@@ -630,7 +649,7 @@ const PublicCapacitacion: React.FC<PublicCapacitacionProps> = ({ embeddedCapId, 
                 {pregActual.tipo === 'seleccion_unica' ? 'Selección única'
                   : pregActual.tipo === 'seleccion_multiple' ? 'Selección múltiple'
                     : pregActual.tipo === 'falso_verdadero' ? 'Verdadero / Falso'
-                      : 'Con imagen'}
+                      : 'Asociación / Emparejar'}
               </span>
               {pregActual.tipo === 'seleccion_multiple' && (
                 <span className="text-[9px] text-blue-500 font-black uppercase">Puede haber varias correctas</span>
@@ -647,24 +666,64 @@ const PublicCapacitacion: React.FC<PublicCapacitacionProps> = ({ embeddedCapId, 
 
             {/* Opciones */}
             <div className="space-y-3">
-              {pregActual.opciones.map(op => {
-                const selected = opcionesSeleccionadas.includes(op.id);
-                const isMulti = pregActual.tipo === 'seleccion_multiple';
-                return (
-                  <button key={op.id} onClick={() => { if (!showRetro) toggleOpcion(op.id); }}
-                    disabled={showRetro}
-                    className={`w-full text-left flex items-center gap-4 p-4 rounded-2xl border-2 transition-all ${selected
-                      ? 'bg-slate-900 border-slate-900 text-white'
-                      : 'bg-white border-slate-200 text-slate-700 hover:border-slate-400'}`}>
-                    <div className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${selected ? 'bg-emerald-500 border-emerald-500' : isMulti ? 'bg-slate-100 border-slate-200' : 'rounded-full bg-slate-100 border-slate-200'}`}>
-                      {selected && <Icons.Check className="w-4 h-4 text-white" />}
-                    </div>
-                    {op.imagen_url
-                      ? <img src={op.imagen_url} alt={op.texto || ''} className="h-16 rounded-xl object-contain" />
-                      : <span className="text-sm font-bold">{op.texto}</span>}
-                  </button>
-                );
-              })}
+              {pregActual.tipo === 'asociacion' ? (
+                // Lógica especial para asociación
+                <div className="space-y-4 bg-slate-50 p-4 rounded-2xl border-2 border-slate-100">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Empareja los conceptos con sus definiciones</p>
+                  {pregActual.opciones.map(op => {
+                    const currentMatches = asociacionMatches[pregActual.id] || {};
+                    const matchText = currentMatches[op.id] || '';
+                    const allSelectedValues = Object.values(currentMatches);
+                    const matchOptions = [...pregActual.opciones].map(o => o.imagen_url).filter(Boolean).sort();
+                    
+                    return (
+                      <div key={op.id} className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-white rounded-xl border transition-all ${matchText ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200'}`}>
+                        <div className="flex-1 font-bold text-sm text-slate-800">
+                          {op.texto}
+                        </div>
+                        <div className="flex-shrink-0 w-full sm:w-1/2">
+                          <select 
+                            value={matchText}
+                            onChange={(e) => handleAsociacionMatch(op.id, e.target.value)}
+                            disabled={showRetro}
+                            className={`w-full border-2 rounded-xl px-3 py-2 text-sm font-medium outline-none transition-all disabled:opacity-70 ${matchText ? 'bg-white border-emerald-500 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-700 focus:border-emerald-500'}`}
+                          >
+                            <option value="">Selecciona una opción...</option>
+                            {matchOptions.map((opt, idx) => {
+                              const isSelectedElsewhere = allSelectedValues.includes(opt) && matchText !== opt;
+                              return (
+                                <option key={idx} value={opt} disabled={isSelectedElsewhere}>
+                                  {opt} {isSelectedElsewhere ? '(ya seleccionado)' : ''}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                // Lógica normal para los demás tipos
+                pregActual.opciones.map(op => {
+                  const selected = opcionesSeleccionadas.includes(op.id);
+                  const isMulti = pregActual.tipo === 'seleccion_multiple';
+                  return (
+                    <button key={op.id} onClick={() => { if (!showRetro) toggleOpcion(op.id); }}
+                      disabled={showRetro}
+                      className={`w-full text-left flex items-center gap-4 p-4 rounded-2xl border-2 transition-all ${selected
+                        ? 'bg-slate-900 border-slate-900 text-white'
+                        : 'bg-white border-slate-200 text-slate-700 hover:border-slate-400'}`}>
+                      <div className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ${selected ? 'bg-emerald-500 border-emerald-500' : isMulti ? 'bg-slate-100 border-slate-200' : 'rounded-full bg-slate-100 border-slate-200'}`}>
+                        {selected && <Icons.Check className="w-4 h-4 text-white" />}
+                      </div>
+                      {op.imagen_url
+                        ? <img src={op.imagen_url} alt={op.texto || ''} className="h-16 rounded-xl object-contain" />
+                        : <span className="text-sm font-bold">{op.texto}</span>}
+                    </button>
+                  );
+                })
+              )}
             </div>
 
             {/* Retroalimentación inline */}

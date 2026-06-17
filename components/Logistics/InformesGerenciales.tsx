@@ -3,8 +3,11 @@ import {
   Upload, X, Search, Calendar, Filter, 
   CheckCircle2, RefreshCw, ChevronLeft, ChevronRight, 
   FileSpreadsheet, HelpCircle, BarChart3, ChevronDown, AlertCircle,
-  Download, Eye, Truck, FileText, Check
+  Download, Eye, Truck, FileText, Check, Camera
 } from 'lucide-react';
+import * as htmlToImage from 'html-to-image';
+import { jsPDF } from 'jspdf';
+import { LOGO_MILLA_SIETE } from '../../utils/logoMillaSiete';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
@@ -84,12 +87,192 @@ export const InformesGerenciales: React.FC = () => {
   // Tabs state: 'informes' | 'consultas' | 'cargar'
   const [activeTab, setActiveTab] = useState<'informes' | 'consultas' | 'cargar'>('informes');
 
+  // Helper to download an element as an image
+  const downloadAsImage = async (elementId: string, filename: string) => {
+    const element = document.getElementById(elementId);
+    if (!element) return;
+    
+    // Temporarily expand scrollable areas inside the element
+    const scrollables = Array.from(element.querySelectorAll('.overflow-y-auto, .overflow-x-auto, .overflow-hidden, .max-h-\\[65vh\\], .custom-scrollbar')) as HTMLElement[];
+    scrollables.push(element); // Incluir el contenedor principal
+
+    const originalStyles = scrollables.map(el => ({
+      el,
+      maxHeight: el.style.maxHeight,
+      overflow: el.style.overflow,
+      overflowX: el.style.overflowX,
+      overflowY: el.style.overflowY,
+      height: el.style.height,
+      width: el.style.width
+    }));
+    
+    scrollables.forEach(el => {
+      el.style.maxHeight = 'none';
+      el.style.overflow = 'visible';
+      el.style.overflowX = 'visible';
+      el.style.overflowY = 'visible';
+      el.style.height = 'auto';
+      if (el.className.includes('overflow-x-auto') || el === element) {
+        el.style.width = 'max-content';
+      }
+    });
+
+    try {
+      const dataUrl = await htmlToImage.toPng(element, {
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
+      });
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = filename;
+      link.click();
+    } catch (err) {
+      console.error("Error al generar imagen", err);
+      toast.error('Error al generar la imagen');
+    } finally {
+      // Restore styles
+      originalStyles.forEach(({ el, maxHeight, overflow, overflowX, overflowY, height, width }) => {
+        el.style.maxHeight = maxHeight;
+        el.style.overflow = overflow;
+        el.style.overflowX = overflowX;
+        el.style.overflowY = overflowY;
+        el.style.height = height;
+        el.style.width = width;
+      });
+    }
+  };
+
   // Sub-reports tab: 'estados' | 'clientes'
   const [subReportTab, setSubReportTab] = useState<'estados' | 'clientes' | 'tdmVentas' | 'pendienteFacturar'>('tdmVentas');
   const [provClientes, setProvClientes] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [managementClients, setManagementClients] = useState<string[]>([]);
+
+  // --- PDF REPORT MODAL STATE ---
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const pdfTitleRef = useRef('Informe Gerencial');
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+  
+  const PDF_SECTIONS = [
+    { id: 'chart-manifiesto-mes', label: 'Gráfica: Volúmenes Mensuales' },
+    { id: 'chart-manifiesto-cliente', label: 'Gráfica: Volúmenes por Cliente' },
+    { id: 'table-ventas-clientes-general', label: 'Tabla: Ventas Clientes General' },
+    { id: 'chart-pie-ventas-general', label: 'Gráfica: Distribución Ventas General' },
+    { id: 'table-resumen-ventas-generales', label: 'Tabla: Resumen Ventas Generales' },
+    { id: 'chart-pie-ventas-resumen', label: 'Gráfica: Distribución Resumen Ventas' },
+    { id: 'table-pendiente-facturar', label: 'Tabla: Pendiente por Facturar' },
+    { id: 'table-estados', label: 'Tabla: Consolidado por Estados' },
+    { id: 'table-clientes', label: 'Tabla: Consolidado Clientes y Placas' }
+  ];
+  
+  const [pdfSelectedSections, setPdfSelectedSections] = useState<string[]>([
+    'chart-manifiesto-mes', 'table-ventas-clientes-general'
+  ]);
+
+  const generatePdfReport = async () => {
+    if (pdfSelectedSections.length === 0) {
+      toast.error('Debe seleccionar al menos un elemento para el informe');
+      return;
+    }
+    setPdfGenerating(true);
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    let yPos = 10;
+
+    try {
+      // Add Logo
+      pdf.addImage(LOGO_MILLA_SIETE, 'PNG', margin, yPos, 40, 15);
+      yPos += 20;
+
+      // Add Title
+      const currentTitle = pdfTitleRef.current || 'Informe Gerencial';
+      pdf.setFontSize(16);
+      pdf.setFont('helvetica', 'bold');
+      const titleWidth = pdf.getTextWidth(currentTitle);
+      pdf.text(currentTitle, (pageWidth - titleWidth) / 2, yPos);
+      yPos += 8;
+
+      // Add Metadata (Dates and Clients)
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      pdf.text(`Fecha Desde: ${reportFromDate || 'N/A'} - Fecha Hasta: ${reportToDate || 'N/A'}`, margin, yPos);
+      yPos += 6;
+      const clientText = reportSelectedClients.includes('ALL') ? 'Todos los Clientes' : reportSelectedClients.join(', ');
+      const truncatedClientText = clientText.length > 100 ? clientText.substring(0, 97) + '...' : clientText;
+      pdf.text(`Clientes: ${truncatedClientText}`, margin, yPos);
+      yPos += 15;
+
+      // Add sections
+      for (const sectionId of pdfSelectedSections) {
+        const element = document.getElementById(sectionId);
+        if (!element) continue;
+
+        const scrollables = Array.from(element.querySelectorAll('.overflow-y-auto, .overflow-x-auto, .overflow-hidden, .max-h-\\[65vh\\], .custom-scrollbar')) as HTMLElement[];
+        scrollables.push(element);
+
+        const originalStyles = scrollables.map(el => ({
+          el,
+          maxHeight: el.style.maxHeight,
+          overflow: el.style.overflow,
+          overflowX: el.style.overflowX,
+          overflowY: el.style.overflowY,
+          height: el.style.height,
+          width: el.style.width
+        }));
+
+        scrollables.forEach(el => {
+          el.style.maxHeight = 'none';
+          el.style.overflow = 'visible';
+          el.style.overflowX = 'visible';
+          el.style.overflowY = 'visible';
+          el.style.height = 'auto';
+          if (el.className.includes('overflow-x-auto') || el === element) {
+            el.style.width = 'max-content';
+          }
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        const dataUrl = await htmlToImage.toPng(element, {
+          backgroundColor: '#ffffff',
+          pixelRatio: 2,
+        });
+
+        originalStyles.forEach(({ el, maxHeight, overflow, overflowX, overflowY, height, width }) => {
+          el.style.maxHeight = maxHeight;
+          el.style.overflow = overflow;
+          el.style.overflowX = overflowX;
+          el.style.overflowY = overflowY;
+          el.style.height = height;
+          el.style.width = width;
+        });
+
+        const imgProps = pdf.getImageProperties(dataUrl);
+        const imgWidth = pageWidth - (margin * 2);
+        const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+
+        if (yPos + imgHeight > pageHeight - margin) {
+          pdf.addPage();
+          yPos = margin;
+        }
+
+        pdf.addImage(dataUrl, 'PNG', margin, yPos, imgWidth, imgHeight);
+        yPos += imgHeight + 10;
+      }
+
+      pdf.save(`${currentTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.pdf`);
+      toast.success('Informe generado exitosamente');
+      setIsPdfModalOpen(false);
+    } catch (error) {
+      console.error('Error generando PDF:', error);
+      toast.error('Ocurrió un error al generar el PDF');
+    } finally {
+      setPdfGenerating(false);
+    }
+  };
 
   useEffect(() => {
     const fetchOnMount = async () => {
@@ -2355,14 +2538,24 @@ export const InformesGerenciales: React.FC = () => {
               )}
             </div>
 
-            <button
-              onClick={generateReport}
-              disabled={reportLoading || !canGenerateReport}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-indigo-600/15 self-stretch md:self-auto justify-center transition-all disabled:opacity-40"
-            >
-              <RefreshCw className={reportLoading ? 'animate-spin' : ''} size={14} />
-              <span>Generar Consolidado</span>
-            </button>
+            <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+              <button
+                onClick={() => setIsPdfModalOpen(true)}
+                disabled={reportRecords.length === 0}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-emerald-600/15 justify-center transition-all disabled:opacity-40"
+              >
+                <Download size={14} />
+                <span>Bajar Informe</span>
+              </button>
+              <button
+                onClick={generateReport}
+                disabled={reportLoading || !canGenerateReport}
+                className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl text-xs font-black uppercase tracking-wider shadow-lg shadow-indigo-600/15 justify-center transition-all disabled:opacity-40"
+              >
+                <RefreshCw className={reportLoading ? 'animate-spin' : ''} size={14} />
+                <span>Generar Consolidado</span>
+              </button>
+            </div>
           </div>
 
           {/* RENDER BODY ONLY WHEN DATE RANGE IS SELECTED AS REQUESTED */}
@@ -2444,7 +2637,7 @@ export const InformesGerenciales: React.FC = () => {
               </div>
 
               {/* RENDER TREE SYSTEM */}
-              {subReportTab === 'pendienteFacturar' ? (
+              <div className={subReportTab === 'pendienteFacturar' || pdfGenerating ? 'block' : 'hidden'}>
                 <div className="space-y-4 animate-in fade-in duration-300">
                   {(() => {
                     // Calculate pending data
@@ -2588,7 +2781,7 @@ export const InformesGerenciales: React.FC = () => {
                     };
 
                     return (
-                      <div className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
+                      <div id="table-pendiente-facturar" className="bg-white rounded-3xl border border-slate-200/60 shadow-sm overflow-hidden">
                         <div className="p-5 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
                           <div>
                             <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">
@@ -2646,6 +2839,16 @@ export const InformesGerenciales: React.FC = () => {
                             >
                               <Download size={14} />
                               <span>Exportar Excel</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => downloadAsImage('table-pendiente-facturar', 'Pendiente_Facturar.png')}
+                              className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-slate-800/15 transition-all"
+                              title="Descargar como Imagen"
+                            >
+                              <Camera size={14} />
+                              <span>Imagen</span>
                             </button>
 
                             <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase font-mono border border-indigo-100/50">
@@ -2872,11 +3075,21 @@ export const InformesGerenciales: React.FC = () => {
                     );
                   })()}
                 </div>
-              ) : subReportTab === 'estados' ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between px-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                    <span>Arborescencia: Estado OC ➔ Estado Remesa ➔ Estado Manifiesto ➔ Clientes con Cantidad</span>
-                    <span>Mostrando {Object.keys(reportData).length} Estados de OC</span>
+              </div>
+              <div className={subReportTab === 'estados' || pdfGenerating ? 'block' : 'hidden'}>
+                <div id="table-estados" className="space-y-3 relative">
+                  <div className="flex items-start justify-between px-2 text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                    <div className="flex flex-col gap-1">
+                      <span>Arborescencia: Estado OC ➔ Estado Remesa ➔ Estado Manifiesto ➔ Clientes con Cantidad</span>
+                      <span>Mostrando {Object.keys(reportData).length} Estados de OC</span>
+                    </div>
+                    <button
+                      onClick={() => downloadAsImage('table-estados', 'Consolidado_Estados.png')}
+                      className="bg-slate-200 hover:bg-slate-300 text-slate-700 p-1.5 rounded-lg transition-all"
+                      title="Descargar como Imagen"
+                    >
+                      <Camera size={14} />
+                    </button>
                   </div>
 
                   <div className="space-y-3">
@@ -3016,11 +3229,21 @@ export const InformesGerenciales: React.FC = () => {
                     })}
                   </div>
                 </div>
-              ) : subReportTab === 'clientes' ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between px-2 text-[9px] font-black uppercase tracking-widest text-slate-400">
-                    <span>Arborescencia: Nombre Cliente ➔ Placa Vehículo (Cantidad de Viajes / Remesas)</span>
-                    <span>Mostrando {Object.keys(clientReportData).length} Clientes</span>
+              </div>
+              <div className={subReportTab === 'clientes' || pdfGenerating ? 'block' : 'hidden'}>
+                <div id="table-clientes" className="space-y-3 relative">
+                  <div className="flex items-start justify-between px-2 text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                    <div className="flex flex-col gap-1">
+                      <span>Arborescencia: Nombre Cliente ➔ Placa Vehículo (Cantidad de Viajes / Remesas)</span>
+                      <span>Mostrando {Object.keys(clientReportData).length} Clientes</span>
+                    </div>
+                    <button
+                      onClick={() => downloadAsImage('table-clientes', 'Consolidado_Clientes.png')}
+                      className="bg-slate-200 hover:bg-slate-300 text-slate-700 p-1.5 rounded-lg transition-all"
+                      title="Descargar como Imagen"
+                    >
+                      <Camera size={14} />
+                    </button>
                   </div>
 
                   <div className="space-y-3">
@@ -3082,7 +3305,8 @@ export const InformesGerenciales: React.FC = () => {
                     })}
                   </div>
                 </div>
-              ) : (
+              </div>
+              <div className={subReportTab === 'tdmVentas' || pdfGenerating ? 'block' : 'hidden'}>
                 <div className="space-y-8 animate-in fade-in duration-300">
               {(() => {
                 const ocBarData = getOcBarDataByMonth();
@@ -3092,10 +3316,19 @@ export const InformesGerenciales: React.FC = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     
                     {/* Chart 1: Estado Manifiesto distribution (Grouped by Month) */}
-                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col">
-                      <div className="border-b border-slate-100 pb-3 mb-3">
-                        <span className="text-[9px] font-black tracking-widest text-indigo-600 uppercase font-mono">Volúmenes Mensuales</span>
-                        <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 mt-0.5">ESTADO DE MANIFIESTO POR MES - Total: {reportRecords.length.toLocaleString()}</h3>
+                    <div id="chart-manifiesto-mes" className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm flex flex-col">
+                      <div className="border-b border-slate-100 pb-3 mb-3 flex justify-between items-start">
+                        <div>
+                          <span className="text-[9px] font-black tracking-widest text-indigo-600 uppercase font-mono">Volúmenes Mensuales</span>
+                          <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 mt-0.5">ESTADO DE MANIFIESTO POR MES - Total: {reportRecords.length.toLocaleString()}</h3>
+                        </div>
+                        <button
+                          onClick={() => downloadAsImage('chart-manifiesto-mes', 'Manifiestos_Mes.png')}
+                          className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-1.5 rounded-lg transition-all"
+                          title="Descargar Gráfica como Imagen"
+                        >
+                          <Camera size={14} />
+                        </button>
                       </div>
 
                       {/* Dynamic Title Badges for Left Chart */}
@@ -3146,11 +3379,20 @@ export const InformesGerenciales: React.FC = () => {
                     </div>
 
                     {/* Chart 2: States per Client */}
-                    <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm overflow-hidden flex flex-col">
+                    <div id="chart-manifiesto-cliente" className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm overflow-hidden flex flex-col">
                       <div className="border-b border-slate-100 pb-3 mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                          <span className="text-[9px] font-black tracking-widest text-violet-600 uppercase font-mono">Volúmenes de Clientes</span>
-                          <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 mt-0.5">ESTADO DE MANIFIESTO por Cliente - Total: {reportRecords.length.toLocaleString()}</h3>
+                        <div className="flex justify-between w-full sm:w-auto items-start">
+                          <div>
+                            <span className="text-[9px] font-black tracking-widest text-violet-600 uppercase font-mono">Volúmenes de Clientes</span>
+                            <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 mt-0.5">ESTADO DE MANIFIESTO por Cliente - Total: {reportRecords.length.toLocaleString()}</h3>
+                          </div>
+                          <button
+                            onClick={() => downloadAsImage('chart-manifiesto-cliente', 'Manifiestos_Cliente.png')}
+                            className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-1.5 rounded-lg transition-all"
+                            title="Descargar Gráfica como Imagen"
+                          >
+                            <Camera size={14} />
+                          </button>
                         </div>
                         
                         {/* Interactive Dimension & limit Switchers */}
@@ -3451,6 +3693,7 @@ export const InformesGerenciales: React.FC = () => {
                       <div className="space-y-8">
                         {/* TABLE 1: CLIENTES GENERAL */}
                         <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
+                          <div id="table-ventas-clientes-general">
                           <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                               <div className="flex items-center gap-2">
@@ -3506,6 +3749,16 @@ export const InformesGerenciales: React.FC = () => {
                               >
                                 <Download size={14} />
                                 <span>Exportar Excel</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => downloadAsImage('table-ventas-clientes-general', 'Ventas_Clientes_General.png')}
+                                className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-slate-800/15 transition-all"
+                                title="Descargar como Imagen"
+                              >
+                                <Camera size={14} />
+                                <span>Imagen</span>
                               </button>
 
                               <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase font-mono border border-indigo-100/50">
@@ -3756,11 +4009,26 @@ export const InformesGerenciales: React.FC = () => {
                                 </tbody>
                                 </table>
                               </div>
-
+                              </div>
+                            )}
+                          </div>
+                          {filteredGeneralData.length > 0 && (
+                            <div className="px-6 pb-6 pt-0">
                               {/* Bottom Section: Pie Chart */}
-                              <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col items-center justify-center w-full shadow-xs mt-4">
-                                <h4 className="text-[11px] font-black uppercase text-slate-500 tracking-wider mb-2 text-center">Distribución y Participación de Venta</h4>
-                                <SalesPieChart data={filteredGeneralData.map(item => ({ client: item.clientName, ventaTotal: item.ventaTotal }))} />
+                              <div id="chart-pie-ventas-general" className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col items-center justify-center w-full shadow-xs mt-0 relative">
+                                <div className="w-full flex justify-between items-start absolute top-4 left-0 px-6">
+                                  <h4 className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Distribución y Participación de Venta</h4>
+                                  <button
+                                    onClick={() => downloadAsImage('chart-pie-ventas-general', 'Distribucion_Ventas_General.png')}
+                                    className="bg-white hover:bg-slate-100 text-slate-600 p-1.5 rounded-lg transition-all border border-slate-200"
+                                    title="Descargar Gráfica como Imagen"
+                                  >
+                                    <Camera size={14} />
+                                  </button>
+                                </div>
+                                <div className="mt-8">
+                                  <SalesPieChart data={filteredGeneralData.map(item => ({ client: item.clientName, ventaTotal: item.ventaTotal }))} />
+                                </div>
                               </div>
                             </div>
                           )}
@@ -3768,6 +4036,7 @@ export const InformesGerenciales: React.FC = () => {
 
                         {/* TABLE 2: RESUMEN VENTAS CON EL 100% DE TDM */}
                         <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
+                          <div id="table-resumen-ventas-generales">
                           <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                               <div className="flex items-center gap-2">
@@ -3808,6 +4077,16 @@ export const InformesGerenciales: React.FC = () => {
                               >
                                 <Download size={14} />
                                 <span>Exportar Excel</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => downloadAsImage('table-resumen-ventas-generales', 'Resumen_Ventas_Generales.png')}
+                                className="bg-slate-800 hover:bg-slate-900 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-slate-800/15 transition-all"
+                                title="Descargar como Imagen"
+                              >
+                                <Camera size={14} />
+                                <span>Imagen</span>
                               </button>
 
                               <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase font-mono border border-indigo-100/50">
@@ -4058,11 +4337,26 @@ export const InformesGerenciales: React.FC = () => {
                                 </tbody>
                                 </table>
                               </div>
-
+                              </div>
+                            )}
+                          </div>
+                          {filteredSummaryData.length > 0 && (
+                            <div className="px-6 pb-6 pt-0">
                               {/* Bottom Section: Pie Chart */}
-                              <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col items-center justify-center w-full shadow-xs mt-4">
-                                <h4 className="text-[11px] font-black uppercase text-slate-500 tracking-wider mb-2 text-center">Distribución y Participación de Venta</h4>
-                                <SalesPieChart data={filteredSummaryData.map(item => ({ client: item.clientName, ventaTotal: item.ventaTotal }))} />
+                              <div id="chart-pie-ventas-resumen" className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col items-center justify-center w-full shadow-xs mt-0 relative">
+                                <div className="w-full flex justify-between items-start absolute top-4 left-0 px-6">
+                                  <h4 className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Distribución y Participación de Venta</h4>
+                                  <button
+                                    onClick={() => downloadAsImage('chart-pie-ventas-resumen', 'Distribucion_Ventas_Resumen.png')}
+                                    className="bg-white hover:bg-slate-100 text-slate-600 p-1.5 rounded-lg transition-all border border-slate-200"
+                                    title="Descargar Gráfica como Imagen"
+                                  >
+                                    <Camera size={14} />
+                                  </button>
+                                </div>
+                                <div className="mt-8">
+                                  <SalesPieChart data={filteredSummaryData.map(item => ({ client: item.clientName, ventaTotal: item.ventaTotal }))} />
+                                </div>
                               </div>
                             </div>
                           )}
@@ -4071,7 +4365,7 @@ export const InformesGerenciales: React.FC = () => {
                     );
                   })()}
                 </div>
-              )}
+              </div>
 
             </div>
           )}
@@ -5207,6 +5501,126 @@ export const InformesGerenciales: React.FC = () => {
                 className="px-4 py-2 bg-slate-800 text-white rounded-lg text-xs font-black uppercase tracking-wider hover:bg-slate-900 shadow-sm transition-all active:scale-[0.98]"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* PDF REPORT MODAL */}
+      {isPdfModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h2 className="text-sm font-black uppercase text-slate-800 tracking-wider">Configurar Informe PDF</h2>
+              <button
+                onClick={() => setIsPdfModalOpen(false)}
+                className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-500"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 custom-scrollbar space-y-6">
+              <div className="space-y-2">
+                <label className="text-xs font-black uppercase text-slate-600">Título del Informe</label>
+                <input 
+                  type="text"
+                  defaultValue={pdfTitleRef.current}
+                  onChange={(e) => { pdfTitleRef.current = e.target.value; }}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  placeholder="Ej. Informe Gerencial"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <label className="text-xs font-black uppercase text-slate-600">Secciones a Incluir (Orden de Aparición)</label>
+                <p className="text-[10px] text-slate-400">Seleccione las secciones y use las flechas para ordenar cómo aparecerán en el PDF.</p>
+                
+                <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  {pdfSelectedSections.map((sectionId, index) => {
+                    const section = PDF_SECTIONS.find(s => s.id === sectionId);
+                    if (!section) return null;
+                    return (
+                      <div key={sectionId} className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                        <div className="flex items-center gap-3">
+                          <button 
+                            onClick={() => {
+                              setPdfSelectedSections(prev => prev.filter(id => id !== sectionId));
+                            }}
+                            className="w-5 h-5 rounded border border-indigo-600 bg-indigo-600 flex items-center justify-center"
+                          >
+                            <Check size={12} className="text-white" />
+                          </button>
+                          <span className="text-xs font-bold text-slate-700">{section.label}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button 
+                            disabled={index === 0}
+                            onClick={() => {
+                              const newArr = [...pdfSelectedSections];
+                              [newArr[index - 1], newArr[index]] = [newArr[index], newArr[index - 1]];
+                              setPdfSelectedSections(newArr);
+                            }}
+                            className="p-1 hover:bg-slate-100 rounded text-slate-500 disabled:opacity-30 transition-colors"
+                          >
+                            <ChevronLeft size={16} className="rotate-90" />
+                          </button>
+                          <button 
+                            disabled={index === pdfSelectedSections.length - 1}
+                            onClick={() => {
+                              const newArr = [...pdfSelectedSections];
+                              [newArr[index + 1], newArr[index]] = [newArr[index], newArr[index + 1]];
+                              setPdfSelectedSections(newArr);
+                            }}
+                            className="p-1 hover:bg-slate-100 rounded text-slate-500 disabled:opacity-30 transition-colors"
+                          >
+                            <ChevronLeft size={16} className="-rotate-90" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {PDF_SECTIONS.filter(s => !pdfSelectedSections.includes(s.id)).map(section => (
+                    <div key={section.id} className="flex items-center justify-between bg-white p-3 rounded-lg border border-slate-200/60 shadow-sm opacity-70 hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={() => {
+                            setPdfSelectedSections(prev => [...prev, section.id]);
+                          }}
+                          className="w-5 h-5 rounded border border-slate-300 bg-slate-50 flex items-center justify-center hover:border-indigo-400"
+                        />
+                        <span className="text-xs font-bold text-slate-600">{section.label}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 rounded-b-2xl">
+              <button
+                onClick={() => setIsPdfModalOpen(false)}
+                className="px-5 py-2.5 rounded-xl text-xs font-black uppercase text-slate-600 hover:bg-slate-200 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={generatePdfReport}
+                disabled={pdfGenerating || pdfSelectedSections.length === 0}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50"
+              >
+                {pdfGenerating ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>Generando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download size={14} />
+                    <span>Generar y Bajar PDF</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

@@ -13,7 +13,7 @@ interface Opcion {
 
 interface Pregunta {
   id?: number;
-  tipo: 'seleccion_unica' | 'seleccion_multiple' | 'falso_verdadero' | 'imagen_opciones';
+  tipo: 'seleccion_unica' | 'seleccion_multiple' | 'falso_verdadero' | 'asociacion';
   pregunta: string;
   imagen_url?: string;
   peso: number;
@@ -62,7 +62,7 @@ const TIPO_LABELS: Record<string, string> = {
   seleccion_unica: 'Selección Única',
   seleccion_multiple: 'Selección Múltiple',
   falso_verdadero: 'Falso / Verdadero',
-  imagen_opciones: 'Imagen + Opciones',
+  asociacion: 'Asociación / Emparejar',
 };
 
 function buildFVOpciones(): Opcion[] {
@@ -100,7 +100,7 @@ const CapacitacionEditor: React.FC<Props> = ({ capacitacion, usuario_control, al
 
   const addPregunta = (tipo: Pregunta['tipo']) => {
     const opciones: Opcion[] = tipo === 'falso_verdadero' ? buildFVOpciones()
-      : tipo === 'seleccion_unica' || tipo === 'imagen_opciones'
+      : tipo === 'seleccion_unica' || tipo === 'asociacion'
         ? [{ texto: '', es_correcta: true, orden: 0 }, { texto: '', es_correcta: false, orden: 1 }]
         : [{ texto: '', es_correcta: true, orden: 0 }, { texto: '', es_correcta: false, orden: 1 }];
     const nueva: Pregunta = { tipo, pregunta: '', peso: 1, opciones };
@@ -128,7 +128,7 @@ const CapacitacionEditor: React.FC<Props> = ({ capacitacion, usuario_control, al
     const ops = [...ps[pi].opciones];
     ops[oi] = { ...ops[oi], ...patch };
     // Para seleccion_unica y falso_verdadero, solo una puede ser correcta
-    if (patch.es_correcta && (ps[pi].tipo === 'seleccion_unica' || ps[pi].tipo === 'falso_verdadero' || ps[pi].tipo === 'imagen_opciones')) {
+    if (patch.es_correcta && (ps[pi].tipo === 'seleccion_unica' || ps[pi].tipo === 'falso_verdadero')) {
       ops.forEach((o, i) => { if (i !== oi) o.es_correcta = false; });
     }
     ps[pi].opciones = ops;
@@ -205,6 +205,10 @@ const CapacitacionEditor: React.FC<Props> = ({ capacitacion, usuario_control, al
     try {
       const payload = {
         ...form,
+        preguntas: form.preguntas.map(p => ({
+          ...p,
+          opciones: p.tipo === 'asociacion' ? p.opciones.map(o => ({ ...o, es_correcta: true })) : p.opciones
+        })),
         estado: publishNow ? 'ACTIVO' : form.estado,
         tiempo_limite_minutos: form.tiempo_limite_minutos === '' ? null : form.tiempo_limite_minutos,
         usuario_control,
@@ -424,7 +428,7 @@ const CapacitacionEditor: React.FC<Props> = ({ capacitacion, usuario_control, al
                     <select value={p.tipo} onChange={e => {
                       const newTipo = e.target.value as Pregunta['tipo'];
                       const opciones = newTipo === 'falso_verdadero' ? buildFVOpciones()
-                        : newTipo === 'seleccion_unica' || newTipo === 'imagen_opciones'
+                        : newTipo === 'seleccion_unica' || newTipo === 'asociacion'
                           ? [{ texto: '', es_correcta: true, orden: 0 }, { texto: '', es_correcta: false, orden: 1 }]
                           : p.opciones.map(o => ({ ...o, es_correcta: false }));
                       updatePregunta(pi, { tipo: newTipo, opciones });
@@ -453,22 +457,34 @@ const CapacitacionEditor: React.FC<Props> = ({ capacitacion, usuario_control, al
                   {p.tipo !== 'falso_verdadero' && (
                     <div className="space-y-2">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">
-                        Opciones de Respuesta
+                        {p.tipo === 'asociacion' ? 'Pares a Emparejar (Concepto y Definición)' : 'Opciones de Respuesta'}
                         {p.tipo === 'seleccion_multiple' && <span className="ml-2 text-blue-500">(puedes marcar varias correctas)</span>}
                       </p>
                       {p.opciones.map((o, oi) => (
-                        <div key={oi} className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${o.es_correcta ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-100'}`}>
-                          {/* Selector correcto */}
-                          <button onClick={() => updateOpcion(pi, oi, { es_correcta: !o.es_correcta })}
-                            className={`w-6 h-6 rounded-lg border-2 flex-shrink-0 flex items-center justify-center transition-all ${o.es_correcta ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-300'}`}>
-                            {o.es_correcta && <Icons.Check className="w-3.5 h-3.5 text-white" />}
-                          </button>
-                          <input value={o.texto} onChange={e => updateOpcion(pi, oi, { texto: e.target.value })}
-                            className="flex-1 bg-transparent outline-none text-sm font-medium text-slate-700 placeholder:text-slate-300"
-                            placeholder={`Opción ${oi + 1}...`} />
+                        <div key={oi} className={`flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-xl border-2 transition-all ${o.es_correcta && p.tipo !== 'asociacion' ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-100'}`}>
+                          {/* Selector correcto (oculto en asociacion) */}
+                          {p.tipo !== 'asociacion' && (
+                            <button onClick={() => updateOpcion(pi, oi, { es_correcta: !o.es_correcta })}
+                              className={`w-6 h-6 rounded-lg border-2 flex-shrink-0 flex items-center justify-center transition-all ${o.es_correcta ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-slate-300'}`}>
+                              {o.es_correcta && <Icons.Check className="w-3.5 h-3.5 text-white" />}
+                            </button>
+                          )}
+                          
+                          <div className="flex-1 flex flex-col sm:flex-row gap-2">
+                            <input value={o.texto} onChange={e => updateOpcion(pi, oi, { texto: e.target.value })}
+                              className="flex-1 bg-transparent border-b border-slate-200 outline-none text-sm font-medium text-slate-700 placeholder:text-slate-300 pb-1"
+                              placeholder={p.tipo === 'asociacion' ? 'Ej: Caneca roja' : `Opción ${oi + 1}...`} />
+                            
+                            {p.tipo === 'asociacion' && (
+                              <input value={o.imagen_url || ''} onChange={e => updateOpcion(pi, oi, { imagen_url: e.target.value })}
+                                className="flex-1 bg-transparent border-b border-slate-200 outline-none text-sm font-medium text-slate-700 placeholder:text-slate-300 pb-1"
+                                placeholder="Ej: Residuos biológicos..." />
+                            )}
+                          </div>
+
                           {p.opciones.length > 2 && (
                             <button onClick={() => removeOpcion(pi, oi)}
-                              className="w-6 h-6 text-slate-300 hover:text-rose-500 transition-colors flex-shrink-0">
+                              className="w-6 h-6 text-slate-300 hover:text-rose-500 transition-colors flex-shrink-0 flex items-center justify-center">
                               <Icons.X className="w-4 h-4" />
                             </button>
                           )}
@@ -476,7 +492,7 @@ const CapacitacionEditor: React.FC<Props> = ({ capacitacion, usuario_control, al
                       ))}
                       <button onClick={() => addOpcion(pi)}
                         className="w-full py-2 border-2 border-dashed border-slate-200 rounded-xl text-[10px] font-black uppercase text-slate-400 hover:border-emerald-400 hover:text-emerald-500 transition-all">
-                        + Agregar opción
+                        + Agregar {p.tipo === 'asociacion' ? 'par' : 'opción'}
                       </button>
                     </div>
                   )}
