@@ -937,9 +937,9 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
         console.error('[M7-ERR] getOrders:', error?.message || error);
         if (error?.message?.includes('canceling statement due to statement timeout')) {
             // Cambiamos a 400 para que Nginx no intercepte el error y lo reemplace con HTML
-            return res.status(400).json({ message: 'La consulta abarcó demasiados registros. Por favor reduce el rango de fechas a menos de 15 días e intenta de nuevo.' });
+            res.status(400).json({ message: 'La consulta abarcó demasiados registros. Por favor reduce el rango de fechas a menos de 15 días e intenta de nuevo.' });
         } else {
-            return res.status(500).json({ message: 'Error al obtener pedidos', detail: error?.message });
+            res.status(500).json({ message: 'Error al obtener pedidos', detail: error?.message });
         }
     } finally {
         dbClient.release();
