@@ -1,0 +1,62 @@
+{
+  "RoutePlanner": {
+    "name": "RoutePlanner",
+    "file": "components/RoutePlanner.tsx",
+    "updatedAt": "2026-06-17T13:32:12.422Z",
+    "hasPdf": true
+  },
+  "FleetManager": {
+    "name": "FleetManager",
+    "file": "components/FleetManager.tsx",
+    "updatedAt": "2026-06-17T13:32:21.627Z",
+    "hasPdf": true
+  },
+  "AssignmentManager": {
+    "name": "AssignmentManager",
+    "file": "components/AssignmentManager.tsx",
+    "updatedAt": "2026-06-17T13:32:24.296Z",
+    "hasPdf": true
+  },
+  "ExecutiveDashboard": {
+    "name": "ExecutiveDashboard",
+    "file": "components/ExecutiveDashboard.tsx",
+    "updatedAt": "2026-06-17T13:32:26.999Z",
+    "hasPdf": true
+  },
+  "ConciliacionFacturas": {
+    "name": "ConciliacionFacturas",
+    "file": "components/ConciliacionFacturas.tsx",
+    "updatedAt": "2026-06-17T13:32:29.652Z",
+    "hasPdf": true
+  },
+  "InfoRow": {
+    "name": "InfoRow",
+    "file": "components/ConsultaFacturas.tsx",
+    "updatedAt": "2026-06-17T13:32:32.344Z",
+    "hasPdf": true
+  },
+  "BlindCount": {
+    "name": "BlindCount",
+    "file": "components/BlindCount.tsx",
+    "updatedAt": "2026-06-17T13:32:35.051Z",
+    "hasPdf": true
+  },
+  "Login": {
+    "name": "Login",
+    "file": "components/Login.tsx",
+    "updatedAt": "2026-06-17T13:32:37.778Z",
+    "hasPdf": true
+  },
+  "HelpChat": {
+    "name": "HelpChat",
+    "file": "components/HelpChat.tsx",
+    "updatedAt": "2026-06-17T13:32:40.460Z",
+    "hasPdf": true
+  },
+  "ConsultaFacturas": {
+    "name": "ConsultaFacturas",
+    "file": "components/ConsultaFacturas.tsx",
+    "updatedAt": "2026-06-17T13:33:12.679Z",
+    "hasPdf": true
+  }
+}

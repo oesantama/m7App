@@ -1,5 +1,8 @@
 import express from 'express';
-import { getRecords, saveRecords, removeRecord, clearRecords, checkFiles, checkHistory, getRedespachos, forceSync, updateRecord } from '../controllers/planillas-operativas.controller.js';
+import multer from 'multer';
+import { getRecords, saveRecords, removeRecord, clearRecords, checkFiles, checkHistory, getRedespachos, forceSync, updateRecord, analyzePdf } from '../controllers/planillas-operativas.controller.js';
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 const router = express.Router();
 
@@ -12,5 +15,6 @@ router.delete('/', clearRecords);
 router.delete('/:id', removeRecord);
 router.put('/:id', updateRecord);
 router.all('/force-sync', forceSync);
+router.post('/analyze-pdf', upload.single('file'), analyzePdf);
 
 export default router;

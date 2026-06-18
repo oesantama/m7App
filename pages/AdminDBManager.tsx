@@ -59,6 +59,7 @@ const AdminDBManager: React.FC = () => {
   // Cron State
   const [cronLogs, setCronLogs] = useState<string[]>([]);
   const [runningCrons, setRunningCrons] = useState<Record<string, boolean>>({});
+  const [pendingDriveCount, setPendingDriveCount] = useState<number | null>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -178,6 +179,14 @@ const AdminDBManager: React.FC = () => {
           if (interval) clearInterval(interval);
       };
   }, [runningCrons]);
+
+  useEffect(() => {
+    if (mode === 'CRON') {
+       api.getAdminPendingDriveCount()
+         .then(res => setPendingDriveCount(res.count))
+         .catch(() => setPendingDriveCount(null));
+    }
+  }, [mode, runningCrons['syncDrive']]);
 
   useEffect(() => {
     if (selectedTable && mode === 'TABLE' && user && user.token) {
@@ -881,8 +890,18 @@ const AdminDBManager: React.FC = () => {
                           </div>
                       </div>
 
-                      <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
+                      <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow relative">
                           <h4 className="font-bold text-slate-800">Sincronización Planillas Drive</h4>
+                          {pendingDriveCount !== null && pendingDriveCount > 0 && (
+                             <span className="absolute top-4 right-4 bg-red-100 text-red-700 font-bold text-xs px-2 py-1 rounded-full animate-pulse shadow-sm border border-red-200">
+                                {pendingDriveCount} pendientes
+                             </span>
+                          )}
+                          {pendingDriveCount === 0 && (
+                             <span className="absolute top-4 right-4 bg-green-100 text-green-700 font-bold text-xs px-2 py-1 rounded-full shadow-sm border border-green-200">
+                                Al día
+                             </span>
+                          )}
                           <p className="text-xs text-slate-500">Sincroniza las fechas de cumplido desde Google Drive hacia el sistema de Planillas Operativas (CLI-09).</p>
                           <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Lunes a Sábado, 09:00 AM</p>
                           <div className="mt-auto pt-2">

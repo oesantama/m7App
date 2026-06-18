@@ -397,6 +397,15 @@ export const api = {
       body: JSON.stringify(data),
     }),
   clearPlanillasRecords: () => fetchJson(`${API_URL}/planillas-operativas`, { method: 'DELETE' }),
+  analyzePlanillaPdf: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return fetchJson(`${API_URL}/planillas-operativas/analyze-pdf`, {
+      method: 'POST',
+      body: fd,
+      // No Content-Type header so the browser sets multipart/form-data correctly
+    });
+  },
   checkPlanillasFiles: (files: string[]) => fetchJson(`${API_URL}/planillas-operativas/check-files`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1457,6 +1466,7 @@ export const api = {
     body: JSON.stringify({ cronName })
   }),
   getCronLogs: () => fetchJson(`${API_URL}/admin/cron/logs`),
+  getAdminPendingDriveCount: () => fetchJson(`${API_URL}/admin/cron/pending-drive`),
 
   // --- DASHBOARD & INTELLIGENCE ---
   getDashboardStats: (period: string) => fetchJson(`${API_URL}/dashboard/stats?period=${period}`),

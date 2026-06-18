@@ -4,6 +4,9 @@ import { exec } from 'child_process';
 import util from 'util';
 import fs from 'fs';
 import path from 'path';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
 const execAsync = util.promisify(exec);
 
@@ -98,8 +101,21 @@ export const syncDriveCumplidos = async () => {
                 console.log(`[M7-CRON] Descargando ${doc.file_name}...`);
                 await execAsync(`rclone copyto "${remotePath}" "${localPath}"`);
 
-                const fileBuffer = fs.readFileSync(localPath);
-                const base64Data = fileBuffer.toString('base64');
+                // Extraer texto con pdf-parse localmente para ahorrar muchísimos tokens
+                let textContent = '';
+                let useTextFallback = false;
+                try {
+                    const fileBuffer = fs.readFileSync(localPath);
+                    const pdfData = await pdfParse(fileBuffer);
+                    textContent = pdfData.text.trim();
+                    if (textContent.length > 100) {
+                         useTextFallback = true;
+                    }
+                } catch (e) {
+                    console.error(`[M7-CRON] Error leyendo PDF localmente:`, e);
+                }
+
+                const base64Data = fs.readFileSync(localPath).toString('base64');
 
                 const systemPrompt = `
 Eres un asistente experto en extracción de datos tabulares a JSON.
@@ -113,6 +129,7 @@ REGLAS DE EXTRACCIÓN:
 4. Si el Pedido y la Cédula están pegados (ej. "163352206107970043502"), el Pedido son los primeros ~13 dígitos y la Cédula el resto.
 5. Limpia el número de pedido: quita prefijos como "E-com" o guiones. Solo devuelve los números.
 6. Los PLU son siempre números positivos. Ignora guiones iniciales (ej. "-3698640" es "3698640").
+7. IMPORTANTE: La "placa" del vehículo (ej. JYN070, ABC-123) usualmente NO está dentro de la tabla principal. Búscala en el recuadro que suele estar justo debajo de la tabla, a veces al lado del nombre del conductor (ej: "JYN070 JOSE HENRY..."). Una vez la encuentres, asígnale esa misma placa al campo "placa" de TODOS los registros extraídos de la tabla.
 
 EJEMPLO DE LECTURA (Fíjate cómo se limpian los pedidos):
 Fila 1 (E-com 1633032041116): Pedido 1633032041116, Cédula 39268715, Cliente ALBA TERESA
@@ -138,17 +155,25 @@ Campos exactos por cada fila:
                 let attempts = 0;
                 let matches: any[] = [];
                 
-                while (!fileSuccess && attempts < keys.length) {
+                const fallBackModels = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+
+                while (!fileSuccess && attempts < keys.length * fallBackModels.length) {
                     try {
                         const currentKey = keys[keyIndex % keys.length];
+                        const currentModel = fallBackModels[Math.floor(attempts / keys.length) % fallBackModels.length];
                         const genAI = new GoogleGenerativeAI(currentKey);
-                        const modelIA = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+                        const modelIA = genAI.getGenerativeModel({ model: currentModel });
 
-                        console.log(`[M7-CRON] Analizando ${doc.file_name} con IA (Intento ${attempts + 1})...`);
-                        const result = await modelIA.generateContent([
-                            systemPrompt,
-                            { inlineData: { data: base64Data, mimeType: "application/pdf" } }
-                        ]);
+                        console.log(`[M7-CRON] Analizando ${doc.file_name} IA (Intento ${attempts + 1}). Llave ...${currentKey.slice(-4)} Modelo: ${currentModel}`);
+                        
+                        let promptContent: any[] = [systemPrompt];
+                        if (useTextFallback) {
+                             promptContent.push(`TEXTO EXTRAÍDO DEL DOCUMENTO:\n\n${textContent}`);
+                        } else {
+                             promptContent.push({ inlineData: { data: base64Data, mimeType: "application/pdf" } });
+                        }
+
+                        const result = await modelIA.generateContent(promptContent);
                         
                         const responseText = await result.response.text();
                         const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -157,17 +182,16 @@ Campos exactos por cada fila:
                         fileSuccess = true;
                     } catch (apiErr: any) {
                         lastFileError = apiErr.message || 'Error desconocido';
-                        console.error(`[M7-CRON] Error API procesando ${doc.file_name}:`, lastFileError);
                         
-                        if (lastFileError.includes('429')) {
-                            console.log(`[M7-CRON] Cuota excedida (429). Rotando llave...`);
+                        if (lastFileError.includes('429') || lastFileError.includes('404')) {
+                            console.log(`[M7-CRON] Cuota (429) o Modelo (404) excedido/no-encontrado. Rotando...`);
                             keyIndex++;
                             attempts++;
-                            if (attempts < keys.length) {
-                                await new Promise(r => setTimeout(r, 2000)); // Breve pausa antes de reintentar con nueva llave
+                            if (attempts < keys.length * fallBackModels.length) {
+                                await new Promise(r => setTimeout(r, 2000));
                             }
                         } else {
-                            // Otro error (ej. JSON parse error), no reintentar
+                            console.error(`[M7-CRON] Error crítico no-cuota procesando ${doc.file_name}:`, lastFileError);
                             break;
                         }
                     }

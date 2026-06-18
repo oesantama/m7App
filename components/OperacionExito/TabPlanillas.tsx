@@ -133,10 +133,8 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
 
   // ─── Análisis con validación real en BD ──────────────────────────────────────
   const runAnalysis = async (files: { file: File; name: string }[]) => {
-    if (!apiKey)        { toast.error('API Key no detectada'); return; }
     if (!files.length)  return;
 
-    geminiService.init(apiKey);
     setAnalyzing(true);
     setProgressValue(0);
     setFailedFiles([]);
@@ -201,7 +199,8 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
 
           let matches;
           try {
-            matches = await geminiService.analyzeDocument(buffer, 'application/pdf');
+            const response = await api.analyzePlanillaPdf(fileObj.file);
+            matches = response.matches || [];
           } finally {
             clearInterval(progressInterval);
           }
@@ -656,6 +655,9 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
                   <h3 className="text-xl font-black text-orange-800">Alertas de Historial: Re-Despachos</h3>
                   <p className="text-sm text-orange-600 font-medium mt-1">
                     Se detectaron {historyWarnings.length} pedidos en esta planilla que ya han salido previamente.
+                  </p>
+                  <p className="text-sm text-orange-700 font-bold mt-2 bg-orange-200/50 p-2 rounded-lg inline-block">
+                    👉 Acción requerida: Verifique si estos pedidos son un re-despacho legítimo. Si es un error o están duplicados, elimínelos de la tabla inferior usando el botón rojo de borrar antes de exportar o guardar.
                   </p>
                 </div>
               </div>

@@ -349,3 +349,26 @@ export const getCronLogs = async (req: any, res: Response) => {
         res.json({ logs: [] });
     }
 };
+
+export const getPendingDriveCount = async (req: any, res: Response) => {
+    const user = req.user;
+    try {
+        if (!isUserAdmin(user)) return res.status(403).json({ error: "Acceso denegado." });
+        const query = `
+            SELECT COUNT(d.id) as count
+            FROM document_drive_logs d
+            WHERE d.category = 'CUMPLIDOS' 
+              AND d.client_id = 'CLI-09'
+              AND d.upload_date >= CURRENT_DATE - INTERVAL '5 days'
+              AND NOT EXISTS (
+                  SELECT 1 FROM registros_logistica rl 
+                  WHERE rl.archivo = d.file_name
+              )
+        `;
+        const { rows } = await pool.query(query);
+        res.json({ count: parseInt(rows[0].count) });
+    } catch (err: any) {
+        console.error('[ADMIN-GET-PENDING-DRIVE]', err.message);
+        res.status(500).json({ error: "Error al obtener pendientes", details: err.message });
+    }
+};

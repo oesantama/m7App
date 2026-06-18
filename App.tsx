@@ -92,6 +92,7 @@ const OperacionesFlotaManual = lazyWithRetry(() => import('./components/Operacio
 const FormatosTransportes = lazyWithRetry(() => import('./components/AdminCenter/FormatosTransportes'));
 const MaestrasDogama = lazyWithRetry(() => import('./components/Dogama/MaestrasDogama'));
 const CitasDespachosCarga = lazyWithRetry(() => import('./components/Dogama/CitasDespachosCarga'));
+const HelpDesk = lazyWithRetry(() => import('./components/HelpDesk'));
 
 // Import Admin Module
 const AdminDBManager = lazyWithRetry(() => import('./pages/AdminDBManager'));
@@ -1081,6 +1082,12 @@ const App: React.FC = () => {
         return <FletesConciliacion user={user!} />;
       case 'formatos-transportes':
         return <FormatosTransportes />;
+      case 'helpdesk':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Mesa de Ayuda...</div>}>
+            <HelpDesk />
+          </React.Suspense>
+        );
       default:
         return (
           <div className="p-10 border-2 border-dashed border-slate-200 rounded-[3rem] text-center">
