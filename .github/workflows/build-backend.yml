@@ -11,6 +11,7 @@ on:
       - 'package.json'
       - 'tsconfig*.json'
       - 'Dockerfile.backend'
+      - '.dockerignore'
       - '.github/workflows/build-backend.yml'
 
 env:
