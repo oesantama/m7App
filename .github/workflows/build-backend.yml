@@ -4,6 +4,7 @@ name: Build & Push Backend Image
 # Construye la imagen en GitHub Actions (7GB RAM) y la sube a GHCR.
 # El servidor solo hace "docker pull", eliminando el build en producción.
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
