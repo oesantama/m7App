@@ -34,6 +34,7 @@ legacy_sources/
 *.txt
 !package.json
 !run_migration.js
+!scripts/generate-manual.js
 
 # ── Archivos Pesados / Binarios ───────────────────────────────────────────────
 # Documentos Office y archivos comprimidos

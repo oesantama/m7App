@@ -243,6 +243,7 @@ export const getCapacitacionById = async (req: Request, res: Response) => {
 
     const preguntas = pregRes.rows.map(p => ({
       ...p,
+      orden: (p.orden || 0) + 1, // 1-indexed for frontend
       opciones: opcRes.rows.filter(o => o.pregunta_id === p.id)
     }));
 
@@ -258,10 +259,11 @@ export const saveCapacitacion = async (req: Request, res: Response) => {
   try {
     await client.query('BEGIN');
     const { id, titulo, descripcion, objetivo, categoria, nota_minima_aprobacion,
-      max_intentos, tiempo_limite_minutos, tipo_proceso, tipo_acceso, estado,
+      max_intentos, tiempo_limite_minutos, tipo_proceso, tipo_acceso, estado, formato_opciones,
       preguntas = [], usuario_control } = req.body;
 
     const acceso = tipo_acceso || 'INTERNO';
+    const formatoOpciones = formato_opciones || 'letras';
     let capId: number;
 
     if (id) {
@@ -269,10 +271,10 @@ export const saveCapacitacion = async (req: Request, res: Response) => {
         UPDATE cap_capacitaciones SET
           titulo=$1, descripcion=$2, objetivo=$3, categoria=$4,
           nota_minima_aprobacion=$5, max_intentos=$6, tiempo_limite_minutos=$7,
-          tipo_proceso=$8, tipo_acceso=$9, estado=$10, usuario_control=$11, fecha_control=NOW()
-        WHERE id=$12
+          tipo_proceso=$8, tipo_acceso=$9, estado=$10, formato_opciones=$11, usuario_control=$12, fecha_control=NOW()
+        WHERE id=$13
       `, [titulo, descripcion, objetivo, categoria, nota_minima_aprobacion,
-          max_intentos, tiempo_limite_minutos, tipo_proceso, acceso, estado, usuario_control, id]);
+          max_intentos, tiempo_limite_minutos, tipo_proceso, acceso, estado, formatoOpciones, usuario_control, id]);
       capId = id;
     } else {
       const folderName = sanitizeFolderName(titulo);
@@ -284,11 +286,11 @@ export const saveCapacitacion = async (req: Request, res: Response) => {
         INSERT INTO cap_capacitaciones
           (titulo, descripcion, objetivo, categoria, nota_minima_aprobacion,
            max_intentos, tiempo_limite_minutos, tipo_proceso, tipo_acceso, estado,
-           drive_folder_path, usuario_control)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id
+           formato_opciones, drive_folder_path, usuario_control)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id
       `, [titulo, descripcion, objetivo, categoria, nota_minima_aprobacion,
           max_intentos, tiempo_limite_minutos, tipo_proceso, acceso, estado || 'BORRADOR',
-          drivePath, usuario_control]);
+          formatoOpciones, drivePath, usuario_control]);
       capId = ins.rows[0].id;
     }
 
@@ -333,7 +335,7 @@ export const saveCapacitacion = async (req: Request, res: Response) => {
            retroalimentacion_correcta, retroalimentacion_incorrecta, usuario_control)
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id
       `, [capId, p.tipo, p.pregunta, p.imagen_url || null, p.imagen_drive_id || null,
-          p.peso || 1, i, p.retroalimentacion_correcta || null,
+          p.peso || 1, (p.orden !== undefined ? p.orden - 1 : i), p.retroalimentacion_correcta || null,
           p.retroalimentacion_incorrecta || null, usuario_control]);
 
       const pregId = pRes.rows[0].id;
@@ -630,7 +632,7 @@ export const getPublicCapacitacion = async (req: Request, res: Response) => {
       SELECT a.*, c.titulo, c.descripcion, c.objetivo,
         c.nota_minima_aprobacion, c.tiempo_limite_minutos,
         COALESCE(a.max_intentos_override, c.max_intentos) AS max_intentos_total,
-        c.estado AS cap_estado, c.drive_folder_path
+        c.estado AS cap_estado, c.drive_folder_path, c.formato_opciones
       FROM cap_asignaciones a
       INNER JOIN cap_capacitaciones c ON c.id = a.capacitacion_id
       WHERE a.capacitacion_id = $1 AND a.cedula = $2
@@ -711,6 +713,7 @@ export const getPublicCapacitacion = async (req: Request, res: Response) => {
         objetivo: asignacion.objetivo,
         nota_minima_aprobacion: asignacion.nota_minima_aprobacion,
         tiempo_limite_minutos: asignacion.tiempo_limite_minutos,
+        formato_opciones: asignacion.formato_opciones,
         max_intentos_total: asignacion.max_intentos_total,
         intentos_realizados: asignacion.intentos_realizados,
         estado: asignacion.estado,
@@ -732,7 +735,7 @@ export const getCapacitacionPreview = async (req: Request, res: Response) => {
     const { id } = req.params;
     const capRes = await pool.query(
       `SELECT id, titulo, descripcion, objetivo, nota_minima_aprobacion,
-              tiempo_limite_minutos, max_intentos, tipo_proceso, tipo_acceso
+              tiempo_limite_minutos, max_intentos, tipo_proceso, tipo_acceso, formato_opciones
        FROM cap_capacitaciones WHERE id = $1`,
       [id]
     );
@@ -1166,7 +1169,7 @@ export const getIntentosByAsignacion = async (req: Request, res: Response) => {
       FROM cap_intentos i
       LEFT JOIN cap_certificados cert ON cert.intento_id = i.id
       WHERE i.asignacion_id = $1
-      ORDER BY i.numero_intento DESC
+      ORDER BY i.fecha_inicio DESC
     `, [id]);
     res.json(result.rows);
   } catch (err: any) {
@@ -1201,5 +1204,169 @@ export const getCargos = async (_req: Request, res: Response) => {
     res.json(result.rows);
   } catch (err: any) {
     res.status(500).json({ error: 'Error al obtener cargos' });
+  }
+};
+
+// ─── DESCARGA DE EVALUACIÓN PDF (FORMATO F-GA-016) ───────────────────────────
+export const descargarEvaluacionPDF = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const r = await pool.query(`
+      SELECT i.*, a.nombre_colaborador, a.cedula, c.titulo, p.cargo, p.operacion
+      FROM cap_intentos i
+      JOIN cap_asignaciones a ON a.id = i.asignacion_id
+      JOIN cap_capacitaciones c ON c.id = i.capacitacion_id
+      LEFT JOIN gh_personal p ON p.cedula = a.cedula
+      WHERE i.id = $1
+    `, [id]);
+    if (!r.rows[0]) return res.status(404).json({ error: 'Intento no encontrado' });
+    const intento = r.rows[0];
+
+    const pregRes = await pool.query('SELECT * FROM cap_preguntas WHERE capacitacion_id = $1 ORDER BY orden', [intento.capacitacion_id]);
+    const opcRes = await pool.query('SELECT * FROM cap_opciones WHERE pregunta_id IN (SELECT id FROM cap_preguntas WHERE capacitacion_id = $1) ORDER BY orden', [intento.capacitacion_id]);
+    const respRes = await pool.query('SELECT * FROM cap_respuestas WHERE intento_id = $1', [id]);
+
+    const preguntas = pregRes.rows.map(p => ({
+      ...p,
+      opciones: opcRes.rows.filter(o => o.pregunta_id === p.id),
+      respuesta: respRes.rows.find(res => res.pregunta_id === p.id)
+    }));
+
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const W = 210, H = 297;
+    const margin = 15;
+    
+    // Marco exterior
+    doc.setLineWidth(0.3);
+    doc.rect(margin, margin, W - (margin*2), H - (margin*2));
+    
+    // Header Table (Row 1)
+    doc.rect(margin, margin, 40, 25); // Logo cell
+    try { doc.addImage(LOGO_MILLA_SIETE, 'PNG', margin + 2, margin + 3, 36, 19); } catch {}
+    
+    doc.rect(margin + 40, margin, W - (margin*2) - 80, 25); // Middle title cell
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SISTEMA INTEGRADO DE GESTIÓN BASC - PESV - AMBIENTAL - SG-SST', margin + 40 + (W-30-80)/2, margin + 7, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text('EVALUACIÓN INDUCCIÓN - REINDUCCIÓN', margin + 40 + (W-30-80)/2, margin + 17, { align: 'center' });
+    
+    doc.rect(W - margin - 40, margin, 40, 25); // Right cell
+    doc.setFontSize(8);
+    doc.text('CÓDIGO: F-GA-026\nVERSIÓN: 01\nFECHA 17/01/2025', W - margin - 38, margin + 7);
+    
+    // Info Table
+    let y = margin + 25;
+    doc.rect(margin, y, 100, 7);
+    doc.rect(margin + 100, y, W - (margin*2) - 100, 7);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Nombre Completo: `, margin + 2, y + 5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(intento.nombre_colaborador || intento.cedula, margin + 32, y + 5);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Fecha Evaluación: `, margin + 102, y + 5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(intento.fecha_inicio ? new Date(intento.fecha_inicio).toLocaleDateString('es-CO') : '', margin + 132, y + 5);
+    
+    y += 7;
+    doc.rect(margin, y, 100, 7);
+    doc.rect(margin + 100, y, W - (margin*2) - 100, 7);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Cargo: `, margin + 2, y + 5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(intento.cargo || '', margin + 15, y + 5);
+    
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Operación: `, margin + 102, y + 5);
+    doc.setFont('helvetica', 'normal');
+    doc.text(intento.operacion || '', margin + 122, y + 5);
+    
+    y += 15;
+    
+    // Preguntas
+    doc.setFontSize(10);
+    for (let idx = 0; idx < preguntas.length; idx++) {
+       const p = preguntas[idx];
+       doc.setFont('helvetica', 'bold');
+       const num = idx + 1;
+       const qLines = doc.splitTextToSize(`${num}. ${p.pregunta}`, W - (margin*2) - 4);
+       
+       if (y + (qLines.length * 5) > H - margin - 10) { 
+         doc.addPage(); doc.rect(margin, margin, W - (margin*2), H - (margin*2)); y = margin + 10; 
+       }
+       doc.text(qLines, margin + 2, y);
+       y += qLines.length * 5;
+       
+       doc.setFont('helvetica', 'normal');
+       const pResp = p.respuesta;
+       
+       // Parse opciones_seleccionadas safely
+       let rawSelected = pResp?.opciones_seleccionadas;
+       let userSelected: string[] = [];
+       if (typeof rawSelected === 'string') {
+         userSelected = rawSelected.replace(/[{}[\]"]/g, '').split(',').map(x => x.trim()).filter(Boolean);
+       } else if (Array.isArray(rawSelected)) {
+         userSelected = rawSelected.map(String);
+       }
+       
+       p.opciones.forEach((o: any, oidx: number) => {
+         const prefix = p.tipo === 'asociacion' ? '' : `${String.fromCharCode(97 + oidx)}) `; // a), b), c)
+         const isSelected = userSelected.includes(String(o.id));
+         
+         let optionText = p.tipo === 'asociacion' 
+            ? `• ${o.texto}   -->   ${o.imagen_url || ''}` 
+            : `${prefix}${o.texto}`;
+         
+         const txt = doc.splitTextToSize(optionText, W - (margin*2) - 10);
+         if (y + (txt.length * 5) > H - margin - 10) { 
+           doc.addPage(); doc.rect(margin, margin, W - (margin*2), H - (margin*2)); y = margin + 10; 
+         }
+         
+         if (isSelected) {
+           doc.setFillColor(255, 255, 0); // Amarillo
+           const textWidth = doc.getTextWidth(txt[0]);
+           doc.rect(margin + 2, y - 3.5, textWidth + 2, (txt.length * 5) - 1, 'F');
+         }
+         doc.text(txt, margin + 4, y);
+         y += txt.length * 5;
+       });
+       y += 4;
+    }
+    
+    if (y + 35 > H - margin - 10) { 
+      doc.addPage(); doc.rect(margin, margin, W - (margin*2), H - (margin*2)); y = margin + 10; 
+    }
+    
+    y += 10;
+    doc.setFont('helvetica', 'normal');
+    doc.text('Aprobado', margin + 2, y);
+    doc.rect(margin + 25, y - 4, 5, 5);
+    if (intento.aprobado) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('X', margin + 26, y);
+      doc.setFont('helvetica', 'normal');
+    }
+    
+    y += 8;
+    doc.text('No Aprobado', margin + 2, y);
+    doc.rect(margin + 25, y - 4, 5, 5);
+    if (!intento.aprobado) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('X', margin + 26, y);
+      doc.setFont('helvetica', 'normal');
+    }
+    
+    y += 20;
+    doc.text('Firma del Evaluador: _________________________________', margin + 2, y);
+    
+    const buffer = Buffer.from(doc.output('arraybuffer'));
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=Evaluacion_${intento.cedula}.pdf`);
+    res.send(buffer);
+  } catch (err: any) {
+    console.error('[CAP] descargarEvaluacionPDF:', err.message);
+    res.status(500).json({ error: 'Error al generar PDF' });
   }
 };

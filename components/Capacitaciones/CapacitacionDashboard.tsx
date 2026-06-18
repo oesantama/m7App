@@ -3,6 +3,7 @@ import { Icons } from '../../constants';
 import { api, API_URL } from '../../services/api';
 
 const certUrl = (numero: string) => `${API_URL.replace('/api', '')}/api/cap/public/certificado/${numero}`;
+const evalUrl = (id: number) => `${API_URL.replace('/api', '')}/api/cap/public/intento/${id}/evaluacion`;
 import { toast } from 'sonner';
 import { DataTable, ColumnDef } from '../shared/DataTable';
 
@@ -254,31 +255,31 @@ const CapacitacionDashboard: React.FC<Props> = ({ capacitaciones, usuarioControl
       render: (a) => (
         <div className="flex items-center gap-1">
           {/* Ver intentos */}
-          <div className="group relative">
+          <div className="group/btn relative">
             <button onClick={e => { e.stopPropagation(); handleVerIntentos(a); }}
               className="flex items-center gap-1 px-2 py-1.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-900 hover:text-white transition-all text-[9px] font-black uppercase">
               <Icons.Eye className="w-3 h-3" /> Ver
             </button>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 bg-slate-900 text-white text-[9px] font-medium rounded-xl px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 text-center leading-snug shadow-xl">
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-40 bg-slate-900 text-white text-[9px] font-medium rounded-xl px-3 py-2 opacity-0 group-hover/btn:opacity-100 pointer-events-none transition-all z-50 text-center leading-snug shadow-xl">
               Historial de intentos, calificaciones y tiempo empleado
             </div>
           </div>
 
           {/* Nuevo ciclo */}
           {(a.estado === 'COMPLETADO' || a.estado === 'FALLIDO' || a.estado === 'VENCIDO') && (
-            <div className="group relative">
+            <div className="group/btn relative">
               <button onClick={e => { e.stopPropagation(); handleResetAsignacion(a); }}
                 className="flex items-center gap-1 px-2 py-1.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-500 hover:text-white transition-all text-[9px] font-black uppercase">
                 <Icons.RotateCcw className="w-3 h-3" /> Ciclo
               </button>
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 bg-slate-900 text-white text-[9px] font-medium rounded-xl px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 text-center leading-snug shadow-xl">
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 bg-slate-900 text-white text-[9px] font-medium rounded-xl px-3 py-2 opacity-0 group-hover/btn:opacity-100 pointer-events-none transition-all z-50 text-center leading-snug shadow-xl">
                 Reinicia la asignación a PENDIENTE conservando el historial anterior
               </div>
             </div>
           )}
 
           {/* Editar fechas */}
-          <div className="group relative">
+          <div className="group/btn relative">
             <button onClick={e => {
               e.stopPropagation();
               setModalFechas(a);
@@ -290,18 +291,18 @@ const CapacitacionDashboard: React.FC<Props> = ({ capacitaciones, usuarioControl
               className="flex items-center gap-1 px-2 py-1.5 bg-violet-50 text-violet-600 rounded-xl hover:bg-violet-500 hover:text-white transition-all text-[9px] font-black uppercase">
               <Icons.Calendar className="w-3 h-3" /> Fechas
             </button>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 bg-slate-900 text-white text-[9px] font-medium rounded-xl px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 text-center leading-snug shadow-xl">
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 bg-slate-900 text-white text-[9px] font-medium rounded-xl px-3 py-2 opacity-0 group-hover/btn:opacity-100 pointer-events-none transition-all z-50 text-center leading-snug shadow-xl">
               Modificar fecha de inicio y vencimiento
             </div>
           </div>
 
           {/* Ampliar intentos */}
-          <div className="group relative">
+          <div className="group/btn relative">
             <button onClick={e => { e.stopPropagation(); setModalAmpliar(a); setCantidadAmpliar(1); }}
               className="flex items-center gap-1 px-2 py-1.5 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-500 hover:text-white transition-all text-[9px] font-black uppercase">
               <Icons.Plus className="w-3 h-3" /> +Int
             </button>
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 bg-slate-900 text-white text-[9px] font-medium rounded-xl px-3 py-2 opacity-0 group-hover:opacity-100 pointer-events-none transition-all z-50 text-center leading-snug shadow-xl">
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-44 bg-slate-900 text-white text-[9px] font-medium rounded-xl px-3 py-2 opacity-0 group-hover/btn:opacity-100 pointer-events-none transition-all z-50 text-center leading-snug shadow-xl">
               Agrega más intentos disponibles sin resetear el historial
             </div>
           </div>
@@ -445,7 +446,7 @@ const CapacitacionDashboard: React.FC<Props> = ({ capacitaciones, usuarioControl
                       <div className="flex-1 grid grid-cols-4 gap-3">
                         <div>
                           <p className="text-[9px] font-black text-slate-400 uppercase">Fecha</p>
-                          <p className="text-xs font-bold text-slate-700">{new Date(i.fecha_inicio).toLocaleDateString('es-CO')}</p>
+                          <p className="text-xs font-bold text-slate-700">{new Date(i.fecha_inicio).toLocaleString('es-CO', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
                         </div>
                         <div>
                           <p className="text-[9px] font-black text-slate-400 uppercase">Calificación</p>
@@ -464,12 +465,20 @@ const CapacitacionDashboard: React.FC<Props> = ({ capacitaciones, usuarioControl
                           </p>
                         </div>
                       </div>
-                      {i.numero_certificado ? (
-                        <a href={`/api/cap/public/certificado/${i.numero_certificado}`} target="_blank" rel="noreferrer"
-                          className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase hover:bg-emerald-600 transition-all flex-shrink-0 whitespace-nowrap">
-                          <Icons.Download className="w-3.5 h-3.5" /> Descargar
-                        </a>
-                      ) : <div className="w-24 flex-shrink-0" />}
+                      <div className="flex flex-col gap-1.5 flex-shrink-0 items-end">
+                        {i.numero_certificado && (
+                          <a href={certUrl(i.numero_certificado)} target="_blank" rel="noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase hover:bg-emerald-600 transition-all whitespace-nowrap w-full justify-center">
+                            <Icons.Download className="w-3 h-3" /> Certificado
+                          </a>
+                        )}
+                        {['INDUCCION', 'REINDUCCION', 'AMBOS'].includes(modalIntento.tipo_proceso) && i.estado !== 'EN_CURSO' && (
+                          <a href={evalUrl(i.id)} target="_blank" rel="noreferrer"
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-xl text-[9px] font-black uppercase hover:bg-blue-600 transition-all whitespace-nowrap w-full justify-center">
+                            <Icons.Download className="w-3 h-3" /> Evaluación
+                          </a>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

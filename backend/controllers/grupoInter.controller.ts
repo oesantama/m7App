@@ -246,7 +246,7 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             return;
         }
 
-        const { placa, fleteTotal, planilla } = req.body;
+        const { placa, fleteTotal, planilla, ruta } = req.body;
         const fleteTotalNum = parseFloat(fleteTotal) || 0;
 
         // Leer archivo desde disco
@@ -266,19 +266,21 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             notas_encabezado: ['NOTA ENCABEZADO', 'NOTAS ENCABEZADO', 'NOTAS', 'OBSERVACIONES', 'OBS'],
             municipio_destino: ['MUNICIPIO', 'CIUDAD', 'DESTINO'],
             producto: ['PRODUCTO', 'ARTICULO', 'DESCRIPCION'],
-            cantidad_total: ['CANTIDAD', 'CANT'],
+            cantidad_total: ['CANTIDAD', 'CANT', 'CANTIDAD TOTAL'],
             precio_total: ['PRECIO TOTAL', 'VALOR TOTAL', 'TOTAL', 'SUBTOTAL', 'VALOR DECLARADO'],
             tipo_articulo: ['TIPO ARTICULO', 'CATEGORIA', 'TIPO_ARTICULO', 'TIPO', 'ARTICULO_TIPO'],
             empresa: ['EMPRESA', 'UNIDAD NEGOCIO'],
             peso_total_prod: ['PESO', 'KILOS'],
-            f_ultimo_corte: ['FECHA CORTE', 'FCT. ULTIMO CORTE', 'FECHA DE CORTE', 'FC CORTE', 'ULTIMO CORTE', 'FECHA_CORTE'],
+            f_ultimo_corte: ['FECHA CORTE', 'FCT. ULTIMO CORTE', 'FECHA DE CORTE', 'FC CORTE', 'ULTIMO CORTE', 'FECHA_CORTE', 'FECHA FACTURA'],
             clasificacion: ['CLASIFICACION', 'ABC', 'TIPO PEDIDO', 'SEGMENTO', 'CLASIFICACIÓN']
         };
 
-        const identifyAliases = [...columnAliases.numero_documento, ...columnAliases.cliente].map(a => a.toUpperCase());
+        const normalizeStr = (str: any) => String(str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+
+        const identityKeywords = ['NUMERO DOCUMENTO', 'NRO DOCUMENTO', 'DOCUMENTO', 'REMISION', 'NIT CLIENTE', 'NIT', 'NOMBRE CLIENTE'].map(normalizeStr);
         for (let i = 0; i < Math.min(rows.length, 25); i++) {
-            const currentRow = (rows[i] || []).map(cell => String(cell || '').toUpperCase());
-            if (currentRow.some(cell => identifyAliases.some(alias => cell.includes(alias)))) {
+            const rowStr = (rows[i] || []).map(normalizeStr).join(' ');
+            if (identityKeywords.some(kw => rowStr.includes(kw))) {
                 headerRowIndex = i;
                 break;
             }
@@ -289,13 +291,15 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             return;
         }
 
-        const headerRow = (rows[headerRowIndex] || []).map(cell => String(cell || '').toUpperCase().trim());
+        const headerRow = (rows[headerRowIndex] || []).map(cell => cell ? normalizeStr(cell) : '');
         const getColIndex = (list: string[]) => {
+            if (!list) return -1;
+            const normalizedList = list.map(a => normalizeStr(a));
             // Primero buscar coincidencia exacta
-            const exact = headerRow.findIndex(cell => list.some(alias => cell === alias));
+            const exact = headerRow.findIndex(cell => cell && normalizedList.some(alias => cell === alias));
             if (exact >= 0) return exact;
             // Luego coincidencia parcial (si no hay exacta)
-            return headerRow.findIndex(cell => list.some(alias => cell.includes(alias)));
+            return headerRow.findIndex(cell => cell && normalizedList.some(alias => cell.includes(alias)));
         };
 
         const idxDoc = getColIndex(columnAliases.numero_documento);
@@ -358,28 +362,32 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
         const processedDocs = new Set<string>();
         const username = req.body.username || 'System';
 
-        for (const item of rowsToProcess) {
-            const { doc, rowArr } = item;
-            
-            if (!processedDocs.has(doc)) {
-                const docTotal = docsPriceMap[doc] || 0;
-                // Regla de 3 para el flete: (FleteTotal * PrecioFactura) / PrecioTotalBatch
-                const fleteProporcional = totalBatchPrice > 0 ? (fleteTotalNum * docTotal) / totalBatchPrice : 0;
+        const dbClient = await pool.connect();
+        try {
+            await dbClient.query('BEGIN');
 
-                const existingRes = await pool.query('SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1', [doc]);
-                let pedidoId: number;
+            for (const item of rowsToProcess) {
+                const { doc, rowArr } = item;
+                
+                if (!processedDocs.has(doc)) {
+                    const docTotal = docsPriceMap[doc] || 0;
+                    // Regla de 3 para el flete: (FleteTotal * PrecioFactura) / PrecioTotalBatch
+                    const fleteProporcional = totalBatchPrice > 0 ? (fleteTotalNum * docTotal) / totalBatchPrice : 0;
 
-                const excelCorteDate = idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null;
+                    const existingRes = await dbClient.query('SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1', [doc]);
+                    let pedidoId: number;
 
-                if (existingRes.rows.length > 0) {
-                    pedidoId = existingRes.rows[0].id;
-                    await pool.query(`
+                    const excelCorteDate = idxCorte >= 0 ? parseExcelDate(rowArr[idxCorte]) : null;
+
+                    if (existingRes.rows.length > 0) {
+                        pedidoId = existingRes.rows[0].id;
+                        await dbClient.query(`
                         UPDATE grupo_inter_pedidos SET
                             nit = $2, cliente = $3, direccion = $4, notas_encabezado = $5, 
                             municipio_destino = $6, empresa = $7, f_ultimo_corte = COALESCE($8, f_ultimo_corte, CURRENT_TIMESTAMP), 
                             clasificacion = $9, placa = $10, valor_flete = $11, numero_planilla = $12,
                             cantidad_total = $13, precio_total = $14, peso_total_prod = $15,
-                            update_by = $16, update_at = CURRENT_TIMESTAMP
+                            update_by = $16, update_at = CURRENT_TIMESTAMP, ruta = $17
                         WHERE id = $1;
                     `, [
                         pedidoId,
@@ -397,17 +405,18 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                         idxCant >= 0 ? parseNum(rowArr[idxCant]) : 0,
                         idxPrice >= 0 ? parseNum(rowArr[idxPrice]) : 0,
                         idxPeso >= 0 ? parseNum(rowArr[idxPeso]) : 0,
-                        username
+                        username,
+                        ruta || ''
                     ]);
                 } else {
-                    const insertRes = await pool.query(`
+                    const insertRes = await dbClient.query(`
                         INSERT INTO grupo_inter_pedidos (
                             numero_documento, nit, cliente, direccion, notas_encabezado, 
                             municipio_destino, empresa, f_ultimo_corte, 
                             clasificacion, placa, valor_flete, numero_planilla, 
                             cantidad_total, precio_total, peso_total_prod,
-                            estado, create_by, create_at, fecha_carge
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, CURRENT_TIMESTAMP), $9, $10, $11, $12, $13, $14, $15, 'Pendiente', $16, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                            estado, create_by, create_at, fecha_carge, ruta
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, CURRENT_TIMESTAMP), $9, $10, $11, $12, $13, $14, $15, 'Pendiente', $16, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $17)
                         RETURNING id;
                     `, [
                         doc,
@@ -425,11 +434,12 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                         idxCant >= 0 ? parseNum(rowArr[idxCant]) : 0,
                         idxPrice >= 0 ? parseNum(rowArr[idxPrice]) : 0,
                         idxPeso >= 0 ? parseNum(rowArr[idxPeso]) : 0,
-                        username
+                        username,
+                        ruta || ''
                     ]);
                     pedidoId = insertRes.rows[0].id;
 
-                    await pool.query(`
+                    await dbClient.query(`
                         INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario)
                         VALUES ($1, 'Pendiente', 'Carga inicial valorizada', $2)
                     `, [pedidoId, username]);
@@ -439,8 +449,8 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             }
 
             // Insertar items siempre
-            const pedidoIdForItems = (await pool.query('SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1', [doc])).rows[0].id;
-            await pool.query(`
+            const pedidoIdForItems = (await dbClient.query('SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1', [doc])).rows[0].id;
+            await dbClient.query(`
                 INSERT INTO grupo_inter_pedidos_items (pedido_id, producto, cantidad, precio, peso, tipo_articulo)
                 VALUES ($1, $2, $3, $4, $5, $6)
             `, [
@@ -453,7 +463,20 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             ]);
         }
 
-        res.json({ message: `Excel procesado: ${savedCount} facturas sincronizadas. Flete total distribuido: $${fleteTotalNum.toLocaleString()}`, count: savedCount });
+            if (savedCount === 0) {
+                await dbClient.query('ROLLBACK');
+                res.status(400).json({ message: 'El archivo Excel no contenía filas válidas con documentos. Verifique que las columnas coincidan con la guía.' });
+                return;
+            }
+
+            await dbClient.query('COMMIT');
+            res.json({ message: `Excel procesado exitosamente: ${savedCount} facturas sincronizadas. Flete distribuido: $${fleteTotalNum.toLocaleString()}`, count: savedCount });
+        } catch (trxError) {
+            await dbClient.query('ROLLBACK');
+            throw trxError;
+        } finally {
+            dbClient.release();
+        }
     } catch (error) {
         console.error('[GRUPO-INTER] Error al subir Excel:', error);
         res.status(500).json({ message: 'Error interno al procesar el Excel' });
@@ -631,7 +654,17 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         
         sendProgress({ type: 'start', totalPages });
 
-        const ordersResult = await pool.query("SELECT numero_documento, no_factura_m7 FROM grupo_inter_pedidos WHERE estado != 'Entregado'");
+        const planilla = req.body.planilla?.trim();
+        let queryStr = "SELECT numero_documento, no_factura_m7 FROM grupo_inter_pedidos WHERE estado != 'Entregado'";
+        let queryParams: any[] = [];
+        
+        if (planilla) {
+            queryStr += " AND numero_planilla = $1";
+            queryParams.push(planilla);
+            sendProgress({ type: 'log', message: `🔍 Optimizando búsqueda a la Planilla: ${planilla}` });
+        }
+        
+        const ordersResult = await pool.query(queryStr, queryParams);
         const pendingRows = ordersResult.rows;
 
         if (pendingRows.length === 0) {

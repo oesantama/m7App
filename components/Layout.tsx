@@ -208,7 +208,15 @@ const Layout: React.FC<LayoutProps> = ({
           {!isCollapsed && (
             <div className="flex flex-col">
               <h1 className="font-black text-lg tracking-tighter text-white">ORBITM7</h1>
-              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em]">GLOBAL v{(__APP_VERSION__ as any) || '1.0.0'}-ULTRA-SLIM</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em]">GLOBAL v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.9.56'}-ULTRA-SLIM</span>
+                <button onClick={() => {
+                  if ('caches' in window) caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+                  window.location.reload();
+                }} title="Limpiar caché y recargar" className="text-slate-500 hover:text-emerald-400 transition-colors">
+                  <Icons.RefreshCw className="w-3 h-3" />
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -260,7 +268,15 @@ const Layout: React.FC<LayoutProps> = ({
             <button onClick={onLogout} title="Cerrar Sesión" className="p-1.5 text-slate-500 hover:text-rose-500 z-20 relative transition-colors"><Icons.LogOut className="w-4 h-4" /></button>
           </div>
           {!isCollapsed && (
-             <p className="text-[7px] text-slate-600 font-bold uppercase text-center opacity-40">Milla 7 • Orbit v1.9.54-ULTRA-SLIM</p>
+             <div className="flex items-center justify-center gap-2 opacity-40 hover:opacity-100 transition-opacity">
+               <p className="text-[7px] text-slate-600 font-bold uppercase text-center">Milla 7 • Orbit v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.9.56'}-ULTRA-SLIM</p>
+               <button onClick={() => {
+                 if ('caches' in window) caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+                 window.location.reload();
+               }} title="Limpiar caché y recargar" className="text-slate-600 hover:text-emerald-400 transition-colors">
+                 <Icons.RefreshCw className="w-3 h-3" />
+               </button>
+             </div>
           )}
         </div>
       </aside>

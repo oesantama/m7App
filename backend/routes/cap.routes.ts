@@ -41,6 +41,7 @@ router.delete('/especialistas/:id', requirePermission('CAPACITACIONES', 'create'
 router.get('/public/capacitacion', cap.getPublicCapacitacion);
 router.post('/public/intento/start', cap.iniciarIntento);
 router.post('/public/intento/submit', cap.submitIntento);
+router.get('/public/intento/:id/evaluacion', cap.descargarEvaluacionPDF);
 router.get('/public/certificado/:numero', cap.getCertificado);
 router.get('/public/recursos/:id/stream', cap.streamRecurso);
 

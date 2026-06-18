@@ -1544,9 +1544,10 @@ export const api = {
     body: JSON.stringify(data)
   }),
   getGrupoInterDetails: (id: string) => fetchJson(`${API_URL}/grupo-inter/details/${id}?_t=${Date.now()}`),
-  processGrupoInterPDF: async (file: File, onProgress: (data: any) => void) => {
+  processGrupoInterPDF: async (file: File, planilla: string, onProgress: (data: any) => void) => {
     const formData = new FormData();
     formData.append('file', file);
+    if (planilla) formData.append('planilla', planilla);
     
     // Adjuntamos el usuario actual para auditoría (update_by)
     const sessionStr = localStorage.getItem('m7_user_session');

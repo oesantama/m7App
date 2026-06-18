@@ -20,6 +20,7 @@ interface Pregunta {
   retroalimentacion_correcta?: string;
   retroalimentacion_incorrecta?: string;
   opciones: Opcion[];
+  orden?: number;
 }
 
 interface Recurso {
@@ -43,9 +44,10 @@ interface Capacitacion {
   nota_minima_aprobacion: number;
   max_intentos: number;
   tiempo_limite_minutos: number | '';
-  tipo_proceso: 'INDUCCION' | 'REINDUCCION' | 'AMBOS';
+  tipo_proceso: 'INDUCCION' | 'REINDUCCION' | 'AMBOS' | 'OTROS';
   tipo_acceso: 'INTERNO' | 'EXTERNO' | 'AMBOS';
   estado: 'BORRADOR' | 'ACTIVO' | 'ARCHIVADO';
+  formato_opciones?: 'letras' | 'numeros';
   preguntas: Pregunta[];
   recursos: Recurso[];
 }
@@ -53,7 +55,7 @@ interface Capacitacion {
 const BLANK: Capacitacion = {
   titulo: '', descripcion: '', objetivo: '', categoria: 'GENERAL',
   nota_minima_aprobacion: 70, max_intentos: 3, tiempo_limite_minutos: '',
-  tipo_proceso: 'AMBOS', tipo_acceso: 'INTERNO', estado: 'BORRADOR', preguntas: [], recursos: [],
+  tipo_proceso: 'AMBOS', tipo_acceso: 'INTERNO', estado: 'BORRADOR', formato_opciones: 'letras', preguntas: [], recursos: [],
 };
 
 const CATEGORIAS = ['GENERAL', 'SST', 'INDUCCION CORPORATIVA', 'PROCESO OPERATIVO', 'COMPLIANCE', 'CALIDAD', 'TECNOLOGIA'];
@@ -103,7 +105,7 @@ const CapacitacionEditor: React.FC<Props> = ({ capacitacion, usuario_control, al
       : tipo === 'seleccion_unica' || tipo === 'asociacion'
         ? [{ texto: '', es_correcta: true, orden: 0 }, { texto: '', es_correcta: false, orden: 1 }]
         : [{ texto: '', es_correcta: true, orden: 0 }, { texto: '', es_correcta: false, orden: 1 }];
-    const nueva: Pregunta = { tipo, pregunta: '', peso: 1, opciones };
+    const nueva: Pregunta = { tipo, pregunta: '', peso: 1, orden: form.preguntas.length + 1, opciones };
     setF({ preguntas: [...form.preguntas, nueva] });
   };
 
@@ -205,10 +207,14 @@ const CapacitacionEditor: React.FC<Props> = ({ capacitacion, usuario_control, al
     try {
       const payload = {
         ...form,
-        preguntas: form.preguntas.map(p => ({
-          ...p,
-          opciones: p.tipo === 'asociacion' ? p.opciones.map(o => ({ ...o, es_correcta: true })) : p.opciones
-        })),
+        preguntas: form.preguntas
+          .map((p, idx) => ({ ...p, orden_temporal: p.orden ?? idx + 1 }))
+          .sort((a, b) => a.orden_temporal - b.orden_temporal)
+          .map((p, idx) => ({
+            ...p,
+            orden: idx + 1,
+            opciones: p.tipo === 'asociacion' ? p.opciones.map(o => ({ ...o, es_correcta: true })) : p.opciones
+          })),
         estado: publishNow ? 'ACTIVO' : form.estado,
         tiempo_limite_minutos: form.tiempo_limite_minutos === '' ? null : form.tiempo_limite_minutos,
         usuario_control,
@@ -316,6 +322,7 @@ const CapacitacionEditor: React.FC<Props> = ({ capacitacion, usuario_control, al
                     <option value="AMBOS">Inducción y Reinducción</option>
                     <option value="INDUCCION">Solo Inducción</option>
                     <option value="REINDUCCION">Solo Reinducción</option>
+                    <option value="OTROS">Otros</option>
                   </select>
                 </div>
 
@@ -373,6 +380,14 @@ const CapacitacionEditor: React.FC<Props> = ({ capacitacion, usuario_control, al
                       onChange={e => setF({ tiempo_limite_minutos: e.target.value ? Number(e.target.value) : '' })}
                       placeholder="Sin límite"
                       className="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 font-black text-slate-700 outline-none focus:border-emerald-500 transition-all" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">Formato de Listado de Opciones</label>
+                    <select value={form.formato_opciones || 'letras'} onChange={e => setF({ formato_opciones: e.target.value as any })}
+                      className="w-full bg-white border-2 border-slate-200 rounded-xl px-4 py-3 font-black text-slate-900 outline-none focus:border-emerald-500 transition-all uppercase">
+                      <option value="letras">Letras (A, B, C, D...)</option>
+                      <option value="numeros">Números (1, 2, 3, 4...)</option>
+                    </select>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-slate-500 font-medium pt-1">
@@ -442,6 +457,12 @@ const CapacitacionEditor: React.FC<Props> = ({ capacitacion, usuario_control, al
                         onChange={e => updatePregunta(pi, { peso: Number(e.target.value) })}
                         className="w-14 text-center bg-white border border-slate-200 rounded-lg px-2 py-1.5 font-black text-slate-700 outline-none" />
                     </div>
+                    <div className="flex items-center gap-1 text-[9px] font-black text-slate-400 uppercase">
+                      <span>Orden:</span>
+                      <input type="number" min={1} value={p.orden ?? (pi + 1)}
+                        onChange={e => updatePregunta(pi, { orden: Number(e.target.value) })}
+                        className="w-14 text-center bg-white border border-slate-200 rounded-lg px-2 py-1.5 font-black text-slate-700 outline-none" />
+                    </div>
                     <button onClick={() => removePregunta(pi)}
                       className="ml-auto w-8 h-8 bg-rose-50 text-rose-400 rounded-xl flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all flex-shrink-0">
                       <Icons.Trash className="w-3.5 h-3.5" />
@@ -456,10 +477,19 @@ const CapacitacionEditor: React.FC<Props> = ({ capacitacion, usuario_control, al
                   {/* Opciones */}
                   {p.tipo !== 'falso_verdadero' && (
                     <div className="space-y-2">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest px-1">
-                        {p.tipo === 'asociacion' ? 'Pares a Emparejar (Concepto y Definición)' : 'Opciones de Respuesta'}
-                        {p.tipo === 'seleccion_multiple' && <span className="ml-2 text-blue-500">(puedes marcar varias correctas)</span>}
-                      </p>
+                      <div className="flex text-[9px] font-black text-slate-400 uppercase tracking-widest px-1 mb-1">
+                        {p.tipo === 'asociacion' ? (
+                          <>
+                            <div className="flex-1">Concepto / Elemento Base</div>
+                            <div className="flex-1">Debe emparejar con (Respuesta Correcta)</div>
+                          </>
+                        ) : (
+                          <div className="w-full">
+                            Opciones de Respuesta
+                            {p.tipo === 'seleccion_multiple' && <span className="ml-2 text-blue-500">(puedes marcar varias correctas)</span>}
+                          </div>
+                        )}
+                      </div>
                       {p.opciones.map((o, oi) => (
                         <div key={oi} className={`flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-xl border-2 transition-all ${o.es_correcta && p.tipo !== 'asociacion' ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-100'}`}>
                           {/* Selector correcto (oculto en asociacion) */}
@@ -470,15 +500,20 @@ const CapacitacionEditor: React.FC<Props> = ({ capacitacion, usuario_control, al
                             </button>
                           )}
                           
-                          <div className="flex-1 flex flex-col sm:flex-row gap-2">
+                          <div className="flex-1 flex flex-col sm:flex-row gap-2 items-center">
+                            {p.tipo !== 'asociacion' && (
+                              <span className="text-[11px] font-black text-slate-400 w-5 flex-shrink-0">
+                                {form.formato_opciones === 'numeros' ? `${oi + 1}.` : `${String.fromCharCode(65 + oi)}.`}
+                              </span>
+                            )}
                             <input value={o.texto} onChange={e => updateOpcion(pi, oi, { texto: e.target.value })}
                               className="flex-1 bg-transparent border-b border-slate-200 outline-none text-sm font-medium text-slate-700 placeholder:text-slate-300 pb-1"
-                              placeholder={p.tipo === 'asociacion' ? 'Ej: Caneca roja' : `Opción ${oi + 1}...`} />
+                              placeholder={p.tipo === 'asociacion' ? 'Ej: Azul' : `Opción ${oi + 1}...`} />
                             
                             {p.tipo === 'asociacion' && (
                               <input value={o.imagen_url || ''} onChange={e => updateOpcion(pi, oi, { imagen_url: e.target.value })}
                                 className="flex-1 bg-transparent border-b border-slate-200 outline-none text-sm font-medium text-slate-700 placeholder:text-slate-300 pb-1"
-                                placeholder="Ej: Residuos biológicos..." />
+                                placeholder="Asociación correcta (Ej: Cielo)" />
                             )}
                           </div>
 

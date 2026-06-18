@@ -164,7 +164,10 @@ const PublicCapacitacion: React.FC<PublicCapacitacionProps> = ({ embeddedCapId, 
   const handleSubmitExamen = useCallback(async (autoSubmit = false) => {
     if (!intentoId || !asignacion) return;
     if (!autoSubmit) {
-      const sinResponder = preguntas.filter(p => !respuestas[p.id] || respuestas[p.id].length === 0);
+      const sinResponder = preguntas.filter(p => {
+        if (p.tipo === 'asociacion') return Object.keys(asociacionMatches[p.id] || {}).length === 0;
+        return !respuestas[p.id] || respuestas[p.id].length === 0;
+      });
       if (sinResponder.length > 0 && !confirm(`Tienes ${sinResponder.length} pregunta(s) sin responder. ¿Enviar de todas formas?`)) return;
     }
 
@@ -222,6 +225,15 @@ const PublicCapacitacion: React.FC<PublicCapacitacionProps> = ({ embeddedCapId, 
 
   const pregActual = preguntas[pregIdx];
   const opcionesSeleccionadas = respuestas[pregActual?.id] || [];
+
+  const checkAnswered = (pId: number) => {
+    const p = preguntas.find(x => x.id === pId);
+    if (p?.tipo === 'asociacion') {
+      return Object.keys(asociacionMatches[pId] || {}).length > 0;
+    }
+    return (respuestas[pId] || []).length > 0;
+  };
+  const hasAnsweredCurrent = pregActual ? checkAnswered(pregActual.id) : false;
 
   const toggleOpcion = (opcionId: number) => {
     if (!pregActual) return;
@@ -751,7 +763,7 @@ const PublicCapacitacion: React.FC<PublicCapacitacionProps> = ({ embeddedCapId, 
                 if (pregIdx < preguntas.length - 1) { setPregIdx(i => i + 1); setShowRetro(false); }
                 else handleSubmitExamen();
               }}
-              disabled={submitting || opcionesSeleccionadas.length === 0}
+              disabled={submitting || !hasAnsweredCurrent}
               className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl text-sm font-black uppercase hover:bg-emerald-600 active:scale-95 transition-all shadow-xl disabled:opacity-40 flex items-center justify-center gap-2">
               {submitting ? (
                 <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Enviando...</>
@@ -767,7 +779,7 @@ const PublicCapacitacion: React.FC<PublicCapacitacionProps> = ({ embeddedCapId, 
           <div className="flex gap-1 justify-center flex-wrap">
             {preguntas.map((p, i) => (
               <button key={p.id} onClick={() => { setPregIdx(i); setShowRetro(false); }}
-                className={`w-7 h-7 rounded-lg text-[9px] font-black transition-all ${i === pregIdx ? 'bg-emerald-500 text-white' : respuestas[p.id]?.length > 0 ? 'bg-white/30 text-white' : 'bg-white/10 text-slate-500'}`}>
+                className={`w-7 h-7 rounded-lg text-[9px] font-black transition-all ${i === pregIdx ? 'bg-emerald-500 text-white' : checkAnswered(p.id) ? 'bg-white/30 text-white' : 'bg-white/10 text-slate-500'}`}>
                 {i + 1}
               </button>
             ))}

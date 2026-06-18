@@ -89,7 +89,8 @@ const GrupoInterView: React.FC = () => {
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [manifestFile, setManifestFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [uploadExtra, setUploadExtra] = useState({ placa: '', fleteTotal: '', planilla: '' });
+  const [pdfPlanilla, setPdfPlanilla] = useState('');
+  const [uploadExtra, setUploadExtra] = useState({ placa: '', fleteTotal: '', planilla: '', ruta: '', formato: 'antiguo' });
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showManifestPreview, setShowManifestPreview] = useState(false);
@@ -214,17 +215,58 @@ const GrupoInterView: React.FC = () => {
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
         if (rows.length > 0) {
-          const headers = rows[0] || [];
-          const json = rows.slice(1).map(row => {
+          let headerRowIdx = -1;
+          const normalizeStr = (str: any) => String(str || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+          const identityKeywords = ['NUMERO DOCUMENTO', 'NRO DOCUMENTO', 'DOCUMENTO', 'REMISION', 'NIT CLIENTE', 'NIT', 'NOMBRE CLIENTE'].map(normalizeStr);
+          for (let i = 0; i < Math.min(rows.length, 25); i++) {
+            const rowStr = (rows[i] || []).map(normalizeStr).join(' ');
+            if (identityKeywords.some(kw => rowStr.includes(kw))) {
+              headerRowIdx = i;
+              break;
+            }
+          }
+
+          if (headerRowIdx === -1) {
+              toast.error('❌ Archivo rechazado. No tiene la estructura de cabeceras válida. Consulte la Guía de Formato.');
+              setExcelFile(null);
+              return;
+          }
+
+          const headers = rows[headerRowIdx] || [];
+          const json = rows.slice(headerRowIdx + 1).map(row => {
             const obj: any = {};
             for (let i = 0; i < headers.length; i++) {
               const h = headers[i];
+              if (!h) continue;
               const val = row[i];
-              obj[String(h || `COL_${i}`)] = (val === undefined || val === null || val === '') ? ' ' : val;
+              obj[String(h)] = (val === undefined || val === null || val === '') ? ' ' : val;
             }
             return obj;
-          });
+          }).filter(row => Object.values(row).some(v => String(v).trim() !== ''));
+          
           setPreviewData(json);
+          
+          // [M7-AUTO] Detectar nuevo formato automáticamente buscando etiquetas en las primeras 15 filas
+          let autoPlaca = '';
+          let autoRuta = '';
+          for (let i = 0; i < Math.min(rows.length, 15); i++) {
+             const rowArr = rows[i] || [];
+             for (let j = 0; j < rowArr.length; j++) {
+                 const cellValue = String(rowArr[j] || '').toUpperCase().trim();
+                 if (cellValue === 'PLACA:' || cellValue === 'PLACA') {
+                     autoPlaca = String(rowArr[j + 1] || '').trim();
+                 }
+                 if (cellValue === 'RUTA:' || cellValue === 'RUTA') {
+                     autoRuta = String(rowArr[j + 1] || '').trim();
+                 }
+             }
+          }
+          
+          if (autoPlaca || autoRuta) {
+             setUploadExtra(prev => ({ ...prev, formato: 'nuevo', placa: autoPlaca, ruta: autoRuta, planilla: '' }));
+          } else {
+             setUploadExtra(prev => ({ ...prev, formato: 'antiguo', placa: '', planilla: '', ruta: '' }));
+          }
         }
         setShowPreviewModal(true);
       } catch (err) {
@@ -323,7 +365,7 @@ const GrupoInterView: React.FC = () => {
       setDebugLogs([]);
       setProcessingStatus("Iniciando escaneo de documentos...");
       
-      await api.processGrupoInterPDF(pdfFile, (data) => {
+      await api.processGrupoInterPDF(pdfFile, pdfPlanilla, (data) => {
         if (data.type === 'log') {
           setDebugLogs(prev => [...prev, data.message]);
           setProcessingStatus(data.message);
@@ -333,14 +375,19 @@ const GrupoInterView: React.FC = () => {
           setProcessingStatus(`COMPLETADO: ${data.matches} COINCIDENCIAS.`);
           setIsFinished(true); // Marcamos el fin del proceso
           toast.success(`Se encontraron ${data.matches} coincidencias.`);
+        } else if (data.type === 'error') {
+          setProcessingStatus(`ERROR: ${data.message}`);
+          setIsFinished(true); // Muestra el botón de cerrar
+          toast.error(data.message);
         }
       });
-      setPdfFile(null);
       fetchOrders();
     } catch (error: any) {
       toast.error(error.message || 'Error al procesar PDF');
       setIsProcessing(false);
     } finally {
+      setPdfFile(null);
+      setPdfPlanilla('');
       setLoading(false);
     }
   };
@@ -382,6 +429,7 @@ const GrupoInterView: React.FC = () => {
         'Número Documento': o.numero_documento,
         'Planilla': o.numero_planilla || '-',
         'Placa': o.placa || '-',
+        'Ruta Logística': o.ruta || '-',
         'Número Guía': o.numero_guia || '-',
         'Fct. Último Corte': o.f_ultimo_corte ? new Date(o.f_ultimo_corte).toLocaleDateString() : '-',
         'NIT Cliente': o.nit,
@@ -529,6 +577,7 @@ const GrupoInterView: React.FC = () => {
            (o.cliente || '').toLowerCase().includes(term) ||
            String(o.nit || '').toLowerCase().includes(term) ||
            (o.numero_planilla || '').toLowerCase().includes(term) ||
+           (o.ruta || '').toLowerCase().includes(term) ||
            (o.placa || '').toLowerCase().includes(term) ||
            (o.municipio_destino || '').toLowerCase().includes(term) ||
            (o.estado || '').toLowerCase().includes(term) ||
@@ -661,9 +710,23 @@ const GrupoInterView: React.FC = () => {
                   <input type="file" className="hidden" accept=".pdf" onChange={(e) => setPdfFile(e.target.files?.[0] || null)} />
                 </label>
                 {pdfFile && (
-                  <button onClick={handlePdfUpload} disabled={loading} className="mt-4 w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition">
-                    {loading ? 'Procesando...' : 'Iniciar OCR'}
-                  </button>
+                  <div className="mt-4 w-full space-y-3">
+                    <div>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">
+                        Filtrar por Planilla (Opcional - Recomendado)
+                      </label>
+                      <input 
+                        type="text" 
+                        placeholder="Ej. 100435"
+                        value={pdfPlanilla}
+                        onChange={(e) => setPdfPlanilla(e.target.value)}
+                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </div>
+                    <button onClick={handlePdfUpload} disabled={loading} className="w-full py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition">
+                      {loading ? 'Procesando...' : 'Iniciar OCR'}
+                    </button>
+                  </div>
                 )}
             </div>
 
@@ -902,6 +965,7 @@ const GrupoInterView: React.FC = () => {
                     {[
                       { key: 'numero_documento', label: 'Documento' },
                       { key: 'numero_planilla', label: 'Planilla' },
+                      { key: 'ruta', label: 'Ruta' },
                       { key: 'placa', label: 'Placa' },
                       { key: 'fecha_carge', label: 'F. Cargue' },
                       { key: 'fecha_entregado', label: 'F. Entrega' },
@@ -911,7 +975,7 @@ const GrupoInterView: React.FC = () => {
                       { key: 'valor_flete', label: 'Flete ($)' },
                       { key: 'ultimaNovedad', label: 'Seguimiento' }
                     ].map(col => (
-                      <th key={col.key} className="px-8 py-5 cursor-pointer hover:bg-slate-100/50 transition-colors group select-none" onClick={() => requestSort(col.key)}>
+                      <th key={col.key} className="px-4 py-3 md:px-8 md:py-5 cursor-pointer hover:bg-slate-100/50 transition-colors group select-none" onClick={() => requestSort(col.key)}>
                         <div className="flex items-center gap-1">
                           {col.label} 
                           <span className={`text-[10px] transition-opacity ${sortConfig?.key === col.key ? 'opacity-100 text-blue-500' : 'opacity-0 group-hover:opacity-100 text-slate-300'}`}>
@@ -920,31 +984,36 @@ const GrupoInterView: React.FC = () => {
                         </div>
                       </th>
                     ))}
-                    <th className="px-8 py-5 text-right">Acciones</th>
+                    <th className="px-4 py-3 md:px-8 md:py-5 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50 text-xs text-slate-600">
                   {loading ? (
-                    <tr><td colSpan={11} className="py-24 text-center">
+                    <tr><td colSpan={12} className="py-24 text-center">
                         <div className="flex flex-col items-center gap-4">
                           <div className="w-10 h-10 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
                           <span className="font-black text-[10px] uppercase text-slate-400 tracking-widest">Sincronizando con el núcleo M7...</span>
                         </div>
                     </td></tr>
                   ) : visibleOrders.length === 0 ? (
-                    <tr><td colSpan={11} className="py-24 text-center text-slate-300 font-bold uppercase tracking-widest text-[10px]">Sin registros encontrados</td></tr>
+                    <tr><td colSpan={12} className="py-24 text-center text-slate-300 font-bold uppercase tracking-widest text-[10px]">Sin registros encontrados</td></tr>
                   ) : (
                     visibleOrders.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(order => (
                       <tr key={order.id} className="hover:bg-blue-50/20 transition-all group">
-                        <td className="px-8 py-5 font-black text-slate-900">{order.numero_documento}</td>
-                        <td className="px-8 py-5">
+                        <td className="px-4 py-3 md:px-8 md:py-5 font-black text-slate-900">{order.numero_documento}</td>
+                        <td className="px-4 py-3 md:px-8 md:py-5">
                            <span className="px-2.5 py-1 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-black uppercase tracking-tight border border-slate-200 group-hover:bg-white transition-colors">
                              {order.numero_planilla || '-'}
                            </span>
                         </td>
-                        <td className="px-8 py-5 font-black text-slate-700 uppercase">{order.placa || '-'}</td>
-                        <td className="px-8 py-5 font-bold text-slate-500">{formatColDate(order.fecha_carge)}</td>
-                        <td className="px-8 py-5 font-bold text-slate-500">
+                        <td className="px-4 py-3 md:px-8 md:py-5">
+                           <span className="text-slate-500 text-xs font-medium truncate max-w-[120px] block" title={order.ruta}>
+                             {order.ruta || '-'}
+                           </span>
+                        </td>
+                        <td className="px-4 py-3 md:px-8 md:py-5 font-black text-slate-700 uppercase">{order.placa || '-'}</td>
+                        <td className="px-4 py-3 md:px-8 md:py-5 font-bold text-slate-500">{formatColDate(order.fecha_carge)}</td>
+                        <td className="px-4 py-3 md:px-8 md:py-5 font-bold text-slate-500">
                           {order.fecha_entregado ? (
                             <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-lg text-[10px] font-black border border-emerald-100">
                               {formatColDate(order.fecha_entregado)}
@@ -953,7 +1022,7 @@ const GrupoInterView: React.FC = () => {
                             <span className="text-slate-300">-</span>
                           )}
                         </td>
-                        <td className="px-8 py-5">
+                        <td className="px-4 py-3 md:px-8 md:py-5">
                            <div className="flex flex-col max-w-[200px]">
                              <span className="font-extrabold text-slate-800 truncate">{order.cliente}</span>
                              <div className="flex items-center gap-1.5 mt-0.5">
@@ -968,13 +1037,13 @@ const GrupoInterView: React.FC = () => {
                             <span className="font-black text-slate-500">{order.cantidad_total || 0}</span>
                           </div>
                         </td>
-                        <td className="px-8 py-5 font-black text-slate-400">{order.peso_total_prod || 0} Kg</td>
-                        <td className="px-8 py-5">
+                        <td className="px-4 py-3 md:px-8 md:py-5 font-black text-slate-400">{order.peso_total_prod || 0} Kg</td>
+                        <td className="px-4 py-3 md:px-8 md:py-5">
                            <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full font-black text-[11px] border border-emerald-100">
                              ${Math.round(order.valor_flete || 0).toLocaleString()}
                            </span>
                         </td>
-                        <td className="px-8 py-5">
+                        <td className="px-4 py-3 md:px-8 md:py-5">
                            <div className="flex flex-col min-w-[180px] bg-slate-50 p-3 rounded-2xl border border-slate-100 group-hover:bg-white transition-colors">
                              <div className="flex items-center gap-2 mb-1.5">
                                 <div className={`w-2 h-2 rounded-full ${['Entregado', 'Completado'].includes(order.estado || '') ? 'bg-emerald-500' : 'bg-blue-500 animate-pulse'}`}></div>
@@ -993,7 +1062,7 @@ const GrupoInterView: React.FC = () => {
                              </div>
                            </div>
                         </td>
-                        <td className="px-8 py-5 text-right">
+                        <td className="px-4 py-3 md:px-8 md:py-5 text-right">
                           <div className="flex gap-2 justify-end transition-opacity">
                             <button onClick={() => openDetail(order)} className="p-2.5 bg-blue-600 text-white rounded-xl hover:bg-black transition-all shadow-lg shadow-blue-200" title="Ver Detalle"><Eye size={18} /></button>
                             <button 
@@ -1051,7 +1120,7 @@ const GrupoInterView: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setShowDetailModal(false)}></div>
           <div className="relative bg-white w-full max-w-5xl max-h-[90vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col scale-100 animate-in fade-in zoom-in duration-300">
-             <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-white">
+             <div className="p-4 md:p-8 border-b border-slate-50 flex justify-between items-center bg-white">
                 <div className="flex items-center gap-4">
                   <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg shadow-blue-100"><Eye size={24} /></div>
                   <div>
@@ -1104,7 +1173,7 @@ const GrupoInterView: React.FC = () => {
                   </div>
              </div>
 
-             <div className="flex-1 overflow-y-auto p-8 flex flex-col gap-8">
+             <div className="flex-1 overflow-y-auto p-4 md:p-8 flex flex-col gap-8">
                 {/* Encabezado de Datos Detallado */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                    <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col gap-4">
@@ -1324,61 +1393,77 @@ const GrupoInterView: React.FC = () => {
       {/* Preview Modal 1 */}
       {showPreviewModal && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-           <div className="bg-white w-[95vw] max-w-7xl max-h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden">
-              <div className="p-6 border-b flex justify-between items-center px-8">
-                 <h2 className="text-2xl font-black text-slate-900">Previsualización Carga 1 (valorizados)</h2>
-                 <button onClick={() => setShowPreviewModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={24}/></button>
+           <div className="bg-white w-full max-w-7xl max-h-[95vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+              <div className="shrink-0 p-4 md:p-6 border-b flex justify-between items-center px-4 md:px-8 gap-4 bg-white z-10">
+                 <h2 className="text-xl md:text-2xl font-black text-slate-900">Previsualización Carga 1 (valorizados)</h2>
+                 <button onClick={() => setShowPreviewModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400 shrink-0"><X size={24}/></button>
               </div>
-              <div className="flex-1 overflow-auto bg-slate-50 p-6">
-                 <table className="w-full text-[10px] text-left border-collapse bg-white rounded-xl overflow-hidden shadow-sm">
-                    <thead className="bg-slate-100 sticky top-0 font-black uppercase text-slate-600 border-b">
-                       <tr>{previewData[0] && Object.keys(previewData[0]).map(k => <th key={k} className="p-3 px-4 whitespace-nowrap">{k}</th>)}</tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                       {previewData.slice(0, 100).map((r, i) => (
-                         <tr key={i} className="hover:bg-blue-50/30 transition-colors">
-                           {Object.values(r).map((v:any, j) => <td key={j} className="p-3 px-4 text-slate-500 truncate max-w-[200px]">{String(v)}</td>)}
-                         </tr>
-                       ))}
-                    </tbody>
-                 </table>
-              </div>
-              <div className="p-6 bg-slate-50 border-t border-b grid grid-cols-1 md:grid-cols-3 gap-6 px-10">
-                 <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Placa Vehículo *</label>
-                    <input 
-                      type="text" 
-                      placeholder="Ej: XYZ-123" 
-                      className="p-3 bg-white border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none uppercase"
-                      value={uploadExtra.placa}
-                      onChange={(e) => setUploadExtra(prev => ({ ...prev, placa: e.target.value.toUpperCase() }))}
-                    />
+              
+              <div className="flex-1 overflow-y-auto bg-slate-50 flex flex-col">
+                 <div className="p-4 md:p-6">
+                    <div className="w-full overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-100">
+                       <table className="w-full text-[10px] text-left border-collapse">
+                          <thead className="bg-slate-100 font-black uppercase text-slate-600 border-b">
+                             <tr>{previewData[0] && Object.keys(previewData[0]).map(k => <th key={k} className="p-3 px-4 whitespace-nowrap">{k}</th>)}</tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                             {previewData.slice(0, 100).map((r, i) => (
+                               <tr key={i} className="hover:bg-blue-50/30 transition-colors">
+                                 {Object.values(r).map((v:any, j) => <td key={j} className="p-3 px-4 text-slate-500 truncate max-w-[200px]">{String(v)}</td>)}
+                               </tr>
+                             ))}
+                          </tbody>
+                       </table>
+                    </div>
                  </div>
-                 <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Flete Total *</label>
-                    <input 
-                      type="number" 
-                      placeholder="Ej: 1500000" 
-                      className="p-3 bg-white border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                      value={uploadExtra.fleteTotal}
-                      onChange={(e) => setUploadExtra(prev => ({ ...prev, fleteTotal: e.target.value }))}
-                    />
-                 </div>
-                 <div className="flex flex-col gap-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Número de Planilla</label>
-                    <input 
-                      type="text" 
-                      placeholder="Opcional..." 
-                      className="p-3 bg-white border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none"
-                      value={uploadExtra.planilla}
-                      onChange={(e) => setUploadExtra(prev => ({ ...prev, planilla: e.target.value }))}
-                    />
+
+                 <div className="p-4 md:p-6 bg-white border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 px-4 md:px-8">
+                    <div className="flex flex-col gap-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Placa Vehículo *</label>
+                       <input 
+                         type="text" 
+                         placeholder="Ej: XYZ-123" 
+                         className="p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none uppercase"
+                         value={uploadExtra.placa}
+                         onChange={(e) => setUploadExtra(prev => ({ ...prev, placa: e.target.value.toUpperCase() }))}
+                       />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Flete Total *</label>
+                       <input 
+                         type="number" 
+                         placeholder="Ej: 1500000" 
+                         className="p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                         value={uploadExtra.fleteTotal}
+                         onChange={(e) => setUploadExtra(prev => ({ ...prev, fleteTotal: e.target.value }))}
+                       />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ruta (Destino Logístico)</label>
+                       <input 
+                         type="text" 
+                         placeholder="Opcional..." 
+                         className="p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                         value={uploadExtra.ruta}
+                         onChange={(e) => setUploadExtra(prev => ({ ...prev, ruta: e.target.value }))}
+                       />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Número de Planilla</label>
+                       <input 
+                         type="text" 
+                         placeholder="Opcional..." 
+                         className="p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                         value={uploadExtra.planilla}
+                         onChange={(e) => setUploadExtra(prev => ({ ...prev, planilla: e.target.value }))}
+                       />
+                    </div>
                  </div>
               </div>
 
-              <div className="p-6 bg-white border-t flex justify-end gap-4 px-8">
-                 <button onClick={() => setShowPreviewModal(false)} className="px-8 py-3 border border-slate-200 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition">Cancelar</button>
-                 <button onClick={handleExcelUpload} disabled={loading} className="px-12 py-3 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition shadow-xl shadow-emerald-100 active:scale-95 disabled:opacity-50">{loading ? 'Procesando...' : 'Confirmar Carga'}</button>
+              <div className="shrink-0 p-4 md:p-6 bg-white border-t flex flex-col sm:flex-row justify-end gap-3 md:gap-4 px-4 md:px-8 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+                 <button onClick={() => setShowPreviewModal(false)} className="w-full sm:w-auto px-8 py-3 border border-slate-200 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition">Cancelar</button>
+                 <button onClick={handleExcelUpload} disabled={loading} className="w-full sm:w-auto px-12 py-3 bg-emerald-600 text-white rounded-xl font-black hover:bg-emerald-700 transition shadow-xl shadow-emerald-100 active:scale-95 disabled:opacity-50">{loading ? 'Procesando...' : 'Confirmar Carga'}</button>
               </div>
            </div>
         </div>
@@ -1387,28 +1472,34 @@ const GrupoInterView: React.FC = () => {
       {/* Preview Modal 2 */}
       {showManifestPreview && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-           <div className="bg-white w-[95vw] max-w-7xl max-h-[90vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden">
-              <div className="p-6 border-b flex justify-between items-center px-8">
-                 <h2 className="text-2xl font-black text-slate-900">Previsualización Carga 2 (Logística)</h2>
-                 <button onClick={() => setShowManifestPreview(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={24}/></button>
+           <div className="bg-white w-full max-w-7xl max-h-[95vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+              <div className="shrink-0 p-4 md:p-6 border-b flex justify-between items-center px-4 md:px-8 gap-4 bg-white z-10">
+                 <h2 className="text-xl md:text-2xl font-black text-slate-900">Previsualización Carga 2 (Logística)</h2>
+                 <button onClick={() => setShowManifestPreview(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400 shrink-0"><X size={24}/></button>
               </div>
-              <div className="flex-1 overflow-auto bg-slate-50 p-6">
-                 <table className="w-full text-[10px] text-left border-collapse bg-white rounded-xl overflow-hidden shadow-sm">
-                    <thead className="bg-slate-100 sticky top-0 font-black uppercase text-slate-600 border-b">
-                       <tr>{previewData[0] && Object.keys(previewData[0]).map(k => <th key={k} className="p-3 px-4 whitespace-nowrap">{k}</th>)}</tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                       {previewData.slice(0, 100).map((r, i) => (
-                         <tr key={i} className="hover:bg-blue-50/30 transition-colors">
-                           {Object.values(r).map((v:any, j) => <td key={j} className="p-3 px-4 text-slate-500 truncate max-w-[200px]">{String(v)}</td>)}
-                         </tr>
-                       ))}
-                    </tbody>
-                 </table>
+              
+              <div className="flex-1 overflow-y-auto bg-slate-50 flex flex-col">
+                 <div className="p-4 md:p-6">
+                    <div className="w-full overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-100">
+                       <table className="w-full text-[10px] text-left border-collapse">
+                          <thead className="bg-slate-100 font-black uppercase text-slate-600 border-b">
+                             <tr>{previewData[0] && Object.keys(previewData[0]).map(k => <th key={k} className="p-3 px-4 whitespace-nowrap">{k}</th>)}</tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                             {previewData.slice(0, 100).map((r, i) => (
+                               <tr key={i} className="hover:bg-blue-50/30 transition-colors">
+                                 {Object.values(r).map((v:any, j) => <td key={j} className="p-3 px-4 text-slate-500 truncate max-w-[200px]">{String(v)}</td>)}
+                               </tr>
+                             ))}
+                          </tbody>
+                       </table>
+                    </div>
+                 </div>
               </div>
-              <div className="p-6 bg-white border-t flex justify-end gap-4 px-8">
-                 <button onClick={() => setShowManifestPreview(false)} className="px-8 py-3 border border-slate-200 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition">Cancelar</button>
-                 <button onClick={handleManifestUpload} disabled={loading} className="px-12 py-3 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 transition shadow-xl shadow-blue-100 active:scale-95 disabled:opacity-50">{loading ? 'Actualizando...' : 'Actualizar Logística'}</button>
+
+              <div className="shrink-0 p-4 md:p-6 bg-white border-t flex flex-col sm:flex-row justify-end gap-3 md:gap-4 px-4 md:px-8 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+                 <button onClick={() => setShowManifestPreview(false)} className="w-full sm:w-auto px-8 py-3 border border-slate-200 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition">Cancelar</button>
+                 <button onClick={handleManifestUpload} disabled={loading} className="w-full sm:w-auto px-12 py-3 bg-blue-600 text-white rounded-xl font-black hover:bg-blue-700 transition shadow-xl shadow-blue-100 active:scale-95 disabled:opacity-50">{loading ? 'Actualizando...' : 'Actualizar Logística'}</button>
               </div>
            </div>
         </div>
@@ -1424,15 +1515,25 @@ const GrupoInterView: React.FC = () => {
                  <button onClick={() => setShowGuideModal(null)} className="p-1 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={20}/></button>
               </div>
               <div className="space-y-4 text-xs font-medium text-slate-600">
-                 <p>Para cargar correctamente, su archivo Excel debe tener los siguientes encabezados en la primera fila:</p>
-                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 font-mono text-[10px] leading-6">
+                 <p>Para cargar correctamente, su archivo Excel debe tener uno de los siguientes esquemas:</p>
+                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 font-mono text-[10px] leading-6 max-h-48 overflow-y-auto">
                     {showGuideModal === 'operacion' ? (
-                       <span className="text-emerald-600 font-bold underline uppercase">NUMERO DOCUMENTO, NIT CLIENTE, CLIENTE, PRODUCTO, CANTIDAD, PESO</span>
+                       <div className="space-y-4">
+                          <div>
+                            <p className="font-black text-slate-800 uppercase tracking-widest mb-1 text-[9px] bg-slate-200 inline-block px-2 py-0.5 rounded">Formato Nuevo Valorizado</p>
+                            <span className="text-blue-600 font-bold block">NUMERO DOCUMENTO, FECHA FACTURA, NIT CLIENTE, NOMBRE CLIENTE, DIRECCIÓN, NOTA ENCABEZADO, MUNICIPIO DESTINO, CANTIDAD TOTAL, PRECIO TOTAL</span>
+                            <span className="text-slate-400 block mt-1">Soporta auto-detección de Placa y Ruta en cabecera (Filas B6, B7)</span>
+                          </div>
+                          <div className="border-t border-slate-200 pt-3">
+                            <p className="font-black text-slate-800 uppercase tracking-widest mb-1 text-[9px] bg-slate-200 inline-block px-2 py-0.5 rounded">Formato Antiguo (Básico)</p>
+                            <span className="text-emerald-600 font-bold block">NUMERO DOCUMENTO, NIT CLIENTE, CLIENTE, PRODUCTO, CANTIDAD, PESO, PRECIO TOTAL</span>
+                          </div>
+                       </div>
                     ) : (
                        <span className="text-blue-600 font-bold underline uppercase">DOCUMENTO, MANIFIESTO, PLANILLA, RUTA, FLETE</span>
                     )}
                  </div>
-                 <p className="italic text-amber-600 font-bold">* El sistema buscará coincidencias exactas por "NUMERO DOCUMENTO" o "DOCUMENTO".</p>
+                 <p className="italic text-amber-600 font-bold">* El sistema validará estrictamente que exista la fila de títulos.</p>
                  <button onClick={() => setShowGuideModal(null)} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest mt-4 hover:bg-blue-600 transition shadow-xl shadow-blue-100">Entendido</button>
               </div>
            </div>
