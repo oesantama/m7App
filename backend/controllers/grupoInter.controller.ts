@@ -817,7 +817,8 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
     await ensureSchema();
     const dbClient = await pool.connect();
     try {
-        // [M7-PERF] Timeout de seguridad: si la query tarda más de 20s, devolvemos error controlado
+        // [M7-PERF] Timeout de seguridad: usamos BEGIN para que SET LOCAL funcione
+        await dbClient.query('BEGIN');
         await dbClient.query(`SET LOCAL statement_timeout = '20000'`);
 
         const { search, status, client, fechaCorteDesde, fechaCorteHasta, invoice, plate, planilla, dateType } = req.query;
@@ -929,8 +930,10 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
         `;
 
         const result = await dbClient.query(query, values);
+        await dbClient.query('COMMIT');
         res.json(result.rows);
     } catch (error: any) {
+        await dbClient.query('ROLLBACK');
         console.error('[M7-ERR] getOrders:', error?.message || error);
         if (error?.message?.includes('canceling statement due to statement timeout')) {
             // Cambiamos de 504 a 408 para que Nginx no intercepte el error y lo reemplace con HTML
