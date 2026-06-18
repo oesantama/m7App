@@ -674,6 +674,9 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         const username = req.body.username || 'System OCR';
 
         for (let i = 0; i < totalPages; i++) {
+            // [M7-PERF] Cedemos el event loop vitalmente para que los HealthChecks no fallen (Previene 502/504 por saturación)
+            await sleep(200);
+
             sendProgress({ type: 'log', message: `Analizando página ${i + 1} de ${totalPages}...` });
             
             const subPdf = await PDFDocument.create();

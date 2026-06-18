@@ -14,7 +14,7 @@ RUN --mount=type=cache,target=/root/.npm \
 
 COPY . .
 # Compilamos el servidor con límite de RAM ajustado y podamos dependencias usando el package.json optimizado
-ENV NODE_OPTIONS="--max-old-space-size=1024"
+ENV NODE_OPTIONS="--max-old-space-size=768"
 RUN mv package.json.modified package.json && \
     npm run build:server && \
     npm prune --omit=dev --legacy-peer-deps
