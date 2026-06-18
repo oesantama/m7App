@@ -152,9 +152,9 @@ let visionModel: any = null;
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-async function generateContentWithRetry(model: any, promptData: any, sendProgress: Function, maxRetries = 4, workerContext?: { id: number, keyIndex: number }) {
+async function generateContentWithRetry(modelNameStr: string, promptData: any, sendProgress: Function, maxRetries = 4, workerContext?: { id: number, keyIndex: number }) {
     const keys = getAPIKeysPool();
-    let localModel = model;
+    let localModel = getVisionModel(modelNameStr, workerContext ? keys[workerContext.keyIndex] : keys[currentKeyIndex % keys.length]);
     let poolTrialCount = 0;
     const workerLabel = workerContext ? `[W${workerContext.id + 1}]` : '';
 
@@ -207,15 +207,16 @@ async function generateContentWithRetry(model: any, promptData: any, sendProgres
                         await sleep(pauseTime * 1000);
                         poolTrialCount = 0;
                     } else {
-                        const shortWait = Math.max(5, waitSeconds);
+                        // [M7-PERF] Al rotar a una NUEVA llave, ignoramos el castigo de la llave agotada.
+                        const shortWait = 2; // Solo 2s para prevenir spam a la red
                         sendProgress({ 
                             type: 'log', 
-                            message: `⚠️ Rotando a Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}] (${Math.round(shortWait)}s)...` 
+                            message: `⚠️ Rotando a Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}] (${shortWait}s)...` 
                         });
                         await sleep(shortWait * 1000);
                     }
                     
-                    localModel = getVisionModel("gemini-2.0-flash", nextKey);
+                    localModel = getVisionModel(modelNameStr, nextKey);
                     continue;
                 }
 
@@ -734,8 +735,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                     
                     const currentModelName = fallBackModels[modelAttempts];
                     try {
-                        let visionModelLocal = getVisionModel(currentModelName, apiKey);
-                        const result = await generateContentWithRetry(visionModelLocal, [
+                        const result = await generateContentWithRetry(currentModelName, [
                             { text: prompt },
                             { inlineData: { data: pageBase64, mimeType: "application/pdf" } }
                         ], sendProgress, 2); // Reducido maxRetries a 2 por modelo
@@ -903,7 +903,7 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
                 SELECT p.*
                 FROM grupo_inter_pedidos p
                 WHERE ${whereStr}
-                ORDER BY ${orderCol} DESC NULLS LAST, p.create_at DESC
+                ORDER BY ${orderCol} DESC
                 LIMIT 500
             ),
             items_agg AS (
@@ -926,20 +926,20 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
             FROM pedidos_filtrados pf
             LEFT JOIN items_agg      ia ON ia.pid = pf.id
             LEFT JOIN historico_agg  ha ON ha.pid = pf.id
-            ORDER BY ${orderCol === 'p.fecha_carge' ? 'pf.fecha_carge' : 'pf.fecha_entregado'} DESC NULLS LAST, pf.create_at DESC
+            ORDER BY ${orderCol === 'p.fecha_carge' ? 'pf.fecha_carge' : 'pf.fecha_entregado'} DESC
         `;
 
         const result = await dbClient.query(query, values);
         await dbClient.query('COMMIT');
         res.json(result.rows);
     } catch (error: any) {
-        await dbClient.query('ROLLBACK');
+        try { await dbClient.query('ROLLBACK'); } catch(e) {}
         console.error('[M7-ERR] getOrders:', error?.message || error);
         if (error?.message?.includes('canceling statement due to statement timeout')) {
-            // Cambiamos de 504 a 408 para que Nginx no intercepte el error y lo reemplace con HTML
-            res.status(408).json({ message: 'La consulta tardó demasiado. Por favor reduce el rango de fechas e intenta de nuevo.' });
+            // Cambiamos a 400 para que Nginx no intercepte el error y lo reemplace con HTML
+            return res.status(400).json({ message: 'La consulta abarcó demasiados registros. Por favor reduce el rango de fechas a menos de 15 días e intenta de nuevo.' });
         } else {
-            res.status(500).json({ message: 'Error al obtener pedidos', detail: error?.message });
+            return res.status(500).json({ message: 'Error al obtener pedidos', detail: error?.message });
         }
     } finally {
         dbClient.release();
