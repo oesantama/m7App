@@ -1445,10 +1445,10 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query })
   }),
-  saveAdminRecord: (tableName: string, data: any) => fetchJson(`${API_URL}/admin/save`, {
+  saveAdminRecord: (tableName: string, data: any, isUpdate: boolean = false) => fetchJson(`${API_URL}/admin/save`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tableName, data })
+    body: JSON.stringify({ tableName, data, isUpdate })
   }),
   deleteAdminRecord: (tableName: string, id: any) => fetchJson(`${API_URL}/admin/delete`, {
     method: 'POST',

@@ -5,6 +5,10 @@ import path from 'path';
 import fs from 'fs';
 import { PDFDocument } from 'pdf-lib';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
 // Función para obtener el pool de API Keys desde el CSV
 const getAPIKeysPool = (): string[] => {
@@ -133,8 +137,8 @@ const getVisionModel = (modelName?: string, forceApiKey?: string) => {
         console.error('[OCR-NUCLEAR] ❌ ERROR CRÍTICO: No se detectó ninguna API Key válida en el pool.');
     }
     
-    // M7-DYNAMIC-MODEL: Forzar fallback estable porque gemini-1.5-flash simple da 404
-    const modelId = "gemini-flash-latest"; 
+    // M7-DYNAMIC-MODEL: Uso dinámico
+    const modelId = modelName || "gemini-flash-latest"; 
     
     const keyForLog = apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4);
     console.log(`[OCR-NUCLEAR] 🧠 Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}] | Modelo: ${modelId} | Key: ${keyForLog}`);
@@ -675,71 +679,114 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [i]);
             subPdf.addPage(copiedPage);
             const pageBase64 = await subPdf.saveAsBase64();
-
-            const prompt = `Actúa como un motor OCR de logística. 
-            Analiza esta página PDF.
-            Busca EXCLUSIVAMENTE las siguientes secuencias numéricas (ignora prefijos como 'FEV', 'FV', o cualquier otra letra alrededor):
-            [${numericList.join(', ')}]
+            const pageBuffer = Buffer.from(pageBase64, 'base64');
             
-            REGLAS:
-            1. Escanea la página.
-            2. Si encuentras un número que coincida EXACTAMENTE con uno de la lista (ignorando letras), inclúyelo en la lista "matches".
-            3. Responde SOLO con un JSON estricto con esta estructura exacta:
-            {"matches": ["NUMERO_1", "NUMERO_2"]}
-            4. Si no hay coincidencias, responde: {"matches": []}
-            5. Prohibido agregar formato markdown o texto adicional, solo el JSON raw.`;
+            let foundMatchesInPage: any[] = [];
+            let localExtractionSuccess = false;
 
+            // 🟢 FASE 1: Intento de extracción LOCAL ultrarrápida
             try {
-                const result = await generateContentWithRetry(visionModel, [
-                    { text: prompt },
-                    { inlineData: { data: pageBase64, mimeType: "application/pdf" } }
-                ], sendProgress, 3);
-
-                const response = await result.response;
-                const textResponse = response.text().trim();
+                const pdfData = await pdfParse(pageBuffer);
+                const localText = pdfData.text || '';
                 
-                const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
-                if (!jsonMatch) {
-                    sendProgress({ type: 'log', message: `⚠️ Página ${i + 1}: Respuesta inválida del modelo.` });
-                    continue;
-                }
-                
-                const data = JSON.parse(jsonMatch[0]);
-                const foundMatchesInPage = data.matches || [];
-
-                for (const item of foundMatchesInPage) {
-                    const matchedNum = String(item).replace(/\D/g, '');
-                    const originalDocId = numericDocsMap.get(matchedNum);
-
-                    if (originalDocId) {
-                        sendProgress({ type: 'log', message: `✅ Match exacto: ${originalDocId} (encontrado como ${matchedNum}) en Pág ${i + 1}...` });
-                        
-                        const base64PagePrefix = `data:application/pdf;base64,${pageBase64}`;
-
-                        await pool.query(
-                            "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $3",
-                            [base64PagePrefix, username, originalDocId]
-                        );
-
-                        // Registrar en histórico
-                        const pedRes = await pool.query("SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1", [originalDocId]);
-                        if (pedRes.rows.length > 0) {
-                            await pool.query(
-                                "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', 'PDF Procesado Automáticamente', 'System OCR')",
-                                [pedRes.rows[0].id]
-                            );
+                if (localText.length > 50) {
+                    // Limpiar el texto: extraer todas las secuencias numéricas (de al menos 4 dígitos para evitar falsos positivos)
+                    const numbersInText = localText.replace(/\D+/g, ' ').split(' ').filter((n: string) => n.length >= 4);
+                    const uniqueNumbers = new Set(numbersInText);
+                    
+                    for (const num of numericList) {
+                        if (uniqueNumbers.has(num)) {
+                            foundMatchesInPage.push(num);
                         }
-                        
-                        // Remover de la lista pendiente para no volver a buscarlo y acelerar el proceso
-                        const idx = numericList.indexOf(matchedNum);
-                        if (idx > -1) numericList.splice(idx, 1);
-                        
-                        finalMatches++;
+                    }
+                    
+                    if (foundMatchesInPage.length > 0) {
+                        sendProgress({ type: 'log', message: `⚡ Lectura LOCAL exitosa en Pág ${i + 1}. Evitando uso de IA.` });
+                        localExtractionSuccess = true;
                     }
                 }
-            } catch (pageError) {
-                sendProgress({ type: 'log', message: `❌ Error al procesar la página ${i + 1}. Omitiendo...` });
-                console.error(`Error en página ${i + 1}:`, pageError);
+            } catch (localErr) {
+                console.error(`[GRUPO-INTER] Error en OCR local pág ${i + 1}:`, localErr);
+            }
+
+            // 🟠 FASE 2: Si la lectura local falla o no encuentra números, usar Gemini (con fallback de modelos)
+            if (!localExtractionSuccess) {
+                sendProgress({ type: 'log', message: `🤖 Lectura local insuficiente en Pág ${i + 1}. Iniciando OCR IA...` });
+                
+                const prompt = `Actúa como un motor OCR de logística. 
+                Analiza esta página PDF.
+                Busca EXCLUSIVAMENTE las siguientes secuencias numéricas (ignora prefijos como 'FEV', 'FV', o cualquier otra letra alrededor):
+                [${numericList.join(', ')}]
+                
+                REGLAS:
+                1. Escanea la página.
+                2. Si encuentras un número que coincida EXACTAMENTE con uno de la lista (ignorando letras), inclúyelo en la lista "matches".
+                3. Responde SOLO con un JSON estricto con esta estructura exacta:
+                {"matches": ["NUMERO_1", "NUMERO_2"]}
+                4. Si no hay coincidencias, responde: {"matches": []}
+                5. Prohibido agregar formato markdown o texto adicional, solo el JSON raw.`;
+
+                const fallBackModels = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+                let geminiSuccess = false;
+
+                for (let modelAttempts = 0; modelAttempts < fallBackModels.length; modelAttempts++) {
+                    if (geminiSuccess) break;
+                    
+                    const currentModelName = fallBackModels[modelAttempts];
+                    try {
+                        let visionModelLocal = getVisionModel(currentModelName, apiKey);
+                        const result = await generateContentWithRetry(visionModelLocal, [
+                            { text: prompt },
+                            { inlineData: { data: pageBase64, mimeType: "application/pdf" } }
+                        ], sendProgress, 2); // Reducido maxRetries a 2 por modelo
+
+                        const response = await result.response;
+                        const textResponse = response.text().trim();
+                        
+                        const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+                        if (jsonMatch) {
+                            const data = JSON.parse(jsonMatch[0]);
+                            foundMatchesInPage = data.matches || [];
+                            geminiSuccess = true;
+                        } else {
+                            sendProgress({ type: 'log', message: `⚠️ Página ${i + 1}: Respuesta inválida del modelo ${currentModelName}.` });
+                        }
+                    } catch (pageError: any) {
+                        sendProgress({ type: 'log', message: `❌ Error con modelo ${currentModelName} en pág ${i + 1}: ${pageError?.message?.substring(0, 50)}...` });
+                    }
+                }
+            }
+
+            // 🔵 FASE 3: Procesar los matches encontrados (sea local o IA)
+            for (const item of foundMatchesInPage) {
+                const matchedNum = String(item).replace(/\D/g, '');
+                const originalDocId = numericDocsMap.get(matchedNum);
+
+                if (originalDocId) {
+                    sendProgress({ type: 'log', message: `✅ Match exacto: ${originalDocId} (encontrado como ${matchedNum}) en Pág ${i + 1}...` });
+                    
+                    const base64PagePrefix = `data:application/pdf;base64,${pageBase64}`;
+
+                    await pool.query(
+                        "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $3",
+                        [base64PagePrefix, username, originalDocId]
+                    );
+
+                    // Registrar en histórico
+                    const pedRes = await pool.query("SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1", [originalDocId]);
+                    if (pedRes.rows.length > 0) {
+                        await pool.query(
+                            "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', $2, 'System OCR')",
+                            [pedRes.rows[0].id, localExtractionSuccess ? 'PDF Procesado Automáticamente (Extracción Local Rápida)' : 'PDF Procesado Automáticamente (IA)']
+                        );
+                    }
+                    
+                    // Remover de la lista pendiente para no volver a buscarlo y acelerar el proceso
+                    const idx = numericList.indexOf(matchedNum);
+                    if (idx > -1) numericList.splice(idx, 1);
+                    
+                    finalMatches++;
+                }
             }
             
             // Emit progress
@@ -848,7 +895,7 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
         const whereStr = whereClauses.join(' AND ');
 
         // Ordenar por la columna filtrada para maximizar el uso del índice
-        const orderCol = dateType === 'cargue' ? 'p.fecha_carge' : 'p.fecha_carge';
+        const orderCol = dateType === 'cargue' ? 'p.fecha_carge' : 'p.fecha_entregado';
 
         const query = `
             WITH pedidos_filtrados AS (
@@ -878,7 +925,7 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
             FROM pedidos_filtrados pf
             LEFT JOIN items_agg      ia ON ia.pid = pf.id
             LEFT JOIN historico_agg  ha ON ha.pid = pf.id
-            ORDER BY pf.fecha_carge DESC NULLS LAST, pf.create_at DESC
+            ORDER BY ${orderCol === 'p.fecha_carge' ? 'pf.fecha_carge' : 'pf.fecha_entregado'} DESC NULLS LAST, pf.create_at DESC
         `;
 
         const result = await dbClient.query(query, values);
@@ -886,7 +933,8 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
     } catch (error: any) {
         console.error('[M7-ERR] getOrders:', error?.message || error);
         if (error?.message?.includes('canceling statement due to statement timeout')) {
-            res.status(504).json({ message: 'La consulta tardó demasiado. Por favor reduce el rango de fechas e intenta de nuevo.' });
+            // Cambiamos de 504 a 408 para que Nginx no intercepte el error y lo reemplace con HTML
+            res.status(408).json({ message: 'La consulta tardó demasiado. Por favor reduce el rango de fechas e intenta de nuevo.' });
         } else {
             res.status(500).json({ message: 'Error al obtener pedidos', detail: error?.message });
         }

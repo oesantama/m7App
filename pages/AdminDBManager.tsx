@@ -314,7 +314,21 @@ const AdminDBManager: React.FC = () => {
 
   const handleSave = async () => {
     try {
-      const result = await api.saveAdminRecord(selectedTable, formData);
+      // Limpiar formData antes de enviar
+      const cleanedData = { ...formData };
+      
+      // Remover campos que no deberían forzarse en inserciones si están vacíos o son fechas autogeneradas
+      Object.keys(cleanedData).forEach(key => {
+          if (cleanedData[key] === '') {
+              cleanedData[key] = null; // Convertir strings vacíos a null para BD
+          }
+          // Si es un registro nuevo, evitar enviar fechas autogeneradas para que la BD use CURRENT_TIMESTAMP
+          if (!editingRecord && (key.toLowerCase() === 'created_at' || key.toLowerCase() === 'updated_at' || key.toLowerCase() === 'created_by' || key.toLowerCase() === 'updated_by')) {
+              delete cleanedData[key];
+          }
+      });
+
+      const result = await api.saveAdminRecord(selectedTable, cleanedData, !!editingRecord);
       toast.success(result.action === 'UPDATE' ? 'Registro Actualizado' : 'Registro Creado');
       setIsModalOpen(false);
       loadData(page);

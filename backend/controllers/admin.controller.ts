@@ -137,7 +137,7 @@ export const executeSql = async (req: any, res: Response) => {
 }
 
 export const saveRecord = async (req: any, res: Response) => {
-  const { tableName, data } = req.body;
+  const { tableName, data, isUpdate } = req.body;
   const user = req.user;
   try {
     if (!isUserAdmin(user)) return res.status(403).json({ error: "Acceso denegado." });
@@ -151,11 +151,8 @@ export const saveRecord = async (req: any, res: Response) => {
     const invalidCol = keys.find(k => !/^[a-zA-Z0-9_]+$/.test(k));
     if (invalidCol) return res.status(400).json({ error: `Nombre de columna inválido: ${invalidCol}` });
     
-    // Check if it's an UPDATE (has 'id') or INSERT
-    // We assume 'id' column exists for updates. 
-    // If not, we might need a more complex primary key detection, but for now 'id' is standard.
-    
-    if (data.id) {
+    // Check if it's an UPDATE or INSERT based on frontend flag
+    if (isUpdate) {
        // UPDATE
        const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
        const idVal = data.id;
