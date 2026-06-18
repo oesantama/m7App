@@ -1,8 +1,7 @@
 services:
   m7app-backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
+    image: 'ghcr.io/oesantama/m7-backend:latest'
+    pull_policy: always
     restart: always
     expose:
       - '8080'
