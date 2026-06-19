@@ -165,8 +165,22 @@ export const getCapacitaciones = async (req: Request, res: Response) => {
   try {
     const tokenUser = (req as any).user;
     const CAPACITACIONES_PAGE = 'PAG-32';
+
+    let isEspecialistaDb = false;
+    const userId = tokenUser?.id || tokenUser?.userId;
+    if (userId) {
+      const espCheck = await pool.query(
+        `SELECT 1 FROM cap_especialistas WHERE user_id = $1 AND activo = true LIMIT 1`,
+        [userId]
+      );
+      if (espCheck.rows.length > 0) {
+        isEspecialistaDb = true;
+      }
+    }
+
     const hasViewPerm = tokenUser?.roleId === 'ROL-01' || tokenUser?.role_id === 'ROL-01' ||
       tokenUser?.email?.toLowerCase() === 'directorti@millasiete.com' ||
+      isEspecialistaDb ||
       tokenUser?.permissions?.some((p: any) =>
         (p.module === 'CAPACITACIONES' || p.module === CAPACITACIONES_PAGE) && p.actions.includes('view')
       );

@@ -93,8 +93,12 @@ const CapacitacionesAdmin: React.FC<Props> = ({ user }) => {
     api.capGetEspecialistaMe()
       .then((r: any) => { if (r?.isEspecialista) setIsDbEspecialista(true); })
       .catch(() => {});
-    loadCaps();
   }, []);
+
+  useEffect(() => {
+    loadCaps();
+  }, [loadCaps]);
+
 
   useEffect(() => {
     if (isEspecialista) {
@@ -139,7 +143,7 @@ const CapacitacionesAdmin: React.FC<Props> = ({ user }) => {
     } catch { toast.error('Error al eliminar'); }
   };
 
-  const loadCaps = async () => {
+  const loadCaps = React.useCallback(async () => {
     setLoading(true);
     try {
       const cedula = isEspecialista ? undefined : (user.documentNumber || undefined);
@@ -148,7 +152,7 @@ const CapacitacionesAdmin: React.FC<Props> = ({ user }) => {
       setCaps(data);
     } catch { toast.error('Error al cargar capacitaciones'); }
     finally { setLoading(false); }
-  };
+  }, [isEspecialista, user.documentNumber]);
 
   const handleEditar = async (cap: Capacitacion) => {
     try {
