@@ -88,6 +88,17 @@ const CapacitacionesAdmin: React.FC<Props> = ({ user }) => {
   // Solo quien está en cap_especialistas (o super admin) puede crear, ver RADAR y ESPECIALISTAS
   const isEspecialista   = isSuperAdmin || isDbEspecialista;
 
+  const loadCaps = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const cedula = isEspecialista ? undefined : (user.documentNumber || undefined);
+      const cedulaSelf = user.documentNumber || undefined;
+      const data = await api.capGetCapacitaciones(cedula, cedulaSelf);
+      setCaps(data);
+    } catch { toast.error('Error al cargar capacitaciones'); }
+    finally { setLoading(false); }
+  }, [isEspecialista, user.documentNumber]);
+
   useEffect(() => {
     // Verificar si el usuario está en la tabla cap_especialistas (independiente del rol)
     api.capGetEspecialistaMe()
@@ -142,17 +153,6 @@ const CapacitacionesAdmin: React.FC<Props> = ({ user }) => {
       setConfirmDeleteEsp(null); loadEspecialistas();
     } catch { toast.error('Error al eliminar'); }
   };
-
-  const loadCaps = React.useCallback(async () => {
-    setLoading(true);
-    try {
-      const cedula = isEspecialista ? undefined : (user.documentNumber || undefined);
-      const cedulaSelf = user.documentNumber || undefined;
-      const data = await api.capGetCapacitaciones(cedula, cedulaSelf);
-      setCaps(data);
-    } catch { toast.error('Error al cargar capacitaciones'); }
-    finally { setLoading(false); }
-  }, [isEspecialista, user.documentNumber]);
 
   const handleEditar = async (cap: Capacitacion) => {
     try {
