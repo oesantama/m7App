@@ -1534,7 +1534,8 @@ export const restoreSystem = async () => {
 
     await client.query(`
       ALTER TABLE cap_capacitaciones
-        ADD COLUMN IF NOT EXISTS tipo_acceso VARCHAR(20) DEFAULT 'INTERNO' NOT NULL
+        ADD COLUMN IF NOT EXISTS tipo_acceso VARCHAR(20) DEFAULT 'INTERNO' NOT NULL,
+        ADD COLUMN IF NOT EXISTS formato_opciones VARCHAR(20) DEFAULT 'letras' NOT NULL
     `);
 
     await client.query(`
@@ -1553,6 +1554,14 @@ export const restoreSystem = async () => {
         fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_cap_preguntas_cap ON cap_preguntas(capacitacion_id);
+    `);
+
+    await client.query(`
+      ALTER TABLE cap_preguntas
+        ADD COLUMN IF NOT EXISTS retroalimentacion_correcta TEXT,
+        ADD COLUMN IF NOT EXISTS retroalimentacion_incorrecta TEXT,
+        ADD COLUMN IF NOT EXISTS peso INTEGER DEFAULT 1,
+        ADD COLUMN IF NOT EXISTS orden INTEGER DEFAULT 0
     `);
 
     await client.query(`
@@ -1586,6 +1595,13 @@ export const restoreSystem = async () => {
         fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
       CREATE INDEX IF NOT EXISTS idx_cap_recursos_cap ON cap_recursos(capacitacion_id);
+    `);
+
+    await client.query(`
+      ALTER TABLE cap_recursos
+        ADD COLUMN IF NOT EXISTS url_externa TEXT,
+        ADD COLUMN IF NOT EXISTS usuario_control VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS orden INTEGER DEFAULT 0
     `);
 
     await client.query(`
