@@ -363,6 +363,10 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   } | null>(null);
   const scanSuppressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addInvoiceInputRef = useRef<HTMLInputElement>(null);
+  const importExcelRef = useRef<HTMLInputElement>(null);
+  const [importExcelPreview, setImportExcelPreview] = useState<{
+    items: Array<{ invoiceNum: string; invoice: Invoice | null }>;
+  } | null>(null);
   const [isPendingInvoicesModalOpen, setIsPendingInvoicesModalOpen] = useState(false);
   const [pendingInvoicesSearch, setPendingInvoicesSearch] = useState('');
 
@@ -2401,6 +2405,72 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     toast.success(`✓ ${invoice.invoiceNumber} → ${route.vehicle.plate}`);
   };
 
+  const handleDownloadImportTemplate = () => {
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([['FACTURA'], ['AFE7752434'], ['AFE7752435']]);
+    ws['!cols'] = [{ wch: 20 }];
+    XLSX.utils.book_append_sheet(wb, ws, 'Plantilla');
+    XLSX.writeFile(wb, 'plantilla_importar_facturas.xlsx');
+  };
+
+  const handleImportExcelFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target!.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        const invoiceNums = rows
+          .slice(1) // skip header
+          .map(r => String(r[0] || '').trim().toUpperCase())
+          .filter(v => v.length > 0);
+        if (invoiceNums.length === 0) {
+          toast.error('El archivo no contiene facturas en la primera columna.');
+          return;
+        }
+        const items = invoiceNums.map(invoiceNum => ({
+          invoiceNum,
+          invoice: unassignedInvoices.find(inv =>
+            (inv.invoiceNumber || '').toUpperCase() === invoiceNum
+          ) || null,
+        }));
+        setImportExcelPreview({ items });
+      } catch {
+        toast.error('No se pudo leer el archivo. Verifique que sea un Excel válido.');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleConfirmImportExcel = () => {
+    if (!importExcelPreview || addInvoiceModal.routeIndex === null) return;
+    const toAdd = importExcelPreview.items.filter(i => i.invoice !== null);
+    if (toAdd.length === 0) {
+      toast.error('Ninguna factura del archivo coincide con el plan actual.');
+      return;
+    }
+    const newSuggestions = [...suggestedRoutes];
+    const route = newSuggestions[addInvoiceModal.routeIndex];
+    let added = 0;
+    for (const { invoice } of toAdd) {
+      if (!invoice) continue;
+      const already = route.assignedInvoices.some(
+        a => (a.invoiceNumber || '').toUpperCase() === (invoice.invoiceNumber || '').toUpperCase()
+      );
+      if (already) continue;
+      route.assignedInvoices.push(invoice);
+      added++;
+    }
+    const totalVol = route.assignedInvoices.reduce((s, i) => s + Number(i.volumeM3 || 0), 0);
+    const cap = Number(route.vehicle.capacityM3 || (route.vehicle as any).capacity_m3) || 30;
+    route.totalVolume = Number(totalVol.toFixed(4));
+    route.utilization = Math.round((totalVol / cap) * 100);
+    setSuggestedRoutes(newSuggestions);
+    setImportExcelPreview(null);
+    toast.success(`✓ ${added} factura${added !== 1 ? 's' : ''} agregada${added !== 1 ? 's' : ''} a ${route.vehicle.plate}`);
+  };
+
   const handleSwapRouteVehicle = (routeIndex: number, newVehicle: Vehicle) => {
     const newSuggestions = [...suggestedRoutes];
     const route = newSuggestions[routeIndex];
@@ -3883,7 +3953,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                       <p className="text-[10px] font-bold text-slate-500 uppercase">{addInvoiceModal.tab === 'plan' ? 'Seleccione una factura pendiente' : 'Factura de repice (no está en el plan)'}</p>
                     </div>
                   </div>
-                  <button onClick={() => { setAddInvoiceModal({ isOpen: false, routeIndex: null, tab: 'plan' }); setModalSearchTerm(''); }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
+                  <button onClick={() => { setAddInvoiceModal({ isOpen: false, routeIndex: null, tab: 'plan' }); setModalSearchTerm(''); setImportExcelPreview(null); }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
                     <Icons.X className="w-5 h-5 text-slate-400" />
                   </button>
                 </div>
@@ -3929,6 +3999,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                 </div>
 
                 {addInvoiceModal.tab === 'plan' ? (
+                  <div className="flex flex-col gap-2">
                   <div className="relative">
                     <Icons.Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" />
                     <input
@@ -3988,6 +4059,34 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                       }}
                       className="w-full pl-12 pr-4 py-4 bg-white border-2 border-slate-100 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-emerald-500 transition-all shadow-sm"
                     />
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      ref={importExcelRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) { handleImportExcelFile(file); e.target.value = ''; }
+                      }}
+                    />
+                    <button
+                      onClick={() => importExcelRef.current?.click()}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                    >
+                      <Icons.Upload className="w-3.5 h-3.5" />
+                      Importar Excel
+                    </button>
+                    <button
+                      onClick={handleDownloadImportTemplate}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      title="Descargar formato Excel"
+                    >
+                      <Icons.Download className="w-3.5 h-3.5" />
+                      Formato
+                    </button>
+                  </div>
                   </div>
                 ) : (
                   <div className="flex gap-2">
@@ -4169,6 +4268,95 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                     </div>
                   ));
                 })()}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Modal Vista Previa Importación Excel */}
+      {importExcelPreview && addInvoiceModal.routeIndex !== null && (() => {
+        const activeRoute = suggestedRoutes[addInvoiceModal.routeIndex];
+        const plate = (activeRoute?.vehicle as any)?.plate || '—';
+        const found = importExcelPreview.items.filter(i => i.invoice);
+        const notFound = importExcelPreview.items.filter(i => !i.invoice);
+        return (
+          <div className="fixed inset-0 z-[700] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
+            <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-200">
+              {/* Header */}
+              <div className="p-8 border-b border-slate-100 bg-indigo-50 rounded-t-[2.5rem] shrink-0">
+                <div className="flex justify-between items-start">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white text-indigo-600 rounded-2xl flex items-center justify-center shadow-md">
+                      <Icons.Upload className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Vista previa — Importar Excel</h3>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase">Revise las facturas antes de confirmar</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setImportExcelPreview(null)} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm shrink-0">
+                    <Icons.X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+                {/* Stats bar */}
+                <div className="flex items-center gap-3 mt-5 flex-wrap">
+                  <div className="flex items-center gap-2 bg-slate-900 text-white rounded-xl px-3 py-1.5">
+                    <Icons.Truck className="w-3.5 h-3.5 text-indigo-400" />
+                    <span className="text-[11px] font-black uppercase">{plate}</span>
+                  </div>
+                  <div className="flex items-center gap-2 bg-emerald-500 text-white rounded-xl px-3 py-1.5">
+                    <span className="text-[11px] font-black">{found.length} encontradas</span>
+                  </div>
+                  {notFound.length > 0 && (
+                    <div className="flex items-center gap-2 bg-red-100 text-red-600 rounded-xl px-3 py-1.5 border border-red-200">
+                      <span className="text-[11px] font-black">{notFound.length} no encontradas</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 bg-white rounded-xl px-3 py-1.5 border border-slate-200">
+                    <span className="text-[11px] font-bold text-slate-500">{importExcelPreview.items.length} total en archivo</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* List */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-2">
+                {importExcelPreview.items.map((item, i) => (
+                  <div key={i} className={`flex items-center gap-4 px-5 py-3.5 rounded-2xl border ${item.invoice ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-100'}`}>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-white text-[10px] font-black shrink-0 ${item.invoice ? 'bg-emerald-500' : 'bg-red-400'}`}>
+                      {item.invoice ? '✓' : '✕'}
+                    </span>
+                    <span className={`text-[12px] font-black uppercase tracking-wide flex-1 ${item.invoice ? 'text-emerald-900' : 'text-red-500'}`}>
+                      {item.invoiceNum}
+                    </span>
+                    {item.invoice ? (
+                      <>
+                        <span className="text-[11px] font-bold text-slate-600 truncate max-w-[200px]">{item.invoice.customerName}</span>
+                        <span className="text-[10px] font-black text-emerald-600 shrink-0">{(Number(item.invoice.volumeM3) || 0).toFixed(3)} m³</span>
+                      </>
+                    ) : (
+                      <span className="text-[10px] text-red-400 font-bold">No está en el plan actual</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="p-6 border-t border-slate-100 flex gap-3 shrink-0">
+                <button
+                  onClick={() => setImportExcelPreview(null)}
+                  className="flex-1 py-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all"
+                >
+                  Cancelar
+                </button>
+                {found.length > 0 && (
+                  <button
+                    onClick={handleConfirmImportExcel}
+                    className="flex-[2] py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-md"
+                  >
+                    ✓ Confirmar — agregar {found.length} factura{found.length !== 1 ? 's' : ''} a {plate}
+                  </button>
+                )}
               </div>
             </div>
           </div>
