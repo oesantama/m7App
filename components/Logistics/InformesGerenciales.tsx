@@ -1898,7 +1898,7 @@ export const InformesGerenciales: React.FC = () => {
         "PARTICIPACIÓN (%)": (Math.round((row.participation || 0) * 10) / 10) / 100,
         "FACT. MISMO MES": Math.round(row.invoicedSameMonthVal || 0),
         "% FACT. MISMO MES": (Math.round((row.invoicedSameMonthPct || 0) * 10) / 10) / 100,
-        "PROM DÍA PAGO": Math.round(row.averagePaymentDays || 0),
+        "PROM DÍA FACT": Math.round(row.averagePaymentDays || 0),
         "PROM DIAS REC": Math.round(row.averageRecDays || 0),
         "PROM DIAS EGRESO": Math.round(row.averageEgrDays || 0),
         "PROM DIA MAN RECIBIDO": Math.round(row.averageManRecDays || 0),
@@ -1951,7 +1951,7 @@ export const InformesGerenciales: React.FC = () => {
         "PARTICIPACIÓN (%)": 1,
         "FACT. MISMO MES": Math.round(totalInvoicedSameMonth || 0),
         "% FACT. MISMO MES": (Math.round((overallInvoicedSameMonthPct || 0) * 10) / 10) / 100,
-        "PROM DÍA PAGO": Math.round(overallAveragePaymentDays || 0),
+        "PROM DÍA FACT": Math.round(overallAveragePaymentDays || 0),
         "PROM DIAS REC": Math.round(overallAverageRecDays || 0),
         "PROM DIAS EGRESO": Math.round(overallAverageEgrDays || 0),
         "PROM DIA MAN RECIBIDO": Math.round(overallAverageManRecDays || 0),
@@ -1973,7 +1973,7 @@ export const InformesGerenciales: React.FC = () => {
         "PARTICIPACIÓN (%)": '0.0%',
         "FACT. MISMO MES": '"$"#,##0',
         "% FACT. MISMO MES": '0.0%',
-        "PROM DÍA PAGO": '#,##0',
+        "PROM DÍA FACT": '#,##0',
         "PROM DIAS REC": '#,##0',
         "PROM DIAS EGRESO": '#,##0',
         "PROM DIA MAN RECIBIDO": '#,##0',
@@ -2054,7 +2054,7 @@ export const InformesGerenciales: React.FC = () => {
         const sameMonth = !!(dMan && dInv
           && dMan.getFullYear() === dInv.getFullYear()
           && dMan.getMonth()    === dInv.getMonth());
-        const factMismoMes = hasInvoice && sameMonth ? 1 : 0;
+        const factMismoMes = hasInvoice && sameMonth ? ventaRow : 0;
 
         const recibido   = !!(dRec && hasInvoice && sameMonth);
         const vlRecibido = recibido ? ventaRow : 0;
@@ -2076,12 +2076,11 @@ export const InformesGerenciales: React.FC = () => {
           "FECHA EGRESO":          dEgr  ? formatColombianDateStr(rawEgrStr)   : '',
           // Métricas calculadas — vacías si la fecha fuente no existe
           "FACT. MISMO MES":       factMismoMes,
-          "DÍA PAGO (MAN→FACT)":  diasPago,
+          "DÍA FACTURACION (MAN→FACT)":  diasPago,
           "DIAS REC (FACT→REC)":  diasRec,
           "DIAS EGRESO (MAN→EGR)": diasEgreso,
           "DIA MAN RECIBIDO (MAN→REC)": diasManRec,
           "VL RECIBIDO":           vlRecibido,
-          "RECIBIDO":              recibido ? 1 : 0,
         };
       });
 
@@ -2092,13 +2091,12 @@ export const InformesGerenciales: React.FC = () => {
         "TOTAL CXC":             '"$"#,##0',
         "VALOR TOTAL CXC FINAL": '"$"#,##0',
         "VALOR TOT CXP FINAL":   '"$"#,##0',
-        "FACT. MISMO MES":       '0',
-        "DÍA PAGO (MAN→FACT)":  '#,##0',
+        "FACT. MISMO MES":       '"$"#,##0',
+        "DÍA FACTURACION (MAN→FACT)":  '#,##0',
         "DIAS REC (FACT→REC)":  '#,##0',
         "DIAS EGRESO (MAN→EGR)": '#,##0',
         "DIA MAN RECIBIDO (MAN→REC)": '#,##0',
         "VL RECIBIDO":           '"$"#,##0',
-        "RECIBIDO":              '0',
       };
       if (worksheetDetail['!ref']) {
         const dRange = XLSX.utils.decode_range(worksheetDetail['!ref']);
@@ -2150,7 +2148,7 @@ export const InformesGerenciales: React.FC = () => {
         "PARTICIPACIÓN (%)": (Math.round((row.participation || 0) * 10) / 10) / 100,
         "FACT. MISMO MES": Math.round(row.invoicedSameMonthVal || 0),
         "% FACT. MISMO MES": (Math.round((row.invoicedSameMonthPct || 0) * 10) / 10) / 100,
-        "PROM DÍA PAGO": Math.round(row.averagePaymentDays || 0),
+        "PROM DÍA FACT": Math.round(row.averagePaymentDays || 0),
         "PROM DIAS REC": Math.round(row.averageRecDays || 0),
         "PROM DIAS EGRESO": Math.round(row.averageEgrDays || 0),
         "PROM DIA MAN RECIBIDO": Math.round(row.averageManRecDays || 0),
@@ -2203,7 +2201,7 @@ export const InformesGerenciales: React.FC = () => {
         "PARTICIPACIÓN (%)": 1,
         "FACT. MISMO MES": Math.round(totalInvoicedSameMonth || 0),
         "% FACT. MISMO MES": (Math.round((overallInvoicedSameMonthPct || 0) * 10) / 10) / 100,
-        "PROM DÍA PAGO": Math.round(overallAveragePaymentDays || 0),
+        "PROM DÍA FACT": Math.round(overallAveragePaymentDays || 0),
         "PROM DIAS REC": Math.round(overallAverageRecDays || 0),
         "PROM DIAS EGRESO": Math.round(overallAverageEgrDays || 0),
         "PROM DIA MAN RECIBIDO": Math.round(overallAverageManRecDays || 0),
@@ -2225,7 +2223,7 @@ export const InformesGerenciales: React.FC = () => {
         "PARTICIPACIÓN (%)": '0.0%',
         "FACT. MISMO MES": '"$"#,##0',
         "% FACT. MISMO MES": '0.0%',
-        "PROM DÍA PAGO": '#,##0',
+        "PROM DÍA FACT": '#,##0',
         "PROM DIAS REC": '#,##0',
         "PROM DIAS EGRESO": '#,##0',
         "PROM DIA MAN RECIBIDO": '#,##0',
