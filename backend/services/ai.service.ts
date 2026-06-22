@@ -1,23 +1,9 @@
-
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { AIOrchestrator } from './ai-orchestrator/orchestrator.js';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 
 dotenv.config();
-
-/**
- * M7 INTELLIGENCE - NÚCLEO DE IA
- * Refactorizado para máxima resiliencia y priorización de .env
- */
-
-// Función para obtener el pool de API Keys desde el CSV (Sincronizado con Grupo Inter)
-const getAPIKeysPool = (): string[] => {
-    const rawKeys = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
-    return rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
-};
-
-let currentKeyIndex = 0; 
 
 // Base de Conocimiento
 const KNOWLEDGE_BASE_PATH = path.join(process.cwd(), 'ai_knowledge.json');
@@ -33,39 +19,18 @@ const getKnowledgeBase = () => {
     return [];
 };
 
-// Function to get the vision model (assuming it's defined elsewhere or will be added)
-const getVisionModel = () => {
-    // Placeholder for actual vision model retrieval logic
-    // For now, it might return a default model name or an object
-    return process.env.AI_VISION_MODEL || "gemini-pro-vision";
-};
-
 export const aiService = {
   
-  getClient(forceApiKey?: string, modelName?: string) {
-    const keys = getAPIKeysPool();
-    const apiKey = forceApiKey || keys[currentKeyIndex % keys.length] || '';
-    const modelId = modelName || process.env.AI_MODEL || "gemini-1.5-flash";
-    
-    if (!apiKey) {
-        console.error("[M7-AI] CRÍTICO: No se encontraron API KEYS válidas en el pool.");
-        throw new Error("API Pool vacío");
-    }
-
-    const keyForLog = apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4);
-    console.log(`[M7-AI] 🔑 Usando Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}]: ${keyForLog}`);
-    
-    return new GoogleGenerativeAI(apiKey);
+  getClient() {
+    console.warn("[M7-AI] getClient() deprecado. Toda la orquestación de clientes es interna en AIOrchestrator.");
+    return null;
   },
 
   rotateKey() {
-    const keys = getAPIKeysPool();
-    currentKeyIndex++;
-    console.log(`[M7-AI] 🔄 Rotando a la siguiente llave del pool [${(currentKeyIndex % keys.length) + 1}/${keys.length}].`);
+    console.warn("[M7-AI] rotateKey() deprecado. AIOrchestrator maneja la rotación de cuotas automáticamente.");
   },
 
   async saveLearning(rule: string) {
-      const visionModel = getVisionModel(); // Added this line
       const knowledge = getKnowledgeBase();
       knowledge.push({ rule, date: new Date().toISOString(), approved: true });
       fs.writeFileSync(KNOWLEDGE_BASE_PATH, JSON.stringify(knowledge, null, 2));
@@ -73,10 +38,6 @@ export const aiService = {
   },
 
   async generateResponse(prompt: string, context?: any) {
-    const keys = getAPIKeysPool();
-    const maxGlobalAttempts = keys.length; 
-    let lastErrorDetails = "";
-
     const knowledgeRules = getKnowledgeBase().map((k: any) => `- ${k.rule}`).join('\n');
 
     const systemPrompt = `
@@ -89,6 +50,9 @@ export const aiService = {
     3. GUÍA POR MENÚS: Indica siempre la ruta (ej: "Puedes encontrar esto en el menú Despachos > Alistado").
     4. FOCO OPERATIVO: Explica procesos como "Recibido de Material", "Consolidación de Carga", "Planeación de Rutas" y "Gestión de Grupo Inter (OCR)".
 
+    REGLAS ADICIONALES (Base de Conocimiento Aprendido):
+    ${knowledgeRules}
+
     REGLAS TÉCNICAS:
     - NO USES IDs INTERNOS (ej. VEH-001). Usa nombres legibles (Placas, Nombres de conductores).
     - Sé proactivo con los datos del contexto operativo.
@@ -98,71 +62,17 @@ export const aiService = {
     ${JSON.stringify(context || {}, null, 2)}
     `;
 
-    const configurations = [
-        { model: process.env.AI_MODEL || "gemini-1.5-flash" }
-    ];
-
-    let attempts = 0;
-    while (attempts < maxGlobalAttempts) {
-        try {
-            const keys = getAPIKeysPool();
-            const genAI = this.getClient();
-            const currentKeyLabel = `(Key ${currentKeyIndex % keys.length + 1}/${keys.length})`;
-
-            for (const config of configurations) {
-                try {
-                    console.log(`[M7-AI] Intento con Llave ${currentKeyLabel} | Modelo: ${config.model}`);
-                    const modelIA = genAI.getGenerativeModel({ 
-                        model: config.model,
-                        systemInstruction: systemPrompt 
-                    });
-                    
-                    const result = await modelIA.generateContent(prompt);
-                    const response = await result.response;
-                    const text = response.text();
-                    
-                    if (text) return text;
-                } catch (innerError: any) {
-                    lastErrorDetails = (innerError.message || '').toLowerCase();
-                    
-                    // Si es error de cuota (429), esperar un poco antes de rotar
-                    if (lastErrorDetails.includes('429') || lastErrorDetails.includes('quota')) {
-                        console.warn(`[M7-AI] Cuota excedida para ${config.model}. Pausa estratégica de 5s...`);
-                        await new Promise(r => setTimeout(r, 5000));
-                        continue;
-                    }
-
-                    if (lastErrorDetails.includes('method') || lastErrorDetails.includes('support')) {
-                        console.warn(`[M7-AI] Modelo ${config.model} no compatible. Probando siguiente.`);
-                        continue;
-                    }
-
-                    if (lastErrorDetails.includes('key')) {
-                        console.warn(`[M7-AI] Llave inválida detectada.`);
-                        break; 
-                    }
-                }
-            }
-            
-            // Si todo el pool falla (ej. OCR masivo en paralelo), pausa nuclear
-            if (attempts > 0 && (attempts % keys.length === 0)) {
-                console.log(`[M7-AI] Pool saturado. Espera nuclear de 20s...`);
-                await new Promise(r => setTimeout(r, 20000));
-            }
-
-            this.rotateKey();
-            attempts++;
-
-        } catch (e: any) {
-            console.error(`[M7-AI] Error en ciclo: ${e.message}`);
-            this.rotateKey();
-            attempts++;
-            await new Promise(r => setTimeout(r, 2000));
-        }
+    try {
+        const result = await AIOrchestrator.execute({
+            prompt,
+            context,
+            systemInstruction: systemPrompt,
+            taskType: 'chat'
+        });
+        return result.text;
+    } catch (e: any) {
+        console.error("[M7-AI] Error orquestando respuesta de chat:", e);
+        return `M7 IQ Error: No se pudo establecer conexión con los modelos de IA orquestados. Detalle técnico: ${e.message || e}`;
     }
-
-    return `M7 IQ Error: No se pudo establecer conexión con los modelos de IA tras agotar todas las llaves y configuraciones. 
-Detalle técnico: ${lastErrorDetails || 'Servicio no disponible'}. 
-Por favor, verifique que su GEMINI_API_KEY en .env sea válida y tenga la API habilitada.`;
   }
 };

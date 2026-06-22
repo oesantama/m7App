@@ -1,11 +1,13 @@
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
 import { syncDriveCumplidos } from '../services/drive-gemini.service.js';
+import { AIOrchestrator } from '../services/ai-orchestrator/orchestrator.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createRequire } from 'module';
 import { performLocalOCR } from '../utils/ocr.js';
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
+
 
 // ─── Inicialización y Migración de Esquema ──────────────────────────────────
 const initDB = async () => {
@@ -412,15 +414,7 @@ export const analyzePdf = async (req: Request, res: Response) => {
         } catch (e) {
             console.error(`[M7-API] Error leyendo PDF localmente:`, e);
         }
-        
-        // Asumimos que GEMINI_API_KEY está en el .env del backend (y puede venir separada por comas).
-        const rawKeys = process.env.GEMINI_API_KEY || '';
-        const keys = rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
-        if (keys.length === 0) return res.status(500).json({ error: 'API Key de Gemini no configurada en el servidor' });
 
-        // --- OCR LOCAL DESCARTADO POR BAJA PRECISIÓN ---
-        // Se comprobó que el OCR local genera texto basura en imágenes torcidas,
-        // lo que corrompe la extracción de Gemini. Las imágenes deben enviarse enteras a Gemini.
         if (!useTextFallback) {
             console.log(`[M7-API] PDF sin texto detectado. Se enviará la imagen directamente a la IA para garantizar precisión.`);
         }
@@ -459,57 +453,21 @@ Formato OBLIGATORIO de salida (sin comentarios ni formato extra fuera del JSON):
 \`\`\`
 `;
         
-        let promptContent: any[] = [systemPrompt];
+        let promptText = systemPrompt;
         if (useTextFallback) {
-             promptContent.push(`TEXTO EXTRAÍDO DEL DOCUMENTO:\n\n${textContent}`);
-        } else {
-             const base64Data = fileBuffer.toString('base64');
-             promptContent.push({ inlineData: { data: base64Data, mimeType: "application/pdf" } });
-        }
-        
-        let matches: any[] = [];
-        let success = false;
-        let lastError = '';
-        let keyIndex = Math.floor(Math.random() * keys.length);
-        let attempts = 0;
-
-        const fallBackModels = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest"];
-
-        while (!success && attempts < keys.length * fallBackModels.length) {
-            try {
-                const currentKey = keys[keyIndex % keys.length];
-                const currentModel = fallBackModels[Math.floor(attempts / keys.length) % fallBackModels.length];
-                
-                console.log(`[M7-API] Intentando IA (Llave ...${currentKey.slice(-4)}) - Modelo: ${currentModel}`);
-                const genAI = new GoogleGenerativeAI(currentKey);
-                const modelIA = genAI.getGenerativeModel({ model: currentModel });
-
-                const result = await modelIA.generateContent(promptContent);
-                const responseText = await result.response.text();
-                const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-                const parsed = JSON.parse(cleanJsonStr);
-                matches = parsed.matches || (Array.isArray(parsed) ? parsed : []);
-                success = true;
-            } catch (apiErr: any) {
-                lastError = apiErr.message || 'Error desconocido';
-                
-                // Si da error 429 (Cuota) o 404 (Modelo no encontrado), rotamos al siguiente
-                if (lastError.includes('429') || lastError.includes('404')) {
-                    keyIndex++;
-                    attempts++;
-                    if (attempts < keys.length * fallBackModels.length) {
-                        await new Promise(r => setTimeout(r, 1000));
-                    }
-                } else {
-                    console.error(`[M7-API] Error API crítico no recuperable:`, lastError);
-                    break;
-                }
-            }
+             promptText += `\n\nTEXTO EXTRAÍDO DEL DOCUMENTO:\n\n${textContent}`;
         }
 
-        if (!success) {
-            return res.status(500).json({ error: lastError });
-        }
+        const result = await AIOrchestrator.execute({
+            prompt: promptText,
+            imageBuffer: useTextFallback ? undefined : fileBuffer,
+            imageMimeType: useTextFallback ? undefined : 'application/pdf',
+            taskType: 'ocr'
+        });
+
+        const cleanJsonStr = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsed = JSON.parse(cleanJsonStr);
+        const matches = parsed.matches || (Array.isArray(parsed) ? parsed : []);
         
         res.json({ matches });
     } catch (error: any) {
@@ -517,3 +475,4 @@ Formato OBLIGATORIO de salida (sin comentarios ni formato extra fuera del JSON):
         res.status(500).json({ error: error.message });
     }
 };
+

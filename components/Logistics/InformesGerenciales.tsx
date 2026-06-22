@@ -404,6 +404,8 @@ export const InformesGerenciales: React.FC = () => {
   const [vehiclesSortField, setVehiclesSortField] = useState<'plate' | 'manifestCount' | 'ventaTotal' | 'ingTerceros' | 'ingresosPropios' | 'int'>('ventaTotal');
   const [vehiclesSortDirection, setVehiclesSortDirection] = useState<'asc' | 'desc'>('desc');
   const [isUploading, setIsUploading] = useState(false);
+  const [isExportingGeneral, setIsExportingGeneral] = useState(false);
+  const [isExportingTdm, setIsExportingTdm] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [showColumns, setShowColumns] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1288,17 +1290,21 @@ export const InformesGerenciales: React.FC = () => {
       clientsMap[client].ventaTotal += ventaRecord;
       clientsMap[client].ingTerceros += ingTercerosRecord;
 
-      // Calculate same month invoicing & payment speed days
+      // Calcular días usando solo fecha calendario (sin horas) para evitar error ±1 día
+      const toDateOnly = (d: Date | null) => d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
+      const calDaysOnly = (a: Date | null, b: Date | null) => {
+        const da = toDateOnly(a), db = toDateOnly(b);
+        return da && db ? Math.max(0, Math.round((db.getTime() - da.getTime()) / 86400000)) : null;
+      };
+
       let invoicedInSameMonth = 0;
-      const dMan = parseCustomDate(r.manifest_date);
-      const dInv = parseCustomDate(r.invoice_date);
-      const dRec = parseCustomDate(r.fecha_recibo);
-      const dEgr = parseCustomDate(r.fecha_egreso);
+      const dMan = toDateOnly(parseCustomDate(r.manifest_date));
+      const dInv = toDateOnly(parseCustomDate(r.invoice_date));
+      const dRec = toDateOnly(parseCustomDate(r.fecha_recibo));
+      const dEgr = toDateOnly(parseCustomDate(r.fecha_egreso));
 
       if (dMan && dInv) {
-        const diffMs = dInv.getTime() - dMan.getTime();
-        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
-        clientsMap[client].totalPaymentDays += diffDays;
+        clientsMap[client].totalPaymentDays += calDaysOnly(dMan, dInv)!;
         clientsMap[client].paymentDaysCount += 1;
 
         const invStr = r.invoice_cxc ? String(r.invoice_cxc).trim().toUpperCase() : '';
@@ -1313,25 +1319,19 @@ export const InformesGerenciales: React.FC = () => {
 
       // 1. prom dias rec (invoice to receipt)
       if (dInv && dRec) {
-        const diffMs = dRec.getTime() - dInv.getTime();
-        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
-        clientsMap[client].totalRecDays += diffDays;
+        clientsMap[client].totalRecDays += calDaysOnly(dInv, dRec)!;
         clientsMap[client].recDaysCount += 1;
       }
 
-      // 2. prom dias egreso (manifest to egress) -> Updated per user request
+      // 2. prom dias egreso (manifest to egress)
       if (dMan && dEgr) {
-        const diffMs = dEgr.getTime() - dMan.getTime();
-        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
-        clientsMap[client].totalEgrDays += diffDays;
+        clientsMap[client].totalEgrDays += calDaysOnly(dMan, dEgr)!;
         clientsMap[client].egrDaysCount += 1;
       }
 
       // 3. prom dia man recibido (manifest to receipt) and received value
       if (dMan && dRec) {
-        const diffMs = dRec.getTime() - dMan.getTime();
-        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
-        clientsMap[client].totalManRecDays += diffDays;
+        clientsMap[client].totalManRecDays += calDaysOnly(dMan, dRec)!;
         clientsMap[client].manRecDaysCount += 1;
       }
 
@@ -1503,17 +1503,21 @@ export const InformesGerenciales: React.FC = () => {
       clientsMap[client].ventaTotal += ventaRecord;
       clientsMap[client].ingTerceros += ingTercerosRecord;
 
-      // Calculate same month invoicing & payment speed days
+      // Calcular días usando solo fecha calendario (sin horas) para evitar error ±1 día
+      const toDateOnly = (d: Date | null) => d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
+      const calDaysOnly = (a: Date | null, b: Date | null) => {
+        const da = toDateOnly(a), db = toDateOnly(b);
+        return da && db ? Math.max(0, Math.round((db.getTime() - da.getTime()) / 86400000)) : null;
+      };
+
       let invoicedInSameMonth = 0;
-      const dMan = parseCustomDate(r.manifest_date);
-      const dInv = parseCustomDate(r.invoice_date);
-      const dRec = parseCustomDate(r.fecha_recibo);
-      const dEgr = parseCustomDate(r.fecha_egreso);
+      const dMan = toDateOnly(parseCustomDate(r.manifest_date));
+      const dInv = toDateOnly(parseCustomDate(r.invoice_date));
+      const dRec = toDateOnly(parseCustomDate(r.fecha_recibo));
+      const dEgr = toDateOnly(parseCustomDate(r.fecha_egreso));
 
       if (dMan && dInv) {
-        const diffMs = dInv.getTime() - dMan.getTime();
-        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
-        clientsMap[client].totalPaymentDays += diffDays;
+        clientsMap[client].totalPaymentDays += calDaysOnly(dMan, dInv)!;
         clientsMap[client].paymentDaysCount += 1;
 
         const invStr = r.invoice_cxc ? String(r.invoice_cxc).trim().toUpperCase() : '';
@@ -1528,25 +1532,19 @@ export const InformesGerenciales: React.FC = () => {
 
       // 1. prom dias rec (invoice to receipt)
       if (dInv && dRec) {
-        const diffMs = dRec.getTime() - dInv.getTime();
-        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
-        clientsMap[client].totalRecDays += diffDays;
+        clientsMap[client].totalRecDays += calDaysOnly(dInv, dRec)!;
         clientsMap[client].recDaysCount += 1;
       }
 
-      // 2. prom dias egreso (manifest to egress) -> Updated per user request
+      // 2. prom dias egreso (manifest to egress)
       if (dMan && dEgr) {
-        const diffMs = dEgr.getTime() - dMan.getTime();
-        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
-        clientsMap[client].totalEgrDays += diffDays;
+        clientsMap[client].totalEgrDays += calDaysOnly(dMan, dEgr)!;
         clientsMap[client].egrDaysCount += 1;
       }
 
       // 3. prom dia man recibido (manifest to receipt) and received value
       if (dMan && dRec) {
-        const diffMs = dRec.getTime() - dMan.getTime();
-        const diffDays = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
-        clientsMap[client].totalManRecDays += diffDays;
+        clientsMap[client].totalManRecDays += calDaysOnly(dMan, dRec)!;
         clientsMap[client].manRecDaysCount += 1;
       }
 
@@ -1885,6 +1883,8 @@ export const InformesGerenciales: React.FC = () => {
   };
 
   const exportGeneralTdmToExcel = () => {
+    setIsExportingGeneral(true);
+    setTimeout(() => {
     try {
       const tdmTableData = getGeneralTdmTableData();
       
@@ -2010,20 +2010,113 @@ export const InformesGerenciales: React.FC = () => {
         return st !== 'ANULADO' && st !== 'ANULADA';
       });
 
-      const detailRows = detailRecords.map(r => ({
-        "ORDEN DE COMPRA": r.oc_number || '',
-        "MANIFIESTO": r.manifest_number || '',
-        "FECHA MANIFIESTO": formatColombianDateStr(r.manifest_date),
-        "ESTADO MANIFIESTO": r.manifest_status || '',
-        "CLIENTE": r.client_name || '',
-        "TOTAL CXC": parseValNum(r.total_cxc),
-        "VALOR TOTAL CXC FINAL": parseValNum(r.total_value_cxc_final),
-        "VALOR TOT CXP FINAL": parseValNum(r.total_value_cxp_final),
-        "PLACA": r.plate || '',
-        "CONDUCTOR": r.driver_name || ''
-      }));
+      const safeStr = (v: any): string => (v !== null && v !== undefined ? String(v).trim() : '');
+      // Truncar a medianoche local para comparar solo fechas calendario (sin horas)
+      const dateOnly = (d: Date | null): Date | null =>
+        d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
+      const daysDiff = (a: Date | null, b: Date | null): number | '' => {
+        const da = dateOnly(a), db = dateOnly(b);
+        return da && db ? Math.max(0, Math.round((db.getTime() - da.getTime()) / 86400000)) : '';
+      };
+
+      const detailRows = detailRecords.map(r => {
+        const cxc = parseValNum(r.total_cxc);
+        const cxcFinal = parseValNum(r.total_value_cxc_final);
+        const ventaRow = cxc === 0 ? cxcFinal : cxc;
+
+        const rawManDate = safeStr(r.manifest_date);
+        const rawInvDate = safeStr(r.invoice_date);
+        // fecha_recibo y fecha_egreso son campos de fecha dedicados (actualizados manualmente)
+        // r.receipt y r.egress son números de referencia, NO fechas — no usar como fallback
+        const rawRecStr  = safeStr(r.fecha_recibo);
+        const rawEgrStr  = safeStr(r.fecha_egreso);
+
+        const isValidYear = (d: Date | null) => d !== null && d.getFullYear() >= 2000 && d.getFullYear() <= 2100;
+
+        const dManRaw = rawManDate ? parseCustomDate(rawManDate) : null;
+        const dInvRaw = rawInvDate ? parseCustomDate(rawInvDate) : null;
+        const dRecRaw = rawRecStr  ? parseCustomDate(rawRecStr)  : null;
+        const dEgrRaw = rawEgrStr  ? parseCustomDate(rawEgrStr)  : null;
+
+        const dMan = isValidYear(dManRaw) ? dManRaw : null;
+        const dInv = isValidYear(dInvRaw) ? dInvRaw : null;
+        const dRec = isValidYear(dRecRaw) ? dRecRaw : null;
+        const dEgr = isValidYear(dEgrRaw) ? dEgrRaw : null;
+
+        const diasPago   = daysDiff(dMan, dInv);
+        const diasRec    = daysDiff(dInv, dRec);
+        const diasEgreso = daysDiff(dMan, dEgr);
+        const diasManRec = daysDiff(dMan, dRec);
+
+        const invStr = safeStr(r.invoice_cxc).toUpperCase();
+        const hasInvoice = invStr !== '' && invStr !== '0' && invStr !== 'S/I' && invStr !== 'N/A'
+          && !invStr.includes('SIN FACTURA') && invStr !== 'NO APLICA';
+        const sameMonth = !!(dMan && dInv
+          && dMan.getFullYear() === dInv.getFullYear()
+          && dMan.getMonth()    === dInv.getMonth());
+        const factMismoMes = hasInvoice && sameMonth ? 1 : 0;
+
+        const recibido   = !!(dRec && hasInvoice && sameMonth);
+        const vlRecibido = recibido ? ventaRow : 0;
+
+        return {
+          "ORDEN DE COMPRA":       safeStr(r.oc_number),
+          "MANIFIESTO":            safeStr(r.manifest_number),
+          "FECHA MANIFIESTO":      formatColombianDateStr(r.manifest_date),
+          "ESTADO MANIFIESTO":     safeStr(r.manifest_status),
+          "CLIENTE":               safeStr(r.client_name),
+          "TOTAL CXC":             parseValNum(r.total_cxc),
+          "VALOR TOTAL CXC FINAL": parseValNum(r.total_value_cxc_final),
+          "VALOR TOT CXP FINAL":   parseValNum(r.total_value_cxp_final),
+          "PLACA":                 safeStr(r.plate),
+          "CONDUCTOR":             safeStr(r.driver_name),
+          // Fechas fuente — permiten ver qué datos hay disponibles por fila
+          "FECHA FACTURA":         dInv  ? formatColombianDateStr(rawInvDate)  : '',
+          "FECHA RECIBO":          dRec  ? formatColombianDateStr(rawRecStr)   : '',
+          "FECHA EGRESO":          dEgr  ? formatColombianDateStr(rawEgrStr)   : '',
+          // Métricas calculadas — vacías si la fecha fuente no existe
+          "FACT. MISMO MES":       factMismoMes,
+          "DÍA PAGO (MAN→FACT)":  diasPago,
+          "DIAS REC (FACT→REC)":  diasRec,
+          "DIAS EGRESO (MAN→EGR)": diasEgreso,
+          "DIA MAN RECIBIDO (MAN→REC)": diasManRec,
+          "VL RECIBIDO":           vlRecibido,
+          "RECIBIDO":              recibido ? 1 : 0,
+        };
+      });
 
       const worksheetDetail = XLSX.utils.json_to_sheet(detailRows);
+
+      // Aplicar formatos numéricos en Detalle Transacciones
+      const detailColFormats: Record<string, string> = {
+        "TOTAL CXC":             '"$"#,##0',
+        "VALOR TOTAL CXC FINAL": '"$"#,##0',
+        "VALOR TOT CXP FINAL":   '"$"#,##0',
+        "FACT. MISMO MES":       '0',
+        "DÍA PAGO (MAN→FACT)":  '#,##0',
+        "DIAS REC (FACT→REC)":  '#,##0',
+        "DIAS EGRESO (MAN→EGR)": '#,##0',
+        "DIA MAN RECIBIDO (MAN→REC)": '#,##0',
+        "VL RECIBIDO":           '"$"#,##0',
+        "RECIBIDO":              '0',
+      };
+      if (worksheetDetail['!ref']) {
+        const dRange = XLSX.utils.decode_range(worksheetDetail['!ref']);
+        const dColNames: Record<number, string> = {};
+        for (let C = dRange.s.c; C <= dRange.e.c; ++C) {
+          const cell = worksheetDetail[XLSX.utils.encode_cell({ r: 0, c: C })];
+          if (cell && cell.v) dColNames[C] = cell.v.toString();
+        }
+        for (let R = dRange.s.r + 1; R <= dRange.e.r; ++R) {
+          for (let C = dRange.s.c; C <= dRange.e.c; ++C) {
+            const colName = dColNames[C];
+            if (colName && detailColFormats[colName]) {
+              const cell = worksheetDetail[XLSX.utils.encode_cell({ r: R, c: C })];
+              if (cell && cell.t === 'n') cell.z = detailColFormats[colName];
+            }
+          }
+        }
+      }
 
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheetSummary, "Clientes General TDM");
@@ -2035,10 +2128,15 @@ export const InformesGerenciales: React.FC = () => {
     } catch (err) {
       console.error('[EXPORT-GENERAL-XLSX-ERR]', err);
       toast.error('Hubo un error al exportar el reporte a Excel.');
+    } finally {
+      setIsExportingGeneral(false);
     }
+    }, 50);
   };
 
   const exportTdmToExcel = () => {
+    setIsExportingTdm(true);
+    setTimeout(() => {
     try {
       const tdmTableData = getClientTdmTableData();
       
@@ -2189,7 +2287,10 @@ export const InformesGerenciales: React.FC = () => {
     } catch (err) {
       console.error('[EXPORT-TDM-XLSX-ERR]', err);
       toast.error('Hubo un error al exportar el reporte a Excel.');
+    } finally {
+      setIsExportingTdm(false);
     }
+    }, 50);
   };
 
   const handleTdmSort = (field: typeof tdmSortField) => {
@@ -3758,11 +3859,14 @@ export const InformesGerenciales: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={exportGeneralTdmToExcel}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-emerald-600/15 transition-all"
+                                disabled={isExportingGeneral}
+                                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-emerald-600/15 transition-all"
                                 title="Descargar Excel con Clientes General (Hoja 1) y detalle origen (Hoja 2)"
                               >
-                                <Download size={14} />
-                                <span>Exportar Excel</span>
+                                {isExportingGeneral
+                                  ? <><svg className="animate-spin w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg><span>Generando…</span></>
+                                  : <><Download size={14} /><span>Exportar Excel</span></>
+                                }
                               </button>
 
                               <button
@@ -4086,11 +4190,14 @@ export const InformesGerenciales: React.FC = () => {
                               <button
                                 type="button"
                                 onClick={exportTdmToExcel}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-emerald-600/15 transition-all"
+                                disabled={isExportingTdm}
+                                className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-md shadow-emerald-600/15 transition-all"
                                 title="Descargar Excel con reporte resumen (Hoja 1) y detalle origen (Hoja 2)"
                               >
-                                <Download size={14} />
-                                <span>Exportar Excel</span>
+                                {isExportingTdm
+                                  ? <><svg className="animate-spin w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg><span>Generando…</span></>
+                                  : <><Download size={14} /><span>Exportar Excel</span></>
+                                }
                               </button>
 
                               <button

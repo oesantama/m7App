@@ -262,8 +262,38 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
         }
     };
 
-    const handleCloseCycle = async (plate?: string) => {
+    const handleCloseCycle = (plate?: string) => {
         if (!selectedDoc) return;
+
+        // Calcular pendiente y sobrecostos en el scope (placa o documento completo)
+        const pendingSurchInScope = routeSurcharges.filter(s =>
+            (s.status_id === 'PENDIENTE' || s.status_id === 'EST-01' || !s.status_id) &&
+            (!plate || s.plate === plate)
+        );
+
+        let pendienteInScope: number;
+        if (!plate) {
+            pendienteInScope = stats.pendiente;
+        } else {
+            const fin = routeFinancials.get(plate);
+            if (fin) {
+                const totalLegPlate = fin.valor_legalizado + fin.valor_grupal + fin.total_sobrecosto_aprobado + fin.valor_devuelto;
+                pendienteInScope = fin.valor_total - totalLegPlate;
+            } else {
+                pendienteInScope = 0;
+            }
+        }
+
+        // Bloquear si aún hay valor pendiente o sobrecostos por aprobar
+        const hasMoneyPending = pendienteInScope > 1500; // margen de redondeo
+        if (hasMoneyPending || pendingSurchInScope.length > 0) {
+            const reasons: string[] = [];
+            if (hasMoneyPending) reasons.push(`valor pendiente de ${fmtCOP(Math.round(pendienteInScope))}`);
+            if (pendingSurchInScope.length > 0) reasons.push(`${pendingSurchInScope.length} sobrecosto(s) pendiente(s) por aprobar`);
+            toast.error(`No se puede cerrar: ${reasons.join(' y ')}.`, { duration: 5000 });
+            return;
+        }
+
         setConfirmClose({ plate });
     };
 
@@ -278,7 +308,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 userId: user.id,
                 vehiclePlate: plate
             } as any);
-            toast.success(`Ciclo cerrado: ${res.closedCount} facturas conciliadas administrativamente.`);
+            toast.success(res.closedCount > 0 ? `Ciclo cerrado: ${res.closedCount} factura(s) conciliadas administrativamente.` : (res.message || 'Ciclo cerrado'));
             loadDocDetail(selectedDoc);
             onRefresh();
         } catch (err: any) {
@@ -2392,7 +2422,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                             }?
                         </p>
                         <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mb-6">
-                            ⚠️ Las facturas restantes se marcarán como conciliadas. Esta acción no se puede deshacer.
+                            ⚠️ Las facturas restantes se marcarán como conciliadas administrativamente. Esta acción no se puede deshacer.
                         </p>
                         <div className="flex gap-3 justify-end">
                             <button

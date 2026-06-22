@@ -1468,66 +1468,139 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                                                     <Icons.X className="w-3 h-3" />
                                                 </button>
                                             </div>
-                                            <div className="space-y-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
+                                            <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+
+                                                {/* ── LEGALIZACIONES INDIVIDUALES ── */}
                                                 {activeDetailCard === 'leg' && (
                                                     <>
                                                         {routeInvs.filter(i => i.forma_pago).map((inv, idx) => (
-                                                            <div key={idx} className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                                                                <div>
-                                                                    <p className="text-[10px] font-black text-slate-900">{inv.invoice_number}</p>
-                                                                    <p className="text-[8px] text-slate-500 font-bold uppercase">{inv.forma_pago} · {inv.comprobante || 'S/R'}</p>
-                                                                </div>
-                                                                <div className="text-right">
-                                                                    <p className="text-[11px] font-black text-emerald-600">{fmtCOP(inv.valor)}</p>
-                                                                    <p className="text-[8px] text-slate-400">{inv.fecha_pago ? String(inv.fecha_pago).slice(0, 10) : '—'}</p>
+                                                            <div key={idx} className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                                                <div className="flex items-center justify-between gap-2">
+                                                                    <div className="min-w-0">
+                                                                        <p className="text-[10px] font-black text-slate-900">{inv.invoice_number}</p>
+                                                                        <p className="text-[8px] text-slate-500 font-bold uppercase">
+                                                                            {inv.forma_pago}
+                                                                            {inv.comprobante && <> · Ref: <span className="text-slate-700">{inv.comprobante}</span></>}
+                                                                            {inv.numero_cheque && <> · Cheque: <span className="text-slate-700">{inv.numero_cheque}</span></>}
+                                                                        </p>
+                                                                        {inv.banco && (
+                                                                            <p className="text-[8px] text-blue-600 font-bold mt-0.5">🏦 Banco: {inv.banco}</p>
+                                                                        )}
+                                                                        {inv.conductor_name && (
+                                                                            <p className="text-[8px] text-slate-500 mt-0.5 italic">👤 Conductor: {inv.conductor_name}</p>
+                                                                        )}
+                                                                        {inv.conciliado_por_nombre && (
+                                                                            <p className="text-[7px] text-slate-400 mt-0.5">Concilió: {inv.conciliado_por_nombre}</p>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="text-right shrink-0">
+                                                                        <p className="text-[11px] font-black text-emerald-600">{fmtCOP(inv.valor)}</p>
+                                                                        <p className="text-[8px] text-slate-400">{inv.fecha_pago ? String(inv.fecha_pago).slice(0, 10) : '—'}</p>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         ))}
+
+                                                        {/* Consignaciones grupales */}
                                                         {groupPayments.filter(p => p.plate === detailRoute.plate).map((p, idx) => (
-                                                            <div key={`gp-${idx}`} className="flex items-center justify-between bg-emerald-50 p-2.5 rounded-xl border border-emerald-100">
-                                                                <div>
-                                                                    <p className="text-[10px] font-black text-emerald-900">Consignación Grupal</p>
-                                                                    <p className="text-[8px] text-emerald-600 font-bold uppercase">{p.metodo_pago} · {p.referencia || 'S/R'}</p>
-                                                                </div>
-                                                                <div className="text-right">
-                                                                    <p className="text-[11px] font-black text-emerald-700">{fmtCOP(p.valor)}</p>
-                                                                    <p className="text-[8px] text-emerald-400">{p.fecha ? String(p.fecha).slice(0, 10) : '—'}</p>
+                                                            <div key={`gp-${idx}`} className="bg-emerald-50 p-2.5 rounded-xl border border-emerald-100">
+                                                                <div className="flex items-start justify-between gap-2">
+                                                                    <div className="min-w-0">
+                                                                        <p className="text-[10px] font-black text-emerald-900">Consignación Grupal</p>
+                                                                        <p className="text-[8px] text-emerald-600 font-bold uppercase">
+                                                                            {p.metodo_pago}
+                                                                            {p.referencia && <> · Ref: <span className="text-emerald-800">{p.referencia}</span></>}
+                                                                        </p>
+                                                                        {p.observacion && (
+                                                                            <p className="text-[8px] text-emerald-700 italic mt-0.5">💬 {p.observacion}</p>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="text-right shrink-0">
+                                                                        <p className="text-[11px] font-black text-emerald-700">{fmtCOP(p.valor)}</p>
+                                                                        <p className="text-[8px] text-emerald-400">{p.fecha ? String(p.fecha).slice(0, 10) : '—'}</p>
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         ))}
                                                     </>
                                                 )}
-                                                {activeDetailCard === 'dev' && routeInvs.filter(i => i.es_devolucion || DEVUELTO_STATUS.includes((i.item_status || '').toUpperCase())).map((inv, idx) => (
-                                                    <div key={idx} className="flex items-center justify-between bg-amber-50 p-2.5 rounded-xl border border-amber-100">
-                                                        <div>
-                                                            <p className="text-[10px] font-black text-amber-900">{inv.invoice_number}</p>
-                                                            <p className="text-[8px] text-amber-600 font-bold uppercase">Devolución Total</p>
+
+                                                {/* ── DEVOLUCIONES ── */}
+                                                {activeDetailCard === 'dev' && routeInvs
+                                                    .filter(i => i.es_devolucion || DEVUELTO_STATUS.includes((i.item_status || '').toUpperCase()))
+                                                    .map((inv, idx) => (
+                                                    <div key={idx} className="bg-amber-50 p-2.5 rounded-xl border border-amber-100">
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className="min-w-0">
+                                                                <p className="text-[10px] font-black text-amber-900">{inv.invoice_number}</p>
+                                                                <p className="text-[8px] text-amber-600 font-bold uppercase">
+                                                                    Devolución Total
+                                                                    {inv.comprobante && <> · Ref: <span className="text-amber-800">{inv.comprobante}</span></>}
+                                                                </p>
+                                                                {inv.conductor_name && (
+                                                                    <p className="text-[8px] text-amber-700 italic mt-0.5">👤 Conductor: {inv.conductor_name}</p>
+                                                                )}
+                                                                {inv.conciliado_por_nombre && (
+                                                                    <p className="text-[7px] text-amber-500 mt-0.5">Registró: {inv.conciliado_por_nombre}</p>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-right shrink-0">
+                                                                <p className="text-[11px] font-black text-amber-700">{fmtCOP(inv.invoice_value)}</p>
+                                                                {inv.fecha_pago && <p className="text-[8px] text-amber-400">{String(inv.fecha_pago).slice(0, 10)}</p>}
+                                                            </div>
                                                         </div>
-                                                        <p className="text-[11px] font-black text-amber-700">{fmtCOP(inv.invoice_value)}</p>
                                                     </div>
                                                 ))}
-                                                {activeDetailCard === 'par' && routeInvs.filter(i => PARCIAL_STATUS.includes((i.item_status || '').toUpperCase())).map((inv, idx) => (
-                                                    <div key={idx} className="flex items-center justify-between bg-orange-50 p-2.5 rounded-xl border border-orange-100">
-                                                        <div>
-                                                            <p className="text-[10px] font-black text-orange-900">{inv.invoice_number}</p>
-                                                            <p className="text-[8px] text-orange-600 font-bold uppercase">Entrega Parcial</p>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <p className="text-[11px] font-black text-orange-700">{fmtCOP(inv.valor)}</p>
-                                                            <p className="text-[8px] text-orange-400">Orig: {fmtCOP(inv.invoice_value)}</p>
+
+                                                {/* ── PARCIALES ── */}
+                                                {activeDetailCard === 'par' && routeInvs
+                                                    .filter(i => PARCIAL_STATUS.includes((i.item_status || '').toUpperCase()))
+                                                    .map((inv, idx) => (
+                                                    <div key={idx} className="bg-orange-50 p-2.5 rounded-xl border border-orange-100">
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className="min-w-0">
+                                                                <p className="text-[10px] font-black text-orange-900">{inv.invoice_number}</p>
+                                                                <p className="text-[8px] text-orange-600 font-bold uppercase">
+                                                                    Entrega Parcial
+                                                                    {inv.comprobante && <> · Ref: <span className="text-orange-800">{inv.comprobante}</span></>}
+                                                                </p>
+                                                                {inv.banco && (
+                                                                    <p className="text-[8px] text-blue-600 font-bold mt-0.5">🏦 Banco: {inv.banco}</p>
+                                                                )}
+                                                                {inv.conductor_name && (
+                                                                    <p className="text-[8px] text-orange-700 italic mt-0.5">👤 Conductor: {inv.conductor_name}</p>
+                                                                )}
+                                                                {inv.conciliado_por_nombre && (
+                                                                    <p className="text-[7px] text-orange-400 mt-0.5">Registró: {inv.conciliado_por_nombre}</p>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-right shrink-0">
+                                                                <p className="text-[11px] font-black text-orange-700">{fmtCOP(inv.valor)}</p>
+                                                                <p className="text-[8px] text-orange-400">Orig: {fmtCOP(inv.invoice_value)}</p>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 ))}
+
+                                                {/* ── SOBRECOSTOS ── */}
                                                 {activeDetailCard === 'sc' && routeSurcharges.filter(s => s.plate === detailRoute.plate).map((s, idx) => {
                                                     const approved = s.status_id === 'APROBADO' || s.status_id === 'EST-02';
                                                     return (
                                                         <div key={idx} className={`p-2.5 rounded-xl border ${approved ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
                                                             <div className="flex items-start justify-between gap-2">
                                                                 <div className="min-w-0">
-                                                                    <p className={`text-[10px] font-black ${approved ? 'text-emerald-900' : 'text-rose-900'}`}>Surcharge / Gasto</p>
-                                                                    <p className={`text-[8px] font-bold uppercase ${approved ? 'text-emerald-600' : 'text-rose-600'}`}>{s.referencia || 'S/R'} · {approved ? 'Aprobado' : 'Pendiente'}</p>
-                                                                    {s.observaciones && <p className="text-[8px] text-slate-500 mt-0.5 italic">{s.observaciones}</p>}
-                                                                    {s.facturas && <p className="text-[7px] font-bold text-slate-400 mt-0.5">Facturas: {s.facturas}</p>}
+                                                                    <p className={`text-[10px] font-black ${approved ? 'text-emerald-900' : 'text-rose-900'}`}>
+                                                                        Surcharge / Gasto
+                                                                    </p>
+                                                                    <p className={`text-[8px] font-bold uppercase ${approved ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                                                        {s.referencia || 'S/R'} · {approved ? '✅ Aprobado' : '⏳ Pendiente'}
+                                                                    </p>
+                                                                    {s.observaciones && (
+                                                                        <p className="text-[8px] text-slate-600 italic mt-0.5 break-words">💬 {s.observaciones}</p>
+                                                                    )}
+                                                                    {s.facturas && (
+                                                                        <p className="text-[7px] font-bold text-slate-400 mt-0.5">Facturas: {s.facturas}</p>
+                                                                    )}
                                                                 </div>
                                                                 <div className="text-right shrink-0">
                                                                     <p className={`text-[11px] font-black ${approved ? 'text-emerald-700' : 'text-rose-700'}`}>{fmtCOP(s.valor)}</p>
@@ -1537,6 +1610,7 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                                                         </div>
                                                     );
                                                 })}
+
                                                 {((activeDetailCard === 'leg' && routeInvs.filter(i => i.forma_pago).length === 0 && groupPayments.filter(p => p.plate === detailRoute.plate).length === 0) ||
                                                   (activeDetailCard === 'dev' && routeInvs.filter(i => i.es_devolucion || DEVUELTO_STATUS.includes((i.item_status || '').toUpperCase())).length === 0) ||
                                                   (activeDetailCard === 'par' && routeInvs.filter(i => PARCIAL_STATUS.includes((i.item_status || '').toUpperCase())).length === 0) ||
@@ -1559,6 +1633,7 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                                             <th className="text-center px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">Estado</th>
                                             <th className="text-center px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">Pago</th>
                                             <th className="text-center px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">Consig./Ref.</th>
+                                            <th className="text-left px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">Observaciones</th>
                                             <th className="text-right px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">V. Original</th>
                                             <th className="text-right px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">V. Legalizado</th>
                                             <th className="text-right px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">V. Devol.</th>
@@ -1605,6 +1680,25 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                                                         {inv.comprobante ? (
                                                             <span className="bg-slate-100 px-1.5 py-0.5 rounded-lg text-[9px] font-black">{inv.comprobante}</span>
                                                         ) : '—'}
+                                                    </td>
+                                                    <td className="px-2 py-2.5 max-w-[160px]">
+                                                        <div className="space-y-0.5">
+                                                            {inv.banco && (
+                                                                <p className="text-[8px] font-bold text-blue-600 truncate">🏦 {inv.banco}</p>
+                                                            )}
+                                                            {inv.numero_cheque && (
+                                                                <p className="text-[8px] font-bold text-slate-500 truncate">📄 Cheque: {inv.numero_cheque}</p>
+                                                            )}
+                                                            {inv.conductor_name && (
+                                                                <p className="text-[8px] text-slate-500 italic truncate">👤 {inv.conductor_name}</p>
+                                                            )}
+                                                            {inv.conciliado_por_nombre && !inv.conductor_name && (
+                                                                <p className="text-[7px] text-slate-400 truncate">Concilió: {inv.conciliado_por_nombre}</p>
+                                                            )}
+                                                            {!inv.banco && !inv.numero_cheque && !inv.conductor_name && !inv.conciliado_por_nombre && (
+                                                                <span className="text-slate-300">—</span>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-2 py-2.5 text-right text-slate-500">{vOriginal > 0 ? fmtCOP(vOriginal) : '—'}</td>
                                                     <td className="px-2 py-2.5 text-right font-black text-emerald-700">{vLegal > 0 ? fmtCOP(vLegal) : '—'}</td>

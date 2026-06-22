@@ -77,6 +77,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [groupScannedItems, setGroupScannedItems] = useState<Record<string, number>>({});
     const [groupItemPickingModes, setGroupItemPickingModes] = useState<Record<string, 'UND' | 'CAJA' | 'STD'>>({});
     const [isGroupDispatching, setIsGroupDispatching] = useState(false);
+    const [lastScannedSku, setLastScannedSku] = useState<string | null>(null);
+    const [groupSearch, setGroupSearch] = useState('');
+    const lastScannedRef = useRef<HTMLDivElement | null>(null);
 
     // ── Client selector ──────────────────────────────────────────────────────
     const [internalClientId, setInternalClientId] = useState<string>('');
@@ -318,7 +321,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             }
         } catch (error) {
             console.error('[M7-GPS-FETCH-ERR]', error);
-            toast.error("Error al obtener ubicaciones GPS");
+            // Fallo silencioso — es solo actualización del mapa, no crítico
         } finally {
             setIsValidating(false);
         }
@@ -1538,23 +1541,45 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             String(it.sku || '').trim().toUpperCase() === sku.toUpperCase() ||
             String(it.barcode || '').trim().toUpperCase() === sku.toUpperCase()
         );
-        if (!item) { toast.error(`Artículo no encontrado: ${sku}`); return; }
+        if (!item) return; // silencioso — el llamador ya hizo la búsqueda con retry
         const itemSku = item.sku;
         const current = groupScannedItems[itemSku] || 0;
         const expected = Number(item.qty || 0);
-        if (current >= expected) { toast.error(`LÍMITE ALCANZADO: ${item.articleName || itemSku}`); return; }
+        if (current >= expected) {
+            toast.warning(`Límite alcanzado: ${item.articleName || itemSku}`, { duration: 2000 });
+            return;
+        }
         const added = Math.min(expected - current, qty);
         setGroupScannedItems(prev => ({ ...prev, [itemSku]: current + added }));
-        toast.success(`${item.articleName || itemSku}`, { description: `${current + added}/${expected}`, icon: '📦', duration: 2000 });
+        setLastScannedSku(itemSku);
+        toast.success(`${item.articleName || itemSku}`, { description: `${current + added}/${expected}`, icon: '📦', duration: 4000 });
     };
 
     const handleGroupBarcodeScan = (rawBarcode: string) => {
         const sku = cleanSkuM7(rawBarcode);
-        const item = groupedItems.find(it =>
-            String(it.sku || '').trim().toUpperCase() === sku.toUpperCase() ||
-            String(it.barcode || '').trim().toUpperCase() === sku.toUpperCase()
+
+        const findItem = (candidate: string) => groupedItems.find(it =>
+            String(it.sku || '').trim().toUpperCase() === candidate.toUpperCase() ||
+            String(it.barcode || '').trim().toUpperCase() === candidate.toUpperCase()
         );
-        if (!item) { toast.error(`Artículo no encontrado: ${sku}`); return; }
+
+        let item = findItem(sku);
+
+        // Reintento: algunas lectoras envían comilla (') en lugar de guion (-)
+        if (!item && sku.includes("'")) {
+            item = findItem(sku.replaceAll("'", '-'));
+        }
+        // Reintento inverso: guion en lugar de comilla
+        if (!item && sku.includes('-')) {
+            item = findItem(sku.replaceAll('-', "'"));
+        }
+
+        if (!item) {
+            // Toast muy breve y discreto — no interrumpir el flujo de escaneo
+            toast.info(`No encontrado: ${sku}`, { duration: 1500 });
+            return;
+        }
+
         const itemSku = item.sku;
         const preferredMode = groupItemPickingModes[itemSku] || 'UND';
         let multiplier = 1;
@@ -1565,8 +1590,15 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             const possibleQty = parts.slice(1).find((p: string) => !isNaN(Number(p)) && p.length <= 4);
             if (possibleQty) multiplier = Number(possibleQty);
         }
-        handleGroupManualAdd(sku, multiplier);
+        handleGroupManualAdd(itemSku, multiplier);
     };
+
+    // Scroll automático al último artículo escaneado
+    useEffect(() => {
+        if (lastScannedSku && lastScannedRef.current) {
+            lastScannedRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, [lastScannedSku, groupScannedItems]);
 
     const handleConfirmGroupDispatch = async () => {
         if (!selectedActiveRoute) return;
@@ -1664,22 +1696,28 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         toast.success(`Añadido: ${item.articleName || itemSku}`, {
             description: `Se sumaron ${added} unidades (${currentCount + added}/${expected})`,
             icon: '📦',
-            duration: 2000
+            duration: 4000
         });
     };
 
     const handleBarcodeScan = async (rawBarcode: string) => {
         if (!assigningInvoice) return;
-        
+
         const sku = cleanSkuM7(rawBarcode);
-        const item = (assigningInvoice.items || []).find((it: any) => 
-            String(it.sku || '').trim().toUpperCase() === sku.toUpperCase() || 
-            String(it.barcode || '').trim().toUpperCase() === sku.toUpperCase() ||
-            String(it.articleId || '').trim().toUpperCase() === sku.toUpperCase()
+
+        const findInvoiceItem = (candidate: string) => (assigningInvoice.items || []).find((it: any) =>
+            String(it.sku || '').trim().toUpperCase() === candidate.toUpperCase() ||
+            String(it.barcode || '').trim().toUpperCase() === candidate.toUpperCase() ||
+            String(it.articleId || '').trim().toUpperCase() === candidate.toUpperCase()
         );
 
+        let item = findInvoiceItem(sku);
+        // Reintento: lectora envía comilla (') en lugar de guion (-)
+        if (!item && sku.includes("'")) item = findInvoiceItem(sku.replaceAll("'", '-'));
+        if (!item && sku.includes('-'))  item = findInvoiceItem(sku.replaceAll('-', "'"));
+
         if (!item) {
-            toast.error(`No se encontró el artículo: ${sku}`);
+            toast.info(`No encontrado: ${sku}`, { duration: 1500 });
             return;
         }
 
@@ -2500,6 +2538,22 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 </div>
                             </div>
 
+                            {/* Búsqueda de artículos */}
+                            <div className="px-4 pt-2 pb-1 bg-white border-b border-slate-100">
+                                <div className="relative">
+                                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                    </svg>
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar artículo o SKU..."
+                                        value={groupSearch}
+                                        onChange={e => setGroupSearch(e.target.value)}
+                                        className="w-full pl-8 pr-3 py-1.5 border border-slate-200 rounded-xl text-[11px] bg-slate-50 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                    />
+                                </div>
+                            </div>
+
                             {/* Lista de artículos agrupados */}
                             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 custom-scrollbar bg-slate-50/50">
                                 <div className="flex justify-between items-center mb-2 px-1">
@@ -2510,12 +2564,34 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                         Escaneado: {Object.values(groupScannedItems).reduce((a,b)=>a+b,0)} / {groupedItems.reduce((a,b)=>a+Number(b.qty||0),0)}
                                     </p>
                                 </div>
-                                {groupedItems.map((item, i) => {
+                                {groupedItems
+                                    .filter(item => !groupSearch ||
+                                        (item.articleName || '').toLowerCase().includes(groupSearch.toLowerCase()) ||
+                                        (item.sku || '').toLowerCase().includes(groupSearch.toLowerCase())
+                                    )
+                                    .map((item, i) => {
                                     const scanned = groupScannedItems[item.sku] || 0;
                                     const expected = Number(item.qty || 0);
                                     const isDone = scanned >= expected;
+                                    const isLastScanned = lastScannedSku === item.sku;
                                     return (
-                                        <div key={i} className={`p-4 rounded-2xl border flex flex-col gap-2 transition-all ${isDone ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-slate-200 shadow-sm'}`}>
+                                        <div
+                                            key={i}
+                                            ref={isLastScanned ? lastScannedRef : null}
+                                            className={`p-4 rounded-2xl border flex flex-col gap-2 transition-all ${
+                                                isLastScanned
+                                                    ? 'bg-amber-50 border-amber-400 shadow-md shadow-amber-100 ring-2 ring-amber-300'
+                                                    : isDone
+                                                    ? 'bg-emerald-50 border-emerald-200'
+                                                    : 'bg-white border-slate-200 shadow-sm'
+                                            }`}
+                                        >
+                                            {isLastScanned && (
+                                                <div className="flex items-center gap-1 mb-1.5">
+                                                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                                    <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">Último escaneado</span>
+                                                </div>
+                                            )}
                                             <div className="flex justify-between items-start">
                                                 <div className="flex-1">
                                                     <p className="text-[12px] font-black text-slate-900 leading-tight">{item.articleName || 'Artículo'}</p>
@@ -2566,7 +2642,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                 >
                                     {isGroupDispatching ? <><Icons.RotateCcw className="w-4 h-4 animate-spin" /> PROCESANDO...</> : <><Icons.Check className="w-4 h-4" /> CONFIRMAR DESPACHO GRUPAL ({routeInvoices.filter(i => !['EST-11','EST-12','EST-13','EST-14'].includes(String(i.itemStatus||i.item_status||''))).length} FACTURAS)</>}
                                 </button>
-                                <button onClick={() => { setGroupScannedItems({}); setGroupItemPickingModes({}); }} className="px-5 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">
+                                <button onClick={() => { setGroupScannedItems({}); setGroupItemPickingModes({}); setLastScannedSku(null); setGroupSearch(''); }} className="px-5 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">
                                     Limpiar
                                 </button>
                             </div>

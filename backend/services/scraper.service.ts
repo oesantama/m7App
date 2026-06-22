@@ -7,8 +7,8 @@ import os from 'os';
 // Configuración de credenciales de Transportando
 const TRANSPORTANDO_URL = 'https://tms.transportando.com.co/#/';
 const NIT = '901121286';
-const USUARIO = 'LINA_OROZCO';
-const CLAVE = 'LINA_OROZCO';
+const USUARIO = 'OSCAR_SANTAMARIA';
+const CLAVE = '986532147';
 
 export const activeScraperLogs: string[] = [];
 

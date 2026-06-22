@@ -1,6 +1,6 @@
-
 import { Request, Response } from 'express';
 import { aiService } from '../services/ai.service.js';
+import { getDashboardMetrics } from '../services/ai-orchestrator/database.js';
 
 export const aiController = {
   async chat(req: Request, res: Response) {
@@ -26,6 +26,15 @@ export const aiController = {
         
         await aiService.saveLearning(rule);
         res.json({ success: true, message: "Conocimiento integrado al núcleo de M7 IQ" });
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+  },
+
+  async getOrchestratorDashboard(req: Request, res: Response) {
+    try {
+        const metrics = await getDashboardMetrics();
+        res.json({ success: true, data: metrics });
     } catch (error: any) {
         res.status(500).json({ success: false, error: error.message });
     }

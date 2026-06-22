@@ -1326,7 +1326,7 @@ export const closeConciliationCycle = async (req: Request, res: Response) => {
 
         if (pendingItemsRes.rows.length === 0) {
             await client.query('COMMIT');
-            return res.json({ success: true, message: 'No hay facturas pendientes por cerrar.' });
+            return res.json({ success: true, closedCount: 0, message: 'No hay facturas pendientes por cerrar.' });
         }
 
         const pendingItems = pendingItemsRes.rows;
