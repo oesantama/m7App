@@ -1902,7 +1902,8 @@ export const InformesGerenciales: React.FC = () => {
         "PROM DIAS REC": Math.round(row.averageRecDays || 0),
         "PROM DIAS EGRESO": Math.round(row.averageEgrDays || 0),
         "PROM DIA MAN RECIBIDO": Math.round(row.averageManRecDays || 0),
-        "VL RECIBIDO": Math.round(row.receivedValue || 0),
+        "VL REC MISMO MES": Math.round(row.receivedValue || 0),
+        "VL REC DIF MES": Math.round(row.receivedDiffMonth || 0),
         "% RECIBIDO": (Math.round((row.receivedPct || 0) * 10) / 10) / 100,
         "DÍAS LABORADOS": Math.round(row.workedDaysCount || 0),
         "VEHÍCULOS UTILIZADOS": Math.round(row.totalVehicleUtilizations || 0),
@@ -1926,6 +1927,7 @@ export const InformesGerenciales: React.FC = () => {
       const overallAverageEgrDays = tdmTableData.reduce((sum, i) => sum + (i.totalEgrDays || 0), 0) / tdmTableData.reduce((sum, i) => sum + (i.egrDaysCount || 0), 0) || 0;
       const overallAverageManRecDays = tdmTableData.reduce((sum, i) => sum + (i.totalManRecDays || 0), 0) / tdmTableData.reduce((sum, i) => sum + (i.manRecDaysCount || 0), 0) || 0;
       const totalReceivedValueVal = tdmTableData.reduce((sum, item) => sum + (item.receivedValue || 0), 0);
+      const totalReceivedDiffMonthVal = tdmTableData.reduce((sum, item) => sum + (item.receivedDiffMonth || 0), 0);
       const overallReceivedPct = totalVenta > 0 ? (totalReceivedValueVal / totalVenta) * 100 : 0;
 
       const allPlates = new Set<string>();
@@ -1955,7 +1957,8 @@ export const InformesGerenciales: React.FC = () => {
         "PROM DIAS REC": Math.round(overallAverageRecDays || 0),
         "PROM DIAS EGRESO": Math.round(overallAverageEgrDays || 0),
         "PROM DIA MAN RECIBIDO": Math.round(overallAverageManRecDays || 0),
-        "VL RECIBIDO": Math.round(totalReceivedValueVal || 0),
+        "VL REC MISMO MES": Math.round(totalReceivedValueVal || 0),
+        "VL REC DIF MES": Math.round(totalReceivedDiffMonthVal || 0),
         "% RECIBIDO": (Math.round((overallReceivedPct || 0) * 10) / 10) / 100,
         "DÍAS LABORADOS": Math.round(totalWorkedDays || 0),
         "VEHÍCULOS UTILIZADOS": Math.round(totalVehicleDaysCount || 0),
@@ -1977,7 +1980,8 @@ export const InformesGerenciales: React.FC = () => {
         "PROM DIAS REC": '#,##0',
         "PROM DIAS EGRESO": '#,##0',
         "PROM DIA MAN RECIBIDO": '#,##0',
-        "VL RECIBIDO": '"$"#,##0',
+        "VL REC MISMO MES": '"$"#,##0',
+        "VL REC DIF MES": '"$"#,##0',
         "% RECIBIDO": '0.0%',
         "DÍAS LABORADOS": '#,##0',
         "VEHÍCULOS UTILIZADOS": '#,##0',
@@ -2056,8 +2060,8 @@ export const InformesGerenciales: React.FC = () => {
           && dMan.getMonth()    === dInv.getMonth());
         const factMismoMes = hasInvoice && sameMonth ? ventaRow : 0;
 
-        const recibido   = !!(dRec && hasInvoice && sameMonth);
-        const vlRecibido = recibido ? ventaRow : 0;
+        const vlRecMismoMes = (dRec && hasInvoice && sameMonth) ? ventaRow : 0;
+        const vlRecDifMes   = (dRec && (!hasInvoice || !sameMonth)) ? ventaRow : 0;
 
         return {
           "ORDEN DE COMPRA":       safeStr(r.oc_number),
@@ -2080,7 +2084,8 @@ export const InformesGerenciales: React.FC = () => {
           "DIAS REC (FACT→REC)":  diasRec,
           "DIAS EGRESO (MAN→EGR)": diasEgreso,
           "DIA MAN RECIBIDO (MAN→REC)": diasManRec,
-          "VL RECIBIDO":           vlRecibido,
+          "VL REC MISMO MES":      vlRecMismoMes,
+          "VL REC DIF MES":        vlRecDifMes,
         };
       });
 
@@ -2096,7 +2101,8 @@ export const InformesGerenciales: React.FC = () => {
         "DIAS REC (FACT→REC)":  '#,##0',
         "DIAS EGRESO (MAN→EGR)": '#,##0',
         "DIA MAN RECIBIDO (MAN→REC)": '#,##0',
-        "VL RECIBIDO":           '"$"#,##0',
+        "VL REC MISMO MES":      '"$"#,##0',
+        "VL REC DIF MES":        '"$"#,##0',
       };
       if (worksheetDetail['!ref']) {
         const dRange = XLSX.utils.decode_range(worksheetDetail['!ref']);
@@ -2152,7 +2158,8 @@ export const InformesGerenciales: React.FC = () => {
         "PROM DIAS REC": Math.round(row.averageRecDays || 0),
         "PROM DIAS EGRESO": Math.round(row.averageEgrDays || 0),
         "PROM DIA MAN RECIBIDO": Math.round(row.averageManRecDays || 0),
-        "VL RECIBIDO": Math.round(row.receivedValue || 0),
+        "VL REC MISMO MES": Math.round(row.receivedValue || 0),
+        "VL REC DIF MES": Math.round(row.receivedDiffMonth || 0),
         "% RECIBIDO": (Math.round((row.receivedPct || 0) * 10) / 10) / 100,
         "DÍAS LABORADOS": Math.round(row.workedDaysCount || 0),
         "VEHÍCULOS UTILIZADOS": Math.round(row.totalVehicleUtilizations || 0),
@@ -2176,6 +2183,7 @@ export const InformesGerenciales: React.FC = () => {
       const overallAverageEgrDays = tdmTableData.reduce((sum, i) => sum + (i.totalEgrDays || 0), 0) / tdmTableData.reduce((sum, i) => sum + (i.egrDaysCount || 0), 0) || 0;
       const overallAverageManRecDays = tdmTableData.reduce((sum, i) => sum + (i.totalManRecDays || 0), 0) / tdmTableData.reduce((sum, i) => sum + (i.manRecDaysCount || 0), 0) || 0;
       const totalReceivedValueVal = tdmTableData.reduce((sum, item) => sum + (item.receivedValue || 0), 0);
+      const totalReceivedDiffMonthVal = tdmTableData.reduce((sum, item) => sum + (item.receivedDiffMonth || 0), 0);
       const overallReceivedPct = totalVenta > 0 ? (totalReceivedValueVal / totalVenta) * 100 : 0;
 
       const allPlates = new Set<string>();
@@ -2205,7 +2213,8 @@ export const InformesGerenciales: React.FC = () => {
         "PROM DIAS REC": Math.round(overallAverageRecDays || 0),
         "PROM DIAS EGRESO": Math.round(overallAverageEgrDays || 0),
         "PROM DIA MAN RECIBIDO": Math.round(overallAverageManRecDays || 0),
-        "VL RECIBIDO": Math.round(totalReceivedValueVal || 0),
+        "VL REC MISMO MES": Math.round(totalReceivedValueVal || 0),
+        "VL REC DIF MES": Math.round(totalReceivedDiffMonthVal || 0),
         "% RECIBIDO": (Math.round((overallReceivedPct || 0) * 10) / 10) / 100,
         "DÍAS LABORADOS": Math.round(totalWorkedDays || 0),
         "VEHÍCULOS UTILIZADOS": Math.round(totalVehicleDaysCount || 0),
@@ -2227,7 +2236,8 @@ export const InformesGerenciales: React.FC = () => {
         "PROM DIAS REC": '#,##0',
         "PROM DIAS EGRESO": '#,##0',
         "PROM DIA MAN RECIBIDO": '#,##0',
-        "VL RECIBIDO": '"$"#,##0',
+        "VL REC MISMO MES": '"$"#,##0',
+        "VL REC DIF MES": '"$"#,##0',
         "% RECIBIDO": '0.0%',
         "DÍAS LABORADOS": '#,##0',
         "VEHÍCULOS UTILIZADOS": '#,##0',
