@@ -13,10 +13,11 @@ interface TdmRow {
   remesa: string;
   valor_cobrar: number;
   valor_pagar: number;
-  ciudad: string;
+  ciudad_origen: string;
+  ciudad_destino: string;
 }
 
-const TEMPLATE_COLUMNS = ['manifiesto', 'fecha_operacion', 'remesa', 'valor_cobrar', 'valor_pagar', 'ciudad'];
+const TEMPLATE_COLUMNS = ['manifiesto', 'fecha_operacion', 'remesa', 'valor_cobrar', 'valor_pagar', 'ciudad_origen', 'ciudad_destino'];
 
 const fmt = (n: number) => `$${Number(n || 0).toLocaleString('es-CO')}`;
 const fmtDate = (d: string) => {
@@ -68,8 +69,8 @@ export default function OperacionesFlotaManual({ user }: Props) {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([
       TEMPLATE_COLUMNS,
-      ['MANI-001', today, 'REM-001', 500000, 450000, 'MEDELLIN'],
-      ['MANI-002', today, 'REM-002', 320000, 300000, 'CALI'],
+      ['MANI-001', today, 'REM-001', 500000, 450000, 'MEDELLIN', 'BOGOTA'],
+      ['MANI-002', today, 'REM-002', 320000, 300000, 'CALI', 'MEDELLIN'],
     ]);
     ws['!cols'] = TEMPLATE_COLUMNS.map(() => ({ wch: 20 }));
     XLSX.utils.book_append_sheet(wb, ws, 'Plantilla TDM');
@@ -121,7 +122,8 @@ export default function OperacionesFlotaManual({ user }: Props) {
             remesa: String(r['remesa'] || '').trim(),
             valor_cobrar: Number(String(r['valor_cobrar'] || '0').replace(/[^0-9.-]/g, '')) || 0,
             valor_pagar:  Number(String(r['valor_pagar']  || '0').replace(/[^0-9.-]/g, '')) || 0,
-            ciudad: String(r['ciudad'] || 'SIN CIUDAD').trim().toUpperCase(),
+            ciudad_origen: String(r['ciudad_origen'] || 'SIN CIUDAD').trim().toUpperCase(),
+            ciudad_destino: String(r['ciudad_destino'] || 'SIN CIUDAD').trim().toUpperCase(),
           });
         });
 
@@ -156,9 +158,8 @@ export default function OperacionesFlotaManual({ user }: Props) {
     try {
       const res = await api.uploadTdmManifiestos({
         clientId: selectedClientId,
-        clientName: selectedClient?.name || '',
         rows: previewRows,
-        uploadedBy: user.name,
+        uploadedBy: user.id, // Only user ID sent
       });
 
       if (res.success) {
@@ -298,7 +299,8 @@ export default function OperacionesFlotaManual({ user }: Props) {
                     <th className="text-left px-3 py-2">Remesa</th>
                     <th className="text-right px-3 py-2">V. Cobrar</th>
                     <th className="text-right px-3 py-2">V. Pagar</th>
-                    <th className="text-center px-3 py-2">Ciudad</th>
+                    <th className="text-center px-3 py-2">Origen</th>
+                    <th className="text-center px-3 py-2">Destino</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -310,7 +312,10 @@ export default function OperacionesFlotaManual({ user }: Props) {
                       <td className="px-3 py-2 text-right font-bold text-emerald-700">{fmt(r.valor_cobrar)}</td>
                       <td className="px-3 py-2 text-right font-bold text-rose-600">{fmt(r.valor_pagar)}</td>
                       <td className="px-3 py-2 text-center">
-                        <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600">{r.ciudad}</span>
+                        <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600">{r.ciudad_origen}</span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600">{r.ciudad_destino}</span>
                       </td>
                     </tr>
                   ))}
@@ -455,14 +460,15 @@ export default function OperacionesFlotaManual({ user }: Props) {
                     <th className="text-left pb-3 pr-4">Remesa</th>
                     <th className="text-right pb-3 pr-4">V. Cobrar</th>
                     <th className="text-right pb-3 pr-4">V. Pagar</th>
-                    <th className="text-center pb-3 pr-4">Ciudad</th>
+                    <th className="text-center pb-3 pr-4">Origen</th>
+                    <th className="text-center pb-3 pr-4">Destino</th>
                     <th className="text-center pb-3 pr-4">Subido por</th>
                     {isSuperAdmin && <th className="pb-3"></th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {detailRows.map(r => (
-                    <tr key={r.id} className="hover:bg-slate-50 transition-colors">
+                     <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-2.5 pr-4 font-bold text-slate-800">{r.manifiesto}</td>
                       <td className="py-2.5 pr-4 font-bold text-amber-700">TDM {r.client_name}</td>
                       <td className="py-2.5 pr-4 text-center text-slate-600 text-xs">{fmtDate(r.fecha_operacion)}</td>
@@ -470,7 +476,10 @@ export default function OperacionesFlotaManual({ user }: Props) {
                       <td className="py-2.5 pr-4 text-right font-bold text-emerald-700">{fmt(r.valor_cobrar)}</td>
                       <td className="py-2.5 pr-4 text-right font-bold text-rose-600">{fmt(r.valor_pagar)}</td>
                       <td className="py-2.5 pr-4 text-center">
-                        <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600">{r.ciudad}</span>
+                        <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600">{r.ciudad_origen}</span>
+                      </td>
+                      <td className="py-2.5 pr-4 text-center">
+                        <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600">{r.ciudad_destino}</span>
                       </td>
                       <td className="py-2.5 pr-4 text-center text-slate-400 text-xs">{r.uploaded_by || '—'}</td>
                       {isSuperAdmin && (

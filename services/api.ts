@@ -1640,21 +1640,9 @@ export const api = {
   // --- INFORMES FLOTA ---
   getFlotaReport: (params: { from: string; to: string }) =>
     fetchJson(`${API_URL}/flota/report?from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`),
-  getFlotaManualEntries: (params?: { from?: string; to?: string; clientId?: string }) => {
-    const qs = params ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null) as [string, string][])).toString() : '';
-    return fetchJson(`${API_URL}/flota/manual-entries${qs}`);
-  },
-  saveFlotaManualEntry: (data: { clientId: string; clientName: string; operationDate: string; quantity: number; city: string; notes?: string; createdBy?: string }) =>
-    fetchJson(`${API_URL}/flota/manual-entries`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }),
-  deleteFlotaManualEntry: (id: number) =>
-    fetchJson(`${API_URL}/flota/manual-entries/${id}`, { method: 'DELETE' }),
 
   // --- TDM MANIFIESTOS (carga por Excel) ---
-  uploadTdmManifiestos: (data: { clientId: string; clientName: string; rows: any[]; uploadedBy?: string }) =>
+  uploadTdmManifiestos: (data: { clientId: string; rows: any[]; uploadedBy?: string }) =>
     fetchJson(`${API_URL}/flota/tdm/upload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

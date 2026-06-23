@@ -239,27 +239,13 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
   
-  // Flota: tabla de operaciones manuales TDM (legada — se conserva por compatibilidad)
+  // Alter tables for management_orders
   try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS flota_manual_entries (
-        id SERIAL PRIMARY KEY,
-        client_id VARCHAR(50),
-        client_name VARCHAR(255) NOT NULL,
-        operation_date DATE NOT NULL,
-        quantity INTEGER NOT NULL DEFAULT 1,
-        city VARCHAR(100) DEFAULT 'SIN CIUDAD',
-        notes TEXT,
-        created_by VARCHAR(100),
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-      )
-    `);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_flota_manual_date ON flota_manual_entries (operation_date)`);
     await client.query(`ALTER TABLE management_orders ADD COLUMN IF NOT EXISTS city VARCHAR(100)`);
     await client.query(`ALTER TABLE management_orders ADD COLUMN IF NOT EXISTS fecha_recibo TIMESTAMP WITH TIME ZONE`);
     await client.query(`ALTER TABLE management_orders ADD COLUMN IF NOT EXISTS fecha_egreso TIMESTAMP WITH TIME ZONE`);
   } catch (err) {
-    console.error('[M7-DB] Error al crear flota_manual_entries:', err);
+    console.error('[M7-DB] Error al alterar management_orders:', err);
   }
 
   // Flota TDM: tabla de manifiestos cargados por Excel (clave primaria de negocio: manifiesto)
@@ -268,14 +254,13 @@ const healSchema = async (client: any) => {
       CREATE TABLE IF NOT EXISTS flota_tdm_manifiestos (
         id SERIAL PRIMARY KEY,
         client_id VARCHAR(50) NOT NULL,
-        client_name VARCHAR(255) NOT NULL,
         manifiesto VARCHAR(150) NOT NULL,
         fecha_operacion DATE NOT NULL,
         remesa VARCHAR(200),
         valor_cobrar NUMERIC(15,2) DEFAULT 0,
         valor_pagar NUMERIC(15,2) DEFAULT 0,
-        ciudad VARCHAR(100) DEFAULT 'SIN CIUDAD',
-        extra_fields JSONB DEFAULT '{}',
+        ciudad_origen VARCHAR(100) DEFAULT 'SIN CIUDAD',
+        ciudad_destino VARCHAR(100) DEFAULT 'SIN CIUDAD',
         uploaded_by VARCHAR(100),
         uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
         CONSTRAINT uq_flota_tdm_manifiesto UNIQUE (manifiesto)

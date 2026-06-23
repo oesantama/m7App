@@ -20,28 +20,18 @@ export const getFlotaReport = async (req: Request, res: Response) => {
                   AND manifest_status NOT IN ('ANULADO', 'CANCELADO', 'ANULADA')
                   AND manifest_date IS NOT NULL
             ),
-            manual AS (
-                SELECT
-                    TRIM(client_name) AS client_name,
-                    quantity,
-                    'TDM' AS operator,
-                    COALESCE(UPPER(TRIM(city)), 'SIN CIUDAD') AS city
-                FROM flota_manual_entries
-                WHERE operation_date BETWEEN $1 AND $2
-            ),
             tdm_excel AS (
                 SELECT
-                    CONCAT('TDM ', TRIM(client_name)) AS client_name,
+                    CONCAT('TDM ', TRIM(c.name)) AS client_name,
                     1 AS quantity,
                     'TDM' AS operator,
-                    COALESCE(UPPER(TRIM(ciudad)), 'SIN CIUDAD') AS city
-                FROM flota_tdm_manifiestos
-                WHERE fecha_operacion BETWEEN $1 AND $2
+                    COALESCE(UPPER(TRIM(ftm.ciudad_destino)), 'SIN CIUDAD') AS city
+                FROM flota_tdm_manifiestos ftm
+                LEFT JOIN clients c ON ftm.client_id = c.id
+                WHERE ftm.fecha_operacion BETWEEN $1 AND $2
             ),
             combined AS (
                 SELECT * FROM manifests
-                UNION ALL
-                SELECT * FROM manual
                 UNION ALL
                 SELECT * FROM tdm_excel
             )
@@ -63,77 +53,13 @@ export const getFlotaReport = async (req: Request, res: Response) => {
     }
 };
 
-export const getManualEntries = async (req: Request, res: Response) => {
-    const { from, to, clientId } = req.query;
-    try {
-        const conditions: string[] = [];
-        const params: any[] = [];
-        let idx = 1;
-
-        if (from) { conditions.push(`operation_date >= $${idx++}`); params.push(from); }
-        if (to) { conditions.push(`operation_date <= $${idx++}`); params.push(to); }
-        if (clientId) { conditions.push(`client_id = $${idx++}`); params.push(clientId); }
-
-        const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-        const result = await pool.query(
-            `SELECT id, client_id, client_name, operation_date, quantity, city, notes, created_by, created_at
-             FROM flota_manual_entries
-             ${where}
-             ORDER BY operation_date DESC, created_at DESC`,
-            params
-        );
-
-        res.json({ success: true, data: result.rows });
-    } catch (err: any) {
-        console.error('[M7-FLOTA-ENTRIES-ERR]', err.message);
-        res.status(500).json({ success: false, error: err.message });
-    }
-};
-
-export const saveManualEntry = async (req: Request, res: Response) => {
-    const { clientId, clientName, operationDate, quantity, city, notes, createdBy } = req.body;
-
-    if (!clientId || !clientName || !operationDate || !quantity) {
-        return res.status(400).json({ success: false, error: 'clientId, clientName, operationDate y quantity son obligatorios' });
-    }
-    if (Number(quantity) <= 0) {
-        return res.status(400).json({ success: false, error: 'La cantidad debe ser mayor a 0' });
-    }
-
-    try {
-        const result = await pool.query(
-            `INSERT INTO flota_manual_entries (client_id, client_name, operation_date, quantity, city, notes, created_by, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-             RETURNING *`,
-            [clientId, clientName, operationDate, Number(quantity), city || 'SIN CIUDAD', notes || null, createdBy || null]
-        );
-
-        res.json({ success: true, data: result.rows[0] });
-    } catch (err: any) {
-        console.error('[M7-FLOTA-SAVE-ERR]', err.message);
-        res.status(500).json({ success: false, error: err.message });
-    }
-};
-
-export const deleteManualEntry = async (req: Request, res: Response) => {
-    const { id } = req.params;
-    try {
-        await pool.query(`DELETE FROM flota_manual_entries WHERE id = $1`, [id]);
-        res.json({ success: true });
-    } catch (err: any) {
-        console.error('[M7-FLOTA-DELETE-ERR]', err.message);
-        res.status(500).json({ success: false, error: err.message });
-    }
-};
-
 // ── TDM MANIFIESTOS (carga por Excel) ─────────────────────────────────────────
 
 export const uploadTdmManifiestos = async (req: Request, res: Response) => {
-    const { clientId, clientName, rows, uploadedBy } = req.body;
+    const { clientId, rows, uploadedBy } = req.body;
 
-    if (!clientId || !clientName || !Array.isArray(rows) || rows.length === 0) {
-        return res.status(400).json({ success: false, error: 'clientId, clientName y rows son obligatorios' });
+    if (!clientId || !Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ success: false, error: 'clientId y rows son obligatorios' });
     }
 
     try {
@@ -153,28 +79,28 @@ export const uploadTdmManifiestos = async (req: Request, res: Response) => {
             try {
                 const res2 = await pool.query(
                     `INSERT INTO flota_tdm_manifiestos
-                        (client_id, client_name, manifiesto, fecha_operacion, remesa, valor_cobrar, valor_pagar, ciudad, uploaded_by, uploaded_at)
+                        (client_id, manifiesto, fecha_operacion, remesa, valor_cobrar, valor_pagar, ciudad_origen, ciudad_destino, uploaded_by, uploaded_at)
                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
                      ON CONFLICT (manifiesto) DO UPDATE SET
                         client_id = EXCLUDED.client_id,
-                        client_name = EXCLUDED.client_name,
                         fecha_operacion = EXCLUDED.fecha_operacion,
                         remesa = EXCLUDED.remesa,
                         valor_cobrar = EXCLUDED.valor_cobrar,
                         valor_pagar = EXCLUDED.valor_pagar,
-                        ciudad = EXCLUDED.ciudad,
+                        ciudad_origen = EXCLUDED.ciudad_origen,
+                        ciudad_destino = EXCLUDED.ciudad_destino,
                         uploaded_by = EXCLUDED.uploaded_by,
                         uploaded_at = NOW()
                      RETURNING (xmax = 0) AS is_insert`,
                     [
                         clientId,
-                        clientName,
                         manifiesto,
                         fecha,
                         String(row.remesa || '').trim() || null,
                         Number(row.valor_cobrar) || 0,
                         Number(row.valor_pagar) || 0,
-                        String(row.ciudad || 'SIN CIUDAD').trim().toUpperCase(),
+                        String(row.ciudad_origen || 'SIN CIUDAD').trim().toUpperCase(),
+                        String(row.ciudad_destino || 'SIN CIUDAD').trim().toUpperCase(),
                         uploadedBy || null,
                     ]
                 );
@@ -198,25 +124,26 @@ export const getTdmManifiestos = async (req: Request, res: Response) => {
         const params: any[] = [];
         let idx = 1;
 
-        if (from)     { conditions.push(`fecha_operacion >= $${idx++}`); params.push(from); }
-        if (to)       { conditions.push(`fecha_operacion <= $${idx++}`); params.push(to); }
-        if (clientId) { conditions.push(`client_id = $${idx++}`); params.push(clientId); }
+        if (from)     { conditions.push(`ftm.fecha_operacion >= $${idx++}`); params.push(from); }
+        if (to)       { conditions.push(`ftm.fecha_operacion <= $${idx++}`); params.push(to); }
+        if (clientId) { conditions.push(`ftm.client_id = $${idx++}`); params.push(clientId); }
 
         const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
         if (view === 'summary') {
             const result = await pool.query(
                 `SELECT
-                    client_id,
-                    client_name,
+                    ftm.client_id,
+                    c.name AS client_name,
                     COUNT(*) AS total_manifiestos,
-                    SUM(valor_cobrar) AS total_cobrar,
-                    SUM(valor_pagar) AS total_pagar,
-                    MIN(fecha_operacion) AS fecha_desde,
-                    MAX(fecha_operacion) AS fecha_hasta
-                 FROM flota_tdm_manifiestos
+                    SUM(ftm.valor_cobrar) AS total_cobrar,
+                    SUM(ftm.valor_pagar) AS total_pagar,
+                    MIN(ftm.fecha_operacion) AS fecha_desde,
+                    MAX(ftm.fecha_operacion) AS fecha_hasta
+                 FROM flota_tdm_manifiestos ftm
+                 LEFT JOIN clients c ON ftm.client_id = c.id
                  ${where}
-                 GROUP BY client_id, client_name
+                 GROUP BY ftm.client_id, c.name
                  ORDER BY total_manifiestos DESC`,
                 params
             );
@@ -224,11 +151,14 @@ export const getTdmManifiestos = async (req: Request, res: Response) => {
         }
 
         const result = await pool.query(
-            `SELECT id, client_id, client_name, manifiesto, fecha_operacion,
-                    remesa, valor_cobrar, valor_pagar, ciudad, uploaded_by, uploaded_at
-             FROM flota_tdm_manifiestos
+            `SELECT ftm.id, ftm.client_id, c.name AS client_name, ftm.manifiesto, ftm.fecha_operacion,
+                    ftm.remesa, ftm.valor_cobrar, ftm.valor_pagar, ftm.ciudad_origen, ftm.ciudad_destino,
+                    u.name AS uploaded_by, ftm.uploaded_at
+             FROM flota_tdm_manifiestos ftm
+             LEFT JOIN clients c ON ftm.client_id = c.id
+             LEFT JOIN users u ON ftm.uploaded_by = u.id::text
              ${where}
-             ORDER BY fecha_operacion DESC, uploaded_at DESC`,
+             ORDER BY ftm.fecha_operacion DESC, ftm.uploaded_at DESC`,
             params
         );
 
