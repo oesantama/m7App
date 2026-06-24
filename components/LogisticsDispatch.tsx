@@ -1538,8 +1538,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     // ── HANDLERS DESPACHO GRUPAL ──────────────────────────────────────────────
     const handleGroupManualAdd = (sku: string, qty: number) => {
         const item = groupedItems.find(it =>
-            String(it.sku || '').trim().toUpperCase() === sku.toUpperCase() ||
-            String(it.barcode || '').trim().toUpperCase() === sku.toUpperCase()
+            String(it.sku || '').trim().toUpperCase() === sku.toUpperCase()
         );
         if (!item) return; // silencioso — el llamador ya hizo la búsqueda con retry
         const itemSku = item.sku;
@@ -1559,24 +1558,19 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         const sku = cleanSkuM7(rawBarcode);
 
         const findItem = (candidate: string) => groupedItems.find(it =>
-            String(it.sku || '').trim().toUpperCase() === candidate.toUpperCase() ||
-            String(it.barcode || '').trim().toUpperCase() === candidate.toUpperCase()
+            String(it.sku || '').trim().toUpperCase() === candidate.toUpperCase()
         );
 
         let item = findItem(sku);
-
-        // Reintento: algunas lectoras envían comilla (') en lugar de guion (-)
-        if (!item && sku.includes("'")) {
-            item = findItem(sku.replaceAll("'", '-'));
-        }
-        // Reintento inverso: guion en lugar de comilla
-        if (!item && sku.includes('-')) {
-            item = findItem(sku.replaceAll('-', "'"));
-        }
+        // Retry: algunas lectoras envían comilla (') donde otras envían guion (-) y viceversa
+        if (!item && sku.includes("'")) item = findItem(sku.replaceAll("'", '-'));
+        if (!item && sku.includes('-'))  item = findItem(sku.replaceAll('-', "'"));
 
         if (!item) {
-            // Toast muy breve y discreto — no interrumpir el flujo de escaneo
-            toast.info(`No encontrado: ${sku}`, { duration: 1500 });
+            toast.warning(`Código no está en el plan: ${sku}`, {
+                description: rawBarcode !== sku ? `Raw: ${rawBarcode.substring(0, 60)}` : undefined,
+                duration: 3000,
+            });
             return;
         }
 
@@ -1661,10 +1655,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const handleManualAdd = (sku: string, qty: number) => {
         if (!assigningInvoice) return;
         
-        // Buscar con máxima flexibilidad: SKU, Barcode o ID
-        const item = (assigningInvoice.items || []).find((it: any) => 
-            String(it.sku || '').trim().toUpperCase() === sku.toUpperCase() || 
-            String(it.barcode || '').trim().toUpperCase() === sku.toUpperCase() ||
+        const item = (assigningInvoice.items || []).find((it: any) =>
+            String(it.sku || '').trim().toUpperCase() === sku.toUpperCase() ||
             String(it.articleId || '').trim().toUpperCase() === sku.toUpperCase()
         );
 
@@ -1707,17 +1699,19 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
         const findInvoiceItem = (candidate: string) => (assigningInvoice.items || []).find((it: any) =>
             String(it.sku || '').trim().toUpperCase() === candidate.toUpperCase() ||
-            String(it.barcode || '').trim().toUpperCase() === candidate.toUpperCase() ||
             String(it.articleId || '').trim().toUpperCase() === candidate.toUpperCase()
         );
 
         let item = findInvoiceItem(sku);
-        // Reintento: lectora envía comilla (') en lugar de guion (-)
+        // Retry: algunas lectoras envían comilla (') donde otras envían guion (-) y viceversa
         if (!item && sku.includes("'")) item = findInvoiceItem(sku.replaceAll("'", '-'));
         if (!item && sku.includes('-'))  item = findInvoiceItem(sku.replaceAll('-', "'"));
 
         if (!item) {
-            toast.info(`No encontrado: ${sku}`, { duration: 1500 });
+            toast.warning(`Código no está en la factura: ${sku}`, {
+                description: rawBarcode !== sku ? `Raw: ${rawBarcode.substring(0, 60)}` : undefined,
+                duration: 3000,
+            });
             return;
         }
 

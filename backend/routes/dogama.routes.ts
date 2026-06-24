@@ -48,7 +48,24 @@ router.delete('/citas/:id', requirePermission('CITAS_DESPACHO_CARGA', 'delete'),
 router.get('/fleet-assignments', requirePermission('CITAS_DESPACHO_CARGA', 'view'), dogama.getActiveFleetAssignments);
 
 // ── Planillas Historial ───────────────────────────────────────────────────────
-router.get('/planillas',  requirePermission('CITAS_DESPACHO_CARGA', 'view'),   dogama.getPlanillasHistorial);
-router.post('/planillas', requirePermission('CITAS_DESPACHO_CARGA', 'create'), dogama.createPlanillaHistorial);
+router.get('/planillas',                   requirePermission('CITAS_DESPACHO_CARGA', 'view'),   dogama.getPlanillasHistorial);
+router.post('/planillas',                  requirePermission('CITAS_DESPACHO_CARGA', 'create'), dogama.createPlanillaHistorial);
+router.patch('/planillas/:id',             requirePermission('CITAS_DESPACHO_CARGA', 'edit'),   dogama.patchPlanillaHistorial);
+router.patch('/enc-planillas/:id',         requirePermission('CITAS_DESPACHO_CARGA', 'edit'),   dogama.patchEncPlanilla);
+router.post('/planillas/material-empaque', requirePermission('CITAS_DESPACHO_CARGA', 'create'), dogama.createPlanillaMaterialEmpaque);
+router.post('/planillas/confeccionista',   requirePermission('CITAS_DESPACHO_CARGA', 'create'), dogama.addConfeccionistaToRoute);
+router.post('/planillas/change-vehicle',   requirePermission('CITAS_DESPACHO_CARGA', 'edit'),   dogama.changeRouteVehicle);
+router.get('/planillas/audit-log',         requirePermission('CITAS_DESPACHO_CARGA', 'view'),   dogama.getRouteAuditLog);
+
+// ── Fletes e Intermediación ───────────────────────────────────────────────────
+router.get('/fletes',     requirePermission('MAESTRAS_DOGAMA', 'view'),   dogama.getFletes);
+router.post('/fletes',    requirePermission('MAESTRAS_DOGAMA', 'create'), dogama.createFlete);
+router.put('/fletes/:id', requirePermission('MAESTRAS_DOGAMA', 'edit'),   dogama.updateFlete);
+
+// ── Notificaciones correo confeccionistas ─────────────────────────────────────
+router.get('/notif-correos',           requirePermission('CITAS_DESPACHO_CARGA', 'view'),   dogama.getNotifCorreos);
+router.post('/notif-correos',          requirePermission('CITAS_DESPACHO_CARGA', 'create'), dogama.createNotifCorreos);
+router.patch('/notif-correos/:id',     requirePermission('CITAS_DESPACHO_CARGA', 'edit'),   dogama.updateNotifCorreo);
+router.post('/notif-correos/:id/send', requirePermission('CITAS_DESPACHO_CARGA', 'edit'),   dogama.sendNotifCorreo);
 
 export default router;

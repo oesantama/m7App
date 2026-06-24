@@ -6,12 +6,14 @@ import { api } from '../../services/api';
 import { User } from '../../types';
 import { hasPermission } from '../../utils/permissions';
 import { DataTable, ColumnDef } from '../shared/DataTable';
+import jsPDF from 'jspdf';
+import { toPng } from 'html-to-image';
 
 interface Props { user: User; }
 
 // ── Catalog types ─────────────────────────────────────────────────────────────
 
-interface CatalogItem { id: number; descripcion: string; estado_id: string | null; }
+interface CatalogItem { id: number; descripcion: string; estado_id: string | null; accion_importacion?: string | null; }
 interface ConfItem    { id: number; descripcion_conf: string; }
 
 // ── Validation / master data ──────────────────────────────────────────────────
@@ -1081,12 +1083,44 @@ function CitaPreviewModal({
     'Mesa': 'mesa', 'Cant.': 'cantidad', 'Proveedor': 'proveedor_txt',
     'Nro.Doc': 'numero_documento', 'Tipo OC': 'tipo_oc', 'Estado': 'status',
   };
-  const cSorted = sortCol ? [...filtered].sort((a, b) => {
+  const isBlocked = (r: CitaRow) => r.status !== 'nuevo';
+  const allChecked = filtered.filter(r => !isBlocked(r)).every(r => selected[r.index]);
+
+  // Devuelve la accion_importacion del tipo OC (busca por id o por texto exacto)
+  const getTipoOcAccion = (r: CitaRow): 'carga' | 'valida' => {
+    if (!r.tipo_oc || r.tipo_oc_match.status === 'empty') return 'carga';
+    // Buscar por id si hay match, o por descripcion si es exact
+    const byId  = r.tipo_oc_match.id != null ? tiposOc.find(t => t.id === r.tipo_oc_match.id) : null;
+    const byTxt = tiposOc.find(t => normM(t.descripcion) === normM(r.tipo_oc));
+    const found = byId ?? byTxt;
+    if (!found) return 'valida'; // no encontrado → requiere revisión
+    return (found.accion_importacion as 'carga' | 'valida') || 'valida';
+  };
+
+  // Rojo: bloqueos reales (marca o proveedor sin resolver)
+  const isRowErrorC = (r: CitaRow) =>
+    (r.prov_match.status !== 'exact' && !provOverrides.has(r.index)) ||
+    (r.marca_match.status !== 'exact' && r.marca_match.status !== 'empty');
+
+  // Amarillo: tipo OC con accion='valida' (siempre requiere revisión visual del usuario)
+  const isRowWarningC = (r: CitaRow) =>
+    !isRowErrorC(r) && !!r.tipo_oc && r.tipo_oc_match.status !== 'empty' && getTipoOcAccion(r) === 'valida';
+
+  // Alias para compatibilidad con el sort y demás lógica
+  const isRowUnresolvedC = (r: CitaRow) => isRowErrorC(r) || isRowWarningC(r);
+
+  // Prioridad: rojo(0) → amarillo(1) → limpio(2), luego sort elegido
+  const rowPriority = (r: CitaRow) => isRowErrorC(r) ? 0 : isRowWarningC(r) ? 1 : 2;
+
+  const cSorted = [...filtered].sort((a, b) => {
+    const pa = rowPriority(a); const pb = rowPriority(b);
+    if (pa !== pb) return pa - pb;
+    if (!sortCol) return 0;
     const k = CCOL[sortCol] as keyof CitaRow;
     if (!k) return 0;
     const av = String(a[k] ?? ''); const bv = String(b[k] ?? '');
     return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
-  }) : filtered;
+  });
   const paginated = pageSize === 'all' ? cSorted : cSorted.slice((currentPage - 1) * (pageSize as number), currentPage * (pageSize as number));
 
   const counts = {
@@ -1094,16 +1128,9 @@ function CitaPreviewModal({
     dup_bd: rows.filter(r => r.status === 'duplicado_bd').length,
     dup_arch: rows.filter(r => r.status === 'duplicado_archivo').length,
     selected: selected.filter(Boolean).length,
-    unresolved: unresolvedMarcaNames.size + unresolvedTipoOcNames.size,
+    errors:   rows.filter(r => r.status === 'nuevo' && isRowErrorC(r)).length,
+    warnings: rows.filter(r => r.status === 'nuevo' && isRowWarningC(r)).length,
   };
-
-  const isBlocked = (r: CitaRow) => r.status !== 'nuevo';
-  const allChecked = filtered.filter(r => !isBlocked(r)).every(r => selected[r.index]);
-
-  const isRowUnresolvedC = (r: CitaRow) =>
-    (r.prov_match.status !== 'exact' && !provOverrides.has(r.index)) ||
-    (r.marca_match.status !== 'exact' && r.marca_match.status !== 'empty') ||
-    (r.tipo_oc_match.status === 'not_found');
 
   const toggleAll = () => {
     const next = !allChecked;
@@ -1128,7 +1155,8 @@ function CitaPreviewModal({
             {counts.dup_bd > 0 && <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">{counts.dup_bd} ya en BD</span>}
             {counts.dup_arch > 0 && <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">{counts.dup_arch} dup.</span>}
             <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">{counts.selected} sel.</span>
-            {counts.unresolved > 0 && <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-bold bg-red-200 text-red-800">⚠ {counts.unresolved} sin resolver</span>}
+            {counts.errors > 0 && <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-bold bg-red-200 text-red-800">✕ {counts.errors} sin resolver</span>}
+            {counts.warnings > 0 && <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-bold bg-amber-300 text-amber-900">⚠ {counts.warnings} por validar (Tipo OC)</span>}
           </div>
         </div>
 
@@ -1197,7 +1225,11 @@ function CitaPreviewModal({
                 {paginated.length === 0 ? (
                   <tr><td colSpan={15} className="py-10 text-center text-slate-400">Sin resultados</td></tr>
                 ) : paginated.map(r => (
-                  <tr key={r.index} className={`hover:bg-slate-50/70 transition-colors ${!selected[r.index] ? 'opacity-40' : ''} ${highlightErrorsC && isRowUnresolvedC(r) ? 'bg-red-200' : ''}`}>
+                  <tr key={r.index} className={`transition-colors ${!selected[r.index] ? 'opacity-40' : ''} ${
+                    isRowErrorC(r)   ? 'bg-red-100 border-l-2 border-red-400 hover:bg-red-50' :
+                    isRowWarningC(r) ? 'bg-amber-50 border-l-2 border-amber-400 hover:bg-amber-100/60' :
+                    'hover:bg-slate-50/70'
+                  }`}>
                     <td className="px-2 py-2 text-center">
                       <input type="checkbox" checked={selected[r.index]} disabled={isBlocked(r)}
                         onChange={() => toggle(r.index)} className="accent-indigo-500 disabled:cursor-not-allowed" />
@@ -1366,10 +1398,10 @@ function CitaPreviewModal({
               const msgs: string[] = [];
               const unresMarcas = [...new Set(sel.filter(r => r.marca_match.status !== 'exact').map(r => r.marca_txt).filter(Boolean))];
               const unresProvs  = sel.filter(r => r.prov_match.status !== 'exact' && !provOverrides.has(r.index));
-              const uresTocs    = [...new Set(sel.filter(r => r.tipo_oc && r.tipo_oc_match.status !== 'exact').map(r => r.tipo_oc).filter(Boolean))];
+              const sinHoraReal = sel.filter(r => !(horaOverrides.get(r.index) ?? r.hora_fin));
+              if (sinHoraReal.length) msgs.push(`Hora Real de Carga faltante en ${sinHoraReal.length} fila(s) — complete el campo en la columna H.Real Carga`);
               if (unresMarcas.length) msgs.push(`Marcas sin definir (col. MARCA): ${unresMarcas.join(', ')}`);
               if (unresProvs.length)  msgs.push(`Confeccionista sin asignar en ${unresProvs.length} fila(s) — use el selector de la columna Proveedor`);
-              if (uresTocs.length)    msgs.push(`Tipos OC sin definir (col. TIPO OC): ${uresTocs.join(', ')}`);
               if (msgs.length) { setValidErrDlg(msgs); setHighlightErrorsC(true); return; }
               onConfirm(
                 rows.map((r, i) => ({
@@ -1580,6 +1612,7 @@ function CitaFormModal({ ctx, user, onClose, onSaved }: {
 
   const handleSave = async () => {
     if (!form.referencia && !form.numero_documento) { toast.error('Ingrese referencia o número de documento'); return; }
+    if (!form.hora_fin) { toast.error('La Hora Real de Carga es obligatoria'); return; }
     setSaving(true);
     try {
       const payload = [{
@@ -1637,7 +1670,7 @@ function CitaFormModal({ ctx, user, onClose, onSaved }: {
             </select>
           </div>
           <Field label="Hora Inicio" k="hora_inicio" type="time" />
-          <Field label="H. Real Carga" k="hora_fin" type="time" />
+          <Field label="H. Real Carga" k="hora_fin" type="time" required />
           <CatalogSelect label="Marca" k="marca_txt" list={ctx.marcas} />
           <Field label="Referencia" k="referencia" required />
           <Field label="Color" k="color" />
@@ -2111,20 +2144,109 @@ interface FleetAssignment {
   client_id: string; client_name: string;
 }
 type AsignMode = 'placa_a_registros' | 'registros_a_placa';
-type TipoReg  = 'despachos' | 'citas' | 'ambos';
+type TipoReg  = 'despachos' | 'citas' | 'ambos' | 'material_empaque';
 
 interface PlanillaHistorial {
-  id: number; fecha: string;
+  id: number;
+  enc_id: number;
+  // Campos del encabezado (nivel ruta)
+  fecha: string;
   vehicle_id: string | null; placa: string | null; vehicle_brand: string | null;
   conductor_id: string | null; conductor_nombre: string | null;
   client_id: string | null; client_nombre: string | null;
   remesa: string | null; manifiesto: string | null;
   valor_cxc: string | null; valor_cxp: string | null;
-  tipo: 'despacho' | 'cita';
+  intermediacion: string | null;
+  enc_estado_id: string | null;
+  // Campos del ítem (nivel confeccionista)
+  tipo: 'despacho' | 'cita' | 'material_empaque';
   despacho_id: number | null; cita_id: number | null;
   usuario_creacion: string | null; fecha_creacion: string;
   usuario_nombre: string | null; confeccionista_nombre: string | null;
+  cajas: number | null; tulas: number | null; canastas: number | null; costales: number | null;
+  estado_id: string;
+  motivo_cancelacion: string | null;
+  tipo_cancelacion: 'reasignar' | 'definitivo' | null;
+  confeccionista_direccion: string | null;
+  confeccionista_ciudad: string | null;
+  hora_inicio: string | null;
+  hora_fin: string | null;
+  turno: string | null;
+  referencia: string | null;
+  // Campos extra de despachos / citas
+  marca: string | null;
+  lote: string | null;
+  unidades: number | null;
+  orden_cargue: string | null;
+  orden_servicio: string | null;
+  color: string | null;
+  mesa: number | null;
+  numero_documento: string | null;
+  tipo_oc: string | null;
+  tipo_prenda: string | null;
 }
+
+interface RouteGroup {
+  key: string;
+  enc_id: number;
+  vehicle_id: string | null;
+  conductor_id: string | null;
+  client_id: string | null;
+  fecha: string;
+  placa: string | null;
+  vehicle_brand: string | null;
+  conductor_nombre: string | null;
+  client_nombre: string | null;
+  tipo: PlanillaHistorial['tipo'];
+  remesa: string | null;
+  manifiesto: string | null;
+  valor_cxc: string | null;
+  valor_cxp: string | null;
+  intermediacion: string | null;
+  records: PlanillaHistorial[];
+}
+
+function groupByRoute(records: PlanillaHistorial[]): RouteGroup[] {
+  const map = new Map<number, RouteGroup>();
+  for (const r of records) {
+    if (!map.has(r.enc_id)) {
+      map.set(r.enc_id, {
+        key: String(r.enc_id),
+        enc_id: r.enc_id,
+        vehicle_id: r.vehicle_id, conductor_id: r.conductor_id,
+        client_id: r.client_id, fecha: r.fecha,
+        placa: r.placa, vehicle_brand: r.vehicle_brand,
+        conductor_nombre: r.conductor_nombre, client_nombre: r.client_nombre,
+        tipo: r.tipo,
+        remesa: r.remesa, manifiesto: r.manifiesto,
+        valor_cxc: r.valor_cxc, valor_cxp: r.valor_cxp,
+        intermediacion: r.intermediacion,
+        records: [],
+      });
+    }
+    map.get(r.enc_id)!.records.push(r);
+  }
+  return Array.from(map.values());
+}
+
+interface FleteIntermediacion {
+  id: number;
+  flete_minimo: string | null;
+  valor_intermediacion_minimo: string | null;
+  flete_maximo: string | null;
+  intermediacion_final: string | null;
+  estado_id: string;
+  estado_nombre: string | null;
+}
+
+// ── Formateador moneda COP ─────────────────────────────────────────────────────
+
+const formatCOP = (v: string | number | null): string => {
+  if (v == null || v === '') return '—';
+  const n = Number(v);
+  if (isNaN(n)) return '—';
+  return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
+};
 
 // ── Diálogo de nueva asignación ────────────────────────────────────────────────
 
@@ -2132,11 +2254,12 @@ function AsignacionDialog({ open, user, onClose, onSaved }: {
   open: boolean; user: User; onClose: () => void; onSaved: () => void;
 }) {
   const [mode, setMode]               = useState<AsignMode | null>(null);
-  const [clients,     setClients]     = useState<Client[]>([]);
-  const [vehicles,    setVehicles]    = useState<Vehicle[]>([]);
-  const [assignments, setAssignments] = useState<FleetAssignment[]>([]);
-  const [despachos,   setDespachos]   = useState<Despacho[]>([]);
-  const [citas,       setCitas]       = useState<Cita[]>([]);
+  const [clients,         setClients]         = useState<Client[]>([]);
+  const [vehicles,        setVehicles]        = useState<Vehicle[]>([]);
+  const [assignments,     setAssignments]     = useState<FleetAssignment[]>([]);
+  const [despachos,       setDespachos]       = useState<Despacho[]>([]);
+  const [citas,           setCitas]           = useState<Cita[]>([]);
+  const [confeccionistas, setConfeccionistas] = useState<ConfItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -2144,10 +2267,11 @@ function AsignacionDialog({ open, user, onClose, onSaved }: {
     const load = async () => {
       setLoading(true);
       try {
-        const [asgns, desps, cts] = await Promise.all([
+        const [asgns, desps, cts, confs] = await Promise.all([
           api.dogamaGetFleetAssignments(),
           api.dogamaGetDespachos(true),
           api.dogamaGetCitas(true),
+          api.dogamaGetConfeccionistas(),
         ]);
         const userClientIds = user.clientIds ?? (user.clientId ? [user.clientId] : []);
         const allAsgns: FleetAssignment[] = Array.isArray(asgns) ? asgns : [];
@@ -2173,6 +2297,7 @@ function AsignacionDialog({ open, user, onClose, onSaved }: {
 
         setDespachos(Array.isArray(desps) ? desps : []);
         setCitas(Array.isArray(cts) ? cts : []);
+        setConfeccionistas(Array.isArray(confs) ? confs : []);
       } catch { toast.error('Error al cargar datos'); }
       finally { setLoading(false); }
     };
@@ -2255,6 +2380,7 @@ function AsignacionDialog({ open, user, onClose, onSaved }: {
           <FlowPlacaARegistros
             user={user} clients={clients} assignments={assignments}
             despachos={despachos} citas={citas}
+            confeccionistas={confeccionistas}
             onBack={() => setMode(null)}
             onSaved={() => { handleClose(); onSaved(); }}
           />
@@ -2271,14 +2397,1252 @@ function AsignacionDialog({ open, user, onClose, onSaved }: {
   );
 }
 
+// ── Tipo badge helper ─────────────────────────────────────────────────────────
+
+function TipoBadge({ tipo }: { tipo: PlanillaHistorial['tipo'] }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    despacho:        { label: 'Despacho',        cls: 'bg-amber-100 text-amber-700' },
+    cita:            { label: 'Cita',             cls: 'bg-emerald-100 text-emerald-700' },
+    material_empaque:{ label: 'Mat. Empaque',     cls: 'bg-purple-100 text-purple-700' },
+  };
+  const m = map[tipo] || { label: tipo, cls: 'bg-slate-100 text-slate-600' };
+  return <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-bold ${m.cls}`}>{m.label}</span>;
+}
+
+// ── EditPlanillaModal ─────────────────────────────────────────────────────────
+
+function EditPlanillaModal({ record, onClose, onSaved }: {
+  record: PlanillaHistorial; onClose: () => void; onSaved: (updated: PlanillaHistorial) => void;
+}) {
+  const [form, setForm] = useState({
+    remesa:     record.remesa     ?? '',
+    manifiesto: record.manifiesto ?? '',
+    valor_cxc:  record.valor_cxc  ?? '',
+    valor_cxp:  record.valor_cxp  ?? '',
+  });
+  const [fletes,        setFletes]        = useState<FleteIntermediacion[]>([]);
+  const [intermediacion, setIntermediacion] = useState<number | null>(
+    record.intermediacion != null ? Number(record.intermediacion) : null
+  );
+  const [saving, setSaving] = useState(false);
+
+  const activeFlete = fletes.find(f => f.estado_id === 'EST-01');
+
+  const intermediacionOpts = useMemo<number[]>(() => {
+    if (!activeFlete) return [];
+    const minVal = Number(activeFlete.valor_intermediacion_minimo ?? 0);
+    const maxVal = Number(activeFlete.intermediacion_final ?? 0);
+    if (isNaN(minVal) || isNaN(maxVal)) return [];
+    const opts: number[] = [];
+    for (let i = Math.ceil(minVal); i <= Math.floor(maxVal); i++) opts.push(i);
+    if (opts.length === 0 && !isNaN(minVal)) opts.push(Math.round(minVal));
+    return opts;
+  }, [activeFlete]);
+
+  // Cargar fletes al montar
+  useEffect(() => {
+    api.dogamaGetFletes().then((rows: FleteIntermediacion[]) => {
+      setFletes(rows);
+      const af = rows.find((f: FleteIntermediacion) => f.estado_id === 'EST-01');
+      // Pre-llenar CxC con flete mínimo solo si no tiene valor previo
+      if (af?.flete_minimo && !form.valor_cxc) {
+        setForm(p => ({ ...p, valor_cxc: String(Number(af.flete_minimo)) }));
+      }
+      // Pre-seleccionar intermediación mínima solo si no tiene valor previo
+      if (intermediacion == null && af?.valor_intermediacion_minimo != null) {
+        setIntermediacion(Math.ceil(Number(af.valor_intermediacion_minimo)));
+      }
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-calcular CxP = CxC − (CxC × int%)
+  useEffect(() => {
+    if (intermediacion == null || !form.valor_cxc) return;
+    const cxc = Number(form.valor_cxc);
+    if (isNaN(cxc)) return;
+    const cxp = Math.round(cxc - (cxc * intermediacion / 100));
+    setForm(p => ({ ...p, valor_cxp: String(cxp) }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.valor_cxc, intermediacion]);
+
+  const setF = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm(p => ({ ...p, [k]: e.target.value }));
+
+  const cxpAutoCalc = intermediacion != null && !!form.valor_cxc;
+
+  const cxcNum    = form.valor_cxc ? Number(form.valor_cxc) : null;
+  const cxcMin    = activeFlete?.flete_minimo  ? Number(activeFlete.flete_minimo)  : null;
+  const cxcMax    = activeFlete?.flete_maximo  ? Number(activeFlete.flete_maximo)  : null;
+  const cxcBelowMin = cxcNum != null && cxcMin != null && cxcNum < cxcMin;
+  const cxcAboveMax = cxcNum != null && cxcMax != null && cxcNum > cxcMax;
+  const cxcError    = cxcBelowMin || cxcAboveMax;
+
+  const handleSave = async () => {
+    if (cxcError) {
+      toast.error(cxcBelowMin
+        ? `El valor CxC no puede ser menor al flete mínimo (${formatCOP(cxcMin)})`
+        : `El valor CxC no puede superar el flete máximo (${formatCOP(cxcMax)})`
+      );
+      return;
+    }
+    setSaving(true);
+    try {
+      const updatedEnc = await api.dogamaPatchEncPlanilla(record.enc_id, {
+        remesa:         form.remesa     || null,
+        manifiesto:     form.manifiesto || null,
+        valor_cxc:      form.valor_cxc  ? Number(form.valor_cxc)  : null,
+        valor_cxp:      form.valor_cxp  ? Number(form.valor_cxp)  : null,
+        intermediacion: intermediacion  ?? null,
+      });
+      toast.success('Planilla actualizada');
+      onSaved({ ...record, ...updatedEnc });
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.message || 'Error al guardar');
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[1000] flex items-center justify-center p-4"
+      onClick={e => { if (e.target === e.currentTarget && !saving) onClose(); }}>
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 animate-in fade-in slide-in-from-bottom-4 duration-150">
+        <div className="mb-4">
+          <p className="text-xs font-black text-indigo-600 uppercase tracking-widest mb-1">Editar Encabezado de Ruta</p>
+          <p className="text-base font-black text-slate-800">Enc #{record.enc_id} — <span className="font-mono text-indigo-600">{record.placa}</span></p>
+          <p className="text-xs text-slate-400">Estos valores aplican a toda la ruta</p>
+        </div>
+        <div className="space-y-3">
+          {/* Remesa + Manifiesto */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">Remesa</label>
+              <input value={form.remesa} onChange={setF('remesa')} placeholder="Ej: 001234"
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">Manifiesto</label>
+              <input value={form.manifiesto} onChange={setF('manifiesto')} placeholder="Ej: M-5678"
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            </div>
+          </div>
+          {/* CxC */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">
+              Valor CxC
+              {activeFlete?.flete_minimo && (
+                <span className={`ml-2 text-[10px] font-normal ${cxcError ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
+                  Flete mín: {formatCOP(activeFlete.flete_minimo)} · máx: {formatCOP(activeFlete.flete_maximo)}
+                </span>
+              )}
+            </label>
+            <input type="number" value={form.valor_cxc} onChange={setF('valor_cxc')} min="0" placeholder="0"
+              className={`w-full text-sm border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 transition ${
+                cxcError
+                  ? 'border-red-400 bg-red-50 text-red-700 focus:ring-red-300'
+                  : 'border-slate-200 focus:ring-indigo-300'
+              }`} />
+            {cxcBelowMin && (
+              <p className="text-[10px] text-red-500 font-semibold mt-1">
+                ✕ Valor menor al flete mínimo ({formatCOP(cxcMin)})
+              </p>
+            )}
+            {cxcAboveMax && (
+              <p className="text-[10px] text-red-500 font-semibold mt-1">
+                ✕ Valor mayor al flete máximo ({formatCOP(cxcMax)})
+              </p>
+            )}
+          </div>
+          {/* Int. (select) */}
+          {intermediacionOpts.length > 0 ? (
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">Int. (%)</label>
+              <select
+                value={intermediacion ?? intermediacionOpts[0]}
+                onChange={e => setIntermediacion(Number(e.target.value))}
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                {intermediacionOpts.map(p => (
+                  <option key={p} value={p}>{p}%</option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">Int. (%)</label>
+              <input type="number" value={intermediacion ?? ''} onChange={e => setIntermediacion(e.target.value ? Number(e.target.value) : null)} placeholder="0"
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            </div>
+          )}
+          {/* CxP — auto-calculado */}
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">
+              Valor CxP
+              {cxpAutoCalc && (
+                <span className="ml-2 text-[10px] font-normal text-emerald-600">calculado automáticamente</span>
+              )}
+            </label>
+            <input
+              type="number" value={form.valor_cxp} min="0" placeholder="0"
+              readOnly={cxpAutoCalc}
+              onChange={cxpAutoCalc ? undefined : setF('valor_cxp')}
+              className={`w-full text-sm border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 ${
+                cxpAutoCalc ? 'bg-slate-50 border-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200'
+              }`} />
+          </div>
+        </div>
+        <div className="flex gap-3 mt-5">
+          <button onClick={onClose} disabled={saving}
+            className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition">
+            Cancelar
+          </button>
+          <button onClick={handleSave} disabled={saving || cxcError}
+            className="flex-1 px-4 py-2.5 rounded-2xl bg-indigo-600 text-white text-sm font-black hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2">
+            {saving ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
+            {saving ? 'Guardando…' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── CancelModal ───────────────────────────────────────────────────────────────
+
+function CancelModal({ title, onClose, onConfirm }: {
+  title: string; onClose: () => void;
+  onConfirm: (motivo: string, tipoCancelacion: 'reasignar' | 'definitivo') => Promise<void>;
+}) {
+  const [motivo,  setMotivo]  = useState('');
+  const [tipo,    setTipo]    = useState<'reasignar' | 'definitivo'>('reasignar');
+  const [saving,  setSaving]  = useState(false);
+
+  const handleConfirm = async () => {
+    if (!motivo.trim()) { toast.warning('Ingrese el motivo de cancelación'); return; }
+    setSaving(true);
+    try { await onConfirm(motivo.trim(), tipo); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[800] flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-2xl bg-red-100 flex items-center justify-center">
+            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </div>
+          <div>
+            <h3 className="font-black text-slate-800 text-sm">Cancelar Asignación</h3>
+            <p className="text-xs text-slate-400">{title}</p>
+          </div>
+        </div>
+
+        {/* Tipo de cancelación */}
+        <p className="text-xs font-bold text-slate-600 mb-2">Tipo de cancelación *</p>
+        <div className="grid grid-cols-2 gap-2 mb-4">
+          <button onClick={() => setTipo('reasignar')}
+            className={`flex flex-col items-start gap-1 px-4 py-3 rounded-2xl border-2 text-left transition ${tipo === 'reasignar' ? 'border-amber-400 bg-amber-50' : 'border-slate-200 hover:border-slate-300'}`}>
+            <span className="text-xs font-black text-amber-700">Por el día</span>
+            <span className="text-[10px] text-slate-500 leading-tight">La cita/despacho vuelve a pendiente para reasignarse otro día</span>
+          </button>
+          <button onClick={() => setTipo('definitivo')}
+            className={`flex flex-col items-start gap-1 px-4 py-3 rounded-2xl border-2 text-left transition ${tipo === 'definitivo' ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:border-slate-300'}`}>
+            <span className="text-xs font-black text-red-700">Definitivo</span>
+            <span className="text-[10px] text-slate-500 leading-tight">La cita/despacho queda cancelada permanentemente</span>
+          </button>
+        </div>
+
+        <label className="block text-xs font-bold text-slate-600 mb-1">Motivo de cancelación *</label>
+        <textarea
+          value={motivo} onChange={e => setMotivo(e.target.value)}
+          rows={3} placeholder="Ej: Cliente canceló el pedido..."
+          className="w-full text-sm border border-slate-200 rounded-2xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-red-300 resize-none mb-4"
+        />
+        <div className="flex gap-2">
+          <button onClick={onClose} disabled={saving}
+            className="flex-1 py-2 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition">
+            Volver
+          </button>
+          <button onClick={handleConfirm} disabled={saving || !motivo.trim()}
+            className="flex-1 py-2 rounded-2xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold disabled:opacity-50 transition">
+            {saving ? 'Cancelando…' : 'Confirmar cancelación'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Tipos para colores de ruta ────────────────────────────────────────────────
+
+interface ColorBand { id: string; label: string; desde: string; hasta: string; color: string; }
+const COLOR_PRESETS = ['#86efac','#fde68a','#93c5fd','#fdba74','#f9a8d4','#e2e8f0','#fca5a5'];
+const BANDS_KEY = 'dogama_color_bands';
+const ROW_COLORS_KEY = 'dogama_row_colors';
+
+function loadBands(): ColorBand[] {
+  try { return JSON.parse(localStorage.getItem(BANDS_KEY) || '[]'); } catch { return []; }
+}
+function saveBands(b: ColorBand[]) { localStorage.setItem(BANDS_KEY, JSON.stringify(b)); }
+function loadRowColors(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(ROW_COLORS_KEY) || '{}'); } catch { return {}; }
+}
+function saveRowColors(rc: Record<string, string>) { localStorage.setItem(ROW_COLORS_KEY, JSON.stringify(rc)); }
+
+function timeToMin(t: string | null): number {
+  if (!t) return -1;
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+function getRowBgColor(record: PlanillaHistorial, bands: ColorBand[], rowColors: Record<string, string>): string {
+  if (rowColors[String(record.id)]) return rowColors[String(record.id)];
+  // Prioriza hora real (hora_fin) sobre la programada (hora_inicio)
+  const hora = record.hora_fin || record.hora_inicio;
+  if (hora) {
+    const min = timeToMin(hora);
+    for (const b of bands) {
+      if (min >= timeToMin(b.desde) && min < timeToMin(b.hasta)) return b.color;
+    }
+  }
+  return '';
+}
+
+// ── AddToRouteModal ───────────────────────────────────────────────────────────
+
+function AddToRouteModal({ group, user, onClose, onAdded }: {
+  group: RouteGroup; user: User; onClose: () => void; onAdded: (r: PlanillaHistorial) => void;
+}) {
+  type Mode = 'conf' | 'despacho' | 'cita';
+  const [mode, setMode]           = useState<Mode>('conf');
+  const [confList,   setConfList]   = useState<ConfItem[]>([]);
+  const [despachos,  setDespachos]  = useState<Despacho[]>([]);
+  const [citas,      setCitas]      = useState<Cita[]>([]);
+  const [confId,     setConfId]     = useState('');
+  const [despId,     setDespId]     = useState('');
+  const [citaId,     setCitaId]     = useState('');
+  const [remesa,     setRemesa]     = useState('');
+  const [manif,      setManif]      = useState('');
+  const [cxc,        setCxc]        = useState('');
+  const [cxp,        setCxp]        = useState('');
+  const [query,      setQuery]      = useState('');
+  const [saving,     setSaving]     = useState(false);
+
+  useEffect(() => {
+    api.dogamaGetConfeccionistas?.().then((d: any) => setConfList(Array.isArray(d) ? d : [])).catch(() => {});
+    api.dogamaGetDespachos(true).then((d: any) => setDespachos(Array.isArray(d) ? d : [])).catch(() => {});
+    api.dogamaGetCitas(true).then((d: any) => setCitas(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
+
+  const filteredConf = confList.filter(c => !query || c.descripcion_conf?.toLowerCase().includes(query.toLowerCase()));
+  const filteredDesp = despachos.filter(d => !query || String(d.confeccionista_nombre || d.orden_servicio || '').toLowerCase().includes(query.toLowerCase()));
+  const filteredCita = citas.filter(c => !query || String(c.proveedor_nombre || c.referencia || '').toLowerCase().includes(query.toLowerCase()));
+
+  const handleAdd = async () => {
+    setSaving(true);
+    try {
+      let r: any;
+      if (mode === 'conf') {
+        if (!confId) { toast.warning('Seleccione un confeccionista'); setSaving(false); return; }
+        r = await api.dogamaAddConfeccionistaToRoute({
+          enc_id: group.enc_id,
+          confeccionista_id: Number(confId),
+          tipo: group.tipo, usuario_creacion: user.id, user_nombre: user.name,
+        });
+      } else {
+        const id = mode === 'despacho' ? Number(despId) : Number(citaId);
+        if (!id) { toast.warning('Seleccione un elemento'); setSaving(false); return; }
+        const result = await api.dogamaCreatePlanillaHistorial({
+          vehicle_id: group.vehicle_id!, fecha: group.fecha,
+          items: [{ tipo: mode, id }],
+          usuario_creacion: user.id,
+        });
+        r = result?.rows?.[0] ?? result;
+      }
+      toast.success('Agregado a la ruta');
+      onAdded(r);
+    } catch { toast.error('Error al agregar'); }
+    finally { setSaving(false); }
+  };
+
+  const tabCls = (m: Mode) => `px-3 py-1.5 rounded-xl text-xs font-bold transition ${mode === m ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`;
+
+  return (
+    <div className="fixed inset-0 z-[900] flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl p-6 flex flex-col" style={{ maxHeight: '90vh' }}>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-black text-slate-800 text-base">Agregar a Ruta</h3>
+            <p className="text-xs text-slate-400">{group.placa} · {group.fecha ? new Date(group.fecha + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }) : '—'}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div className="flex gap-2 mb-3">
+          <button className={tabCls('conf')}    onClick={() => { setMode('conf');    setQuery(''); }}>Confeccionista directo</button>
+          <button className={tabCls('despacho')} onClick={() => { setMode('despacho'); setQuery(''); }}>Despacho existente</button>
+          <button className={tabCls('cita')}    onClick={() => { setMode('cita');    setQuery(''); }}>Cita existente</button>
+        </div>
+        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar…"
+          className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 mb-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        <div className="flex-1 overflow-y-auto border border-slate-100 rounded-2xl mb-3 min-h-0" style={{ minHeight: 300 }}>
+          {mode === 'conf' && filteredConf.map(c => (
+            <button key={c.id} onClick={() => setConfId(String(c.id))}
+              className={`w-full text-left px-4 py-3 text-sm border-b border-slate-50 last:border-0 transition ${confId === String(c.id) ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-50 text-slate-700'}`}>
+              {c.descripcion_conf}
+            </button>
+          ))}
+          {mode === 'despacho' && filteredDesp.map(d => (
+            <button key={d.id} onClick={() => setDespId(String(d.id))}
+              className={`w-full text-left px-4 py-3 text-sm border-b border-slate-50 last:border-0 transition ${despId === String(d.id) ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-50 text-slate-700'}`}>
+              <span className="font-bold">{d.confeccionista_nombre || '—'}</span>
+              {d.orden_servicio && <span className="text-slate-400 ml-2 text-xs">OS: {d.orden_servicio}</span>}
+              {d.referencia && <span className="text-slate-400 ml-2 text-xs">Ref: {d.referencia}</span>}
+            </button>
+          ))}
+          {mode === 'cita' && filteredCita.map(c => (
+            <button key={c.id} onClick={() => setCitaId(String(c.id))}
+              className={`w-full text-left px-4 py-3 text-sm border-b border-slate-50 last:border-0 transition ${citaId === String(c.id) ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-50 text-slate-700'}`}>
+              <span className="font-bold">{c.proveedor_nombre || '—'}</span>
+              {c.hora_inicio && <span className="text-slate-400 ml-2 text-xs">{c.hora_inicio}</span>}
+              {c.referencia && <span className="text-slate-400 ml-2 text-xs">Ref: {c.referencia}</span>}
+            </button>
+          ))}
+        </div>
+        {mode === 'conf' && (
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            {[['Remesa', remesa, setRemesa], ['Manifiesto', manif, setManif]].map(([label, val, setter]) => (
+              <div key={label as string}>
+                <label className="block text-[10px] font-bold text-slate-500 mb-1">{label as string}</label>
+                <input value={val as string} onChange={e => (setter as any)(e.target.value)}
+                  className="w-full text-sm border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+              </div>
+            ))}
+            {[['Valor CxC', cxc, setCxc], ['Valor CxP', cxp, setCxp]].map(([label, val, setter]) => (
+              <div key={label as string}>
+                <label className="block text-[10px] font-bold text-slate-500 mb-1">{label as string}</label>
+                <input type="number" value={val as string} onChange={e => (setter as any)(e.target.value)}
+                  className="w-full text-sm border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-2">
+          <button onClick={onClose} disabled={saving}
+            className="flex-1 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition">
+            Cancelar
+          </button>
+          <button onClick={handleAdd} disabled={saving}
+            className="flex-1 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold disabled:opacity-50 transition">
+            {saving ? 'Guardando…' : 'Agregar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── ChangePlacaModal ──────────────────────────────────────────────────────────
+
+function ChangePlacaModal({ group, user, onClose, onChanged }: {
+  group: RouteGroup; user: User;
+  onClose: () => void;
+  onChanged: (newVehicleId: string, newPlate: string, newBrand: string | null) => void;
+}) {
+  const [vehicles, setVehicles] = useState<{ id: string; plate: string; brand: string | null }[]>([]);
+  const [selected, setSelected] = useState('');
+  const [query,    setQuery]    = useState('');
+  const [saving,   setSaving]   = useState(false);
+
+  useEffect(() => {
+    api.dogamaGetFleetAssignments().then((data: any) => {
+      const arr: FleetAssignment[] = Array.isArray(data) ? data : [];
+      const unique = new Map<string, { id: string; plate: string; brand: string | null }>();
+      arr.forEach(a => { if (!unique.has(a.vehicle_id)) unique.set(a.vehicle_id, { id: a.vehicle_id, plate: a.plate, brand: a.vehicle_brand }); });
+      setVehicles([...unique.values()].filter(v => v.id !== group.vehicle_id));
+    }).catch(() => {});
+  }, []);
+
+  const filtered = vehicles.filter(v => !query || v.plate.toLowerCase().includes(query.toLowerCase()) || (v.brand || '').toLowerCase().includes(query.toLowerCase()));
+
+  const handleConfirm = async () => {
+    if (!selected) { toast.warning('Seleccione una placa de destino'); return; }
+    setSaving(true);
+    try {
+      const result: any = await api.dogamaChangeRouteVehicle({
+        old_vehicle_id: group.vehicle_id!,
+        conductor_id: group.conductor_id,
+        client_id: group.client_id,
+        fecha: group.fecha,
+        new_vehicle_id: selected,
+        user_id: user.id,
+        user_nombre: user.name,
+      });
+      toast.success(`Ruta transferida a ${result.new_plate}`);
+      onChanged(result.new_vehicle_id, result.new_plate, result.new_brand ?? null);
+    } catch { toast.error('Error al cambiar placa'); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[800] flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-black text-slate-800 text-sm">Cambiar Placa de Ruta</h3>
+            <p className="text-xs text-slate-400">Actual: <span className="font-mono font-bold text-slate-700">{group.placa}</span> · {group.fecha}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar placa o marca…"
+          className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        <div className="overflow-y-auto border border-slate-100 rounded-2xl" style={{ maxHeight: 260 }}>
+          {filtered.length === 0 && <p className="text-xs text-slate-400 italic p-4 text-center">Sin vehículos disponibles</p>}
+          {filtered.map(v => (
+            <button key={v.id} onClick={() => setSelected(v.id)}
+              className={`w-full text-left px-4 py-3 text-sm border-b border-slate-50 last:border-0 transition flex items-center gap-3 ${selected === v.id ? 'bg-indigo-50 text-indigo-700 font-bold' : 'hover:bg-slate-50 text-slate-700'}`}>
+              <span className="font-mono font-black text-base tracking-widest bg-slate-900 text-white px-2 py-0.5 rounded-lg">{v.plate}</span>
+              {v.brand && <span className="text-xs text-slate-400">{v.brand}</span>}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onClose} disabled={saving}
+            className="flex-1 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition">
+            Cancelar
+          </button>
+          <button onClick={handleConfirm} disabled={saving || !selected}
+            className="flex-1 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold disabled:opacity-50 transition">
+            {saving ? 'Guardando…' : 'Confirmar cambio'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── RouteDetailDialog — tabla completa con colores configurables ───────────────
+
+function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroupUpdated }: {
+  group: RouteGroup; user: User; localRecords: PlanillaHistorial[];
+  onEdit: (r: PlanillaHistorial) => void; onClose: () => void;
+  onGroupUpdated: (records: PlanillaHistorial[], newGroup?: Partial<RouteGroup>) => void;
+}) {
+  const tableRef = useRef<HTMLDivElement>(null);
+  const [cancelTarget,    setCancelTarget]    = useState<PlanillaHistorial | null>(null);
+  const [showAdd,         setShowAdd]         = useState(false);
+  const [showChangePlaca, setShowChangePlaca] = useState(false);
+  const [showAuditLog,    setShowAuditLog]    = useState(false);
+  const [auditLog,        setAuditLog]        = useState<any[]>([]);
+  const [auditLoading,    setAuditLoading]    = useState(false);
+  const [currentPlaca,    setCurrentPlaca]    = useState(group.placa);
+  const [showEditEnc,     setShowEditEnc]     = useState(false);
+  const [showBandsCfg,    setShowBandsCfg]    = useState(false);
+  const [bands,           setBands]           = useState<ColorBand[]>(loadBands);
+  const [rowColors,       setRowColors]       = useState<Record<string, string>>(loadRowColors);
+  const [colorPickerId,   setColorPickerId]   = useState<string | null>(null);
+  const [innerRecords,  setInnerRecords]  = useState<PlanillaHistorial[]>(localRecords);
+  useEffect(() => { setInnerRecords(localRecords); }, [localRecords]);
+
+  const allCancelled = innerRecords.every(r => r.estado_id === 'EST-16');
+
+  // Qué tipos de bultos tienen al menos un valor > 0 en el grupo
+  const hasCajas    = innerRecords.some(r => (r.cajas    ?? 0) > 0);
+  const hasTulas    = innerRecords.some(r => (r.tulas    ?? 0) > 0);
+  const hasCanastas = innerRecords.some(r => (r.canastas ?? 0) > 0);
+  const hasCostales = innerRecords.some(r => (r.costales ?? 0) > 0);
+  const hasBultos   = hasCajas || hasTulas || hasCanastas || hasCostales;
+
+  const cancelRecord = async (target: PlanillaHistorial, motivo: string, tipoCancelacion: 'reasignar' | 'definitivo') => {
+    await api.dogamaPatchPlanillaHistorial(target.id, {
+      estado_id: 'EST-16',
+      motivo_cancelacion: motivo,
+      tipo_cancelacion: tipoCancelacion,
+      user_id: user.id,
+      user_nombre: user.name,
+    });
+    const updated = innerRecords.map(r =>
+      r.id === target.id
+        ? { ...r, estado_id: 'EST-16', motivo_cancelacion: motivo, tipo_cancelacion: tipoCancelacion }
+        : r
+    );
+    setInnerRecords(updated);
+    onGroupUpdated(updated);
+    const label = tipoCancelacion === 'definitivo' ? 'Cancelado definitivamente' : 'Cancelado para reasignar';
+    toast.success(label);
+    setCancelTarget(null);
+  };
+
+  const setRowColor = (id: string, color: string) => {
+    const updated = { ...rowColors, [id]: color };
+    setRowColors(updated);
+    saveRowColors(updated);
+    setColorPickerId(null);
+  };
+
+  const loadAuditLog = async () => {
+    setAuditLoading(true);
+    try {
+      const data: any = await api.dogamaGetRouteAuditLog(group.enc_id);
+      setAuditLog(Array.isArray(data) ? data : []);
+    } catch { toast.error('Error al cargar historial'); }
+    finally { setAuditLoading(false); }
+  };
+
+  const handleShowAudit = () => {
+    setShowAuditLog(true);
+    loadAuditLog();
+  };
+
+  const handlePlacaChanged = (newVehicleId: string, newPlate: string, newBrand: string | null) => {
+    setCurrentPlaca(newPlate);
+    setShowChangePlaca(false);
+    onGroupUpdated(innerRecords, { vehicle_id: newVehicleId, placa: newPlate, vehicle_brand: newBrand });
+  };
+
+  const addBand = () => {
+    const b: ColorBand[] = [...bands, { id: Date.now().toString(), label: '', desde: '06:00', hasta: '09:00', color: '#86efac' }];
+    setBands(b); saveBands(b);
+  };
+  const updateBand = (id: string, key: keyof ColorBand, val: string) => {
+    const b = bands.map(x => x.id === id ? { ...x, [key]: val } : x);
+    setBands(b); saveBands(b);
+  };
+  const removeBand = (id: string) => {
+    const b = bands.filter(x => x.id !== id);
+    setBands(b); saveBands(b);
+  };
+
+  const exportImage = async () => {
+    if (!tableRef.current) return;
+    const el = tableRef.current;
+    try {
+      toast.loading('Generando imagen…', { id: 'img-export' });
+      const dataUrl = await toPng(el, {
+        pixelRatio: 2,
+        backgroundColor: '#ffffff',
+        width: el.scrollWidth,
+        height: el.scrollHeight,
+        style: { overflow: 'visible', maxHeight: 'none' },
+        filter: (node: Element) => {
+          if (node instanceof HTMLElement && node.getAttribute('data-no-export')) return false;
+          return true;
+        },
+      });
+      toast.dismiss('img-export');
+      const link = document.createElement('a');
+      link.download = `ruta_${currentPlaca}_${group.fecha}.png`;
+      link.href = dataUrl;
+      link.click();
+      toast.success('Imagen exportada');
+    } catch (e: any) {
+      toast.dismiss('img-export');
+      toast.error('Error al exportar: ' + (e as Error).message);
+    }
+  };
+
+  const exportPDF = () => {
+    try {
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const W = doc.internal.pageSize.getWidth();
+      let y = 12;
+      const img = new Image(); img.src = '/logo-encuesta.png';
+      try { doc.addImage(img, 'PNG', 10, y, 45, 13); } catch {}
+      doc.setFontSize(13); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 58, 138);
+      doc.text('PLANILLA DE RUTA', W / 2, y + 6, { align: 'center' });
+      y += 18;
+      doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(71, 85, 105);
+      doc.text(`Placa: ${group.placa || '—'}   Fecha: ${group.fecha || '—'}   Conductor: ${group.conductor_nombre || '—'}   Cliente: ${group.client_nombre || '—'}`, 10, y);
+      y += 8;
+      // Table header
+      const cols = [['Confeccionista', 60], ['Dirección', 55], ['Tipo/Hora', 28], ['ID Ref', 20], ['Bultos', 35], ['Estado', 22]] as [string, number][];
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+      doc.setFillColor(30, 58, 138); doc.rect(10, y - 4.5, W - 20, 7, 'F');
+      doc.setTextColor(255, 255, 255);
+      let cx = 12;
+      cols.forEach(([label, w]) => { doc.text(label, cx, y); cx += w; });
+      y += 4;
+      innerRecords.forEach((r, idx) => {
+        const rowY = y + idx * 7;
+        const bg = getRowBgColor(r, bands, rowColors);
+        if (bg) {
+          const rgb = /^#(..)(..)(..)$/.exec(bg);
+          if (rgb) doc.setFillColor(parseInt(rgb[1], 16), parseInt(rgb[2], 16), parseInt(rgb[3], 16));
+          else if (idx % 2 === 1) doc.setFillColor(248, 250, 252);
+          doc.rect(10, rowY - 4.5, W - 20, 7, 'F');
+        } else if (idx % 2 === 1) {
+          doc.setFillColor(248, 250, 252); doc.rect(10, rowY - 4.5, W - 20, 7, 'F');
+        }
+        const cancelled = r.estado_id === 'EST-16';
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
+        doc.setTextColor(cancelled ? 160 : 15, cancelled ? 160 : 23, cancelled ? 160 : 42);
+        let rx = 12;
+        const pHorario = r.hora_inicio ? `${r.hora_inicio}${r.hora_fin ? '-'+r.hora_fin : ''}` : (r.turno || '');
+        const pIdRef   = r.despacho_id ? `D-${r.despacho_id}` : r.cita_id ? `C-${r.cita_id}` : '—';
+        const pBultos  = [r.cajas && `${r.cajas}cj`, r.tulas && `${r.tulas}tl`, r.canastas && `${r.canastas}cn`, r.costales && `${r.costales}cs`].filter(Boolean).join(' ') || '—';
+        const vals = [
+          (r.confeccionista_nombre || '—').substring(0, 28),
+          (r.confeccionista_direccion || '—').substring(0, 25),
+          `${r.tipo || ''}${pHorario ? ' '+pHorario : ''}`,
+          pIdRef,
+          pBultos,
+          cancelled ? 'Cancelado' : 'Activo',
+        ];
+        cols.forEach(([, w], i) => { doc.text(vals[i], rx, rowY); rx += w; });
+      });
+      doc.save(`ruta_${group.placa}_${group.fecha}.pdf`);
+      toast.success('PDF generado');
+    } catch (e: any) { toast.error('Error PDF: ' + e.message); }
+  };
+
+  return (
+    <>
+      {cancelTarget !== null && (
+        <CancelModal
+          title={`Confeccionista: ${cancelTarget.confeccionista_nombre || '—'}`}
+          onClose={() => setCancelTarget(null)}
+          onConfirm={(motivo, tipoCancelacion) => cancelRecord(cancelTarget, motivo, tipoCancelacion)}
+        />
+      )}
+      {showAdd && (
+        <AddToRouteModal group={group} user={user} onClose={() => setShowAdd(false)}
+          onAdded={r => { setInnerRecords(p => [...p, r]); onGroupUpdated([...innerRecords, r]); setShowAdd(false); }}
+        />
+      )}
+      {showChangePlaca && (
+        <ChangePlacaModal group={group} user={user}
+          onClose={() => setShowChangePlaca(false)}
+          onChanged={handlePlacaChanged}
+        />
+      )}
+      {showAuditLog && (
+        <div className="fixed inset-0 z-[850] flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: '85vh' }}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h3 className="font-black text-slate-800 text-sm">Historial de Cambios — {currentPlaca}</h3>
+              <button onClick={() => setShowAuditLog(false)} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4 min-h-0">
+              {auditLoading && <p className="text-xs text-slate-400 text-center py-8">Cargando…</p>}
+              {!auditLoading && auditLog.length === 0 && <p className="text-xs text-slate-400 italic text-center py-8">Sin cambios registrados para esta ruta</p>}
+              {!auditLoading && auditLog.map((log, i) => {
+                const actionLabels: Record<string, { label: string; color: string }> = {
+                  add_confeccionista: { label: 'Confeccionista agregado', color: 'bg-green-100 text-green-700' },
+                  cancel_confeccionista: { label: 'Confeccionista cancelado', color: 'bg-red-100 text-red-700' },
+                  change_vehicle: { label: 'Cambio de placa', color: 'bg-amber-100 text-amber-700' },
+                };
+                const act = actionLabels[log.action_type] ?? { label: log.action_type, color: 'bg-slate-100 text-slate-600' };
+                return (
+                  <div key={i} className="border-b border-slate-50 py-3 last:border-0">
+                    <div className="flex items-start gap-3">
+                      <span className={`shrink-0 inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold ${act.color}`}>{act.label}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-slate-600">{log.notes || '—'}</p>
+                        {log.new_value && <p className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">{JSON.stringify(log.new_value)}</p>}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-[10px] font-bold text-slate-600">{log.user_nombre || log.user_id || '—'}</p>
+                        <p className="text-[10px] text-slate-400">{log.created_at ? new Date(log.created_at).toLocaleString('es-CO') : ''}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="px-6 py-3 border-t border-slate-100 flex justify-end">
+              <button onClick={() => setShowAuditLog(false)}
+                className="px-4 py-2 rounded-2xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditEnc && innerRecords.length > 0 && (
+        <EditPlanillaModal
+          record={innerRecords[0]}
+          onClose={() => setShowEditEnc(false)}
+          onSaved={updated => {
+            const encFields = { remesa: updated.remesa, manifiesto: updated.manifiesto, valor_cxc: updated.valor_cxc, valor_cxp: updated.valor_cxp, intermediacion: updated.intermediacion };
+            const updatedAll = innerRecords.map(r => ({ ...r, ...encFields }));
+            setInnerRecords(updatedAll);
+            onGroupUpdated(updatedAll);
+            setShowEditEnc(false);
+          }}
+        />
+      )}
+
+      <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black/60 p-3">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl flex flex-col" style={{ maxHeight: '92vh' }}>
+
+          {/* Header */}
+          <div className="flex items-start gap-4 px-6 py-4 border-b border-slate-100 shrink-0">
+            <span className="font-mono font-black text-2xl tracking-widest bg-slate-900 text-white px-3 py-1.5 rounded-xl shrink-0">{currentPlaca || '—'}</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <TipoBadge tipo={group.tipo} />
+                {allCancelled && <span className="text-[10px] font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-lg uppercase tracking-widest">Cancelada</span>}
+                <span className="text-xs text-slate-400">{group.fecha ? new Date(group.fecha + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5 truncate">
+                <span className="font-semibold">{group.conductor_nombre || '—'}</span>
+                <span className="mx-2 text-slate-300">·</span>
+                {group.client_nombre || '—'}
+              </p>
+              {/* Campos enc: Remesa, Manifiesto, CxC, Int., CxP */}
+              {(() => {
+                const enc = innerRecords[0] ?? group;
+                const remesa        = enc.remesa;
+                const manifiesto    = enc.manifiesto;
+                const cxc           = enc.valor_cxc;
+                const cxp           = enc.valor_cxp;
+                const intermediacion = enc.intermediacion != null ? Number(enc.intermediacion) : null;
+                if (!remesa && !manifiesto && !cxc && !cxp && intermediacion == null) return null;
+                return (
+                  <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
+                    {remesa && (
+                      <span className="text-[10px] text-slate-500">
+                        <span className="font-bold text-slate-600">Remesa:</span> {remesa}
+                      </span>
+                    )}
+                    {manifiesto && (
+                      <span className="text-[10px] text-slate-500">
+                        <span className="font-bold text-slate-600">Manifiesto:</span> {manifiesto}
+                      </span>
+                    )}
+                    {cxc && (
+                      <span className="text-[10px] font-bold text-indigo-700">
+                        CxC: {formatCOP(cxc)}
+                      </span>
+                    )}
+                    {intermediacion != null && (
+                      <span className="text-[10px] font-bold text-violet-600">
+                        Int.: {intermediacion}%
+                      </span>
+                    )}
+                    {cxp && (
+                      <span className="text-[10px] font-bold text-emerald-700">
+                        CxP: {formatCOP(cxp)}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Color bands config toggle */}
+              <button onClick={() => setShowBandsCfg(p => !p)}
+                title="Configurar colores" className={`w-8 h-8 flex items-center justify-center rounded-xl transition ${showBandsCfg ? 'bg-indigo-100 text-indigo-600' : 'hover:bg-slate-100 text-slate-400'}`}>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+                </svg>
+              </button>
+              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Color band config panel */}
+          {showBandsCfg && (
+            <div className="px-6 py-3 bg-slate-50 border-b border-slate-100 shrink-0">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-black text-slate-600 uppercase tracking-wider">Configurar colores por horario</p>
+                <button onClick={addBand} className="flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-800">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/></svg>
+                  Agregar franja
+                </button>
+              </div>
+              {bands.length === 0 && <p className="text-xs text-slate-400 italic">Sin franjas configuradas — también puede asignar colores manualmente por fila (ícono 🎨). Los cambios se guardan automáticamente.</p>}
+              {bands.length > 0 && <p className="text-[10px] text-slate-400 mb-2">Compara contra <b>hora real</b> (si existe) o <b>hora programada</b>. Se guarda automáticamente en este navegador.</p>}
+              <div className="space-y-1.5">
+                {bands.map(b => (
+                  <div key={b.id} className="flex items-center gap-2">
+                    <input type="color" value={b.color} onChange={e => updateBand(b.id, 'color', e.target.value)}
+                      className="w-7 h-7 rounded-lg border border-slate-200 cursor-pointer p-0.5" title="Color" />
+                    <input value={b.label} onChange={e => updateBand(b.id, 'label', e.target.value)}
+                      placeholder="Etiqueta" className="text-xs border border-slate-200 rounded-xl px-2 py-1 w-28 focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+                    <input type="time" value={b.desde} onChange={e => updateBand(b.id, 'desde', e.target.value)}
+                      className="text-xs border border-slate-200 rounded-xl px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+                    <span className="text-xs text-slate-400">—</span>
+                    <input type="time" value={b.hasta} onChange={e => updateBand(b.id, 'hasta', e.target.value)}
+                      className="text-xs border border-slate-200 rounded-xl px-2 py-1 focus:outline-none focus:ring-1 focus:ring-indigo-300" />
+                    <button onClick={() => removeBand(b.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Table */}
+          <div className="flex-1 overflow-auto px-6 py-4 min-h-0">
+            <div ref={tableRef} className="bg-white">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-slate-900 text-white">
+                    <th className="text-left px-2 py-2 rounded-tl-xl font-bold w-5">#</th>
+                    <th className="text-left px-2 py-2 font-bold">Confeccionista / Prov.</th>
+                    <th className="text-left px-2 py-2 font-bold">Dirección / Ciudad</th>
+                    <th className="text-left px-2 py-2 font-bold">Tipo · Turno · Hora</th>
+                    <th className="text-left px-2 py-2 font-bold">Referencia</th>
+                    <th className="text-left px-2 py-2 font-bold">Detalle</th>
+                    <th className="text-left px-2 py-2 font-bold">ID</th>
+                    {hasBultos && <th className="text-left px-2 py-2 font-bold">Bultos</th>}
+                    <th className="text-center px-2 py-2 font-bold">Estado</th>
+                    <th data-no-export="1" className="text-center px-2 py-2 rounded-tr-xl font-bold">Acc.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {innerRecords.map((r, idx) => {
+                    const bg = getRowBgColor(r, bands, rowColors);
+                    const cancelled = r.estado_id === 'EST-16';
+                    return (
+                      <tr key={r.id}
+                        style={bg ? { backgroundColor: bg } : undefined}
+                        className={`border-b border-slate-100 ${!bg && idx % 2 === 1 ? 'bg-slate-50' : ''} ${cancelled ? 'opacity-50' : ''}`}>
+                        <td className="px-2 py-2 text-slate-400 font-mono">{idx + 1}</td>
+                        {/* Confeccionista / Proveedor */}
+                        <td className="px-2 py-2 max-w-[150px]">
+                          <span className={`font-semibold block truncate ${cancelled ? 'line-through text-slate-400' : 'text-slate-700'}`}
+                            title={r.confeccionista_nombre || ''}>
+                            {r.confeccionista_nombre || '—'}
+                          </span>
+                          {cancelled && r.motivo_cancelacion && (
+                            <span className="text-[10px] text-red-500 italic">{r.motivo_cancelacion}</span>
+                          )}
+                        </td>
+                        {/* Dirección + Municipio */}
+                        <td className="px-2 py-2 text-slate-500 max-w-[130px]">
+                          <span className="block truncate text-[11px]" title={[r.confeccionista_direccion, r.confeccionista_ciudad].filter(Boolean).join(', ')}>
+                            {r.confeccionista_direccion || '—'}
+                          </span>
+                          {r.confeccionista_ciudad && (
+                            <span className="text-[10px] text-slate-400 font-semibold">{r.confeccionista_ciudad}</span>
+                          )}
+                        </td>
+                        {/* Tipo + Turno + Hora */}
+                        <td className="px-2 py-2 whitespace-nowrap">
+                          <TipoBadge tipo={r.tipo} />
+                          {r.turno && (
+                            <span className="block text-[10px] font-bold text-indigo-500 mt-0.5">{r.turno}</span>
+                          )}
+                          {r.hora_inicio && (
+                            <span className="block text-[10px] text-slate-500 font-mono mt-0.5">
+                              <span className="text-slate-400">Prog:</span> {r.hora_inicio}
+                            </span>
+                          )}
+                          {r.hora_fin && (
+                            <span className="block text-[10px] font-bold text-emerald-600 font-mono">
+                              <span className="font-normal text-slate-400">Real:</span> {r.hora_fin}
+                            </span>
+                          )}
+                        </td>
+                        {/* Referencia */}
+                        <td className="px-2 py-2 text-slate-500 font-mono text-[11px] whitespace-nowrap">{r.referencia || '—'}</td>
+                        {/* Info — tipo-específico */}
+                        <td className="px-2 py-2 min-w-[180px] max-w-[240px]">
+                          <div className="space-y-0.5 text-[10px]">
+                            {/* Marca — ambos */}
+                            {r.marca && (
+                              <span className="inline-block bg-indigo-50 text-indigo-700 font-bold px-1.5 py-0.5 rounded-md mr-1 mb-0.5">{r.marca}</span>
+                            )}
+                            {r.tipo === 'cita' && (<>
+                              <div className="flex flex-wrap gap-x-3">
+                                {r.lote && r.lote !== '0'  && <span><b className="text-slate-600">Lote:</b> {r.lote}</span>}
+                                {r.mesa != null             && <span><b className="text-slate-600">Mesa:</b> {r.mesa}</span>}
+                                {(r.unidades ?? 0) > 0     && <span><b className="text-slate-600">Cant:</b> {r.unidades}</span>}
+                              </div>
+                              {r.color && (
+                                <div><b className="text-slate-600">Color:</b> {r.color}</div>
+                              )}
+                              {r.numero_documento && (
+                                <div className="truncate max-w-[220px]" title={r.numero_documento}>
+                                  <b className="text-slate-600">Doc:</b> {r.numero_documento}
+                                </div>
+                              )}
+                              {r.tipo_oc && (
+                                <div className="text-slate-400">{r.tipo_oc}</div>
+                              )}
+                            </>)}
+                            {r.tipo === 'despacho' && (<>
+                              <div className="flex flex-wrap gap-x-3">
+                                {r.orden_cargue  && <span><b className="text-slate-600">OC:</b> {r.orden_cargue}</span>}
+                                {r.orden_servicio && <span><b className="text-slate-600">OS:</b> {r.orden_servicio}</span>}
+                              </div>
+                              <div className="flex flex-wrap gap-x-3">
+                                {r.lote && r.lote !== '0'  && <span><b className="text-slate-600">Lote:</b> {r.lote}</span>}
+                                {(r.unidades ?? 0) > 0     && <span><b className="text-slate-600">Unid:</b> {r.unidades}</span>}
+                              </div>
+                              {r.tipo_prenda && (
+                                <div className="text-slate-400">{r.tipo_prenda}</div>
+                              )}
+                            </>)}
+                            {r.tipo === 'material_empaque' && (<>
+                              {r.lote && r.lote !== '0' && <div><b className="text-slate-600">Lote:</b> {r.lote}</div>}
+                            </>)}
+                          </div>
+                        </td>
+                        <td className="px-2 py-2 font-mono text-[10px]">
+                          {r.despacho_id
+                            ? <span className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-md font-bold">D-{r.despacho_id}</span>
+                            : r.cita_id
+                              ? <span className="bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded-md font-bold">C-{r.cita_id}</span>
+                              : <span className="text-slate-400">—</span>}
+                        </td>
+                        {hasBultos && (
+                          <td className="px-2 py-2 text-[10px] text-slate-700">
+                            <div className="space-y-0.5">
+                              {hasCajas    && <div><span className="text-slate-400 font-semibold">Caj:</span> {r.cajas    ?? <span className="text-slate-300">—</span>}</div>}
+                              {hasTulas    && <div><span className="text-slate-400 font-semibold">Tul:</span> {r.tulas    ?? <span className="text-slate-300">—</span>}</div>}
+                              {hasCanastas && <div><span className="text-slate-400 font-semibold">Can:</span> {r.canastas ?? <span className="text-slate-300">—</span>}</div>}
+                              {hasCostales && <div><span className="text-slate-400 font-semibold">Cos:</span> {r.costales ?? <span className="text-slate-300">—</span>}</div>}
+                            </div>
+                          </td>
+                        )}
+                        <td className="px-2 py-2 text-center">
+                          <span className={`inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold ${cancelled ? (r.tipo_cancelacion === 'definitivo' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700') : 'bg-emerald-100 text-emerald-700'}`}>
+                            {cancelled ? (r.tipo_cancelacion === 'definitivo' ? 'Cancelado definitivo' : 'Cancel. reasignar') : 'Activo'}
+                          </span>
+                        </td>
+                        <td data-no-export="1" className="px-2 py-2">
+                          <div className="flex items-center justify-center gap-0.5">
+                            <div className="relative">
+                              <button onClick={() => setColorPickerId(colorPickerId === String(r.id) ? null : String(r.id))}
+                                title="Color" className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 transition">
+                                <span className="text-sm">🎨</span>
+                              </button>
+                              {colorPickerId === String(r.id) && (
+                                <div className="absolute right-0 top-7 z-10 bg-white border border-slate-200 rounded-2xl shadow-xl p-2 flex gap-1 flex-wrap w-36">
+                                  {[...COLOR_PRESETS, ''].map(c => (
+                                    <button key={c} onClick={() => setRowColor(String(r.id), c)}
+                                      style={c ? { backgroundColor: c } : undefined}
+                                      className={`w-6 h-6 rounded-lg border-2 transition ${!c ? 'border-slate-200 bg-white text-slate-400 text-[10px]' : 'border-transparent hover:border-slate-400'}`}
+                                      title={c || 'Sin color'}>
+                                      {!c && '✕'}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <button onClick={() => onEdit(r)} title="Editar"
+                              className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-indigo-50 text-indigo-500 transition">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            </button>
+                            {!cancelled && (
+                              <button onClick={() => setCancelTarget(r)} title="Cancelar"
+                                className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-red-50 text-red-400 transition">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center gap-2 px-6 py-3 border-t border-slate-100 shrink-0 flex-wrap">
+            {!allCancelled && (
+              <button onClick={() => setShowAdd(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/></svg>
+                Agregar
+              </button>
+            )}
+            <button onClick={() => setShowEditEnc(true)}
+              title="Editar remesa, manifiesto, CxC, CxP e intermediación de la planilla"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-bold border border-violet-200 transition">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              Editar Planilla
+            </button>
+            <button onClick={() => setShowChangePlaca(true)}
+              title="Reasignar esta ruta a un vehículo diferente"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold border border-amber-200 transition">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+              Cambiar Placa
+            </button>
+            <button onClick={handleShowAudit}
+              title="Ver historial de cambios de esta ruta"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+              Historial
+            </button>
+            <button onClick={exportImage}
+              className="flex items-center gap-1 px-4 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+              Imagen
+            </button>
+            <button onClick={exportPDF}
+              className="flex items-center gap-1 px-4 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+              PDF
+            </button>
+            <div className="flex-1" />
+            <button onClick={onClose}
+              className="px-4 py-2 rounded-2xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition">
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── RouteCard — compacto, abre el dialog ──────────────────────────────────────
+
+function RouteCard({ group, user, onEdit, onGroupUpdated }: {
+  group: RouteGroup;
+  user: User;
+  onEdit: (r: PlanillaHistorial) => void;
+  onGroupUpdated: (records: PlanillaHistorial[]) => void;
+}) {
+  const [showDetail,    setShowDetail]    = useState(false);
+  const [showEditEnc,   setShowEditEnc]   = useState(false);
+  const [localRecords,  setLocalRecords]  = useState<PlanillaHistorial[]>(group.records);
+  const [currentGroup,  setCurrentGroup]  = useState<RouteGroup>(group);
+
+  useEffect(() => { setLocalRecords(group.records); setCurrentGroup(group); }, [group.records]);
+
+  const allCancelled  = localRecords.every(r => r.estado_id === 'EST-16');
+  const activeRecords = localRecords.filter(r => r.estado_id !== 'EST-16');
+  const activeCount   = activeRecords.length;
+  const totalCajas    = activeRecords.reduce((s, r) => s + (Number(r.cajas)    || 0), 0);
+  const totalTulas    = activeRecords.reduce((s, r) => s + (Number(r.tulas)    || 0), 0);
+  const totalCanastas = activeRecords.reduce((s, r) => s + (Number(r.canastas) || 0), 0);
+  const totalCostales = activeRecords.reduce((s, r) => s + (Number(r.costales) || 0), 0);
+
+  const handleGroupUpdated = (updated: PlanillaHistorial[], newGroupData?: Partial<RouteGroup>) => {
+    setLocalRecords(updated);
+    if (newGroupData) setCurrentGroup(p => ({ ...p, ...newGroupData }));
+    onGroupUpdated(updated);
+  };
+
+  return (
+    <>
+      {showEditEnc && localRecords.length > 0 && (
+        <EditPlanillaModal
+          record={localRecords[0]}
+          onClose={() => setShowEditEnc(false)}
+          onSaved={updated => {
+            const encFields = { remesa: updated.remesa, manifiesto: updated.manifiesto, valor_cxc: updated.valor_cxc, valor_cxp: updated.valor_cxp, intermediacion: updated.intermediacion };
+            const updatedAll = localRecords.map(r => ({ ...r, ...encFields }));
+            setLocalRecords(updatedAll);
+            onGroupUpdated(updatedAll);
+            setShowEditEnc(false);
+          }}
+        />
+      )}
+      {showDetail && (
+        <RouteDetailDialog
+          group={currentGroup} user={user}
+          localRecords={localRecords}
+          onEdit={onEdit}
+          onClose={() => setShowDetail(false)}
+          onGroupUpdated={handleGroupUpdated}
+        />
+      )}
+
+      <div className={`bg-white border rounded-3xl shadow-sm hover:shadow-md transition-shadow overflow-hidden ${allCancelled ? 'border-red-200 opacity-60' : 'border-slate-200'}`}>
+        {allCancelled && (
+          <div className="bg-red-50 text-red-700 text-center text-xs font-black py-1.5 uppercase tracking-widest border-b border-red-100">
+            ✕ Ruta Cancelada
+          </div>
+        )}
+        <div className="p-4">
+          <div className="flex items-start justify-between mb-2">
+            <span className="font-mono font-black text-xl tracking-widest bg-slate-900 text-white px-3 py-1 rounded-xl">
+              {currentGroup.placa || '—'}
+            </span>
+            <TipoBadge tipo={group.tipo} />
+          </div>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xs text-slate-400">
+              {group.fecha ? new Date(group.fecha + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+            </span>
+            <span className="text-slate-200">·</span>
+            <span className="text-xs text-slate-400">{activeCount} activo(s) / {localRecords.length} total</span>
+          </div>
+          <div className="space-y-1 text-xs mb-3">
+            <div className="flex justify-between">
+              <span className="text-slate-400 font-medium">Conductor</span>
+              <span className="font-semibold text-slate-700 text-right max-w-[55%] truncate">{group.conductor_nombre || '—'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-400 font-medium">Cliente</span>
+              <span className="font-semibold text-slate-700 text-right max-w-[55%] truncate">{group.client_nombre || '—'}</span>
+            </div>
+          </div>
+          {/* Enc fields: Remesa, Manifiesto, CxC, Int., CxP */}
+          {(() => {
+            const enc = localRecords[0];
+            if (!enc) return null;
+            const remesa        = enc.remesa;
+            const manifiesto    = enc.manifiesto;
+            const cxc           = enc.valor_cxc;
+            const cxp           = enc.valor_cxp;
+            const interm        = enc.intermediacion != null ? Number(enc.intermediacion) : null;
+            if (!remesa && !manifiesto && !cxc && !cxp && interm == null) return null;
+            return (
+              <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-3">
+                {remesa && <span className="text-[10px] text-slate-500"><span className="font-bold text-slate-600">Remesa:</span> {remesa}</span>}
+                {manifiesto && <span className="text-[10px] text-slate-500"><span className="font-bold text-slate-600">Manifiesto:</span> {manifiesto}</span>}
+                {cxc && <span className="text-[10px] font-bold text-indigo-700">CxC: {formatCOP(cxc)}</span>}
+                {interm != null && <span className="text-[10px] font-bold text-violet-600">Int.: {interm}%</span>}
+                {cxp && <span className="text-[10px] font-bold text-emerald-700">CxP: {formatCOP(cxp)}</span>}
+              </div>
+            );
+          })()}
+          {(totalCajas > 0 || totalTulas > 0 || totalCanastas > 0 || totalCostales > 0) && (
+            <div className="bg-slate-50 rounded-2xl p-3">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Bultos activos</p>
+              <p className="text-xs font-black text-slate-700">
+                {[
+                  totalCajas    > 0 && `${totalCajas} cajas`,
+                  totalTulas    > 0 && `${totalTulas} tulas`,
+                  totalCanastas > 0 && `${totalCanastas} canastas`,
+                  totalCostales > 0 && `${totalCostales} costales`,
+                ].filter(Boolean).join(' · ')}
+              </p>
+            </div>
+          )}
+        </div>
+        <div className="px-4 pb-4 flex gap-2">
+          <button onClick={() => setShowEditEnc(true)} title="Editar datos de planilla (remesa, manifiesto, valores)"
+            className="py-2 px-3 rounded-2xl bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-bold border border-violet-200 transition flex items-center gap-1.5 shrink-0">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            Editar
+          </button>
+          <button onClick={() => setShowDetail(true)}
+            className="flex-1 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center justify-center gap-2">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            Ver Ruta
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Tab principal: historial + filtros ────────────────────────────────────────
 
 function AsignacionPlacaTab({ user }: { user: User }) {
   const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
 
-  const [showDialog, setShowDialog] = useState(false);
-  const [historial,  setHistorial]  = useState<PlanillaHistorial[]>([]);
-  const [loading,    setLoading]    = useState(false);
+  const [showDialog,  setShowDialog]  = useState(false);
+  const [historial,   setHistorial]   = useState<PlanillaHistorial[]>([]);
+  const [loading,     setLoading]     = useState(false);
+  const [editRecord,  setEditRecord]  = useState<PlanillaHistorial | null>(null);
 
   // Filtros
   const [fPlaca, setFPlaca] = useState('');
@@ -2307,25 +3671,18 @@ function AsignacionPlacaTab({ user }: { user: User }) {
     loadHistorial({ fecha: today });
   };
 
-  const histCols: ColumnDef<PlanillaHistorial>[] = [
-    { header: '#',              key: 'id',                    sortable: true, render: r => <span className="text-slate-400 text-xs">{r.id}</span> },
-    { header: 'Fecha',          key: 'fecha',                 sortable: true, render: r => <span>{r.fecha ? new Date(r.fecha + 'T12:00:00').toLocaleDateString('es-CO') : '—'}</span> },
-    { header: 'Cliente',        key: 'client_nombre',         sortable: true, render: r => <span className="text-xs font-medium text-slate-700">{r.client_nombre || r.client_id || '—'}</span> },
-    { header: 'Placa',          key: 'placa',                 sortable: true, render: r => <span className="font-mono font-bold text-indigo-700">{r.placa || '—'}</span> },
-    { header: 'Conductor',      key: 'conductor_nombre',      sortable: true, render: r => <span className="font-medium text-slate-700">{r.conductor_nombre || '—'}</span> },
-    { header: 'Tipo',           key: 'tipo',                  sortable: true, render: r => (
-      <span className={`inline-flex px-2 py-0.5 rounded-lg text-xs font-bold ${r.tipo === 'despacho' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-        {r.tipo === 'despacho' ? 'Despacho' : 'Cita'}
-      </span>
-    )},
-    { header: 'ID Reg.',        key: 'despacho_id',           sortable: true, render: r => <span className="text-slate-500 text-xs">{r.despacho_id ?? r.cita_id ?? '—'}</span> },
-    { header: 'Confeccionista', key: 'confeccionista_nombre', sortable: true, render: r => <span className="font-medium">{r.confeccionista_nombre || '—'}</span> },
-    { header: 'Remesa',         key: 'remesa',                sortable: true, render: r => <span className="font-mono">{r.remesa || '—'}</span> },
-    { header: 'Manifiesto',     key: 'manifiesto',            sortable: true, render: r => <span className="font-mono">{r.manifiesto || '—'}</span> },
-    { header: 'CxC',            key: 'valor_cxc',             sortable: true, render: r => <span>{r.valor_cxc ? Number(r.valor_cxc).toLocaleString('es-CO') : '—'}</span> },
-    { header: 'CxP',            key: 'valor_cxp',             sortable: true, render: r => <span>{r.valor_cxp ? Number(r.valor_cxp).toLocaleString('es-CO') : '—'}</span> },
-    { header: 'Usuario',        key: 'usuario_nombre',        sortable: true, render: r => <span className="text-xs text-slate-500">{r.usuario_nombre || r.usuario_creacion || '—'}</span> },
-  ];
+  const handleUpdated = (updated: PlanillaHistorial) => {
+    setHistorial(prev => prev.map(r => r.id === updated.id ? updated : r));
+  };
+
+  const handleGroupUpdated = (updatedRecords: PlanillaHistorial[]) => {
+    setHistorial(prev => {
+      const byId = new Map(updatedRecords.map(r => [r.id, r]));
+      return prev.map(r => byId.has(r.id) ? byId.get(r.id)! : r);
+    });
+  };
+
+  const routeGroups = useMemo(() => groupByRoute(historial), [historial]);
 
   return (
     <>
@@ -2335,6 +3692,14 @@ function AsignacionPlacaTab({ user }: { user: User }) {
         onClose={() => setShowDialog(false)}
         onSaved={() => { setShowDialog(false); loadHistorial({ placa: fPlaca || undefined, fecha: fFecha || undefined, confeccionista: fConf || undefined }); }}
       />
+
+      {editRecord && (
+        <EditPlanillaModal
+          record={editRecord}
+          onClose={() => setEditRecord(null)}
+          onSaved={updated => { handleUpdated(updated); setEditRecord(null); }}
+        />
+      )}
 
       {/* Cabecera */}
       <div className="flex items-center justify-between mb-6">
@@ -2390,46 +3755,132 @@ function AsignacionPlacaTab({ user }: { user: User }) {
         </div>
       </div>
 
-      {/* Tabla historial */}
+      {/* Cards historial agrupadas por ruta */}
       {loading ? (
         <div className="flex justify-center py-20">
           <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : historial.length === 0 ? (
+      ) : routeGroups.length === 0 ? (
         <div className="py-20 text-center text-slate-400">
           <p className="text-4xl mb-3">📋</p>
           <p className="font-bold text-sm">Sin asignaciones para los filtros seleccionados</p>
         </div>
       ) : (
-        <DataTable<PlanillaHistorial>
-          data={historial}
-          columns={histCols}
-          searchPlaceholder="Buscar en historial..."
-          excelFileName="historial_asignaciones"
-          excelSheetName="Historial"
-        />
+        <>
+          <p className="text-xs text-slate-400 font-semibold mb-4">
+            {routeGroups.length} ruta(s) · {historial.length} registro(s)
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {routeGroups.map(g => (
+              <RouteCard
+                key={g.key}
+                group={g}
+                user={user}
+                onEdit={setEditRecord}
+                onGroupUpdated={handleGroupUpdated}
+              />
+            ))}
+          </div>
+        </>
       )}
     </>
   );
 }
 
+// ── Dialog confirmación envío de correos ──────────────────────────────────────
+
+function EmailConfirmDialog({ open, plate, onSend, onSkip }: {
+  open: boolean; plate: string; onSend: () => void; onSkip: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 text-center">
+        <div className="w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center mx-auto mb-4">
+          <svg className="w-7 h-7 text-indigo-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+        </div>
+        <p className="text-xs font-black text-indigo-600 uppercase tracking-widest mb-1">Notificación</p>
+        <h3 className="text-lg font-black text-slate-800 mb-2">¿Enviar correos ahora?</h3>
+        <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+          Planilla guardada para <span className="font-bold text-slate-700">{plate}</span>. ¿Desea enviar correo de confirmación a los confeccionistas ahora o guardar para enviar luego?
+        </p>
+        <div className="flex gap-3">
+          <button onClick={onSkip}
+            className="flex-1 px-4 py-2.5 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">
+            Guardar pendiente
+          </button>
+          <button onClick={onSend}
+            className="flex-1 px-4 py-2.5 rounded-2xl bg-indigo-600 text-white text-sm font-black hover:bg-indigo-700 transition">
+            Enviar ahora
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Modal guardar planilla ─────────────────────────────────────────────────────
 
-interface PlanillaModalData { remesa: string; manifiesto: string; valor_cxc: string; valor_cxp: string; }
+interface PlanillaModalData { remesa: string; manifiesto: string; valor_cxc: string; valor_cxp: string; intermediacion: number | null; }
 
 function GuardarPlanillaModal({ open, plate, totalItems, saving, onConfirm, onClose }: {
   open: boolean; plate: string; totalItems: number; saving: boolean;
   onConfirm: (d: PlanillaModalData) => void; onClose: () => void;
 }) {
-  const [form, setForm] = useState<PlanillaModalData>({ remesa: '', manifiesto: '', valor_cxc: '', valor_cxp: '' });
+  const [form, setForm] = useState<PlanillaModalData>({ remesa: '', manifiesto: '', valor_cxc: '', valor_cxp: '', intermediacion: null });
+  const [fletes, setFletes] = useState<FleteIntermediacion[]>([]);
+  const [intermediacion, setIntermediacion] = useState<number | null>(null);
+
+  const intermediacionOpts = useMemo<number[]>(() => {
+    const activeFlete = fletes.find(f => f.estado_id === 'EST-01');
+    if (!activeFlete) return [];
+    const minVal = Number(activeFlete.valor_intermediacion_minimo ?? 0);
+    const maxVal = Number(activeFlete.intermediacion_final ?? 0);
+    if (isNaN(minVal) || isNaN(maxVal)) return [];
+    const opts: number[] = [];
+    const start = Math.ceil(minVal);
+    const end   = Math.floor(maxVal);
+    for (let i = start; i <= end; i++) opts.push(i);
+    if (opts.length === 0 && !isNaN(minVal)) opts.push(Math.round(minVal));
+    return opts;
+  }, [fletes]);
+
+  useEffect(() => {
+    if (!open) return;
+    setForm({ remesa: '', manifiesto: '', valor_cxc: '', valor_cxp: '', intermediacion: null });
+    setFletes([]);
+    setIntermediacion(null);
+    api.dogamaGetFletes().then((rows: FleteIntermediacion[]) => {
+      setFletes(rows);
+      const activeFlete = rows.find((f: FleteIntermediacion) => f.estado_id === 'EST-01');
+      if (activeFlete?.flete_minimo) {
+        setForm(p => ({ ...p, valor_cxc: String(Number(activeFlete.flete_minimo)) }));
+      }
+      if (activeFlete?.valor_intermediacion_minimo != null) {
+        setIntermediacion(Math.ceil(Number(activeFlete.valor_intermediacion_minimo)));
+      }
+    }).catch(() => {});
+  }, [open]);
+
+  // Auto-calculate CxP when CxC or intermediacion changes
+  useEffect(() => {
+    if (intermediacion == null || !form.valor_cxc) return;
+    const cxc = Number(form.valor_cxc);
+    if (isNaN(cxc)) return;
+    const cxp = Math.round(cxc - (cxc * intermediacion / 100));
+    setForm(p => ({ ...p, valor_cxp: String(cxp) }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.valor_cxc, intermediacion]);
+
   const setF = (k: keyof PlanillaModalData) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(p => ({ ...p, [k]: e.target.value }));
 
-  useEffect(() => {
-    if (open) setForm({ remesa: '', manifiesto: '', valor_cxc: '', valor_cxp: '' });
-  }, [open]);
-
   if (!open) return null;
+
+  const activeFlete = fletes.find(f => f.estado_id === 'EST-01');
+  const cxpAutoCalc = intermediacion != null && !!form.valor_cxc;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -2452,17 +3903,46 @@ function GuardarPlanillaModal({ open, plate, totalItems, saving, onConfirm, onCl
                 className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-1">
+              Valor CxC
+              {activeFlete?.flete_minimo && (
+                <span className="ml-2 text-[10px] font-normal text-slate-400">
+                  Flete mín: {formatCOP(activeFlete.flete_minimo)}
+                </span>
+              )}
+            </label>
+            <input value={form.valor_cxc} onChange={setF('valor_cxc')} type="number" min="0" placeholder="0"
+              className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+          </div>
+          {intermediacionOpts.length > 0 && (
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Valor CxC</label>
-              <input value={form.valor_cxc} onChange={setF('valor_cxc')} type="number" min="0" placeholder="0.00"
-                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+              <label className="block text-xs font-bold text-slate-600 mb-1">Intermediación (%)</label>
+              <select
+                value={intermediacion ?? intermediacionOpts[0]}
+                onChange={e => setIntermediacion(Number(e.target.value))}
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
+                {intermediacionOpts.map(p => (
+                  <option key={p} value={p}>{p}%</option>
+                ))}
+              </select>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Valor CxP</label>
-              <input value={form.valor_cxp} onChange={setF('valor_cxp')} type="number" min="0" placeholder="0.00"
-                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-            </div>
+          )}
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-1">
+              Valor CxP
+              {cxpAutoCalc && (
+                <span className="ml-2 text-[10px] font-normal text-emerald-600">calculado automáticamente</span>
+              )}
+            </label>
+            <input
+              value={form.valor_cxp}
+              readOnly={cxpAutoCalc}
+              onChange={cxpAutoCalc ? undefined : setF('valor_cxp')}
+              type="number" min="0" placeholder="0"
+              className={`w-full text-sm border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 ${
+                cxpAutoCalc ? 'bg-slate-50 border-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200'
+              }`} />
           </div>
         </div>
         <div className="flex gap-3 mt-6">
@@ -2470,7 +3950,7 @@ function GuardarPlanillaModal({ open, plate, totalItems, saving, onConfirm, onCl
             className="flex-1 px-4 py-2.5 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition">
             Cancelar
           </button>
-          <button onClick={() => onConfirm(form)} disabled={saving}
+          <button onClick={() => onConfirm({ ...form, intermediacion })} disabled={saving}
             className="flex-1 px-4 py-2.5 rounded-2xl bg-indigo-600 text-white text-sm font-black hover:bg-indigo-700 disabled:opacity-50 transition flex items-center justify-center gap-2">
             {saving ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
             {saving ? 'Guardando…' : 'Guardar planilla'}
@@ -2481,11 +3961,21 @@ function GuardarPlanillaModal({ open, plate, totalItems, saving, onConfirm, onCl
   );
 }
 
+// ── Material Empaque Form (inline in step 4 when tipo=material_empaque) ────────
+
+interface MatEmpForm {
+  fecha: string; confeccionista_id: string; remesa: string; manifiesto: string;
+  valor_cxc: string; valor_cxp: string;
+  cajas: string; tulas: string; canastas: string; costales: string;
+}
+
 // ── Flow A: selecciono placa → asigno registros ────────────────────────────
 
-function FlowPlacaARegistros({ user, clients, assignments, despachos, citas, onBack, onSaved }: {
+function FlowPlacaARegistros({ user, clients, assignments, despachos, citas, confeccionistas, onBack, onSaved }: {
   user: User; clients: Client[]; assignments: FleetAssignment[];
-  despachos: Despacho[]; citas: Cita[]; onBack: () => void; onSaved: () => void;
+  despachos: Despacho[]; citas: Cita[];
+  confeccionistas: ConfItem[];
+  onBack: () => void; onSaved: () => void;
 }) {
   const [step, setStep]           = useState<1|2|3|4>(1);
   const [clientId,  setClientId]  = useState('');
@@ -2495,12 +3985,93 @@ function FlowPlacaARegistros({ user, clients, assignments, despachos, citas, onB
   const [selCita, setSelCita] = useState<Set<number>>(new Set());
   const [showModal, setShowModal] = useState(false);
   const [saving,    setSaving]    = useState(false);
+  const [emailDialog, setEmailDialog] = useState<{ open: boolean; plate: string }>({ open: false, plate: '' });
+  const pendingEncIdRef = useRef<number | null>(null);
+
+  const createNotifPendientes = async (encId: number): Promise<any[]> => {
+    const r = await api.dogamaCreateNotifCorreos(encId, user.id);
+    return r?.rows ?? [];
+  };
+
+  const handleEmailDialogSend = async () => {
+    const encId = pendingEncIdRef.current;
+    pendingEncIdRef.current = null;
+    setEmailDialog({ open: false, plate: '' });
+    if (!encId) { onSaved(); return; }
+    try {
+      const rows = await createNotifPendientes(encId);
+      if (rows.length === 0) { toast.info('No hay confeccionistas con correo para notificar'); onSaved(); return; }
+      // Enviar correos inmediatamente
+      let enviados = 0;
+      for (const row of rows) {
+        try { await api.dogamaSendNotifCorreo(row.id); enviados++; } catch { /* continuar */ }
+      }
+      if (enviados > 0) toast.success(`${enviados} correo(s) enviado(s) exitosamente`);
+      else toast.warning(`Notificaciones creadas pero no se pudieron enviar los correos`);
+    } catch { toast.error('Error al procesar notificaciones de correo'); }
+    onSaved();
+  };
+
+  const handleEmailDialogSkip = async () => {
+    const encId = pendingEncIdRef.current;
+    pendingEncIdRef.current = null;
+    setEmailDialog({ open: false, plate: '' });
+    if (!encId) { onSaved(); return; }
+    try {
+      const rows = await createNotifPendientes(encId);
+      if (rows.length > 0) toast.info(`${rows.length} notificación(es) guardada(s) como pendiente`);
+    } catch { /* no bloquear el flujo */ }
+    onSaved();
+  };
+
+  // Material empaque form state
+  const today = new Date().toLocaleDateString('en-CA');
+  const [matForm, setMatForm] = useState<MatEmpForm>({
+    fecha: today, confeccionista_id: '', remesa: '', manifiesto: '',
+    valor_cxc: '', valor_cxp: '', cajas: '', tulas: '', canastas: '', costales: '',
+  });
+  const setMF = (k: keyof MatEmpForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setMatForm(p => ({ ...p, [k]: e.target.value }));
+
+  // Fletes para material empaque
+  const [matFletes, setMatFletes] = useState<FleteIntermediacion[]>([]);
+  const [matIntermed, setMatIntermed] = useState<number | null>(null);
+  const matActiveFlete = matFletes.find(f => f.estado_id === 'EST-01');
+  const matIntermOpts = useMemo<number[]>(() => {
+    if (!matActiveFlete) return [];
+    const minV = Number(matActiveFlete.valor_intermediacion_minimo ?? 0);
+    const maxV = Number(matActiveFlete.intermediacion_final ?? 0);
+    if (isNaN(minV) || isNaN(maxV)) return [];
+    const opts: number[] = [];
+    for (let i = Math.ceil(minV); i <= Math.floor(maxV); i++) opts.push(i);
+    if (opts.length === 0 && !isNaN(minV)) opts.push(Math.round(minV));
+    return opts;
+  }, [matActiveFlete]);
+
+  // Cargar fletes al llegar al paso 4 de material empaque
+  useEffect(() => {
+    if (step !== 4 || tipo !== 'material_empaque') return;
+    api.dogamaGetFletes().then((rows: FleteIntermediacion[]) => {
+      setMatFletes(rows);
+      const af = rows.find((f: FleteIntermediacion) => f.estado_id === 'EST-01');
+      if (af?.flete_minimo) setMatForm(p => p.valor_cxc ? p : { ...p, valor_cxc: String(Number(af.flete_minimo)) });
+      if (af?.valor_intermediacion_minimo != null) setMatIntermed(Math.ceil(Number(af.valor_intermediacion_minimo)));
+    }).catch(() => {});
+  }, [step, tipo]);
+
+  // Auto-calc CxP en material empaque
+  useEffect(() => {
+    if (matIntermed == null || !matForm.valor_cxc) return;
+    const cxc = Number(matForm.valor_cxc);
+    if (isNaN(cxc)) return;
+    setMatForm(p => ({ ...p, valor_cxp: String(Math.round(cxc - (cxc * matIntermed / 100))) }));
+  }, [matForm.valor_cxc, matIntermed]);
 
   const clientAssignments = assignments.filter(a => a.client_id === clientId);
   const selectedAssignment = assignments.find(a => a.vehicle_id === vehicleId);
 
-  const shownDespachos = tipo !== 'citas'    ? despachos : [];
-  const shownCitas     = tipo !== 'despachos' ? citas     : [];
+  const shownDespachos = (tipo !== 'citas' && tipo !== 'material_empaque')    ? despachos : [];
+  const shownCitas     = (tipo !== 'despachos' && tipo !== 'material_empaque') ? citas     : [];
   const totalSelected  = selDesp.size + selCita.size;
 
   const handleConfirmSave = async (formData: PlanillaModalData) => {
@@ -2511,17 +4082,47 @@ function FlowPlacaARegistros({ user, clients, assignments, despachos, citas, onB
         ...Array.from(selDesp).map(id => ({ tipo: 'despacho' as const, id })),
         ...Array.from(selCita).map(id => ({ tipo: 'cita' as const, id })),
       ];
-      await api.dogamaCreatePlanillaHistorial({
+      const result = await api.dogamaCreatePlanillaHistorial({
         vehicle_id: vehicleId,
         remesa:     formData.remesa     || null,
         manifiesto: formData.manifiesto || null,
         valor_cxc:  formData.valor_cxc  ? Number(formData.valor_cxc)  : null,
         valor_cxp:  formData.valor_cxp  ? Number(formData.valor_cxp)  : null,
+        intermediacion: formData.intermediacion ?? null,
         items,
         usuario_creacion: user.id,
       });
+      pendingEncIdRef.current = result?.enc?.id ?? null;
       toast.success(`Planilla guardada: ${items.length} registro(s) asignados a ${selectedAssignment.plate}`);
       setShowModal(false);
+      setEmailDialog({ open: true, plate: selectedAssignment.plate });
+    } catch (e: any) {
+      toast.error('Error al guardar: ' + (e?.message ?? 'Error desconocido'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveMaterialEmpaque = async () => {
+    if (!vehicleId) { toast.error('Seleccione una placa'); return; }
+    setSaving(true);
+    try {
+      await api.dogamaCreateMaterialEmpaque({
+        vehicle_id: vehicleId,
+        fecha: matForm.fecha || null,
+        confeccionista_id: matForm.confeccionista_id ? Number(matForm.confeccionista_id) : null,
+        remesa: matForm.remesa || null,
+        manifiesto: matForm.manifiesto || null,
+        valor_cxc: matForm.valor_cxc ? Number(matForm.valor_cxc) : null,
+        valor_cxp: matForm.valor_cxp ? Number(matForm.valor_cxp) : null,
+        intermediacion: matIntermed ?? null,
+        cajas: matForm.cajas ? Number(matForm.cajas) : null,
+        tulas: matForm.tulas ? Number(matForm.tulas) : null,
+        canastas: matForm.canastas ? Number(matForm.canastas) : null,
+        costales: matForm.costales ? Number(matForm.costales) : null,
+        usuario_creacion: user.id,
+      });
+      toast.success(`Despacho material de empaque guardado para ${selectedAssignment?.plate}`);
       onSaved();
     } catch (e: any) {
       toast.error('Error al guardar: ' + (e?.message ?? 'Error desconocido'));
@@ -2607,6 +4208,12 @@ function FlowPlacaARegistros({ user, clients, assignments, despachos, citas, onB
 
   return (
     <div className="max-w-5xl mx-auto">
+      <EmailConfirmDialog
+        open={emailDialog.open}
+        plate={emailDialog.plate}
+        onSend={handleEmailDialogSend}
+        onSkip={handleEmailDialogSkip}
+      />
       <GuardarPlanillaModal
         open={showModal}
         plate={selectedAssignment?.plate ?? ''}
@@ -2666,16 +4273,26 @@ function FlowPlacaARegistros({ user, clients, assignments, despachos, citas, onB
         <div>
           <p className="text-sm font-bold text-slate-700 mb-1">¿Qué va a asignar a la placa <span className="text-indigo-600">{selectedAssignment?.plate}</span>?</p>
           <p className="text-xs text-slate-400 mb-5">Seleccione el tipo de registros pendientes</p>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {([
-              { k: 'ambos',     label: 'Ambos',     desc: 'Citas y Despachos', color: 'indigo' },
-              { k: 'citas',     label: 'Citas',     desc: 'Solo recogidas',    color: 'emerald' },
-              { k: 'despachos', label: 'Despachos', desc: 'Solo despachos',    color: 'amber' },
+              { k: 'ambos',            label: 'Ambos',                   desc: 'Citas y Despachos',     color: 'indigo'  },
+              { k: 'citas',            label: 'Citas',                   desc: 'Solo recogidas',        color: 'emerald' },
+              { k: 'despachos',        label: 'Despachos',               desc: 'Solo despachos',        color: 'amber'   },
+              { k: 'material_empaque', label: 'Despacho Mat. Empaque',   desc: 'Registro directo',      color: 'purple'  },
             ] as const).map(opt => (
               <button key={opt.k} onClick={() => { setTipo(opt.k); setSelDesp(new Set()); setSelCita(new Set()); setStep(4); }}
                 className={`p-5 rounded-2xl border-2 transition-all hover:shadow-md text-left
-                  ${tipo === opt.k ? `border-${opt.color}-500 bg-${opt.color}-50` : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
-                <p className={`font-black text-sm text-${opt.color}-700`}>{opt.label}</p>
+                  ${tipo === opt.k
+                    ? opt.color === 'indigo'  ? 'border-indigo-500 bg-indigo-50'
+                    : opt.color === 'emerald' ? 'border-emerald-500 bg-emerald-50'
+                    : opt.color === 'amber'   ? 'border-amber-500 bg-amber-50'
+                    : 'border-purple-500 bg-purple-50'
+                    : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                <p className={`font-black text-sm ${
+                  opt.color === 'indigo'  ? 'text-indigo-700'
+                  : opt.color === 'emerald' ? 'text-emerald-700'
+                  : opt.color === 'amber'   ? 'text-amber-700'
+                  : 'text-purple-700'}`}>{opt.label}</p>
                 <p className="text-xs text-slate-400 mt-1">{opt.desc}</p>
               </button>
             ))}
@@ -2684,8 +4301,108 @@ function FlowPlacaARegistros({ user, clients, assignments, despachos, citas, onB
         </div>
       )}
 
-      {/* Step 4: Selección de registros con DataTable */}
-      {step === 4 && (
+      {/* Step 4: Selección de registros con DataTable o formulario material empaque */}
+      {step === 4 && tipo === 'material_empaque' && (
+        <div className="max-w-xl">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <p className="text-sm font-bold text-slate-700">
+                Despacho Material de Empaque — Placa <span className="text-purple-600">{selectedAssignment?.plate}</span>
+              </p>
+              <p className="text-xs text-slate-400 mt-0.5">Registro directo sin citas/despachos</p>
+            </div>
+            <button onClick={() => setStep(3)} className="text-xs text-slate-400 hover:text-slate-600 underline">← Cambiar tipo</button>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-3xl p-5 space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Fecha</label>
+                <input type="date" value={matForm.fecha} onChange={setMF('fecha')}
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Confeccionista / Proveedor</label>
+                <select value={matForm.confeccionista_id} onChange={setMF('confeccionista_id')}
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white">
+                  <option value="">— Seleccionar —</option>
+                  {confeccionistas.map(c => <option key={c.id} value={c.id}>{c.descripcion_conf}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Remesa</label>
+                <input value={matForm.remesa} onChange={setMF('remesa')} placeholder="Ej: 001234"
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Manifiesto</label>
+                <input value={matForm.manifiesto} onChange={setMF('manifiesto')} placeholder="Ej: M-5678"
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">
+                Valor CxC
+                {matActiveFlete?.flete_minimo && (
+                  <span className="ml-2 text-[10px] font-normal text-slate-400">
+                    Flete mín: {formatCOP(matActiveFlete.flete_minimo)} — máx: {formatCOP(matActiveFlete.flete_maximo ?? '')}
+                  </span>
+                )}
+              </label>
+              <input type="number" value={matForm.valor_cxc} onChange={setMF('valor_cxc')} placeholder="0"
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+            </div>
+            {matIntermOpts.length > 0 && (
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Intermediación (%)</label>
+                <select value={matIntermed ?? matIntermOpts[0]} onChange={e => setMatIntermed(Number(e.target.value))}
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white">
+                  {matIntermOpts.map(p => <option key={p} value={p}>{p}%</option>)}
+                </select>
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">
+                Valor CxP
+                {matIntermed != null && matForm.valor_cxc && (
+                  <span className="ml-2 text-[10px] font-normal text-emerald-600">calculado automáticamente</span>
+                )}
+              </label>
+              <input type="number" value={matForm.valor_cxp}
+                readOnly={matIntermed != null && !!matForm.valor_cxc}
+                onChange={matIntermed != null && matForm.valor_cxc ? undefined : setMF('valor_cxp')}
+                placeholder="0"
+                className={`w-full text-sm border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 ${
+                  matIntermed != null && matForm.valor_cxc ? 'bg-slate-50 border-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200'
+                }`} />
+            </div>
+            <p className="text-xs font-black text-slate-500 uppercase tracking-widest pt-1">Cantidades</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {(['cajas','tulas','canastas','costales'] as const).map(k => (
+                <div key={k}>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 capitalize">{k}</label>
+                  <input type="number" min="0" value={matForm[k]} onChange={setMF(k)} placeholder="0"
+                    className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="sticky bottom-0 bg-white border-t border-slate-100 pt-4 mt-4 flex justify-end">
+            <button
+              disabled={saving}
+              onClick={handleSaveMaterialEmpaque}
+              className="px-6 py-2.5 rounded-2xl bg-purple-600 text-white text-sm font-black disabled:opacity-40 hover:bg-purple-700 flex items-center gap-2 transition">
+              {saving
+                ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Guardando…</>
+                : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Guardar Material Empaque</>
+              }
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 4 && tipo !== 'material_empaque' && (
         <div>
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -2864,6 +4581,18 @@ function FlowRegistrosAPlaca({ user, assignments, despachos, citas, onBack, onSa
   const [placasCita, setPlacasCita] = useState<Record<number, string>>({});
   const [showModal, setShowModal] = useState(false);
   const [saving,    setSaving]    = useState(false);
+  const [emailDialog, setEmailDialog] = useState<{ open: boolean; encIds: number[]; plates: string }>({ open: false, encIds: [], plates: '' });
+
+  const handleEmailDialogSendB = async () => {
+    if (emailDialog.encIds.length > 0) {
+      try {
+        await Promise.all(emailDialog.encIds.map(eid => api.dogamaCreateNotifCorreos(eid, user.id)));
+        toast.success('Notificaciones de correo creadas correctamente');
+      } catch { toast.error('No se pudieron crear las notificaciones de correo'); }
+    }
+    setEmailDialog({ open: false, encIds: [], plates: '' });
+    onSaved();
+  };
 
   const shownDespachos = tipo !== 'citas'    ? despachos : [];
   const shownCitas     = tipo !== 'despachos' ? citas     : [];
@@ -2888,7 +4617,7 @@ function FlowRegistrosAPlaca({ user, assignments, despachos, citas, onBack, onSa
         byVehicle.get(item.vehicle_id)!.push(item);
       });
 
-      await Promise.all(
+      const results = await Promise.all(
         [...byVehicle.entries()].map(([vid, grp]) => {
           return api.dogamaCreatePlanillaHistorial({
             vehicle_id: vid,
@@ -2896,15 +4625,21 @@ function FlowRegistrosAPlaca({ user, assignments, despachos, citas, onBack, onSa
             manifiesto: formData.manifiesto || null,
             valor_cxc:  formData.valor_cxc  ? Number(formData.valor_cxc)  : null,
             valor_cxp:  formData.valor_cxp  ? Number(formData.valor_cxp)  : null,
+            intermediacion: formData.intermediacion ?? null,
             items: grp.map(i => ({ tipo: i.tipo, id: i.item_id })),
             usuario_creacion: user.id,
           });
         })
       );
 
+      const encIds = results.map((r: any) => r?.enc?.id).filter(Boolean) as number[];
+      const plates = [...byVehicle.entries()]
+        .map(([vid]) => assignments.find(a => a.vehicle_id === vid)?.plate ?? vid)
+        .join(', ');
+
       toast.success(`Asignaciones guardadas: ${allItems.length} registro(s) en ${byVehicle.size} placa(s)`);
       setShowModal(false);
-      onSaved();
+      setEmailDialog({ open: true, encIds, plates });
     } catch (e: any) {
       toast.error('Error al guardar: ' + (e?.message ?? 'Error desconocido'));
     } finally {
@@ -2967,6 +4702,12 @@ function FlowRegistrosAPlaca({ user, assignments, despachos, citas, onBack, onSa
 
   return (
     <div className="max-w-6xl mx-auto">
+      <EmailConfirmDialog
+        open={emailDialog.open}
+        plate={emailDialog.plates}
+        onSend={handleEmailDialogSendB}
+        onSkip={() => { setEmailDialog({ open: false, encIds: [], plates: '' }); onSaved(); }}
+      />
       <GuardarPlanillaModal
         open={showModal}
         plate={modalPlate}
@@ -3046,6 +4787,238 @@ function FlowRegistrosAPlaca({ user, assignments, despachos, citas, onBack, onSa
   );
 }
 
+// ── Correos Tab ────────────────────────────────────────────────────────────────
+
+interface NotifCorreo {
+  id: number;
+  enc_id: number | null;
+  confeccionista_id: number | null;
+  confeccionista_nombre: string | null;
+  confeccionista_email: string | null;
+  placa: string | null;
+  placa_actual: string | null;
+  fecha_cita: string | null;
+  conductor_nombre: string | null;
+  ruta_descripcion: string | null;
+  from_email: string | null;
+  from_provider: string | null;
+  estado: 'pendiente' | 'enviado' | 'cancelado';
+  sent_at: string | null;
+  created_at: string;
+  remesa: string | null;
+  manifiesto: string | null;
+  conf_nombre_actual: string | null;
+  conf_email_actual: string | null;
+  conf_ciudad: string | null;
+}
+
+const ESTADO_CORREO_LABELS: Record<string, { label: string; cls: string }> = {
+  pendiente:  { label: 'Pendiente',  cls: 'bg-amber-100 text-amber-700' },
+  enviado:    { label: 'Enviado',    cls: 'bg-emerald-100 text-emerald-700' },
+  cancelado:  { label: 'Cancelado', cls: 'bg-red-100 text-red-700' },
+};
+
+function CorreosTab({ user }: { user: User }) {
+  const [rows, setRows] = useState<NotifCorreo[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [filtroEstado, setFiltroEstado] = useState<string>('pendiente');
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
+  const [sending, setSending] = useState<number | null>(null);
+  const [updating, setUpdating] = useState<number | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await api.dogamaGetNotifCorreos({
+        estado: filtroEstado === 'todos' ? undefined : filtroEstado,
+        fecha_desde: fechaDesde || undefined,
+        fecha_hasta: fechaHasta || undefined,
+      });
+      setRows(Array.isArray(data) ? data : []);
+    } catch { toast.error('Error al cargar notificaciones'); }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, [filtroEstado, fechaDesde, fechaHasta]);
+
+  const handleSend = async (notif: NotifCorreo) => {
+    if (!notif.confeccionista_email && !notif.conf_email_actual) {
+      toast.error('El confeccionista no tiene correo registrado');
+      return;
+    }
+    setSending(notif.id);
+    try {
+      await api.dogamaSendNotifCorreo(notif.id);
+      toast.success(`Correo enviado a ${notif.confeccionista_email ?? notif.conf_email_actual}`);
+      setRows(prev => prev.map(r => r.id === notif.id ? { ...r, estado: 'enviado' } : r));
+    } catch (e: any) {
+      toast.error('Error al enviar: ' + (e?.message ?? 'Error desconocido'));
+    }
+    setSending(null);
+  };
+
+  const handleUpdateEstado = async (notif: NotifCorreo, estado: 'pendiente' | 'enviado' | 'cancelado') => {
+    setUpdating(notif.id);
+    try {
+      await api.dogamaUpdateNotifCorreo(notif.id, estado);
+      setRows(prev => prev.map(r => r.id === notif.id ? { ...r, estado } : r));
+    } catch { toast.error('Error al actualizar estado'); }
+    setUpdating(null);
+  };
+
+  const today = new Date().toLocaleDateString('en-CA');
+
+  return (
+    <div className="max-w-6xl mx-auto">
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-3 mb-5 items-center">
+        <div className="flex gap-1">
+          {(['pendiente', 'enviado', 'cancelado', 'todos'] as const).map(e => (
+            <button key={e} onClick={() => setFiltroEstado(e)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${filtroEstado === e ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+              {e === 'todos' ? 'Todos' : ESTADO_CORREO_LABELS[e]?.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2 items-center">
+          <label className="text-xs font-bold text-slate-500">Desde</label>
+          <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)}
+            className="text-xs border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+          <label className="text-xs font-bold text-slate-500">Hasta</label>
+          <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)}
+            className="text-xs border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        </div>
+        <button onClick={load} disabled={loading}
+          className="ml-auto px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition disabled:opacity-50">
+          {loading ? 'Cargando…' : 'Actualizar'}
+        </button>
+      </div>
+
+      {loading && (
+        <div className="py-20 text-center text-slate-400">
+          <div className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+          <p className="text-sm">Cargando notificaciones…</p>
+        </div>
+      )}
+
+      {!loading && rows.length === 0 && (
+        <div className="py-20 text-center text-slate-400">
+          <p className="text-4xl mb-3">📭</p>
+          <p className="font-bold text-sm">No hay notificaciones</p>
+          <p className="text-xs mt-1 text-slate-400">Al guardar una planilla, puede crear notificaciones pendientes</p>
+        </div>
+      )}
+
+      {!loading && rows.length > 0 && (
+        <div className="overflow-x-auto rounded-2xl border border-slate-200">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Confeccionista</th>
+                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Placa</th>
+                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Fecha</th>
+                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Remesa / Manif.</th>
+                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Correo destino</th>
+                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Desde</th>
+                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Estado</th>
+                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(r => {
+                const estadoMeta = ESTADO_CORREO_LABELS[r.estado] ?? { label: r.estado, cls: 'bg-slate-100 text-slate-600' };
+                const confNombre = r.conf_nombre_actual ?? r.confeccionista_nombre ?? '—';
+                const correo = r.conf_email_actual ?? r.confeccionista_email;
+                const placa = r.placa_actual ?? r.placa ?? '—';
+                const fechaStr = r.fecha_cita
+                  ? new Date(r.fecha_cita + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : '—';
+                const isSending = sending === r.id;
+                const isUpdating = updating === r.id;
+                return (
+                  <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                    <td className="px-3 py-2.5">
+                      <p className="font-semibold text-slate-800">{confNombre}</p>
+                      {r.conf_ciudad && <p className="text-[10px] text-slate-400">{r.conf_ciudad}</p>}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className="font-mono font-black text-slate-700 tracking-widest">{placa}</span>
+                    </td>
+                    <td className="px-3 py-2.5 text-slate-600">{fechaStr}</td>
+                    <td className="px-3 py-2.5">
+                      {r.remesa && <p className="text-[11px] text-slate-500"><span className="font-bold text-slate-600">R:</span> {r.remesa}</p>}
+                      {r.manifiesto && <p className="text-[11px] text-slate-500"><span className="font-bold text-slate-600">M:</span> {r.manifiesto}</p>}
+                      {!r.remesa && !r.manifiesto && <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      {correo
+                        ? <span className="text-indigo-700 font-medium">{correo}</span>
+                        : <span className="text-red-400 text-[11px]">Sin correo</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-slate-500">{r.from_email ?? '—'}</td>
+                    <td className="px-3 py-2.5">
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${estadoMeta.cls}`}>
+                        {estadoMeta.label}
+                      </span>
+                      {r.sent_at && (
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {new Date(r.sent_at).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex gap-1.5 flex-wrap">
+                        {r.estado === 'pendiente' && (
+                          <>
+                            <button
+                              onClick={() => handleSend(r)}
+                              disabled={isSending || !correo}
+                              title={!correo ? 'Sin correo registrado' : 'Enviar correo'}
+                              className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold hover:bg-indigo-700 disabled:opacity-40 transition flex items-center gap-1">
+                              {isSending
+                                ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                : <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                  </svg>}
+                              Enviar
+                            </button>
+                            <button
+                              onClick={() => handleUpdateEstado(r, 'cancelado')}
+                              disabled={isUpdating}
+                              className="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-[11px] font-bold hover:bg-red-100 disabled:opacity-40 transition">
+                              Cancelar
+                            </button>
+                          </>
+                        )}
+                        {r.estado === 'cancelado' && (
+                          <button
+                            onClick={() => handleUpdateEstado(r, 'pendiente')}
+                            disabled={isUpdating}
+                            className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-[11px] font-bold hover:bg-amber-100 disabled:opacity-40 transition">
+                            Reactivar
+                          </button>
+                        )}
+                        {r.estado === 'enviado' && (
+                          <span className="text-[11px] text-emerald-600 font-bold">✓ Entregado</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!loading && rows.length > 0 && (
+        <p className="text-[11px] text-slate-400 mt-3 text-right">{rows.length} notificación(es)</p>
+      )}
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function CitasDespachosCarga({ user }: Props) {
@@ -3061,6 +5034,7 @@ export default function CitasDespachosCarga({ user }: Props) {
           { key: 'asignacion', label: 'Asignación Placa × Planilla' },
           { key: 'despachos',  label: 'Despachos Dogama' },
           { key: 'citas',      label: 'Citas / Recogidas' },
+          { key: 'correos',    label: 'Envío de Correos' },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`px-5 py-2.5 text-sm font-bold rounded-t-2xl transition border-b-2 -mb-px ${
@@ -3072,6 +5046,7 @@ export default function CitasDespachosCarga({ user }: Props) {
       {tab === 'asignacion' && <AsignacionPlacaTab user={user} />}
       {tab === 'despachos'  && <DespachoTab user={user} />}
       {tab === 'citas'      && <CitasTab user={user} />}
+      {tab === 'correos'    && <CorreosTab user={user} />}
     </div>
   );
 }

@@ -79,8 +79,8 @@ export const uploadTdmManifiestos = async (req: Request, res: Response) => {
             try {
                 const res2 = await pool.query(
                     `INSERT INTO flota_tdm_manifiestos
-                        (client_id, manifiesto, fecha_operacion, remesa, valor_cobrar, valor_pagar, ciudad_origen, ciudad_destino, uploaded_by, uploaded_at)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+                        (client_id, manifiesto, fecha_operacion, remesa, valor_cobrar, valor_pagar, ciudad_origen, ciudad_destino, placa, uploaded_by, uploaded_at)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
                      ON CONFLICT (manifiesto) DO UPDATE SET
                         client_id = EXCLUDED.client_id,
                         fecha_operacion = EXCLUDED.fecha_operacion,
@@ -89,6 +89,7 @@ export const uploadTdmManifiestos = async (req: Request, res: Response) => {
                         valor_pagar = EXCLUDED.valor_pagar,
                         ciudad_origen = EXCLUDED.ciudad_origen,
                         ciudad_destino = EXCLUDED.ciudad_destino,
+                        placa = COALESCE(EXCLUDED.placa, flota_tdm_manifiestos.placa),
                         uploaded_by = EXCLUDED.uploaded_by,
                         uploaded_at = NOW()
                      RETURNING (xmax = 0) AS is_insert`,
@@ -101,6 +102,7 @@ export const uploadTdmManifiestos = async (req: Request, res: Response) => {
                         Number(row.valor_pagar) || 0,
                         String(row.ciudad_origen || 'SIN CIUDAD').trim().toUpperCase(),
                         String(row.ciudad_destino || 'SIN CIUDAD').trim().toUpperCase(),
+                        String(row.placa || '').trim().toUpperCase() || null,
                         uploadedBy || null,
                     ]
                 );
@@ -153,7 +155,7 @@ export const getTdmManifiestos = async (req: Request, res: Response) => {
         const result = await pool.query(
             `SELECT ftm.id, ftm.client_id, c.name AS client_name, ftm.manifiesto, ftm.fecha_operacion,
                     ftm.remesa, ftm.valor_cobrar, ftm.valor_pagar, ftm.ciudad_origen, ftm.ciudad_destino,
-                    u.name AS uploaded_by, ftm.uploaded_at
+                    ftm.placa, u.name AS uploaded_by, ftm.uploaded_at
              FROM flota_tdm_manifiestos ftm
              LEFT JOIN clients c ON ftm.client_id = c.id
              LEFT JOIN users u ON ftm.uploaded_by = u.id::text

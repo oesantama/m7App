@@ -1817,10 +1817,12 @@ export const api = {
   },
   dogamaCreatePlanillaHistorial: (body: {
     vehicle_id: string;
+    fecha?: string;
     remesa?: string | null;
     manifiesto?: string | null;
     valor_cxc?: number | null;
     valor_cxp?: number | null;
+    intermediacion?: number | null;
     items: Array<{ tipo: 'despacho' | 'cita'; id: number }>;
     usuario_creacion?: string;
   }) =>
@@ -1828,6 +1830,135 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+    }),
+
+  dogamaPatchPlanillaHistorial: (id: number, data: {
+    estado_id: string;
+    motivo_cancelacion?: string | null;
+    tipo_cancelacion?: 'reasignar' | 'definitivo' | null;
+    user_id?: string | null;
+    user_nombre?: string | null;
+  }) =>
+    fetchJson(`${API_URL}/dogama/planillas/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  dogamaPatchEncPlanilla: (id: number, data: {
+    remesa?: string | null; manifiesto?: string | null;
+    valor_cxc?: number | null; valor_cxp?: number | null;
+    intermediacion?: number | null; estado_id?: string;
+  }) =>
+    fetchJson(`${API_URL}/dogama/enc-planillas/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  dogamaAddConfeccionistaToRoute: (data: {
+    enc_id?: number; vehicle_id?: string; conductor_id?: string | null;
+    client_id?: string | null; fecha?: string; confeccionista_id: number;
+    tipo?: string; usuario_creacion?: string; user_nombre?: string;
+  }) =>
+    fetchJson(`${API_URL}/dogama/planillas/confeccionista`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  dogamaChangeRouteVehicle: (data: {
+    old_vehicle_id: string; conductor_id?: string | null;
+    client_id?: string | null; fecha?: string;
+    new_vehicle_id: string; user_id?: string; user_nombre?: string;
+  }) =>
+    fetchJson(`${API_URL}/dogama/planillas/change-vehicle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  dogamaGetRouteAuditLog: (enc_id: number) =>
+    fetchJson(`${API_URL}/dogama/planillas/audit-log?enc_id=${enc_id}`),
+
+  dogamaCreateMaterialEmpaque: (body: {
+    vehicle_id: string;
+    fecha?: string | null;
+    confeccionista_id?: number | null;
+    remesa?: string | null;
+    manifiesto?: string | null;
+    valor_cxc?: number | null;
+    valor_cxp?: number | null;
+    intermediacion?: number | null;
+    cajas?: number | null;
+    tulas?: number | null;
+    canastas?: number | null;
+    costales?: number | null;
+    usuario_creacion?: string;
+  }) =>
+    fetchJson(`${API_URL}/dogama/planillas/material-empaque`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+
+  // ── Fletes e Intermediación ───────────────────────────────────────────────
+  dogamaGetFletes: () => fetchJson(`${API_URL}/dogama/fletes`),
+  dogamaCreateFlete: (data: {
+    flete_minimo?: number | null;
+    valor_intermediacion_minimo?: number | null;
+    flete_maximo?: number | null;
+    intermediacion_final?: number | null;
+    estado_id?: string;
+    usuario_creacion?: string;
+  }) =>
+    fetchJson(`${API_URL}/dogama/fletes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  dogamaUpdateFlete: (id: number, data: {
+    flete_minimo?: number | null;
+    valor_intermediacion_minimo?: number | null;
+    flete_maximo?: number | null;
+    intermediacion_final?: number | null;
+    estado_id?: string;
+    usuario_actualizacion?: string;
+  }) =>
+    fetchJson(`${API_URL}/dogama/fletes/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  dogamaGetNotifCorreos: (filters?: { estado?: string; fecha_desde?: string; fecha_hasta?: string; enc_id?: number }) => {
+    const params = new URLSearchParams();
+    if (filters?.estado)      params.set('estado', filters.estado);
+    if (filters?.fecha_desde) params.set('fecha_desde', filters.fecha_desde);
+    if (filters?.fecha_hasta) params.set('fecha_hasta', filters.fecha_hasta);
+    if (filters?.enc_id != null) params.set('enc_id', String(filters.enc_id));
+    const qs = params.toString();
+    return fetchJson(`${API_URL}/dogama/notif-correos${qs ? '?' + qs : ''}`);
+  },
+
+  dogamaCreateNotifCorreos: (enc_id: number, created_by?: string) =>
+    fetchJson(`${API_URL}/dogama/notif-correos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enc_id, created_by }),
+    }),
+
+  dogamaUpdateNotifCorreo: (id: number, estado: 'pendiente' | 'enviado' | 'cancelado') =>
+    fetchJson(`${API_URL}/dogama/notif-correos/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estado }),
+    }),
+
+  dogamaSendNotifCorreo: (id: number) =>
+    fetchJson(`${API_URL}/dogama/notif-correos/${id}/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
     }),
 
 };

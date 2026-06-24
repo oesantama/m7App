@@ -1141,7 +1141,7 @@ function ConfeccionistasTab({ user }: { user: User }) {
 }
 
 // ── Tab Catálogo Genérico (Marcas + Tipos Prenda) ─────────────────────────────
-interface CatalogItem { id: number; descripcion: string; estado_id: string | null; estado_nombre: string | null; fecha_creacion: string; usuariocreacion: string | null; usuario_nombre: string | null; usuarioactualizacion: string | null; usuario_actualizacion_nombre: string | null; fecha_actualizacion: string | null; }
+interface CatalogItem { id: number; descripcion: string; estado_id: string | null; estado_nombre: string | null; fecha_creacion: string; usuariocreacion: string | null; usuario_nombre: string | null; usuarioactualizacion: string | null; usuario_actualizacion_nombre: string | null; fecha_actualizacion: string | null; accion_importacion?: string | null; }
 type CatalogRowStatus = 'nuevo' | 'ya_existe' | 'duplicado_archivo';
 
 interface CatalogPreviewRow { index: number; descripcion: string; status: CatalogRowStatus; selected: boolean; }
@@ -1304,11 +1304,17 @@ function CatalogPreviewModal({ rows, label, onClose, onConfirm, importing }: {
   );
 }
 
+const ACCION_OPTS = [
+  { value: 'carga',  label: 'Carga',  cls: 'bg-blue-100 text-blue-700' },
+  { value: 'valida', label: 'Valida', cls: 'bg-amber-100 text-amber-700' },
+];
+
 function CatalogTab({ user, table, label }: { user: User; table: string; label: string }) {
   const [rows, setRows] = useState<CatalogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState<{ open: boolean; editing: CatalogItem | null }>({ open: false, editing: null });
-  const [form, setForm] = useState({ descripcion: '', estado_id: 'EST-01' });
+  const isTiposOc = table === 'dogama_tipos_oc';
+  const [form, setForm] = useState({ descripcion: '', estado_id: 'EST-01', accion_importacion: 'valida' });
   const [estados, setEstados] = useState<{ id: string; name: string }[]>([]);
   useEffect(() => { api.getEstados().then((d: any[]) => setEstados(Array.isArray(d) ? d : [])).catch(() => {}); }, []);
   const [saving, setSaving] = useState(false);
@@ -1329,8 +1335,8 @@ function CatalogTab({ user, table, label }: { user: User; table: string; label: 
   };
   useEffect(() => { load(); }, [table]);
 
-  const openNew = () => { setForm({ descripcion: '', estado_id: 'EST-01' }); setModal({ open: true, editing: null }); };
-  const openEdit = (r: CatalogItem) => { setForm({ descripcion: r.descripcion, estado_id: r.estado_id ?? 'EST-01' }); setModal({ open: true, editing: r }); };
+  const openNew = () => { setForm({ descripcion: '', estado_id: 'EST-01', accion_importacion: 'valida' }); setModal({ open: true, editing: null }); };
+  const openEdit = (r: CatalogItem) => { setForm({ descripcion: r.descripcion, estado_id: r.estado_id ?? 'EST-01', accion_importacion: r.accion_importacion ?? 'valida' }); setModal({ open: true, editing: r }); };
 
   const handleSave = async () => {
     if (!form.descripcion.trim()) { toast.error('Descripción es obligatoria'); return; }
@@ -1387,6 +1393,13 @@ function CatalogTab({ user, table, label }: { user: User; table: string; label: 
         {r.estado_nombre ?? '—'}
       </span>
     )},
+    ...(isTiposOc ? [{
+      header: 'Acción importación', key: 'accion_importacion' as keyof CatalogItem, sortable: true,
+      render: (r: CatalogItem) => {
+        const opt = ACCION_OPTS.find(o => o.value === r.accion_importacion) ?? ACCION_OPTS[1];
+        return <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${opt.cls}`}>{opt.label}</span>;
+      },
+    }] : []),
     { header: 'Creado por', key: 'usuariocreacion', sortable: false,
       render: r => (
         <div className="text-xs text-slate-400 leading-tight">
@@ -1454,6 +1467,18 @@ function CatalogTab({ user, table, label }: { user: User; table: string; label: 
                   {estados.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
                 </select>
               </div>
+              {isTiposOc && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1 uppercase">Acción al importar</label>
+                  <select value={form.accion_importacion} onChange={e => setForm(f => ({ ...f, accion_importacion: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 transition bg-white">
+                    {ACCION_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    <b>Carga:</b> acepta el tipo OC aunque no esté en catálogo. <b>Valida:</b> exige que exista exacto.
+                  </p>
+                </div>
+              )}
             </div>
             <div className="flex gap-3 mt-6 justify-end">
               <button onClick={() => setModal({ open: false, editing: null })} className="px-5 py-2 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">Cancelar</button>
@@ -1669,6 +1694,206 @@ function VinculacionCorreoTab({ user }: { user: User }) {
   );
 }
 
+// ── Flete e Intermediación Tab ────────────────────────────────────────────────
+
+interface FleteItem {
+  id: number;
+  flete_minimo: string | null;
+  valor_intermediacion_minimo: string | null;
+  flete_maximo: string | null;
+  intermediacion_final: string | null;
+  estado_id: string;
+  estado_nombre: string | null;
+  usuario_creacion: string | null;
+  usuario_creacion_nombre: string | null;
+  fecha_creacion: string;
+  usuario_actualizacion: string | null;
+  usuario_actualizacion_nombre: string | null;
+  fecha_actualizacion: string | null;
+}
+
+const EMPTY_FLETE = {
+  flete_minimo: '',
+  valor_intermediacion_minimo: '',
+  flete_maximo: '',
+  intermediacion_final: '',
+  estado_id: 'EST-01',
+};
+
+function FleteTab({ user }: { user: User }) {
+  const [rows,     setRows]     = useState<FleteItem[]>([]);
+  const [loading,  setLoading]  = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editItem, setEditItem] = useState<FleteItem | null>(null);
+  const [form,     setForm]     = useState({ ...EMPTY_FLETE });
+  const [saving,   setSaving]   = useState(false);
+
+  const canCreate = hasPermission(user, 'MAESTRAS_DOGAMA', 'create');
+  const canEdit   = hasPermission(user, 'MAESTRAS_DOGAMA', 'edit');
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await api.dogamaGetFletes();
+      setRows(Array.isArray(data) ? data : []);
+    } catch { toast.error('Error al cargar fletes'); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const openCreate = () => { setForm({ ...EMPTY_FLETE }); setEditItem(null); setShowForm(true); };
+  const openEdit = (item: FleteItem) => {
+    setForm({
+      flete_minimo:                String(item.flete_minimo ?? ''),
+      valor_intermediacion_minimo: String(item.valor_intermediacion_minimo ?? ''),
+      flete_maximo:                String(item.flete_maximo ?? ''),
+      intermediacion_final:        String(item.intermediacion_final ?? ''),
+      estado_id:                   item.estado_id,
+    });
+    setEditItem(item);
+    setShowForm(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const payload = {
+        flete_minimo:                form.flete_minimo                ? Number(form.flete_minimo)                : null,
+        valor_intermediacion_minimo: form.valor_intermediacion_minimo ? Number(form.valor_intermediacion_minimo) : null,
+        flete_maximo:                form.flete_maximo                ? Number(form.flete_maximo)                : null,
+        intermediacion_final:        form.intermediacion_final        ? Number(form.intermediacion_final)        : null,
+        estado_id: form.estado_id,
+      };
+      if (editItem) {
+        await api.dogamaUpdateFlete(editItem.id, { ...payload, usuario_actualizacion: user.id });
+        toast.success('Flete actualizado');
+      } else {
+        await api.dogamaCreateFlete({ ...payload, usuario_creacion: user.id });
+        toast.success('Flete creado');
+      }
+      setShowForm(false);
+      load();
+    } catch (e: any) { toast.error(e?.message || 'Error al guardar'); }
+    finally { setSaving(false); }
+  };
+
+  const toggleEstado = async (item: FleteItem) => {
+    try {
+      await api.dogamaUpdateFlete(item.id, {
+        flete_minimo:                item.flete_minimo                ? Number(item.flete_minimo)                : null,
+        valor_intermediacion_minimo: item.valor_intermediacion_minimo ? Number(item.valor_intermediacion_minimo) : null,
+        flete_maximo:                item.flete_maximo                ? Number(item.flete_maximo)                : null,
+        intermediacion_final:        item.intermediacion_final        ? Number(item.intermediacion_final)        : null,
+        estado_id: item.estado_id === 'EST-01' ? 'EST-02' : 'EST-01',
+        usuario_actualizacion: user.id,
+      });
+      toast.success(item.estado_id === 'EST-01' ? 'Desactivado' : 'Activado');
+      load();
+    } catch { toast.error('Error al cambiar estado'); }
+  };
+
+  const formatNum = (v: string | null) => {
+    if (!v) return '—';
+    const n = Number(v);
+    return isNaN(n) ? '—' : n.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+  };
+
+  const columns: ColumnDef<FleteItem>[] = [
+    { header: '#', key: 'id', sortable: true, render: r => <span className="text-slate-400 text-xs">{r.id}</span> },
+    { header: 'Flete Mínimo',   key: 'flete_minimo',                sortable: true, render: r => <span className="font-mono">{formatNum(r.flete_minimo)}</span> },
+    { header: 'Intermed. Mín.', key: 'valor_intermediacion_minimo', sortable: true, render: r => <span className="font-mono">{formatNum(r.valor_intermediacion_minimo)}%</span> },
+    { header: 'Flete Máximo',   key: 'flete_maximo',                sortable: true, render: r => <span className="font-mono">{formatNum(r.flete_maximo)}</span> },
+    { header: 'Intermed. Final',key: 'intermediacion_final',         sortable: true, render: r => <span className="font-mono">{formatNum(r.intermediacion_final)}%</span> },
+    { header: 'Estado', key: 'estado_id', sortable: true, render: r => (
+      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-bold ${r.estado_id === 'EST-01' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+        {r.estado_id === 'EST-01' ? 'Activo' : 'Inactivo'}
+      </span>
+    )},
+    { header: 'Creado', key: 'fecha_creacion', sortable: true, render: r => <span className="text-xs text-slate-400">{r.fecha_creacion ? new Date(r.fecha_creacion).toLocaleDateString('es-CO') : '—'}</span> },
+    ...(canEdit ? [{
+      header: 'Acciones', key: 'acciones' as keyof FleteItem, sortable: false,
+      render: (r: FleteItem) => (
+        <div className="flex gap-2">
+          <button onClick={() => openEdit(r)}
+            className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition">Editar</button>
+          <button onClick={() => toggleEstado(r)}
+            className={`text-xs font-bold transition ${r.estado_id === 'EST-01' ? 'text-amber-600 hover:text-amber-800' : 'text-emerald-600 hover:text-emerald-800'}`}>
+            {r.estado_id === 'EST-01' ? 'Desactivar' : 'Activar'}
+          </button>
+        </div>
+      ),
+    }] : []),
+  ];
+
+  const setF = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm(p => ({ ...p, [k]: e.target.value }));
+
+  return (
+    <div>
+      {showForm && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg p-6 animate-in fade-in slide-in-from-bottom-4 duration-150">
+            <div className="mb-5">
+              <p className="text-xs font-black text-indigo-600 uppercase tracking-widest mb-1">
+                {editItem ? 'Editar' : 'Nuevo'} Flete / Intermediación
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                { k: 'flete_minimo',                label: 'Flete Mínimo',       type: 'number' },
+                { k: 'valor_intermediacion_minimo', label: 'Intermed. Mínimo (%)', type: 'number' },
+                { k: 'flete_maximo',                label: 'Flete Máximo',        type: 'number' },
+                { k: 'intermediacion_final',        label: 'Intermed. Final (%)', type: 'number' },
+              ] as const).map(f => (
+                <div key={f.k}>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">{f.label}</label>
+                  <input type={f.type} value={(form as any)[f.k]} onChange={setF(f.k)} placeholder="0"
+                    className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                </div>
+              ))}
+              <div className="col-span-2">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Estado</label>
+                <select value={form.estado_id} onChange={setF('estado_id')}
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white">
+                  <option value="EST-01">Activo</option>
+                  <option value="EST-02">Inactivo</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setShowForm(false)} disabled={saving}
+                className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition">
+                Cancelar
+              </button>
+              <button onClick={handleSave} disabled={saving}
+                className="flex-1 px-4 py-2.5 rounded-2xl bg-indigo-600 text-white text-sm font-black hover:bg-indigo-700 disabled:opacity-50 transition flex items-center justify-center gap-2">
+                {saving ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
+                {saving ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-3 mb-6 items-center">
+        {canCreate && (
+          <button onClick={openCreate}
+            className="px-5 py-2.5 rounded-2xl text-sm font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition">
+            + Agregar
+          </button>
+        )}
+        <span className="ml-auto text-xs text-slate-400 font-semibold">{rows.length} registros</span>
+      </div>
+
+      {loading
+        ? <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"/></div>
+        : <DataTable<FleteItem> data={rows} columns={columns} searchPlaceholder="Buscar..." excelFileName="fletes_intermediacion.xlsx" excelSheetName="Fletes" />
+      }
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 const TABS = [
   { key: 'confeccionistas', label: 'Confeccionistas' },
@@ -1676,6 +1901,7 @@ const TABS = [
   { key: 'tipos-prenda', label: 'Tipos de Prendas' },
   { key: 'tipos-oc', label: 'Tipos OC' },
   { key: 'vinculacion-correo', label: 'Vinculación Correo' },
+  { key: 'fletes', label: 'Flete y/o Int' },
 ];
 
 export default function MaestrasDogama({ user }: Props) {
@@ -1706,6 +1932,7 @@ export default function MaestrasDogama({ user }: Props) {
       {tab === 'tipos-prenda' && <CatalogTab user={user} table="dogama_tipos_prenda" label="Tipo de Prenda" />}
       {tab === 'tipos-oc' && <CatalogTab user={user} table="dogama_tipos_oc" label="Tipo OC" />}
       {tab === 'vinculacion-correo' && <VinculacionCorreoTab user={user} />}
+      {tab === 'fletes' && <FleteTab user={user} />}
     </div>
   );
 }

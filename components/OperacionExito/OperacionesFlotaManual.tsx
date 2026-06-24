@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
 import { Trash2, Download, Upload, FileSpreadsheet, X, ChevronDown } from 'lucide-react';
+import { DataTable, ColumnDef } from '../shared/DataTable';
 
 interface User { id: string; name: string; clientIds?: string[]; clientId?: string; role?: string; }
 interface Props { user: User; }
@@ -15,9 +16,10 @@ interface TdmRow {
   valor_pagar: number;
   ciudad_origen: string;
   ciudad_destino: string;
+  placa: string;
 }
 
-const TEMPLATE_COLUMNS = ['manifiesto', 'fecha_operacion', 'remesa', 'valor_cobrar', 'valor_pagar', 'ciudad_origen', 'ciudad_destino'];
+const TEMPLATE_COLUMNS = ['manifiesto', 'fecha_operacion', 'remesa', 'valor_cobrar', 'valor_pagar', 'ciudad_origen', 'ciudad_destino', 'placa'];
 
 const fmt = (n: number) => `$${Number(n || 0).toLocaleString('es-CO')}`;
 const fmtDate = (d: string) => {
@@ -69,8 +71,8 @@ export default function OperacionesFlotaManual({ user }: Props) {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet([
       TEMPLATE_COLUMNS,
-      ['MANI-001', today, 'REM-001', 500000, 450000, 'MEDELLIN', 'BOGOTA'],
-      ['MANI-002', today, 'REM-002', 320000, 300000, 'CALI', 'MEDELLIN'],
+      ['MANI-001', today, 'REM-001', 500000, 450000, 'MEDELLIN', 'BOGOTA', 'ABC123'],
+      ['MANI-002', today, 'REM-002', 320000, 300000, 'CALI', 'MEDELLIN', 'XYZ456'],
     ]);
     ws['!cols'] = TEMPLATE_COLUMNS.map(() => ({ wch: 20 }));
     XLSX.utils.book_append_sheet(wb, ws, 'Plantilla TDM');
@@ -124,6 +126,7 @@ export default function OperacionesFlotaManual({ user }: Props) {
             valor_pagar:  Number(String(r['valor_pagar']  || '0').replace(/[^0-9.-]/g, '')) || 0,
             ciudad_origen: String(r['ciudad_origen'] || 'SIN CIUDAD').trim().toUpperCase(),
             ciudad_destino: String(r['ciudad_destino'] || 'SIN CIUDAD').trim().toUpperCase(),
+            placa: String(r['placa'] || '').trim().toUpperCase(),
           });
         });
 
@@ -219,6 +222,51 @@ export default function OperacionesFlotaManual({ user }: Props) {
   const totalPagar  = summaryRows.reduce((s, r) => s + Number(r.total_pagar || 0), 0);
   const totalManif  = summaryRows.reduce((s, r) => s + Number(r.total_manifiestos || 0), 0);
 
+  const summaryColumns: ColumnDef<any>[] = [
+    { header: 'Cliente TDM', key: 'client_name', sortable: true, render: r => <span className="font-bold text-amber-700">TDM {r.client_name}</span> },
+    { header: 'Manifiestos', key: 'total_manifiestos', sortable: true, render: r => <span className="font-black text-slate-900">{Number(r.total_manifiestos).toLocaleString('es-CO')}</span> },
+    { header: 'Total Cobrar', key: 'total_cobrar', sortable: true, render: r => <span className="font-bold text-emerald-700">{fmt(r.total_cobrar)}</span> },
+    { header: 'Total Pagar', key: 'total_pagar', sortable: true, render: r => <span className="font-bold text-rose-600">{fmt(r.total_pagar)}</span> },
+    { header: 'Fecha Desde', key: 'fecha_desde', sortable: true, render: r => <span className="text-slate-500 text-xs">{fmtDate(r.fecha_desde)}</span> },
+    { header: 'Fecha Hasta', key: 'fecha_hasta', sortable: true, render: r => <span className="text-slate-500 text-xs">{fmtDate(r.fecha_hasta)}</span> },
+  ];
+
+  const detailColumns: ColumnDef<any>[] = [
+    { header: 'Manifiesto', key: 'manifiesto', sortable: true, render: r => <span className="font-bold text-slate-800">{r.manifiesto}</span> },
+    { header: 'Cliente TDM', key: 'client_name', sortable: true, render: r => <span className="font-bold text-amber-700">TDM {r.client_name}</span> },
+    { header: 'Fecha', key: 'fecha_operacion', sortable: true, render: r => <span className="text-slate-600 text-xs">{fmtDate(r.fecha_operacion)}</span> },
+    { header: 'Remesa', key: 'remesa', render: r => <span className="text-slate-500 text-xs">{r.remesa || '—'}</span> },
+    { header: 'V. Cobrar', key: 'valor_cobrar', sortable: true, render: r => <span className="font-bold text-emerald-700">{fmt(r.valor_cobrar)}</span> },
+    { header: 'V. Pagar', key: 'valor_pagar', sortable: true, render: r => <span className="font-bold text-rose-600">{fmt(r.valor_pagar)}</span> },
+    { header: 'Origen', key: 'ciudad_origen', render: r => <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600">{r.ciudad_origen}</span> },
+    { header: 'Destino', key: 'ciudad_destino', render: r => <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600">{r.ciudad_destino}</span> },
+    { header: 'Placa', key: 'placa', render: r => r.placa
+      ? <span className="px-2 py-0.5 bg-indigo-50 rounded-full text-[10px] font-black text-indigo-700 tracking-widest">{r.placa}</span>
+      : <span className="text-slate-300 text-xs">—</span> },
+    { header: 'Subido por', key: 'uploaded_by', render: r => <span className="text-slate-400 text-xs">{r.uploaded_by || '—'}</span> },
+    ...(isSuperAdmin ? [{
+      header: '',
+      key: 'id' as const,
+      render: (r: any) => (
+        <button onClick={() => {
+          toast.custom((t) => (
+            <div className="bg-white rounded-xl shadow-xl border border-rose-100 p-5 flex flex-col gap-3 min-w-[280px]">
+              <p className="text-sm font-bold text-slate-800">¿Eliminar manifiesto {r.manifiesto}?</p>
+              <p className="text-xs text-slate-500">Esta acción no se puede deshacer.</p>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => toast.dismiss(t)} className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
+                <button onClick={() => { toast.dismiss(t); handleDelete(r.id); }} className="px-3 py-1.5 text-xs font-bold bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-colors">Eliminar</button>
+              </div>
+            </div>
+          ), { duration: Infinity });
+        }} disabled={deleting === r.id}
+          className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40">
+          {deleting === r.id ? <span className="animate-spin inline-block text-xs">⏳</span> : <Trash2 size={14} />}
+        </button>
+      ),
+    }] : []),
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6 space-y-6">
       {/* Header */}
@@ -301,6 +349,7 @@ export default function OperacionesFlotaManual({ user }: Props) {
                     <th className="text-right px-3 py-2">V. Pagar</th>
                     <th className="text-center px-3 py-2">Origen</th>
                     <th className="text-center px-3 py-2">Destino</th>
+                    <th className="text-center px-3 py-2">Placa</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -316,6 +365,11 @@ export default function OperacionesFlotaManual({ user }: Props) {
                       </td>
                       <td className="px-3 py-2 text-center">
                         <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600">{r.ciudad_destino}</span>
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        {r.placa
+                          ? <span className="px-2 py-0.5 bg-indigo-50 rounded-full text-[10px] font-black text-indigo-700 tracking-widest">{r.placa}</span>
+                          : <span className="text-slate-300">—</span>}
                       </td>
                     </tr>
                   ))}
@@ -394,121 +448,26 @@ export default function OperacionesFlotaManual({ user }: Props) {
 
         {/* Tab: Resumen */}
         {activeTab === 'resumen' && (
-          loadingResults ? (
-            <div className="text-center py-10 text-slate-400 text-sm font-bold">Cargando...</div>
-          ) : summaryRows.length === 0 ? (
-            <div className="text-center py-10">
-              <p className="text-3xl mb-2">📊</p>
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Sin datos en el rango seleccionado</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                    <th className="text-left pb-3 pr-4">Cliente TDM</th>
-                    <th className="text-center pb-3 pr-4">Manifiestos</th>
-                    <th className="text-right pb-3 pr-4">Total Cobrar</th>
-                    <th className="text-right pb-3 pr-4">Total Pagar</th>
-                    <th className="text-center pb-3 pr-4">Fecha Desde</th>
-                    <th className="text-center pb-3">Fecha Hasta</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {summaryRows.map((r, i) => (
-                    <tr key={i} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 pr-4 font-bold text-amber-700">TDM {r.client_name}</td>
-                      <td className="py-3 pr-4 text-center font-black text-slate-900">{Number(r.total_manifiestos).toLocaleString('es-CO')}</td>
-                      <td className="py-3 pr-4 text-right font-bold text-emerald-700">{fmt(r.total_cobrar)}</td>
-                      <td className="py-3 pr-4 text-right font-bold text-rose-600">{fmt(r.total_pagar)}</td>
-                      <td className="py-3 pr-4 text-center text-slate-500 text-xs">{fmtDate(r.fecha_desde)}</td>
-                      <td className="py-3 text-center text-slate-500 text-xs">{fmtDate(r.fecha_hasta)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot className="border-t-2 border-slate-200">
-                  <tr className="font-black text-slate-900">
-                    <td className="pt-3 pr-4">Total</td>
-                    <td className="pt-3 pr-4 text-center">{totalManif.toLocaleString('es-CO')}</td>
-                    <td className="pt-3 pr-4 text-right text-emerald-700">{fmt(totalCobrar)}</td>
-                    <td className="pt-3 text-right text-rose-600">{fmt(totalPagar)}</td>
-                    <td colSpan={2}></td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )
+          <DataTable
+            data={summaryRows}
+            columns={summaryColumns}
+            loading={loadingResults}
+            searchPlaceholder="Buscar cliente..."
+            excelFileName="manifiestos_tdm_resumen.xlsx"
+            excelSheetName="Resumen"
+          />
         )}
 
         {/* Tab: Detalle */}
         {activeTab === 'detalle' && (
-          loadingResults ? (
-            <div className="text-center py-10 text-slate-400 text-sm font-bold">Cargando...</div>
-          ) : detailRows.length === 0 ? (
-            <div className="text-center py-10">
-              <p className="text-3xl mb-2">📋</p>
-              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Sin registros</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                    <th className="text-left pb-3 pr-4">Manifiesto</th>
-                    <th className="text-left pb-3 pr-4">Cliente TDM</th>
-                    <th className="text-center pb-3 pr-4">Fecha</th>
-                    <th className="text-left pb-3 pr-4">Remesa</th>
-                    <th className="text-right pb-3 pr-4">V. Cobrar</th>
-                    <th className="text-right pb-3 pr-4">V. Pagar</th>
-                    <th className="text-center pb-3 pr-4">Origen</th>
-                    <th className="text-center pb-3 pr-4">Destino</th>
-                    <th className="text-center pb-3 pr-4">Subido por</th>
-                    {isSuperAdmin && <th className="pb-3"></th>}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50">
-                  {detailRows.map(r => (
-                     <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-2.5 pr-4 font-bold text-slate-800">{r.manifiesto}</td>
-                      <td className="py-2.5 pr-4 font-bold text-amber-700">TDM {r.client_name}</td>
-                      <td className="py-2.5 pr-4 text-center text-slate-600 text-xs">{fmtDate(r.fecha_operacion)}</td>
-                      <td className="py-2.5 pr-4 text-slate-500 text-xs">{r.remesa || '—'}</td>
-                      <td className="py-2.5 pr-4 text-right font-bold text-emerald-700">{fmt(r.valor_cobrar)}</td>
-                      <td className="py-2.5 pr-4 text-right font-bold text-rose-600">{fmt(r.valor_pagar)}</td>
-                      <td className="py-2.5 pr-4 text-center">
-                        <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600">{r.ciudad_origen}</span>
-                      </td>
-                      <td className="py-2.5 pr-4 text-center">
-                        <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600">{r.ciudad_destino}</span>
-                      </td>
-                      <td className="py-2.5 pr-4 text-center text-slate-400 text-xs">{r.uploaded_by || '—'}</td>
-                      {isSuperAdmin && (
-                        <td className="py-2.5 text-center">
-                          <button onClick={() => {
-                            toast.custom((t) => (
-                              <div className="bg-white rounded-xl shadow-xl border border-rose-100 p-5 flex flex-col gap-3 min-w-[280px]">
-                                <p className="text-sm font-bold text-slate-800">¿Eliminar manifiesto {r.manifiesto}?</p>
-                                <p className="text-xs text-slate-500">Esta acción no se puede deshacer.</p>
-                                <div className="flex gap-2 justify-end">
-                                  <button onClick={() => toast.dismiss(t)}
-                                    className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">Cancelar</button>
-                                  <button onClick={() => { toast.dismiss(t); handleDelete(r.id); }}
-                                    className="px-3 py-1.5 text-xs font-bold bg-rose-500 text-white rounded-lg hover:bg-rose-600 transition-colors">Eliminar</button>
-                                </div>
-                              </div>
-                            ), { duration: Infinity });
-                          }} disabled={deleting === r.id}
-                            className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors disabled:opacity-40">
-                            {deleting === r.id ? <span className="animate-spin inline-block text-xs">⏳</span> : <Trash2 size={14} />}
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
+          <DataTable
+            data={detailRows}
+            columns={detailColumns}
+            loading={loadingResults}
+            searchPlaceholder="Buscar manifiesto, remesa, ciudad..."
+            excelFileName="manifiestos_tdm_detalle.xlsx"
+            excelSheetName="Detalle"
+          />
         )}
       </div>
     </div>
