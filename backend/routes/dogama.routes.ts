@@ -68,4 +68,22 @@ router.post('/notif-correos',          requirePermission('CITAS_DESPACHO_CARGA',
 router.patch('/notif-correos/:id',     requirePermission('CITAS_DESPACHO_CARGA', 'edit'),   dogama.updateNotifCorreo);
 router.post('/notif-correos/:id/send', requirePermission('CITAS_DESPACHO_CARGA', 'edit'),   dogama.sendNotifCorreo);
 
+// ── Plantilla global de correo ────────────────────────────────────────────────
+router.get('/email-template',  requirePermission('MAESTRAS_DOGAMA', 'view'),  dogama.getEmailTemplate);
+router.put('/email-template',  requirePermission('MAESTRAS_DOGAMA', 'edit'),  dogama.saveEmailTemplate);
+
+// ── Maestra auxiliares de mesa ────────────────────────────────────────────────
+router.get('/auxiliares-mesa',      requirePermission('MAESTRAS_DOGAMA', 'view'),   dogama.getAuxiliaresMesa);
+router.post('/auxiliares-mesa',     requirePermission('MAESTRAS_DOGAMA', 'create'), dogama.createAuxiliarMesa);
+router.put('/auxiliares-mesa/:id',  requirePermission('MAESTRAS_DOGAMA', 'edit'),   dogama.updateAuxiliarMesa);
+router.delete('/auxiliares-mesa/:id', requirePermission('MAESTRAS_DOGAMA', 'delete'), dogama.deleteAuxiliarMesa);
+
+// ── Cargue de planilla (campos diligenciados por usuario diferente) ───────────
+router.patch('/planillas/:id/cargue', requirePermission('CITAS_DESPACHO_CARGA', 'edit'), dogama.patchPlanillaCargue);
+
+// ── Auxiliares externos por planilla ──────────────────────────────────────────
+router.get('/auxiliares-externos',        requirePermission('CITAS_DESPACHO_CARGA', 'view'),   dogama.getAuxiliaresExternos);
+router.post('/auxiliares-externos',       requirePermission('CITAS_DESPACHO_CARGA', 'create'), dogama.createAuxiliarExterno);
+router.delete('/auxiliares-externos/:id', requirePermission('CITAS_DESPACHO_CARGA', 'delete'), dogama.deleteAuxiliarExterno);
+
 export default router;

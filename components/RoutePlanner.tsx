@@ -4008,6 +4008,27 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                       type="text"
                       placeholder="Buscar por factura, cliente o pedido..."
                       value={modalSearchTerm}
+                      onPaste={(e) => {
+                        const pasted = e.clipboardData.getData('text');
+                        // Detectar múltiples facturas: separadas por salto de línea, tab o espacios
+                        const tokens = pasted.split(/[\n\r\t]+/).map(t => t.trim().toUpperCase()).filter(t => t.length > 3);
+                        if (tokens.length > 1) {
+                          e.preventDefault();
+                          let added = 0, notFound: string[] = [];
+                          for (const token of tokens) {
+                            const match = unassignedInvoices.find(inv =>
+                              (inv.invoiceNumber || '').toUpperCase() === token ||
+                              (inv.id || '').toUpperCase() === token
+                            );
+                            if (match) { handleAddInvoiceToRoute(match); added++; }
+                            else notFound.push(token);
+                          }
+                          setModalSearchTerm('');
+                          if (added > 0) toast.success(`${added} factura${added > 1 ? 's' : ''} agregada${added > 1 ? 's' : ''} a la ruta`);
+                          if (notFound.length > 0) toast.warning(`No encontradas: ${notFound.join(', ')}`, { duration: 6000 });
+                          return;
+                        }
+                      }}
                       onChange={(e) => {
                         const raw = e.target.value;
                         if (scanSuppressRef.current) {

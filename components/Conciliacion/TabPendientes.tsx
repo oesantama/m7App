@@ -155,6 +155,16 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const [showMsPreview, setShowMsPreview]     = useState(false);
     const [closingCycle, setClosingCycle]       = useState(false);
     const [confirmClose, setConfirmClose]       = useState<{ plate?: string } | null>(null);
+    const [warnClose, setWarnClose]             = useState<{
+        plate?: string;
+        vehiclesExceeding: { plate: string; pendiente: number }[];
+        totalPendiente: number;
+        marginTotal: number;
+        nVehicles: number;
+    } | null>(null);
+    const [blockClose, setBlockClose]           = useState<{
+        byPlate: Record<string, { count: number; total: number }>;
+    } | null>(null);
 
     // REMESA TDM
     const [updatingTDMDoc, setUpdatingTDMDoc] = useState<DocSummary | null>(null);
@@ -265,36 +275,69 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const handleCloseCycle = (plate?: string) => {
         if (!selectedDoc) return;
 
-        // Calcular pendiente y sobrecostos en el scope (placa o documento completo)
+        // Sobrecostos pendientes — siempre bloquean
         const pendingSurchInScope = routeSurcharges.filter(s =>
             (s.status_id === 'PENDIENTE' || s.status_id === 'EST-01' || !s.status_id) &&
             (!plate || s.plate === plate)
         );
-
-        let pendienteInScope: number;
-        if (!plate) {
-            pendienteInScope = stats.pendiente;
-        } else {
-            const fin = routeFinancials.get(plate);
-            if (fin) {
-                const totalLegPlate = fin.valor_legalizado + fin.valor_grupal + fin.total_sobrecosto_aprobado + fin.valor_devuelto;
-                pendienteInScope = fin.valor_total - totalLegPlate;
-            } else {
-                pendienteInScope = 0;
-            }
-        }
-
-        // Bloquear si aún hay valor pendiente o sobrecostos por aprobar
-        const hasMoneyPending = pendienteInScope > 1500; // margen de redondeo
-        if (hasMoneyPending || pendingSurchInScope.length > 0) {
-            const reasons: string[] = [];
-            if (hasMoneyPending) reasons.push(`valor pendiente de ${fmtCOP(Math.round(pendienteInScope))}`);
-            if (pendingSurchInScope.length > 0) reasons.push(`${pendingSurchInScope.length} sobrecosto(s) pendiente(s) por aprobar`);
-            toast.error(`No se puede cerrar: ${reasons.join(' y ')}.`, { duration: 5000 });
+        if (pendingSurchInScope.length > 0) {
+            const byPlate = pendingSurchInScope.reduce((acc: Record<string, { count: number; total: number }>, s) => {
+                const p = String(s.plate || 'Sin placa').trim().toUpperCase();
+                if (!acc[p]) acc[p] = { count: 0, total: 0 };
+                acc[p].count++;
+                acc[p].total += Number(s.valor) || 0;
+                return acc;
+            }, {});
+            setBlockClose({ byPlate });
             return;
         }
 
-        setConfirmClose({ plate });
+        const MARGEN_POR_VEHICULO = 1000;
+
+        if (plate) {
+            // ── Cierre por placa individual ──────────────────────────────
+            const fin = routeFinancials.get(plate);
+            const pendientePlaca = fin
+                ? fin.valor_total - (fin.valor_legalizado + fin.valor_grupal + fin.total_sobrecosto_aprobado + fin.valor_devuelto)
+                : 0;
+            if (pendientePlaca > MARGEN_POR_VEHICULO) {
+                toast.error(`No se puede cerrar la placa ${plate}: saldo pendiente ${fmtCOP(Math.round(pendientePlaca))} supera el margen de ${fmtCOP(MARGEN_POR_VEHICULO)}.`, { duration: 5000 });
+                return;
+            }
+            setConfirmClose({ plate });
+            return;
+        }
+
+        // ── Cierre del documento completo ────────────────────────────────
+        // Calcular pendiente por vehículo
+        const vehiclePendings: { plate: string; pendiente: number }[] = [];
+        for (const [p, fin] of routeFinancials.entries()) {
+            const pend = fin.valor_total - (fin.valor_legalizado + fin.valor_grupal + fin.total_sobrecosto_aprobado + fin.valor_devuelto);
+            if (pend > 0) vehiclePendings.push({ plate: p, pendiente: pend });
+        }
+
+        const nVehicles = Math.max(routeFinancials.size, 1);
+        const marginTotal = nVehicles * MARGEN_POR_VEHICULO;
+        const totalPendiente = stats.pendiente;
+
+        // BLOQUEAR si el total supera la ventana acumulada
+        if (totalPendiente > marginTotal) {
+            toast.error(
+                `No se puede cerrar: saldo pendiente ${fmtCOP(Math.round(totalPendiente))} supera el margen permitido de ${fmtCOP(marginTotal)} (${nVehicles} vehículo${nVehicles !== 1 ? 's' : ''} × ${fmtCOP(MARGEN_POR_VEHICULO)}).`,
+                { duration: 6000 }
+            );
+            return;
+        }
+
+        // ADVERTIR si algún vehículo individual supera $1.000 (pero total dentro del margen)
+        const vehiclesExceeding = vehiclePendings.filter(v => v.pendiente > MARGEN_POR_VEHICULO);
+        if (vehiclesExceeding.length > 0) {
+            setWarnClose({ plate: undefined, vehiclesExceeding, totalPendiente, marginTotal, nVehicles });
+            return;
+        }
+
+        // PERMITIR — sin advertencias
+        setConfirmClose({ plate: undefined });
     };
 
     const handleConfirmClose = async () => {
@@ -2403,7 +2446,103 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 />
             )}
 
+            {/* Modal bloqueo — sobrecostos pendientes por aprobar */}
+            {blockClose && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-lg w-full mx-4">
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0">
+                                <Icons.AlertTriangle className="w-5 h-5 text-rose-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-black text-slate-900">No se puede cerrar</h3>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">Sobrecostos pendientes por aprobar</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-5">
+                            <p className="text-[11px] font-bold text-rose-700 mb-3">
+                                Los siguientes vehículos tienen sobrecostos sin aprobar. Apruébalos o recházalos antes de cerrar la facturación:
+                            </p>
+                            <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                {Object.entries(blockClose.byPlate).map(([plate, d]) => (
+                                    <div key={plate} className="flex justify-between items-center bg-white rounded-xl px-3 py-2 border border-rose-100">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[11px] font-black text-slate-900">{plate}</span>
+                                            <span className="text-[9px] font-bold text-rose-400 uppercase">{d.count} sobrecosto{d.count !== 1 ? 's' : ''}</span>
+                                        </div>
+                                        <span className="text-[11px] font-black text-rose-700">{fmtCOP(d.total)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                            <button
+                                onClick={() => setBlockClose(null)}
+                                className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow transition-all active:scale-95">
+                                Entendido
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Modal de asignación de factura a placa */}
+            {/* Modal advertencia — cierre con vehículos que superan $1.000 individualmente */}
+            {warnClose && selectedDoc && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-lg w-full mx-4">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center shrink-0">
+                                <Icons.AlertTriangle className="w-5 h-5 text-amber-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-base font-black text-slate-900">Advertencia de Saldo</h3>
+                                <p className="text-[10px] text-slate-500 font-bold">El total está dentro del margen acumulado — puede cerrar</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4">
+                            <p className="text-[11px] font-bold text-amber-800 mb-3">
+                                Los siguientes vehículos tienen saldo pendiente superior a {fmtCOP(1000)} individualmente:
+                            </p>
+                            <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                                {warnClose.vehiclesExceeding.map(v => (
+                                    <div key={v.plate} className="flex justify-between items-center bg-white rounded-xl px-3 py-1.5 border border-amber-100">
+                                        <span className="text-[11px] font-black text-slate-800">{v.plate}</span>
+                                        <span className="text-[11px] font-bold text-amber-700">{fmtCOP(Math.round(v.pendiente))}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5 mb-5 flex justify-between items-center">
+                            <span className="text-[10px] font-bold text-emerald-700">Total pendiente</span>
+                            <span className="text-[11px] font-black text-emerald-800">{fmtCOP(Math.round(warnClose.totalPendiente))}</span>
+                            <span className="text-[10px] text-emerald-600">/ Margen {fmtCOP(warnClose.marginTotal)} ({warnClose.nVehicles} veh.)</span>
+                        </div>
+
+                        <p className="text-xs text-slate-500 mb-5">
+                            El total acumulado está dentro del margen permitido. ¿Desea cerrar de todas formas?
+                        </p>
+
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => setWarnClose(null)}
+                                className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all">
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => { setWarnClose(null); setConfirmClose({ plate: warnClose.plate }); }}
+                                className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow transition-all active:scale-95">
+                                Sí, cerrar de todas formas
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Modal confirmación Cerrar Facturación */}
             {confirmClose && selectedDoc && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">

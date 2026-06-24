@@ -246,7 +246,7 @@ const DESPACHOS_SELECT = `
   SELECT
     d.*,
     dc.descripcion_conf AS confeccionista_nombre,
-    COALESCE(dm.descripcion, d.marca_txt) AS marca_nombre,
+    dm.descripcion AS marca_nombre,
     dtp.descripcion      AS tipo_prenda_nombre,
     e.name               AS estado_nombre
   FROM dogama_despachos d
@@ -277,9 +277,9 @@ export const bulkCreateDespachos = async (req: Request, res: Response) => {
       const r = await pool.query(
         `INSERT INTO dogama_despachos
            (fecha, orden_cargue, confeccionista_id, orden_servicio,
-            marca_id, marca_txt, referencia, lote, unidades,
+            marca_id, referencia, lote, unidades,
             tipo_prenda_id, estado_id, usuario_creacion)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'EST-03',$11)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'EST-03',$10)
          ON CONFLICT ON CONSTRAINT uq_despacho DO NOTHING
          RETURNING id`,
         [
@@ -288,7 +288,6 @@ export const bulkCreateDespachos = async (req: Request, res: Response) => {
           row.confeccionista_id || null,
           row.orden_servicio || null,
           row.marca_id || null,
-          row.marca_txt || null,
           row.referencia || null,
           row.lote || null,
           row.unidades ? Number(row.unidades) : null,
@@ -1163,6 +1162,62 @@ const ensureDonamaTables = async () => {
       ADD COLUMN IF NOT EXISTS placa VARCHAR(20)
   `);
 
+  // ── 9. Maestra auxiliares de mesa ─────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dogama_auxiliares_mesa (
+      id               SERIAL PRIMARY KEY,
+      nombre           VARCHAR(200) NOT NULL,
+      estado_id        VARCHAR(20)  NOT NULL DEFAULT 'EST-01',
+      usuario_creacion TEXT,
+      fecha_creacion   TIMESTAMP   NOT NULL DEFAULT (NOW() AT TIME ZONE 'America/Bogota'),
+      CONSTRAINT fk_aux_mesa_estado   FOREIGN KEY (estado_id)        REFERENCES estados(id),
+      CONSTRAINT fk_aux_mesa_usuario  FOREIGN KEY (usuario_creacion) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+
+  // ── 10. Auxiliares externos por planilla ───────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dogama_auxiliares_externos (
+      id                    SERIAL PRIMARY KEY,
+      nombre                VARCHAR(200) NOT NULL,
+      planilla_historial_id INTEGER REFERENCES dogama_planillas_historial(id) ON DELETE CASCADE,
+      usuario_creacion      TEXT,
+      fecha_creacion        TIMESTAMP NOT NULL DEFAULT (NOW() AT TIME ZONE 'America/Bogota'),
+      CONSTRAINT fk_aux_ext_usuario FOREIGN KEY (usuario_creacion) REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+
+  // ── 11. Columnas de cargue en dogama_planillas_historial ──────────────────
+  await pool.query(`
+    ALTER TABLE dogama_planillas_historial
+      ADD COLUMN IF NOT EXISTS unidades_carge    INTEGER,
+      ADD COLUMN IF NOT EXISTS llegada_vh        TIME,
+      ADD COLUMN IF NOT EXISTS aux_mesa_id       INTEGER REFERENCES dogama_auxiliares_mesa(id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS cantidad_cargada  INTEGER,
+      ADD COLUMN IF NOT EXISTS hora_inicio_carge TIME,
+      ADD COLUMN IF NOT EXISTS hora_final_carge  TIME,
+      ADD COLUMN IF NOT EXISTS observaciones     TEXT,
+      ADD COLUMN IF NOT EXISTS usuario_cargue_id TEXT REFERENCES users(id) ON DELETE SET NULL
+  `);
+
+  // ── 12. Plantilla global de correo a confeccionistas ──────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dogama_email_template (
+      id          SERIAL PRIMARY KEY,
+      subject     TEXT NOT NULL DEFAULT 'Notificación de cita de recogida — {{placa}}',
+      body        TEXT NOT NULL DEFAULT 'Estimado(a) {{confeccionista}},\n\nLe informamos que el vehículo {{placa}} conducido por {{conductor}} (Cédula: {{cedula}} | Cel: {{celular}}) pasará a recoger su mercancía el día {{fecha}}.\n\nLote(s): {{lotes}}\nRemesa: {{remesa}}\n\nGracias por su confianza.\n\nMilla 7 S.A.S.',
+      updated_by  TEXT,
+      updated_at  TIMESTAMP DEFAULT NOW()
+    )
+  `);
+  // Insertar plantilla por defecto si la tabla está vacía
+  await pool.query(`
+    INSERT INTO dogama_email_template (id, subject, body)
+    SELECT 1,
+      'Notificación de cita de recogida — {{placa}}',
+      E'Estimado(a) {{confeccionista}},\n\nLe informamos que el vehículo {{placa}} conducido por {{conductor}} (Cédula: {{cedula}} | Cel: {{celular}}) pasará a recoger su mercancía el día {{fecha}}.\n\nLote(s): {{lotes}}\nRemesa: {{remesa}}\n\nGracias por su confianza.\n\nMilla 7 S.A.S.'
+    WHERE NOT EXISTS (SELECT 1 FROM dogama_email_template)
+  `);
 };
 
 // Alias para compatibilidad con llamadas previas
@@ -1311,7 +1366,7 @@ export const getPlanillasHistorial = async (req: Request, res: Response) => {
         dc.turno,
         COALESCE(dd.referencia, dc.referencia) AS referencia,
         -- Campos adicionales de despachos / citas
-        COALESCE(dd.marca_txt, marc.descripcion) AS marca,
+        marc.descripcion AS marca,
         COALESCE(dd.lote,      dc.lote)          AS lote,
         COALESCE(dd.unidades,  dc.cantidad)      AS unidades,
         dd.orden_cargue,
@@ -1538,6 +1593,69 @@ export const updateNotifCorreo = async (req: Request, res: Response): Promise<vo
   }
 };
 
+// ── Plantilla global de correo ────────────────────────────────────────────────
+
+export const getEmailTemplate = async (req: Request, res: Response): Promise<void> => {
+  try {
+    await ensureDonamaTables();
+    const r = await pool.query(`SELECT * FROM dogama_email_template ORDER BY id LIMIT 1`);
+    res.json(r.rows[0] ?? null);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+};
+
+export const saveEmailTemplate = async (req: Request, res: Response): Promise<void> => {
+  const { subject, body, updated_by } = req.body;
+  if (!subject || !body) { res.status(400).json({ error: 'subject y body son obligatorios' }); return; }
+  try {
+    await ensureDonamaTables();
+    const r = await pool.query(`
+      INSERT INTO dogama_email_template (id, subject, body, updated_by, updated_at)
+      VALUES (1, $1, $2, $3, NOW())
+      ON CONFLICT (id) DO UPDATE SET subject=$1, body=$2, updated_by=$3, updated_at=NOW()
+      RETURNING *
+    `, [subject, body, updated_by ?? null]);
+    res.json(r.rows[0]);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+};
+
+const applyTemplate = (template: string, vars: Record<string, string>): string => {
+  return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? `{{${key}}}`);
+};
+
+const wrapEmailHtml = (bodyText: string): string => {
+  const htmlBody = bodyText
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>');
+  return `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,Helvetica,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:32px 0;">
+<tr><td align="center">
+<table width="580" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+  <tr>
+    <td style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);padding:28px 40px;text-align:center;">
+      <p style="margin:0;color:#c7d2fe;font-size:11px;text-transform:uppercase;letter-spacing:2px;font-weight:bold;">MILLA SIE7E GRUPO LOGÍSTICO</p>
+      <h1 style="margin:8px 0 0;color:#ffffff;font-size:20px;font-weight:900;">Notificación de Recogida</h1>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:32px 40px;color:#334155;font-size:14px;line-height:1.8;">
+      ${htmlBody}
+    </td>
+  </tr>
+  <tr>
+    <td style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 40px;text-align:center;">
+      <p style="margin:0;color:#94a3b8;font-size:11px;">MILLA SIE7E S.A.S. · OrbitM7 Sistema de Gestión Logística</p>
+      <p style="margin:4px 0 0;color:#94a3b8;font-size:11px;">WhatsApp: 3011825161 · directorti@millasiete.com</p>
+    </td>
+  </tr>
+</table>
+</td></tr>
+</table>
+</body></html>`;
+};
+
 const buildConfeccionistaEmailHtml = (data: {
   confeccionistaNombre: string;
   placa: string;
@@ -1636,7 +1754,15 @@ export const sendNotifCorreo = async (req: Request, res: Response): Promise<void
     const nr = await pool.query(
       `SELECT nc.*, enc.remesa, enc.manifiesto, enc.fecha AS enc_fecha,
               dc.ciudad AS conf_ciudad, v.plate AS placa_actual,
-              d.name AS conductor_name_actual
+              d.name AS conductor_name_actual, d.document_number AS cedula, d.phone AS celular,
+              (SELECT string_agg(DISTINCT COALESCE(dd.lote, cr.lote), ', ' ORDER BY COALESCE(dd.lote, cr.lote))
+               FROM dogama_planillas_historial ph
+               LEFT JOIN dogama_despachos dd       ON dd.id = ph.despacho_id AND ph.tipo='despacho'
+               LEFT JOIN dogama_citas_recogidas cr  ON cr.id = ph.cita_id    AND ph.tipo='cita'
+               WHERE ph.enc_id = nc.enc_id
+                 AND COALESCE(ph.confeccionista_id_directo, dd.confeccionista_id, cr.proveedor_id) = nc.confeccionista_id
+                 AND COALESCE(dd.lote, cr.lote) IS NOT NULL
+              ) AS lotes
        FROM dogama_notif_correos nc
        LEFT JOIN dogama_enc_planillas_historial enc ON enc.id = nc.enc_id
        LEFT JOIN dogama_confeccionistas dc ON dc.id = nc.confeccionista_id
@@ -1657,17 +1783,39 @@ export const sendNotifCorreo = async (req: Request, res: Response): Promise<void
     if (cfgR.rowCount === 0) { res.status(503).json({ error: 'No hay cuenta de correo vinculada activa' }); return; }
     const cfg = cfgR.rows[0];
 
-    const htmlBody = buildConfeccionistaEmailHtml({
-      confeccionistaNombre: notif.confeccionista_nombre ?? '—',
-      placa: notif.placa_actual ?? notif.placa ?? '—',
-      conductorNombre: notif.conductor_name_actual ?? notif.conductor_nombre ?? '—',
-      fecha: notif.fecha_cita ?? notif.enc_fecha,
-      remesa: notif.remesa,
-      manifiesto: notif.manifiesto,
-      ciudadDestino: notif.conf_ciudad,
-    });
+    // Intentar usar plantilla guardada; si no existe, usar HTML clásico
+    const tmplR = await pool.query(`SELECT subject, body FROM dogama_email_template WHERE id=1`);
+    const placa  = notif.placa_actual ?? notif.placa ?? '—';
+    const fechaStr = notif.fecha_cita ?? notif.enc_fecha
+      ? new Date((notif.fecha_cita ?? notif.enc_fecha) + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+      : '—';
+    const vars: Record<string, string> = {
+      confeccionista: notif.confeccionista_nombre ?? '—',
+      ciudad:         notif.conf_ciudad ?? '—',
+      placa,
+      conductor:      notif.conductor_name_actual ?? notif.conductor_nombre ?? '—',
+      cedula:         notif.cedula ?? '—',
+      celular:        notif.celular ?? '—',
+      fecha:          fechaStr,
+      lotes:          notif.lotes ?? '—',
+      remesa:         notif.remesa ?? '—',
+      manifiesto:     notif.manifiesto ?? '—',
+    };
 
-    const subject = `Confirmación de Recogida · ${notif.confeccionista_nombre ?? ''}`;
+    let htmlBody: string;
+    let subject: string;
+    if (tmplR.rowCount && tmplR.rows[0].body) {
+      subject  = applyTemplate(tmplR.rows[0].subject, vars);
+      htmlBody = wrapEmailHtml(applyTemplate(tmplR.rows[0].body, vars));
+    } else {
+      htmlBody = buildConfeccionistaEmailHtml({
+        confeccionistaNombre: notif.confeccionista_nombre ?? '—',
+        placa, conductorNombre: vars.conductor,
+        fecha: notif.fecha_cita ?? notif.enc_fecha,
+        remesa: notif.remesa, manifiesto: notif.manifiesto, ciudadDestino: notif.conf_ciudad,
+      });
+      subject = `Confirmación de Recogida · ${notif.confeccionista_nombre ?? ''}`;
+    }
 
     if (provider === 'gmail') {
       const transport = nodemailer.createTransport({
@@ -1712,6 +1860,155 @@ export const sendNotifCorreo = async (req: Request, res: Response): Promise<void
       `UPDATE dogama_notif_correos SET estado='enviado', sent_at=NOW() WHERE id=$1`, [id]
     );
     res.json({ success: true, to: toEmail });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+// ── Maestra Auxiliares de Mesa ─────────────────────────────────────────────────
+
+export const getAuxiliaresMesa = async (req: Request, res: Response): Promise<void> => {
+  await ensureDonamaTables();
+  try {
+    const r = await pool.query(`
+      SELECT am.*, e.descripcion AS estado_nombre, u.name AS usuario_nombre
+      FROM dogama_auxiliares_mesa am
+      LEFT JOIN estados e ON e.id = am.estado_id
+      LEFT JOIN users u ON u.id::text = am.usuario_creacion::text
+      ORDER BY am.nombre
+    `);
+    res.json(r.rows);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+export const createAuxiliarMesa = async (req: Request, res: Response): Promise<void> => {
+  await ensureDonamaTables();
+  const { nombre, estado_id, usuario_creacion } = req.body;
+  if (!nombre?.trim()) { res.status(400).json({ error: 'nombre es obligatorio' }); return; }
+  try {
+    const r = await pool.query(
+      `INSERT INTO dogama_auxiliares_mesa (nombre, estado_id, usuario_creacion)
+       VALUES ($1, COALESCE($2,'EST-01'), $3) RETURNING *`,
+      [nombre.trim(), estado_id || null, usuario_creacion || null]
+    );
+    res.status(201).json(r.rows[0]);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+export const updateAuxiliarMesa = async (req: Request, res: Response): Promise<void> => {
+  await ensureDonamaTables();
+  const { id } = req.params;
+  const { nombre, estado_id } = req.body;
+  const sets: string[] = [];
+  const vals: any[] = [];
+  if (nombre !== undefined) { vals.push(nombre); sets.push(`nombre=$${vals.length}`); }
+  if (estado_id !== undefined) { vals.push(estado_id); sets.push(`estado_id=$${vals.length}`); }
+  if (sets.length === 0) { res.status(400).json({ error: 'Sin campos válidos' }); return; }
+  vals.push(id);
+  try {
+    const r = await pool.query(
+      `UPDATE dogama_auxiliares_mesa SET ${sets.join(', ')} WHERE id=$${vals.length} RETURNING *`,
+      vals
+    );
+    if (r.rowCount === 0) { res.status(404).json({ error: 'No encontrado' }); return; }
+    res.json(r.rows[0]);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+export const deleteAuxiliarMesa = async (req: Request, res: Response): Promise<void> => {
+  await ensureDonamaTables();
+  try {
+    await pool.query(`DELETE FROM dogama_auxiliares_mesa WHERE id=$1`, [req.params.id]);
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+// ── Patch cargue de planilla (usuario diferente al creador) ───────────────────
+
+export const patchPlanillaCargue = async (req: Request, res: Response): Promise<void> => {
+  await ensureDonamaTables();
+  const { id } = req.params;
+  const {
+    unidades_carge, llegada_vh, aux_mesa_id,
+    cantidad_cargada, hora_inicio_carge, hora_final_carge,
+    observaciones, usuario_cargue_id,
+  } = req.body;
+
+  try {
+    const r = await pool.query(
+      `UPDATE dogama_planillas_historial
+       SET unidades_carge=$1, llegada_vh=$2, aux_mesa_id=$3,
+           cantidad_cargada=$4, hora_inicio_carge=$5, hora_final_carge=$6,
+           observaciones=$7, usuario_cargue_id=$8
+       WHERE id=$9 RETURNING *`,
+      [
+        unidades_carge ?? null,
+        llegada_vh     || null,
+        aux_mesa_id    ?? null,
+        cantidad_cargada ?? null,
+        hora_inicio_carge || null,
+        hora_final_carge  || null,
+        observaciones  || null,
+        usuario_cargue_id ?? null,
+        id,
+      ]
+    );
+    if (r.rowCount === 0) { res.status(404).json({ error: 'Planilla no encontrada' }); return; }
+    res.json(r.rows[0]);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+// ── Auxiliares Externos por planilla ──────────────────────────────────────────
+
+export const getAuxiliaresExternos = async (req: Request, res: Response): Promise<void> => {
+  await ensureDonamaTables();
+  const { planilla_id } = req.query;
+  try {
+    const r = await pool.query(
+      `SELECT ae.*, u.name AS usuario_nombre
+       FROM dogama_auxiliares_externos ae
+       LEFT JOIN users u ON u.id::text = ae.usuario_creacion::text
+       WHERE ($1::integer IS NULL OR ae.planilla_historial_id = $1::integer)
+       ORDER BY ae.fecha_creacion`,
+      [planilla_id || null]
+    );
+    res.json(r.rows);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+export const createAuxiliarExterno = async (req: Request, res: Response): Promise<void> => {
+  await ensureDonamaTables();
+  const { nombre, planilla_historial_id, usuario_creacion } = req.body;
+  if (!nombre?.trim()) { res.status(400).json({ error: 'nombre es obligatorio' }); return; }
+  try {
+    const r = await pool.query(
+      `INSERT INTO dogama_auxiliares_externos (nombre, planilla_historial_id, usuario_creacion)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [nombre.trim(), planilla_historial_id || null, usuario_creacion || null]
+    );
+    res.status(201).json(r.rows[0]);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+export const deleteAuxiliarExterno = async (req: Request, res: Response): Promise<void> => {
+  await ensureDonamaTables();
+  try {
+    await pool.query(`DELETE FROM dogama_auxiliares_externos WHERE id=$1`, [req.params.id]);
+    res.json({ success: true });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

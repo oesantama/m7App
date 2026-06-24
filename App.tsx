@@ -1149,7 +1149,7 @@ const App: React.FC = () => {
 
     return (
       <>
-        <Toaster position="top-right" richColors theme="dark" />
+        <Toaster position="top-left" richColors theme="dark" />
         <PWABanner />
         <AutoUpdate />
 
@@ -1178,12 +1178,13 @@ const App: React.FC = () => {
   return (
     <>
       <Toaster
-        position="top-right"
+        position="top-left"
         richColors
         theme="dark"
         expand={true}
         toastOptions={{
-          style: { borderRadius: '1.5rem', padding: '1.25rem' }
+          style: { borderRadius: '1.5rem', padding: '1.25rem' },
+          duration: 3500,
         }}
       />
       <PWABanner />

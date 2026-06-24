@@ -1961,4 +1961,66 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
     }),
 
+  dogamaGetEmailTemplate: () =>
+    fetchJson(`${API_URL}/dogama/email-template`),
+
+  dogamaSaveEmailTemplate: (subject: string, body: string, updated_by?: string) =>
+    fetchJson(`${API_URL}/dogama/email-template`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject, body, updated_by }),
+    }),
+
+  // ── Auxiliares de mesa ──────────────────────────────────────────────────────
+  dogamaGetAuxiliaresMesa: () =>
+    fetchJson(`${API_URL}/dogama/auxiliares-mesa`),
+
+  dogamaCreateAuxiliarMesa: (data: { nombre: string; estado_id?: string; usuario_creacion?: string }) =>
+    fetchJson(`${API_URL}/dogama/auxiliares-mesa`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  dogamaUpdateAuxiliarMesa: (id: number, data: { nombre?: string; estado_id?: string }) =>
+    fetchJson(`${API_URL}/dogama/auxiliares-mesa/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  dogamaDeleteAuxiliarMesa: (id: number) =>
+    fetchJson(`${API_URL}/dogama/auxiliares-mesa/${id}`, { method: 'DELETE' }),
+
+  // ── Cargue de planilla ──────────────────────────────────────────────────────
+  dogamaPatchPlanillaCargue: (id: number, data: {
+    unidades_carge?: number | null;
+    llegada_vh?: string | null;
+    aux_mesa_id?: number | null;
+    cantidad_cargada?: number | null;
+    hora_inicio_carge?: string | null;
+    hora_final_carge?: string | null;
+    observaciones?: string | null;
+    usuario_cargue_id?: number | null;
+  }) =>
+    fetchJson(`${API_URL}/dogama/planillas/${id}/cargue`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  // ── Auxiliares externos ─────────────────────────────────────────────────────
+  dogamaGetAuxiliaresExternos: (planilla_id: number) =>
+    fetchJson(`${API_URL}/dogama/auxiliares-externos?planilla_id=${planilla_id}`),
+
+  dogamaCreateAuxiliarExterno: (data: { nombre: string; planilla_historial_id: number; usuario_creacion?: number }) =>
+    fetchJson(`${API_URL}/dogama/auxiliares-externos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  dogamaDeleteAuxiliarExterno: (id: number) =>
+    fetchJson(`${API_URL}/dogama/auxiliares-externos/${id}`, { method: 'DELETE' }),
+
 };

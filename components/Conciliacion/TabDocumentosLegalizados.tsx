@@ -3,6 +3,7 @@ import { Icons } from '../../constants';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
+import { DataTable, ColumnDef } from '../shared/DataTable';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -1274,6 +1275,12 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                                                                         <p className="text-xs font-black text-blue-800">{fmtCOP(fin.valor_repice)}</p>
                                                                     </div>
                                                                 )}
+                                                                {fin.total_sobrecosto_aprobado > 0 && (
+                                                                    <div className="bg-rose-50/50 border border-rose-200 rounded-xl px-2.5 py-2">
+                                                                        <p className="text-[7px] font-black text-rose-600 uppercase tracking-wider mb-0.5">✅ S.C Apr.</p>
+                                                                        <p className="text-xs font-black text-rose-800">{fmtCOP(fin.total_sobrecosto_aprobado)}</p>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                             {(fin.efectivo > 0 || fin.credito > 0) && (
                                                                 <div className="flex gap-2">
@@ -1625,94 +1632,142 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
 
                             {/* Tabla de facturas */}
                             <div className="flex-1 overflow-y-auto custom-scrollbar">
-                                <table className="w-full text-[10px]">
-                                    <thead className="sticky top-0 bg-slate-50 border-b border-slate-200">
-                                        <tr>
-                                            <th className="text-left px-3 py-2.5 font-black text-slate-500 uppercase tracking-widest">Factura</th>
-                                            <th className="text-left px-3 py-2.5 font-black text-slate-500 uppercase tracking-widest">Cliente</th>
-                                            <th className="text-center px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">Estado</th>
-                                            <th className="text-center px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">Pago</th>
-                                            <th className="text-center px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">Consig./Ref.</th>
-                                            <th className="text-left px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">Observaciones</th>
-                                            <th className="text-right px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">V. Original</th>
-                                            <th className="text-right px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">V. Legalizado</th>
-                                            <th className="text-right px-2 py-2.5 font-black text-slate-500 uppercase tracking-widest">V. Devol.</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100">
-                                        {routeInvs.map(inv => {
-                                            const legalizada  = !!inv.forma_pago;
-                                            const itemS       = (inv.item_status || '').toUpperCase();
-                                            const isDevuelta  = inv.es_devolucion || DEVUELTO_STATUS.includes(itemS);
-                                            const isParcial   = PARCIAL_STATUS.includes(itemS);
-                                            const isRepice    = REPICE_STATUS.includes(itemS);
-                                            const statusLabel = ENTREGADO_STATUS.includes(itemS)
-                                                ? { label: 'Entregada', color: 'bg-teal-100 text-teal-700' }
-                                                : isDevuelta ? { label: 'Devuelta',  color: 'bg-amber-100 text-amber-700' }
-                                                : isParcial  ? { label: 'Parcial',   color: 'bg-orange-100 text-orange-700' }
-                                                : isRepice   ? { label: 'Repice',    color: 'bg-blue-100 text-blue-700' }
-                                                : { label: 'Pendiente', color: 'bg-slate-100 text-slate-500' };
-                                            const pagoLabel = inv.forma_pago ? (FORMA_COLOR[inv.forma_pago]?.label || inv.forma_pago) : '—';
-                                            const vOriginal = Number(inv.invoice_value) || 0;
-                                            const vLegal    = legalizada ? (Number(inv.valor) || 0) : 0;
-                                            const vDevol    = (() => {
-                                                if (isDevuelta) return vOriginal;
+                                <DataTable
+                                    data={routeInvs}
+                                    searchPlaceholder="Buscar factura, cliente..."
+                                    columns={[
+                                        {
+                                            header: 'Factura',
+                                            key: 'invoice_number',
+                                            sortable: true,
+                                            noWrap: true,
+                                            render: (inv) => (
+                                                <span className="font-black text-slate-900 text-[10px]">{inv.invoice_number}</span>
+                                            ),
+                                            exportRender: (inv) => inv.invoice_number,
+                                        },
+                                        {
+                                            header: 'Cliente',
+                                            key: 'customer_name',
+                                            sortable: true,
+                                            render: (inv) => (
+                                                <span className="text-slate-600 text-[10px]">{inv.customer_name || '—'}</span>
+                                            ),
+                                            exportRender: (inv) => inv.customer_name || '',
+                                        },
+                                        {
+                                            header: 'Estado',
+                                            key: 'item_status',
+                                            sortable: true,
+                                            render: (inv) => {
+                                                const itemS = (inv.item_status || '').toUpperCase();
+                                                const isDevuelta = inv.es_devolucion || DEVUELTO_STATUS.includes(itemS);
+                                                const isParcial  = PARCIAL_STATUS.includes(itemS);
+                                                const isRepice   = REPICE_STATUS.includes(itemS);
+                                                const { label, color } = ENTREGADO_STATUS.includes(itemS)
+                                                    ? { label: 'Entregada', color: 'bg-teal-100 text-teal-700' }
+                                                    : isDevuelta ? { label: 'Devuelta',  color: 'bg-amber-100 text-amber-700' }
+                                                    : isParcial  ? { label: 'Parcial',   color: 'bg-orange-100 text-orange-700' }
+                                                    : isRepice   ? { label: 'Repice',    color: 'bg-blue-100 text-blue-700' }
+                                                    : { label: 'Pendiente', color: 'bg-slate-100 text-slate-500' };
+                                                return <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${color}`}>{label}</span>;
+                                            },
+                                            exportRender: (inv) => {
+                                                const itemS = (inv.item_status || '').toUpperCase();
+                                                const isDevuelta = inv.es_devolucion || DEVUELTO_STATUS.includes(itemS);
+                                                const isParcial  = PARCIAL_STATUS.includes(itemS);
+                                                return ENTREGADO_STATUS.includes(itemS) ? 'Entregada' : isDevuelta ? 'Devuelta' : isParcial ? 'Parcial' : 'Pendiente';
+                                            },
+                                        },
+                                        {
+                                            header: 'Pago',
+                                            key: 'forma_pago',
+                                            sortable: true,
+                                            render: (inv) => (
+                                                <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                                                    {inv.forma_pago ? (FORMA_COLOR[inv.forma_pago]?.label || inv.forma_pago) : '—'}
+                                                </span>
+                                            ),
+                                            exportRender: (inv) => inv.forma_pago || '',
+                                        },
+                                        {
+                                            header: 'Consig./Ref.',
+                                            key: 'comprobante',
+                                            render: (inv) => inv.comprobante
+                                                ? <span className="bg-slate-100 px-1.5 py-0.5 rounded-lg text-[9px] font-black">{inv.comprobante}</span>
+                                                : <span className="text-slate-300">—</span>,
+                                            exportRender: (inv) => inv.comprobante || '',
+                                        },
+                                        {
+                                            header: 'Observaciones',
+                                            key: 'banco',
+                                            render: (inv) => (
+                                                <div className="space-y-0.5 text-[8px]">
+                                                    {inv.banco && <p className="font-bold text-blue-600 truncate">🏦 {inv.banco}</p>}
+                                                    {inv.numero_cheque && <p className="font-bold text-slate-500 truncate">📄 {inv.numero_cheque}</p>}
+                                                    {inv.conductor_name && <p className="text-slate-500 italic truncate">👤 {inv.conductor_name}</p>}
+                                                    {inv.conciliado_por_nombre && !inv.conductor_name && <p className="text-slate-400 truncate">Concilió: {inv.conciliado_por_nombre}</p>}
+                                                    {!inv.banco && !inv.numero_cheque && !inv.conductor_name && !inv.conciliado_por_nombre && <span className="text-slate-300">—</span>}
+                                                </div>
+                                            ),
+                                            exportRender: (inv) => [inv.banco, inv.numero_cheque ? `Cheque:${inv.numero_cheque}` : '', inv.conductor_name].filter(Boolean).join(' | '),
+                                        },
+                                        {
+                                            header: 'V. Original',
+                                            key: 'invoice_value',
+                                            sortable: true,
+                                            render: (inv) => {
+                                                const v = Number(inv.invoice_value) || 0;
+                                                return <span className="text-[10px] text-slate-500">{v > 0 ? fmtCOP(v) : '—'}</span>;
+                                            },
+                                            exportRender: (inv) => Number(inv.invoice_value) || 0,
+                                        },
+                                        {
+                                            header: 'V. Legalizado',
+                                            key: 'valor',
+                                            sortable: true,
+                                            render: (inv) => {
+                                                const v = inv.forma_pago ? (Number(inv.valor) || 0) : 0;
+                                                return <span className={`text-[10px] font-black ${v > 0 ? 'text-emerald-700' : 'text-slate-300'}`}>{v > 0 ? fmtCOP(v) : '—'}</span>;
+                                            },
+                                            exportRender: (inv) => inv.forma_pago ? (Number(inv.valor) || 0) : 0,
+                                        },
+                                        {
+                                            header: 'V. Devol.',
+                                            key: '_vDevol',
+                                            render: (inv) => {
+                                                const itemS = (inv.item_status || '').toUpperCase();
+                                                const isDevuelta = inv.es_devolucion || DEVUELTO_STATUS.includes(itemS);
+                                                const isParcial  = PARCIAL_STATUS.includes(itemS);
+                                                const vOrig = Number(inv.invoice_value) || 0;
+                                                const vLeg  = inv.forma_pago ? (Number(inv.valor) || 0) : 0;
+                                                let v = 0;
+                                                if (isDevuelta) { v = vOrig; }
+                                                else if (isParcial) {
+                                                    const totalQty  = inv.items?.reduce((a: number, it: any) => a + (Number(it.qty) || 0), 0) || 1;
+                                                    const unitPrice = vOrig / (totalQty || 1);
+                                                    const devVal    = inv.items?.reduce((a: number, it: any) => a + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
+                                                    v = devVal > 0 ? devVal : (inv.forma_pago ? Math.max(0, vOrig - vLeg) : 0);
+                                                }
+                                                return <span className={`text-[10px] font-black ${v > 0 ? 'text-amber-700' : 'text-slate-300'}`}>{v > 0 ? fmtCOP(v) : '—'}</span>;
+                                            },
+                                            exportRender: (inv) => {
+                                                const itemS = (inv.item_status || '').toUpperCase();
+                                                const isDevuelta = inv.es_devolucion || DEVUELTO_STATUS.includes(itemS);
+                                                const isParcial  = PARCIAL_STATUS.includes(itemS);
+                                                const vOrig = Number(inv.invoice_value) || 0;
+                                                const vLeg  = inv.forma_pago ? (Number(inv.valor) || 0) : 0;
+                                                if (isDevuelta) return vOrig;
                                                 if (isParcial) {
-                                                    const totalQtyItems = inv.items?.reduce((acc: number, it: any) => acc + (Number(it.qty) || 0), 0) || 1;
-                                                    const unitPrice     = vOriginal / (totalQtyItems || 1);
-                                                    const itemsDevVal   = inv.items?.reduce((acc: number, it: any) => acc + (Number(it.returned_qty || 0) * unitPrice), 0) || 0;
-                                                    if (itemsDevVal > 0) return itemsDevVal;
-                                                    if (inv.forma_pago) return Math.max(0, vOriginal - vLegal);
+                                                    const totalQty  = inv.items?.reduce((a: number, it: any) => a + (Number(it.qty) || 0), 0) || 1;
+                                                    const devVal    = inv.items?.reduce((a: number, it: any) => a + (Number(it.returned_qty || 0) * (vOrig / (totalQty || 1))), 0) || 0;
+                                                    return devVal > 0 ? devVal : (inv.forma_pago ? Math.max(0, vOrig - vLeg) : 0);
                                                 }
                                                 return 0;
-                                            })();
-                                            return (
-                                                <tr key={inv.invoice_number} className={`hover:bg-slate-50/80 ${legalizada ? 'bg-emerald-50/20' : ''}`}>
-                                                    <td className="px-3 py-2.5 font-black text-slate-900 whitespace-nowrap">{inv.invoice_number}</td>
-                                                    <td className="px-3 py-2.5 text-slate-600 max-w-[140px] truncate">{inv.customer_name || '—'}</td>
-                                                    <td className="px-2 py-2.5 text-center">
-                                                        <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${statusLabel.color}`}>
-                                                            {statusLabel.label}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-2 py-2.5 text-center text-slate-500 whitespace-nowrap">{pagoLabel}</td>
-                                                    <td className="px-2 py-2.5 text-center font-bold text-slate-700">
-                                                        {inv.comprobante ? (
-                                                            <span className="bg-slate-100 px-1.5 py-0.5 rounded-lg text-[9px] font-black">{inv.comprobante}</span>
-                                                        ) : '—'}
-                                                    </td>
-                                                    <td className="px-2 py-2.5 max-w-[160px]">
-                                                        <div className="space-y-0.5">
-                                                            {inv.banco && (
-                                                                <p className="text-[8px] font-bold text-blue-600 truncate">🏦 {inv.banco}</p>
-                                                            )}
-                                                            {inv.numero_cheque && (
-                                                                <p className="text-[8px] font-bold text-slate-500 truncate">📄 Cheque: {inv.numero_cheque}</p>
-                                                            )}
-                                                            {inv.conductor_name && (
-                                                                <p className="text-[8px] text-slate-500 italic truncate">👤 {inv.conductor_name}</p>
-                                                            )}
-                                                            {inv.conciliado_por_nombre && !inv.conductor_name && (
-                                                                <p className="text-[7px] text-slate-400 truncate">Concilió: {inv.conciliado_por_nombre}</p>
-                                                            )}
-                                                            {!inv.banco && !inv.numero_cheque && !inv.conductor_name && !inv.conciliado_por_nombre && (
-                                                                <span className="text-slate-300">—</span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-2 py-2.5 text-right text-slate-500">{vOriginal > 0 ? fmtCOP(vOriginal) : '—'}</td>
-                                                    <td className="px-2 py-2.5 text-right font-black text-emerald-700">{vLegal > 0 ? fmtCOP(vLegal) : '—'}</td>
-                                                    <td className="px-2 py-2.5 text-right font-black text-amber-700">{vDevol > 0 ? fmtCOP(vDevol) : '—'}</td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                                {routeInvs.length === 0 && (
-                                    <div className="text-center py-12">
-                                        <p className="text-slate-400 text-xs font-bold">Sin facturas asignadas a esta placa</p>
-                                    </div>
-                                )}
+                                            },
+                                        },
+                                    ] as ColumnDef<any>[]}
+                                />
                             </div>
 
                             {/* Footer */}

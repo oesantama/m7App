@@ -7,13 +7,13 @@ import { User } from '../../types';
 import { hasPermission } from '../../utils/permissions';
 import { DataTable, ColumnDef } from '../shared/DataTable';
 import jsPDF from 'jspdf';
-import { toPng } from 'html-to-image';
+import html2canvas from 'html2canvas';
 
 interface Props { user: User; }
 
 // ── Catalog types ─────────────────────────────────────────────────────────────
 
-interface CatalogItem { id: number; descripcion: string; estado_id: string | null; accion_importacion?: string | null; }
+interface CatalogItem { id: number; descripcion: string; estado_id: string | null; }
 interface ConfItem    { id: number; descripcion_conf: string; }
 
 // ── Validation / master data ──────────────────────────────────────────────────
@@ -1083,44 +1083,12 @@ function CitaPreviewModal({
     'Mesa': 'mesa', 'Cant.': 'cantidad', 'Proveedor': 'proveedor_txt',
     'Nro.Doc': 'numero_documento', 'Tipo OC': 'tipo_oc', 'Estado': 'status',
   };
-  const isBlocked = (r: CitaRow) => r.status !== 'nuevo';
-  const allChecked = filtered.filter(r => !isBlocked(r)).every(r => selected[r.index]);
-
-  // Devuelve la accion_importacion del tipo OC (busca por id o por texto exacto)
-  const getTipoOcAccion = (r: CitaRow): 'carga' | 'valida' => {
-    if (!r.tipo_oc || r.tipo_oc_match.status === 'empty') return 'carga';
-    // Buscar por id si hay match, o por descripcion si es exact
-    const byId  = r.tipo_oc_match.id != null ? tiposOc.find(t => t.id === r.tipo_oc_match.id) : null;
-    const byTxt = tiposOc.find(t => normM(t.descripcion) === normM(r.tipo_oc));
-    const found = byId ?? byTxt;
-    if (!found) return 'valida'; // no encontrado → requiere revisión
-    return (found.accion_importacion as 'carga' | 'valida') || 'valida';
-  };
-
-  // Rojo: bloqueos reales (marca o proveedor sin resolver)
-  const isRowErrorC = (r: CitaRow) =>
-    (r.prov_match.status !== 'exact' && !provOverrides.has(r.index)) ||
-    (r.marca_match.status !== 'exact' && r.marca_match.status !== 'empty');
-
-  // Amarillo: tipo OC con accion='valida' (siempre requiere revisión visual del usuario)
-  const isRowWarningC = (r: CitaRow) =>
-    !isRowErrorC(r) && !!r.tipo_oc && r.tipo_oc_match.status !== 'empty' && getTipoOcAccion(r) === 'valida';
-
-  // Alias para compatibilidad con el sort y demás lógica
-  const isRowUnresolvedC = (r: CitaRow) => isRowErrorC(r) || isRowWarningC(r);
-
-  // Prioridad: rojo(0) → amarillo(1) → limpio(2), luego sort elegido
-  const rowPriority = (r: CitaRow) => isRowErrorC(r) ? 0 : isRowWarningC(r) ? 1 : 2;
-
-  const cSorted = [...filtered].sort((a, b) => {
-    const pa = rowPriority(a); const pb = rowPriority(b);
-    if (pa !== pb) return pa - pb;
-    if (!sortCol) return 0;
+  const cSorted = sortCol ? [...filtered].sort((a, b) => {
     const k = CCOL[sortCol] as keyof CitaRow;
     if (!k) return 0;
     const av = String(a[k] ?? ''); const bv = String(b[k] ?? '');
     return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
-  });
+  }) : filtered;
   const paginated = pageSize === 'all' ? cSorted : cSorted.slice((currentPage - 1) * (pageSize as number), currentPage * (pageSize as number));
 
   const counts = {
@@ -1128,9 +1096,16 @@ function CitaPreviewModal({
     dup_bd: rows.filter(r => r.status === 'duplicado_bd').length,
     dup_arch: rows.filter(r => r.status === 'duplicado_archivo').length,
     selected: selected.filter(Boolean).length,
-    errors:   rows.filter(r => r.status === 'nuevo' && isRowErrorC(r)).length,
-    warnings: rows.filter(r => r.status === 'nuevo' && isRowWarningC(r)).length,
+    unresolved: unresolvedMarcaNames.size + unresolvedTipoOcNames.size,
   };
+
+  const isBlocked = (r: CitaRow) => r.status !== 'nuevo';
+  const allChecked = filtered.filter(r => !isBlocked(r)).every(r => selected[r.index]);
+
+  const isRowUnresolvedC = (r: CitaRow) =>
+    (r.prov_match.status !== 'exact' && !provOverrides.has(r.index)) ||
+    (r.marca_match.status !== 'exact' && r.marca_match.status !== 'empty') ||
+    (r.tipo_oc_match.status === 'not_found');
 
   const toggleAll = () => {
     const next = !allChecked;
@@ -1155,8 +1130,7 @@ function CitaPreviewModal({
             {counts.dup_bd > 0 && <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">{counts.dup_bd} ya en BD</span>}
             {counts.dup_arch > 0 && <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-700">{counts.dup_arch} dup.</span>}
             <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">{counts.selected} sel.</span>
-            {counts.errors > 0 && <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-bold bg-red-200 text-red-800">✕ {counts.errors} sin resolver</span>}
-            {counts.warnings > 0 && <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-bold bg-amber-300 text-amber-900">⚠ {counts.warnings} por validar (Tipo OC)</span>}
+            {counts.unresolved > 0 && <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-bold bg-red-200 text-red-800">⚠ {counts.unresolved} sin resolver</span>}
           </div>
         </div>
 
@@ -1225,11 +1199,7 @@ function CitaPreviewModal({
                 {paginated.length === 0 ? (
                   <tr><td colSpan={15} className="py-10 text-center text-slate-400">Sin resultados</td></tr>
                 ) : paginated.map(r => (
-                  <tr key={r.index} className={`transition-colors ${!selected[r.index] ? 'opacity-40' : ''} ${
-                    isRowErrorC(r)   ? 'bg-red-100 border-l-2 border-red-400 hover:bg-red-50' :
-                    isRowWarningC(r) ? 'bg-amber-50 border-l-2 border-amber-400 hover:bg-amber-100/60' :
-                    'hover:bg-slate-50/70'
-                  }`}>
+                  <tr key={r.index} className={`hover:bg-slate-50/70 transition-colors ${!selected[r.index] ? 'opacity-40' : ''} ${highlightErrorsC && isRowUnresolvedC(r) ? 'bg-red-200' : ''}`}>
                     <td className="px-2 py-2 text-center">
                       <input type="checkbox" checked={selected[r.index]} disabled={isBlocked(r)}
                         onChange={() => toggle(r.index)} className="accent-indigo-500 disabled:cursor-not-allowed" />
@@ -1398,10 +1368,10 @@ function CitaPreviewModal({
               const msgs: string[] = [];
               const unresMarcas = [...new Set(sel.filter(r => r.marca_match.status !== 'exact').map(r => r.marca_txt).filter(Boolean))];
               const unresProvs  = sel.filter(r => r.prov_match.status !== 'exact' && !provOverrides.has(r.index));
-              const sinHoraReal = sel.filter(r => !(horaOverrides.get(r.index) ?? r.hora_fin));
-              if (sinHoraReal.length) msgs.push(`Hora Real de Carga faltante en ${sinHoraReal.length} fila(s) — complete el campo en la columna H.Real Carga`);
+              const uresTocs    = [...new Set(sel.filter(r => r.tipo_oc && r.tipo_oc_match.status !== 'exact').map(r => r.tipo_oc).filter(Boolean))];
               if (unresMarcas.length) msgs.push(`Marcas sin definir (col. MARCA): ${unresMarcas.join(', ')}`);
               if (unresProvs.length)  msgs.push(`Confeccionista sin asignar en ${unresProvs.length} fila(s) — use el selector de la columna Proveedor`);
+              if (uresTocs.length)    msgs.push(`Tipos OC sin definir (col. TIPO OC): ${uresTocs.join(', ')}`);
               if (msgs.length) { setValidErrDlg(msgs); setHighlightErrorsC(true); return; }
               onConfirm(
                 rows.map((r, i) => ({
@@ -1612,7 +1582,6 @@ function CitaFormModal({ ctx, user, onClose, onSaved }: {
 
   const handleSave = async () => {
     if (!form.referencia && !form.numero_documento) { toast.error('Ingrese referencia o número de documento'); return; }
-    if (!form.hora_fin) { toast.error('La Hora Real de Carga es obligatoria'); return; }
     setSaving(true);
     try {
       const payload = [{
@@ -1670,7 +1639,7 @@ function CitaFormModal({ ctx, user, onClose, onSaved }: {
             </select>
           </div>
           <Field label="Hora Inicio" k="hora_inicio" type="time" />
-          <Field label="H. Real Carga" k="hora_fin" type="time" required />
+          <Field label="H. Real Carga" k="hora_fin" type="time" />
           <CatalogSelect label="Marca" k="marca_txt" list={ctx.marcas} />
           <Field label="Referencia" k="referencia" required />
           <Field label="Color" k="color" />
@@ -2147,57 +2116,29 @@ type AsignMode = 'placa_a_registros' | 'registros_a_placa';
 type TipoReg  = 'despachos' | 'citas' | 'ambos' | 'material_empaque';
 
 interface PlanillaHistorial {
-  id: number;
-  enc_id: number;
-  // Campos del encabezado (nivel ruta)
-  fecha: string;
+  id: number; fecha: string;
   vehicle_id: string | null; placa: string | null; vehicle_brand: string | null;
   conductor_id: string | null; conductor_nombre: string | null;
   client_id: string | null; client_nombre: string | null;
   remesa: string | null; manifiesto: string | null;
   valor_cxc: string | null; valor_cxp: string | null;
-  intermediacion: string | null;
-  enc_estado_id: string | null;
-  // Campos del ítem (nivel confeccionista)
   tipo: 'despacho' | 'cita' | 'material_empaque';
   despacho_id: number | null; cita_id: number | null;
   usuario_creacion: string | null; fecha_creacion: string;
   usuario_nombre: string | null; confeccionista_nombre: string | null;
   cajas: number | null; tulas: number | null; canastas: number | null; costales: number | null;
-  estado_id: string;
+  estado: 'activo' | 'cancelado' | null;
   motivo_cancelacion: string | null;
-  tipo_cancelacion: 'reasignar' | 'definitivo' | null;
   confeccionista_direccion: string | null;
   confeccionista_ciudad: string | null;
   hora_inicio: string | null;
   hora_fin: string | null;
   turno: string | null;
   referencia: string | null;
-  // Campos extra de despachos / citas
-  marca: string | null;
-  lote: string | null;
-  unidades: number | null;
-  orden_cargue: string | null;
-  orden_servicio: string | null;
-  color: string | null;
-  mesa: number | null;
-  numero_documento: string | null;
-  tipo_oc: string | null;
-  tipo_prenda: string | null;
-  // Campos de cargue (diligenciados por usuario diferente)
-  unidades_carge: number | null;
-  llegada_vh: string | null;
-  aux_mesa_id: number | null;
-  cantidad_cargada: number | null;
-  hora_inicio_carge: string | null;
-  hora_final_carge: string | null;
-  observaciones: string | null;
-  usuario_cargue_id: number | null;
 }
 
 interface RouteGroup {
   key: string;
-  enc_id: number;
   vehicle_id: string | null;
   conductor_id: string | null;
   client_id: string | null;
@@ -2207,33 +2148,23 @@ interface RouteGroup {
   conductor_nombre: string | null;
   client_nombre: string | null;
   tipo: PlanillaHistorial['tipo'];
-  remesa: string | null;
-  manifiesto: string | null;
-  valor_cxc: string | null;
-  valor_cxp: string | null;
-  intermediacion: string | null;
   records: PlanillaHistorial[];
 }
 
 function groupByRoute(records: PlanillaHistorial[]): RouteGroup[] {
-  const map = new Map<number, RouteGroup>();
+  const map = new Map<string, RouteGroup>();
   for (const r of records) {
-    if (!map.has(r.enc_id)) {
-      map.set(r.enc_id, {
-        key: String(r.enc_id),
-        enc_id: r.enc_id,
-        vehicle_id: r.vehicle_id, conductor_id: r.conductor_id,
+    const key = `${r.vehicle_id}|${r.conductor_id}|${r.client_id}|${r.fecha}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        key, vehicle_id: r.vehicle_id, conductor_id: r.conductor_id,
         client_id: r.client_id, fecha: r.fecha,
         placa: r.placa, vehicle_brand: r.vehicle_brand,
         conductor_nombre: r.conductor_nombre, client_nombre: r.client_nombre,
-        tipo: r.tipo,
-        remesa: r.remesa, manifiesto: r.manifiesto,
-        valor_cxc: r.valor_cxc, valor_cxp: r.valor_cxp,
-        intermediacion: r.intermediacion,
-        records: [],
+        tipo: r.tipo, records: [],
       });
     }
-    map.get(r.enc_id)!.records.push(r);
+    map.get(key)!.records.push(r);
   }
   return Array.from(map.values());
 }
@@ -2429,83 +2360,21 @@ function EditPlanillaModal({ record, onClose, onSaved }: {
     valor_cxc:  record.valor_cxc  ?? '',
     valor_cxp:  record.valor_cxp  ?? '',
   });
-  const [fletes,        setFletes]        = useState<FleteIntermediacion[]>([]);
-  const [intermediacion, setIntermediacion] = useState<number | null>(
-    record.intermediacion != null ? Number(record.intermediacion) : null
-  );
   const [saving, setSaving] = useState(false);
-
-  const activeFlete = fletes.find(f => f.estado_id === 'EST-01');
-
-  const intermediacionOpts = useMemo<number[]>(() => {
-    if (!activeFlete) return [];
-    const minVal = Number(activeFlete.valor_intermediacion_minimo ?? 0);
-    const maxVal = Number(activeFlete.intermediacion_final ?? 0);
-    if (isNaN(minVal) || isNaN(maxVal)) return [];
-    const opts: number[] = [];
-    for (let i = Math.ceil(minVal); i <= Math.floor(maxVal); i++) opts.push(i);
-    if (opts.length === 0 && !isNaN(minVal)) opts.push(Math.round(minVal));
-    return opts;
-  }, [activeFlete]);
-
-  // Cargar fletes al montar
-  useEffect(() => {
-    api.dogamaGetFletes().then((rows: FleteIntermediacion[]) => {
-      setFletes(rows);
-      const af = rows.find((f: FleteIntermediacion) => f.estado_id === 'EST-01');
-      // Pre-llenar CxC con flete mínimo solo si no tiene valor previo
-      if (af?.flete_minimo && !form.valor_cxc) {
-        setForm(p => ({ ...p, valor_cxc: String(Number(af.flete_minimo)) }));
-      }
-      // Pre-seleccionar intermediación mínima solo si no tiene valor previo
-      if (intermediacion == null && af?.valor_intermediacion_minimo != null) {
-        setIntermediacion(Math.ceil(Number(af.valor_intermediacion_minimo)));
-      }
-    }).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Auto-calcular CxP = CxC − (CxC × int%)
-  useEffect(() => {
-    if (intermediacion == null || !form.valor_cxc) return;
-    const cxc = Number(form.valor_cxc);
-    if (isNaN(cxc)) return;
-    const cxp = Math.round(cxc - (cxc * intermediacion / 100));
-    setForm(p => ({ ...p, valor_cxp: String(cxp) }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.valor_cxc, intermediacion]);
-
   const setF = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(p => ({ ...p, [k]: e.target.value }));
 
-  const cxpAutoCalc = intermediacion != null && !!form.valor_cxc;
-
-  const cxcNum    = form.valor_cxc ? Number(form.valor_cxc) : null;
-  const cxcMin    = activeFlete?.flete_minimo  ? Number(activeFlete.flete_minimo)  : null;
-  const cxcMax    = activeFlete?.flete_maximo  ? Number(activeFlete.flete_maximo)  : null;
-  const cxcBelowMin = cxcNum != null && cxcMin != null && cxcNum < cxcMin;
-  const cxcAboveMax = cxcNum != null && cxcMax != null && cxcNum > cxcMax;
-  const cxcError    = cxcBelowMin || cxcAboveMax;
-
   const handleSave = async () => {
-    if (cxcError) {
-      toast.error(cxcBelowMin
-        ? `El valor CxC no puede ser menor al flete mínimo (${formatCOP(cxcMin)})`
-        : `El valor CxC no puede superar el flete máximo (${formatCOP(cxcMax)})`
-      );
-      return;
-    }
     setSaving(true);
     try {
-      const updatedEnc = await api.dogamaPatchEncPlanilla(record.enc_id, {
-        remesa:         form.remesa     || null,
-        manifiesto:     form.manifiesto || null,
-        valor_cxc:      form.valor_cxc  ? Number(form.valor_cxc)  : null,
-        valor_cxp:      form.valor_cxp  ? Number(form.valor_cxp)  : null,
-        intermediacion: intermediacion  ?? null,
+      const updated = await api.dogamaPatchPlanillaHistorial(record.id, {
+        remesa:     form.remesa     || null,
+        manifiesto: form.manifiesto || null,
+        valor_cxc:  form.valor_cxc  ? Number(form.valor_cxc)  : null,
+        valor_cxp:  form.valor_cxp  ? Number(form.valor_cxp)  : null,
       });
       toast.success('Planilla actualizada');
-      onSaved({ ...record, ...updatedEnc });
+      onSaved({ ...record, ...updated });
       onClose();
     } catch (e: any) {
       toast.error(e?.message || 'Error al guardar');
@@ -2517,12 +2386,10 @@ function EditPlanillaModal({ record, onClose, onSaved }: {
       onClick={e => { if (e.target === e.currentTarget && !saving) onClose(); }}>
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6 animate-in fade-in slide-in-from-bottom-4 duration-150">
         <div className="mb-4">
-          <p className="text-xs font-black text-indigo-600 uppercase tracking-widest mb-1">Editar Encabezado de Ruta</p>
-          <p className="text-base font-black text-slate-800">Enc #{record.enc_id} — <span className="font-mono text-indigo-600">{record.placa}</span></p>
-          <p className="text-xs text-slate-400">Estos valores aplican a toda la ruta</p>
+          <p className="text-xs font-black text-indigo-600 uppercase tracking-widest mb-1">Editar Planilla</p>
+          <p className="text-base font-black text-slate-800">ID #{record.id} — <span className="font-mono text-indigo-600">{record.placa}</span></p>
         </div>
         <div className="space-y-3">
-          {/* Remesa + Manifiesto */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">Remesa</label>
@@ -2535,68 +2402,17 @@ function EditPlanillaModal({ record, onClose, onSaved }: {
                 className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
             </div>
           </div>
-          {/* CxC */}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">
-              Valor CxC
-              {activeFlete?.flete_minimo && (
-                <span className={`ml-2 text-[10px] font-normal ${cxcError ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
-                  Flete mín: {formatCOP(activeFlete.flete_minimo)} · máx: {formatCOP(activeFlete.flete_maximo)}
-                </span>
-              )}
-            </label>
-            <input type="number" value={form.valor_cxc} onChange={setF('valor_cxc')} min="0" placeholder="0"
-              className={`w-full text-sm border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 transition ${
-                cxcError
-                  ? 'border-red-400 bg-red-50 text-red-700 focus:ring-red-300'
-                  : 'border-slate-200 focus:ring-indigo-300'
-              }`} />
-            {cxcBelowMin && (
-              <p className="text-[10px] text-red-500 font-semibold mt-1">
-                ✕ Valor menor al flete mínimo ({formatCOP(cxcMin)})
-              </p>
-            )}
-            {cxcAboveMax && (
-              <p className="text-[10px] text-red-500 font-semibold mt-1">
-                ✕ Valor mayor al flete máximo ({formatCOP(cxcMax)})
-              </p>
-            )}
-          </div>
-          {/* Int. (select) */}
-          {intermediacionOpts.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">Int. (%)</label>
-              <select
-                value={intermediacion ?? intermediacionOpts[0]}
-                onChange={e => setIntermediacion(Number(e.target.value))}
-                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                {intermediacionOpts.map(p => (
-                  <option key={p} value={p}>{p}%</option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">Int. (%)</label>
-              <input type="number" value={intermediacion ?? ''} onChange={e => setIntermediacion(e.target.value ? Number(e.target.value) : null)} placeholder="0"
+              <label className="block text-xs font-bold text-slate-500 mb-1">Valor CxC</label>
+              <input type="number" value={form.valor_cxc} onChange={setF('valor_cxc')} placeholder="0"
                 className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
             </div>
-          )}
-          {/* CxP — auto-calculado */}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">
-              Valor CxP
-              {cxpAutoCalc && (
-                <span className="ml-2 text-[10px] font-normal text-emerald-600">calculado automáticamente</span>
-              )}
-            </label>
-            <input
-              type="number" value={form.valor_cxp} min="0" placeholder="0"
-              readOnly={cxpAutoCalc}
-              onChange={cxpAutoCalc ? undefined : setF('valor_cxp')}
-              className={`w-full text-sm border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 ${
-                cxpAutoCalc ? 'bg-slate-50 border-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200'
-              }`} />
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">Valor CxP</label>
+              <input type="number" value={form.valor_cxp} onChange={setF('valor_cxp')} placeholder="0"
+                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            </div>
           </div>
         </div>
         <div className="flex gap-3 mt-5">
@@ -2604,8 +2420,8 @@ function EditPlanillaModal({ record, onClose, onSaved }: {
             className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition">
             Cancelar
           </button>
-          <button onClick={handleSave} disabled={saving || cxcError}
-            className="flex-1 px-4 py-2.5 rounded-2xl bg-indigo-600 text-white text-sm font-black hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center justify-center gap-2">
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 px-4 py-2.5 rounded-2xl bg-indigo-600 text-white text-sm font-black hover:bg-indigo-700 disabled:opacity-50 transition flex items-center justify-center gap-2">
             {saving ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
             {saving ? 'Guardando…' : 'Guardar'}
           </button>
@@ -2618,20 +2434,16 @@ function EditPlanillaModal({ record, onClose, onSaved }: {
 // ── CancelModal ───────────────────────────────────────────────────────────────
 
 function CancelModal({ title, onClose, onConfirm }: {
-  title: string; onClose: () => void;
-  onConfirm: (motivo: string, tipoCancelacion: 'reasignar' | 'definitivo') => Promise<void>;
+  title: string; onClose: () => void; onConfirm: (motivo: string) => Promise<void>;
 }) {
-  const [motivo,  setMotivo]  = useState('');
-  const [tipo,    setTipo]    = useState<'reasignar' | 'definitivo'>('reasignar');
-  const [saving,  setSaving]  = useState(false);
-
+  const [motivo, setMotivo] = useState('');
+  const [saving, setSaving] = useState(false);
   const handleConfirm = async () => {
     if (!motivo.trim()) { toast.warning('Ingrese el motivo de cancelación'); return; }
     setSaving(true);
-    try { await onConfirm(motivo.trim(), tipo); }
+    try { await onConfirm(motivo.trim()); }
     finally { setSaving(false); }
   };
-
   return (
     <div className="fixed inset-0 z-[800] flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md p-6">
@@ -2646,22 +2458,6 @@ function CancelModal({ title, onClose, onConfirm }: {
             <p className="text-xs text-slate-400">{title}</p>
           </div>
         </div>
-
-        {/* Tipo de cancelación */}
-        <p className="text-xs font-bold text-slate-600 mb-2">Tipo de cancelación *</p>
-        <div className="grid grid-cols-2 gap-2 mb-4">
-          <button onClick={() => setTipo('reasignar')}
-            className={`flex flex-col items-start gap-1 px-4 py-3 rounded-2xl border-2 text-left transition ${tipo === 'reasignar' ? 'border-amber-400 bg-amber-50' : 'border-slate-200 hover:border-slate-300'}`}>
-            <span className="text-xs font-black text-amber-700">Por el día</span>
-            <span className="text-[10px] text-slate-500 leading-tight">La cita/despacho vuelve a pendiente para reasignarse otro día</span>
-          </button>
-          <button onClick={() => setTipo('definitivo')}
-            className={`flex flex-col items-start gap-1 px-4 py-3 rounded-2xl border-2 text-left transition ${tipo === 'definitivo' ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:border-slate-300'}`}>
-            <span className="text-xs font-black text-red-700">Definitivo</span>
-            <span className="text-[10px] text-slate-500 leading-tight">La cita/despacho queda cancelada permanentemente</span>
-          </button>
-        </div>
-
         <label className="block text-xs font-bold text-slate-600 mb-1">Motivo de cancelación *</label>
         <textarea
           value={motivo} onChange={e => setMotivo(e.target.value)}
@@ -2706,8 +2502,7 @@ function timeToMin(t: string | null): number {
 }
 function getRowBgColor(record: PlanillaHistorial, bands: ColorBand[], rowColors: Record<string, string>): string {
   if (rowColors[String(record.id)]) return rowColors[String(record.id)];
-  // Prioriza hora real (hora_fin) sobre la programada (hora_inicio)
-  const hora = record.hora_fin || record.hora_inicio;
+  const hora = (record as any).hora_inicio as string | null;
   if (hora) {
     const min = timeToMin(hora);
     for (const b of bands) {
@@ -2754,16 +2549,19 @@ function AddToRouteModal({ group, user, onClose, onAdded }: {
       if (mode === 'conf') {
         if (!confId) { toast.warning('Seleccione un confeccionista'); setSaving(false); return; }
         r = await api.dogamaAddConfeccionistaToRoute({
-          enc_id: group.enc_id,
-          confeccionista_id: Number(confId),
-          tipo: group.tipo, usuario_creacion: user.id, user_nombre: user.name,
+          vehicle_id: group.vehicle_id!, conductor_id: group.conductor_id,
+          client_id: group.client_id, fecha: group.fecha,
+          confeccionista_id: Number(confId), remesa: remesa || null,
+          manifiesto: manif || null, valor_cxc: cxc ? Number(cxc) : null,
+          valor_cxp: cxp ? Number(cxp) : null, tipo: group.tipo, usuario_creacion: user.id,
         });
       } else {
         const id = mode === 'despacho' ? Number(despId) : Number(citaId);
         if (!id) { toast.warning('Seleccione un elemento'); setSaving(false); return; }
         const result = await api.dogamaCreatePlanillaHistorial({
-          vehicle_id: group.vehicle_id!, fecha: group.fecha,
-          items: [{ tipo: mode, id }],
+          vehicle_id: group.vehicle_id!, items: [{ tipo: mode, id }],
+          remesa: remesa || null, manifiesto: manif || null,
+          valor_cxc: cxc ? Number(cxc) : null, valor_cxp: cxp ? Number(cxp) : null,
           usuario_creacion: user.id,
         });
         r = result?.rows?.[0] ?? result;
@@ -2933,183 +2731,6 @@ function ChangePlacaModal({ group, user, onClose, onChanged }: {
   );
 }
 
-// ── CargueDialog — registra datos de cargue por usuario diferente al creador ──
-
-interface AuxiliarMesaOpt { id: number; nombre: string; estado_id: string; }
-
-function CargueDialog({ record, user, onSaved, onClose }: {
-  record: PlanillaHistorial;
-  user: User;
-  onSaved: (updated: PlanillaHistorial) => void;
-  onClose: () => void;
-}) {
-  const [auxiliares, setAuxiliares] = useState<AuxiliarMesaOpt[]>([]);
-  const [extList,    setExtList]    = useState<{ id: number; nombre: string }[]>([]);
-  const [newExtName, setNewExtName] = useState('');
-  const [saving,     setSaving]     = useState(false);
-  const [addingExt,  setAddingExt]  = useState(false);
-
-  const [form, setForm] = useState({
-    unidades_carge:    record.unidades_carge    ?? '',
-    llegada_vh:        record.llegada_vh        ?? '',
-    aux_mesa_id:       record.aux_mesa_id       ?? '',
-    cantidad_cargada:  record.cantidad_cargada  ?? '',
-    hora_inicio_carge: record.hora_inicio_carge ?? '',
-    hora_final_carge:  record.hora_final_carge  ?? '',
-    observaciones:     record.observaciones     ?? '',
-  });
-
-  useEffect(() => {
-    api.dogamaGetAuxiliaresMesa()
-      .then((d: any) => setAuxiliares(Array.isArray(d) ? d.filter((a: any) => a.estado_id === 'EST-01') : []))
-      .catch(() => {});
-    api.dogamaGetAuxiliaresExternos(record.id)
-      .then((d: any) => setExtList(Array.isArray(d) ? d : []))
-      .catch(() => {});
-  }, [record.id]);
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const updated = await api.dogamaPatchPlanillaCargue(record.id, {
-        unidades_carge:    form.unidades_carge    !== '' ? Number(form.unidades_carge)   : null,
-        llegada_vh:        form.llegada_vh        || null,
-        aux_mesa_id:       form.aux_mesa_id       !== '' ? Number(form.aux_mesa_id)      : null,
-        cantidad_cargada:  form.cantidad_cargada  !== '' ? Number(form.cantidad_cargada) : null,
-        hora_inicio_carge: form.hora_inicio_carge || null,
-        hora_final_carge:  form.hora_final_carge  || null,
-        observaciones:     form.observaciones     || null,
-        usuario_cargue_id: user.id || null,
-      }) as PlanillaHistorial;
-      toast.success('Datos de cargue guardados');
-      onSaved(updated);
-    } catch (e: any) { toast.error(e?.message || 'Error al guardar'); }
-    finally { setSaving(false); }
-  };
-
-  const handleAddExt = async () => {
-    if (!newExtName.trim()) return;
-    setAddingExt(true);
-    try {
-      const r = await api.dogamaCreateAuxiliarExterno({
-        nombre: newExtName.trim(),
-        planilla_historial_id: record.id,
-        usuario_creacion: user.id,
-      }) as any;
-      setExtList(l => [...l, r]);
-      setNewExtName('');
-      toast.success('Auxiliar externo agregado');
-    } catch { toast.error('Error al agregar'); }
-    finally { setAddingExt(false); }
-  };
-
-  const handleDeleteExt = async (id: number) => {
-    try {
-      await api.dogamaDeleteAuxiliarExterno(id);
-      setExtList(l => l.filter(x => x.id !== id));
-    } catch { toast.error('Error al eliminar'); }
-  };
-
-  const field = (label: string, key: keyof typeof form, type: 'number' | 'time' | 'text' = 'text') => (
-    <div>
-      <label className="block text-[11px] font-bold text-slate-500 mb-1">{label}</label>
-      <input
-        type={type}
-        value={String(form[key])}
-        onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-      />
-    </div>
-  );
-
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 shrink-0">
-          <h3 className="text-base font-black text-slate-800">Registrar datos de cargue</h3>
-          <p className="text-xs text-slate-400 mt-0.5 truncate">
-            {record.confeccionista_nombre ?? '—'} &nbsp;·&nbsp; {record.tipo === 'despacho' ? `D-${record.despacho_id}` : `C-${record.cita_id}`}
-          </p>
-        </div>
-
-        {/* Body */}
-        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            {field('Unidades cargue', 'unidades_carge', 'number')}
-            {field('Cantidad cargada', 'cantidad_cargada', 'number')}
-            {field('Llegada vehículo', 'llegada_vh', 'time')}
-            {field('Hora inicio cargue', 'hora_inicio_carge', 'time')}
-            {field('Hora final cargue', 'hora_final_carge', 'time')}
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 mb-1">Auxiliar de mesa</label>
-              <select
-                value={String(form.aux_mesa_id)}
-                onChange={e => setForm(f => ({ ...f, aux_mesa_id: e.target.value }))}
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-                <option value="">— Sin auxiliar —</option>
-                {auxiliares.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-500 mb-1">Observaciones</label>
-            <textarea
-              value={form.observaciones}
-              onChange={e => setForm(f => ({ ...f, observaciones: e.target.value }))}
-              rows={2}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
-              placeholder="Observaciones del cargue..."
-            />
-          </div>
-
-          {/* Auxiliares externos */}
-          <div className="border border-slate-100 rounded-2xl p-3">
-            <p className="text-[11px] font-black text-slate-600 mb-2">Auxiliares externos</p>
-            {extList.length === 0
-              ? <p className="text-xs text-slate-400 italic mb-2">Sin auxiliares externos</p>
-              : <ul className="space-y-1 mb-2">
-                  {extList.map(x => (
-                    <li key={x.id} className="flex items-center justify-between text-sm text-slate-700">
-                      <span>{x.nombre}</span>
-                      <button onClick={() => handleDeleteExt(x.id)}
-                        className="w-5 h-5 flex items-center justify-center text-red-400 hover:text-red-600 transition">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-            }
-            <div className="flex gap-2">
-              <input value={newExtName} onChange={e => setNewExtName(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddExt(); } }}
-                placeholder="Nombre auxiliar externo"
-                className="flex-1 border border-slate-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-              <button onClick={handleAddExt} disabled={addingExt || !newExtName.trim()}
-                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition disabled:opacity-50">
-                {addingExt ? '…' : 'Agregar'}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2 shrink-0">
-          <button onClick={onClose}
-            className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">
-            Cancelar
-          </button>
-          <button onClick={handleSave} disabled={saving}
-            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition disabled:opacity-50">
-            {saving ? 'Guardando…' : 'Guardar cargue'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── RouteDetailDialog — tabla completa con colores configurables ───────────────
 
 function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroupUpdated }: {
@@ -3118,15 +2739,13 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
   onGroupUpdated: (records: PlanillaHistorial[], newGroup?: Partial<RouteGroup>) => void;
 }) {
   const tableRef = useRef<HTMLDivElement>(null);
-  const [cancelTarget,    setCancelTarget]    = useState<PlanillaHistorial | null>(null);
-  const [cargueTarget,    setCargueTarget]    = useState<PlanillaHistorial | null>(null);
+  const [cancelTarget,    setCancelTarget]    = useState<'group' | PlanillaHistorial | null>(null);
   const [showAdd,         setShowAdd]         = useState(false);
   const [showChangePlaca, setShowChangePlaca] = useState(false);
   const [showAuditLog,    setShowAuditLog]    = useState(false);
   const [auditLog,        setAuditLog]        = useState<any[]>([]);
   const [auditLoading,    setAuditLoading]    = useState(false);
   const [currentPlaca,    setCurrentPlaca]    = useState(group.placa);
-  const [showEditEnc,     setShowEditEnc]     = useState(false);
   const [showBandsCfg,    setShowBandsCfg]    = useState(false);
   const [bands,           setBands]           = useState<ColorBand[]>(loadBands);
   const [rowColors,       setRowColors]       = useState<Record<string, string>>(loadRowColors);
@@ -3134,32 +2753,22 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
   const [innerRecords,  setInnerRecords]  = useState<PlanillaHistorial[]>(localRecords);
   useEffect(() => { setInnerRecords(localRecords); }, [localRecords]);
 
-  const allCancelled = innerRecords.every(r => r.estado_id === 'EST-16');
+  const allCancelled = innerRecords.every(r => r.estado === 'cancelado');
 
-  // Qué tipos de bultos tienen al menos un valor > 0 en el grupo
-  const hasCajas    = innerRecords.some(r => (r.cajas    ?? 0) > 0);
-  const hasTulas    = innerRecords.some(r => (r.tulas    ?? 0) > 0);
-  const hasCanastas = innerRecords.some(r => (r.canastas ?? 0) > 0);
-  const hasCostales = innerRecords.some(r => (r.costales ?? 0) > 0);
-  const hasBultos   = hasCajas || hasTulas || hasCanastas || hasCostales;
-
-  const cancelRecord = async (target: PlanillaHistorial, motivo: string, tipoCancelacion: 'reasignar' | 'definitivo') => {
-    await api.dogamaPatchPlanillaHistorial(target.id, {
-      estado_id: 'EST-16',
-      motivo_cancelacion: motivo,
-      tipo_cancelacion: tipoCancelacion,
-      user_id: user.id,
-      user_nombre: user.name,
-    });
+  const cancelRecord = async (target: PlanillaHistorial | 'group', motivo: string) => {
+    const ids = target === 'group' ? innerRecords.map(r => r.id) : [target.id];
+    await Promise.all(ids.map(id =>
+      api.dogamaPatchPlanillaHistorial(id, {
+        estado: 'cancelado', motivo_cancelacion: motivo,
+        user_id: user.id, user_nombre: user.name,
+      })
+    ));
     const updated = innerRecords.map(r =>
-      r.id === target.id
-        ? { ...r, estado_id: 'EST-16', motivo_cancelacion: motivo, tipo_cancelacion: tipoCancelacion }
-        : r
+      ids.includes(r.id) ? { ...r, estado: 'cancelado' as const, motivo_cancelacion: motivo } : r
     );
     setInnerRecords(updated);
     onGroupUpdated(updated);
-    const label = tipoCancelacion === 'definitivo' ? 'Cancelado definitivamente' : 'Cancelado para reasignar';
-    toast.success(label);
+    toast.success(target === 'group' ? 'Ruta cancelada' : 'Registro cancelado');
     setCancelTarget(null);
   };
 
@@ -3173,7 +2782,12 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
   const loadAuditLog = async () => {
     setAuditLoading(true);
     try {
-      const data: any = await api.dogamaGetRouteAuditLog(group.enc_id);
+      const data: any = await api.dogamaGetRouteAuditLog({
+        vehicle_id: group.vehicle_id ?? undefined,
+        conductor_id: group.conductor_id ?? undefined,
+        client_id: group.client_id ?? undefined,
+        fecha: group.fecha,
+      });
       setAuditLog(Array.isArray(data) ? data : []);
     } catch { toast.error('Error al cargar historial'); }
     finally { setAuditLoading(false); }
@@ -3205,30 +2819,21 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
 
   const exportImage = async () => {
     if (!tableRef.current) return;
-    const el = tableRef.current;
     try {
-      toast.loading('Generando imagen…', { id: 'img-export' });
-      const dataUrl = await toPng(el, {
-        pixelRatio: 2,
-        backgroundColor: '#ffffff',
-        width: el.scrollWidth,
-        height: el.scrollHeight,
-        style: { overflow: 'visible', maxHeight: 'none' },
-        filter: (node: Element) => {
-          if (node instanceof HTMLElement && node.getAttribute('data-no-export')) return false;
-          return true;
-        },
-      });
-      toast.dismiss('img-export');
+      // Clone table into a temp offscreen div to avoid fixed-position issues
+      const clone = tableRef.current.cloneNode(true) as HTMLElement;
+      const wrapper = document.createElement('div');
+      wrapper.style.cssText = 'position:absolute;top:-9999px;left:-9999px;background:#fff;padding:16px;width:900px;';
+      wrapper.appendChild(clone);
+      document.body.appendChild(wrapper);
+      const canvas = await html2canvas(wrapper, { scale: 2, useCORS: true, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 });
+      document.body.removeChild(wrapper);
       const link = document.createElement('a');
-      link.download = `ruta_${currentPlaca}_${group.fecha}.png`;
-      link.href = dataUrl;
+      link.download = `ruta_${group.placa}_${group.fecha}.png`;
+      link.href = canvas.toDataURL('image/png');
       link.click();
       toast.success('Imagen exportada');
-    } catch (e: any) {
-      toast.dismiss('img-export');
-      toast.error('Error al exportar: ' + (e as Error).message);
-    }
+    } catch (e: any) { toast.error('Error al exportar: ' + e.message); }
   };
 
   const exportPDF = () => {
@@ -3245,7 +2850,7 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
       doc.text(`Placa: ${group.placa || '—'}   Fecha: ${group.fecha || '—'}   Conductor: ${group.conductor_nombre || '—'}   Cliente: ${group.client_nombre || '—'}`, 10, y);
       y += 8;
       // Table header
-      const cols = [['Confeccionista', 60], ['Dirección', 55], ['Tipo/Hora', 28], ['ID Ref', 20], ['Bultos', 35], ['Estado', 22]] as [string, number][];
+      const cols = [['Confeccionista', 70], ['Remesa', 28], ['Manifiesto', 28], ['CxC', 26], ['CxP', 26], ['Estado', 22]] as [string, number][];
       doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
       doc.setFillColor(30, 58, 138); doc.rect(10, y - 4.5, W - 20, 7, 'F');
       doc.setTextColor(255, 255, 255);
@@ -3263,19 +2868,15 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
         } else if (idx % 2 === 1) {
           doc.setFillColor(248, 250, 252); doc.rect(10, rowY - 4.5, W - 20, 7, 'F');
         }
-        const cancelled = r.estado_id === 'EST-16';
+        const cancelled = r.estado === 'cancelado';
         doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5);
         doc.setTextColor(cancelled ? 160 : 15, cancelled ? 160 : 23, cancelled ? 160 : 42);
         let rx = 12;
-        const pHorario = r.hora_inicio ? `${r.hora_inicio}${r.hora_fin ? '-'+r.hora_fin : ''}` : (r.turno || '');
-        const pIdRef   = r.despacho_id ? `D-${r.despacho_id}` : r.cita_id ? `C-${r.cita_id}` : '—';
-        const pBultos  = [r.cajas && `${r.cajas}cj`, r.tulas && `${r.tulas}tl`, r.canastas && `${r.canastas}cn`, r.costales && `${r.costales}cs`].filter(Boolean).join(' ') || '—';
         const vals = [
-          (r.confeccionista_nombre || '—').substring(0, 28),
-          (r.confeccionista_direccion || '—').substring(0, 25),
-          `${r.tipo || ''}${pHorario ? ' '+pHorario : ''}`,
-          pIdRef,
-          pBultos,
+          (r.confeccionista_nombre || '—').substring(0, 32),
+          r.remesa || '—', r.manifiesto || '—',
+          r.valor_cxc ? formatCOP(r.valor_cxc) : '—',
+          r.valor_cxp ? formatCOP(r.valor_cxp) : '—',
           cancelled ? 'Cancelado' : 'Activo',
         ];
         cols.forEach(([, w], i) => { doc.text(vals[i], rx, rowY); rx += w; });
@@ -3287,24 +2888,13 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
 
   return (
     <>
-      {cargueTarget !== null && (
-        <CargueDialog
-          record={cargueTarget}
-          user={user}
-          onSaved={(updated) => {
-            const merged = innerRecords.map(r => r.id === updated.id ? { ...r, ...updated } : r);
-            setInnerRecords(merged);
-            onGroupUpdated(merged);
-            setCargueTarget(null);
-          }}
-          onClose={() => setCargueTarget(null)}
-        />
-      )}
       {cancelTarget !== null && (
         <CancelModal
-          title={`Confeccionista: ${cancelTarget.confeccionista_nombre || '—'}`}
+          title={cancelTarget === 'group'
+            ? `Ruta ${currentPlaca} — ${innerRecords.length} registro(s)`
+            : `Confeccionista: ${(cancelTarget as PlanillaHistorial).confeccionista_nombre || '—'}`}
           onClose={() => setCancelTarget(null)}
-          onConfirm={(motivo, tipoCancelacion) => cancelRecord(cancelTarget, motivo, tipoCancelacion)}
+          onConfirm={motivo => cancelRecord(cancelTarget, motivo)}
         />
       )}
       {showAdd && (
@@ -3364,26 +2954,12 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
         </div>
       )}
 
-      {showEditEnc && innerRecords.length > 0 && (
-        <EditPlanillaModal
-          record={innerRecords[0]}
-          onClose={() => setShowEditEnc(false)}
-          onSaved={updated => {
-            const encFields = { remesa: updated.remesa, manifiesto: updated.manifiesto, valor_cxc: updated.valor_cxc, valor_cxp: updated.valor_cxp, intermediacion: updated.intermediacion };
-            const updatedAll = innerRecords.map(r => ({ ...r, ...encFields }));
-            setInnerRecords(updatedAll);
-            onGroupUpdated(updatedAll);
-            setShowEditEnc(false);
-          }}
-        />
-      )}
-
       <div className="fixed inset-0 z-[700] flex items-center justify-center bg-black/60 p-3">
-        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-6xl flex flex-col" style={{ maxHeight: '92vh' }}>
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl flex flex-col" style={{ maxHeight: '92vh' }}>
 
           {/* Header */}
-          <div className="flex items-start gap-4 px-6 py-4 border-b border-slate-100 shrink-0">
-            <span className="font-mono font-black text-2xl tracking-widest bg-slate-900 text-white px-3 py-1.5 rounded-xl shrink-0">{currentPlaca || '—'}</span>
+          <div className="flex items-center gap-4 px-6 py-4 border-b border-slate-100 shrink-0">
+            <span className="font-mono font-black text-2xl tracking-widest bg-slate-900 text-white px-3 py-1 rounded-xl">{currentPlaca || '—'}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <TipoBadge tipo={group.tipo} />
@@ -3395,45 +2971,6 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
                 <span className="mx-2 text-slate-300">·</span>
                 {group.client_nombre || '—'}
               </p>
-              {/* Campos enc: Remesa, Manifiesto, CxC, Int., CxP */}
-              {(() => {
-                const enc = innerRecords[0] ?? group;
-                const remesa        = enc.remesa;
-                const manifiesto    = enc.manifiesto;
-                const cxc           = enc.valor_cxc;
-                const cxp           = enc.valor_cxp;
-                const intermediacion = enc.intermediacion != null ? Number(enc.intermediacion) : null;
-                if (!remesa && !manifiesto && !cxc && !cxp && intermediacion == null) return null;
-                return (
-                  <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5">
-                    {remesa && (
-                      <span className="text-[10px] text-slate-500">
-                        <span className="font-bold text-slate-600">Remesa:</span> {remesa}
-                      </span>
-                    )}
-                    {manifiesto && (
-                      <span className="text-[10px] text-slate-500">
-                        <span className="font-bold text-slate-600">Manifiesto:</span> {manifiesto}
-                      </span>
-                    )}
-                    {cxc && (
-                      <span className="text-[10px] font-bold text-indigo-700">
-                        CxC: {formatCOP(cxc)}
-                      </span>
-                    )}
-                    {intermediacion != null && (
-                      <span className="text-[10px] font-bold text-violet-600">
-                        Int.: {intermediacion}%
-                      </span>
-                    )}
-                    {cxp && (
-                      <span className="text-[10px] font-bold text-emerald-700">
-                        CxP: {formatCOP(cxp)}
-                      </span>
-                    )}
-                  </div>
-                );
-              })()}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {/* Color bands config toggle */}
@@ -3459,8 +2996,7 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
                   Agregar franja
                 </button>
               </div>
-              {bands.length === 0 && <p className="text-xs text-slate-400 italic">Sin franjas configuradas — también puede asignar colores manualmente por fila (ícono 🎨). Los cambios se guardan automáticamente.</p>}
-              {bands.length > 0 && <p className="text-[10px] text-slate-400 mb-2">Compara contra <b>hora real</b> (si existe) o <b>hora programada</b>. Se guarda automáticamente en este navegador.</p>}
+              {bands.length === 0 && <p className="text-xs text-slate-400 italic">Sin franjas configuradas — también puede asignar colores manualmente por fila (ícono 🎨)</p>}
               <div className="space-y-1.5">
                 {bands.map(b => (
                   <div key={b.id} className="flex items-center gap-2">
@@ -3482,135 +3018,62 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
 
           {/* Table */}
           <div className="flex-1 overflow-auto px-6 py-4 min-h-0">
-            <div ref={tableRef} className="bg-white">
+            <div ref={tableRef}>
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-900 text-white">
                     <th className="text-left px-2 py-2 rounded-tl-xl font-bold w-5">#</th>
-                    <th className="text-left px-2 py-2 font-bold">Confeccionista / Prov.</th>
-                    <th className="text-left px-2 py-2 font-bold">Dirección / Ciudad</th>
-                    <th className="text-left px-2 py-2 font-bold">Tipo · Turno · Hora</th>
+                    <th className="text-left px-2 py-2 font-bold">Confeccionista / Proveedor</th>
+                    <th className="text-left px-2 py-2 font-bold">Dirección</th>
+                    <th className="text-left px-2 py-2 font-bold">Tipo / Horario</th>
                     <th className="text-left px-2 py-2 font-bold">Referencia</th>
-                    <th className="text-left px-2 py-2 font-bold">Detalle</th>
-                    <th className="text-left px-2 py-2 font-bold">ID</th>
-                    {hasBultos && <th className="text-left px-2 py-2 font-bold">Bultos</th>}
+                    <th className="text-left px-2 py-2 font-bold">Remesa</th>
+                    <th className="text-left px-2 py-2 font-bold">Manifiesto</th>
+                    <th className="text-right px-2 py-2 font-bold">CxC</th>
+                    <th className="text-right px-2 py-2 font-bold">CxP</th>
                     <th className="text-center px-2 py-2 font-bold">Estado</th>
-                    <th data-no-export="1" className="text-center px-2 py-2 rounded-tr-xl font-bold">Acc.</th>
+                    <th className="text-center px-2 py-2 rounded-tr-xl font-bold">Acc.</th>
                   </tr>
                 </thead>
                 <tbody>
                   {innerRecords.map((r, idx) => {
                     const bg = getRowBgColor(r, bands, rowColors);
-                    const cancelled = r.estado_id === 'EST-16';
+                    const cancelled = r.estado === 'cancelado';
+                    const horario = r.hora_inicio ? `${r.hora_inicio}${r.hora_fin ? ' – ' + r.hora_fin : ''}` : (r.turno || '—');
                     return (
                       <tr key={r.id}
                         style={bg ? { backgroundColor: bg } : undefined}
                         className={`border-b border-slate-100 ${!bg && idx % 2 === 1 ? 'bg-slate-50' : ''} ${cancelled ? 'opacity-50' : ''}`}>
                         <td className="px-2 py-2 text-slate-400 font-mono">{idx + 1}</td>
-                        {/* Confeccionista / Proveedor */}
-                        <td className="px-2 py-2 max-w-[150px]">
-                          <span className={`font-semibold block truncate ${cancelled ? 'line-through text-slate-400' : 'text-slate-700'}`}
-                            title={r.confeccionista_nombre || ''}>
+                        <td className="px-2 py-2">
+                          <span className={`font-semibold block ${cancelled ? 'line-through text-slate-400' : 'text-slate-700'}`}>
                             {r.confeccionista_nombre || '—'}
                           </span>
                           {cancelled && r.motivo_cancelacion && (
                             <span className="text-[10px] text-red-500 italic">{r.motivo_cancelacion}</span>
                           )}
                         </td>
-                        {/* Dirección + Municipio */}
-                        <td className="px-2 py-2 text-slate-500 max-w-[130px]">
-                          <span className="block truncate text-[11px]" title={[r.confeccionista_direccion, r.confeccionista_ciudad].filter(Boolean).join(', ')}>
+                        <td className="px-2 py-2 text-slate-500 max-w-[140px]">
+                          <span className="block truncate" title={[r.confeccionista_direccion, r.confeccionista_ciudad].filter(Boolean).join(', ')}>
                             {r.confeccionista_direccion || '—'}
                           </span>
-                          {r.confeccionista_ciudad && (
-                            <span className="text-[10px] text-slate-400 font-semibold">{r.confeccionista_ciudad}</span>
-                          )}
+                          {r.confeccionista_ciudad && <span className="text-[10px] text-slate-400">{r.confeccionista_ciudad}</span>}
                         </td>
-                        {/* Tipo + Turno + Hora */}
-                        <td className="px-2 py-2 whitespace-nowrap">
+                        <td className="px-2 py-2">
                           <TipoBadge tipo={r.tipo} />
-                          {r.turno && (
-                            <span className="block text-[10px] font-bold text-indigo-500 mt-0.5">{r.turno}</span>
-                          )}
-                          {r.hora_inicio && (
-                            <span className="block text-[10px] text-slate-500 font-mono mt-0.5">
-                              <span className="text-slate-400">Prog:</span> {r.hora_inicio}
-                            </span>
-                          )}
-                          {r.hora_fin && (
-                            <span className="block text-[10px] font-bold text-emerald-600 font-mono">
-                              <span className="font-normal text-slate-400">Real:</span> {r.hora_fin}
-                            </span>
-                          )}
+                          {horario !== '—' && <span className="block text-[10px] text-slate-500 mt-0.5 font-mono">{horario}</span>}
                         </td>
-                        {/* Referencia */}
-                        <td className="px-2 py-2 text-slate-500 font-mono text-[11px] whitespace-nowrap">{r.referencia || '—'}</td>
-                        {/* Info — tipo-específico */}
-                        <td className="px-2 py-2 min-w-[180px] max-w-[240px]">
-                          <div className="space-y-0.5 text-[10px]">
-                            {/* Marca — ambos */}
-                            {r.marca && (
-                              <span className="inline-block bg-indigo-50 text-indigo-700 font-bold px-1.5 py-0.5 rounded-md mr-1 mb-0.5">{r.marca}</span>
-                            )}
-                            {r.tipo === 'cita' && (<>
-                              <div className="flex flex-wrap gap-x-3">
-                                {r.lote && r.lote !== '0'  && <span><b className="text-slate-600">Lote:</b> {r.lote}</span>}
-                                {r.mesa != null             && <span><b className="text-slate-600">Mesa:</b> {r.mesa}</span>}
-                                {(r.unidades ?? 0) > 0     && <span><b className="text-slate-600">Cant:</b> {r.unidades}</span>}
-                              </div>
-                              {r.color && (
-                                <div><b className="text-slate-600">Color:</b> {r.color}</div>
-                              )}
-                              {r.numero_documento && (
-                                <div className="truncate max-w-[220px]" title={r.numero_documento}>
-                                  <b className="text-slate-600">Doc:</b> {r.numero_documento}
-                                </div>
-                              )}
-                              {r.tipo_oc && (
-                                <div className="text-slate-400">{r.tipo_oc}</div>
-                              )}
-                            </>)}
-                            {r.tipo === 'despacho' && (<>
-                              <div className="flex flex-wrap gap-x-3">
-                                {r.orden_cargue  && <span><b className="text-slate-600">OC:</b> {r.orden_cargue}</span>}
-                                {r.orden_servicio && <span><b className="text-slate-600">OS:</b> {r.orden_servicio}</span>}
-                              </div>
-                              <div className="flex flex-wrap gap-x-3">
-                                {r.lote && r.lote !== '0'  && <span><b className="text-slate-600">Lote:</b> {r.lote}</span>}
-                                {(r.unidades ?? 0) > 0     && <span><b className="text-slate-600">Unid:</b> {r.unidades}</span>}
-                              </div>
-                              {r.tipo_prenda && (
-                                <div className="text-slate-400">{r.tipo_prenda}</div>
-                              )}
-                            </>)}
-                            {r.tipo === 'material_empaque' && (<>
-                              {r.lote && r.lote !== '0' && <div><b className="text-slate-600">Lote:</b> {r.lote}</div>}
-                            </>)}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2 font-mono text-[10px]">
-                          {r.despacho_id
-                            ? <span className="bg-orange-50 text-orange-700 px-1.5 py-0.5 rounded-md font-bold">D-{r.despacho_id}</span>
-                            : r.cita_id
-                              ? <span className="bg-teal-50 text-teal-700 px-1.5 py-0.5 rounded-md font-bold">C-{r.cita_id}</span>
-                              : <span className="text-slate-400">—</span>}
-                        </td>
-                        {hasBultos && (
-                          <td className="px-2 py-2 text-[10px] text-slate-700">
-                            <div className="space-y-0.5">
-                              {hasCajas    && <div><span className="text-slate-400 font-semibold">Caj:</span> {r.cajas    ?? <span className="text-slate-300">—</span>}</div>}
-                              {hasTulas    && <div><span className="text-slate-400 font-semibold">Tul:</span> {r.tulas    ?? <span className="text-slate-300">—</span>}</div>}
-                              {hasCanastas && <div><span className="text-slate-400 font-semibold">Can:</span> {r.canastas ?? <span className="text-slate-300">—</span>}</div>}
-                              {hasCostales && <div><span className="text-slate-400 font-semibold">Cos:</span> {r.costales ?? <span className="text-slate-300">—</span>}</div>}
-                            </div>
-                          </td>
-                        )}
+                        <td className="px-2 py-2 text-slate-500 font-mono text-[11px]">{r.referencia || '—'}</td>
+                        <td className="px-2 py-2 font-mono text-slate-600">{r.remesa || '—'}</td>
+                        <td className="px-2 py-2 font-mono text-slate-600">{r.manifiesto || '—'}</td>
+                        <td className="px-2 py-2 text-right font-bold text-indigo-700">{formatCOP(r.valor_cxc)}</td>
+                        <td className="px-2 py-2 text-right font-bold text-emerald-700">{formatCOP(r.valor_cxp)}</td>
                         <td className="px-2 py-2 text-center">
-                          <span className={`inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold ${cancelled ? (r.tipo_cancelacion === 'definitivo' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-700') : 'bg-emerald-100 text-emerald-700'}`}>
-                            {cancelled ? (r.tipo_cancelacion === 'definitivo' ? 'Cancelado definitivo' : 'Cancel. reasignar') : 'Activo'}
+                          <span className={`inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold ${cancelled ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-700'}`}>
+                            {cancelled ? 'Cancelado' : 'Activo'}
                           </span>
                         </td>
-                        <td data-no-export="1" className="px-2 py-2">
+                        <td className="px-2 py-2">
                           <div className="flex items-center justify-center gap-0.5">
                             <div className="relative">
                               <button onClick={() => setColorPickerId(colorPickerId === String(r.id) ? null : String(r.id))}
@@ -3630,9 +3093,9 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
                                 </div>
                               )}
                             </div>
-                            <button onClick={() => setCargueTarget(r)} title="Registrar cargue"
+                            <button onClick={() => onEdit(r)} title="Editar"
                               className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-indigo-50 text-indigo-500 transition">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                             </button>
                             {!cancelled && (
                               <button onClick={() => setCancelTarget(r)} title="Cancelar"
@@ -3646,6 +3109,18 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
                     );
                   })}
                 </tbody>
+                <tfoot>
+                  <tr className="bg-slate-50 border-t-2 border-slate-200">
+                    <td colSpan={7} className="px-2 py-2 text-xs font-black text-slate-600 uppercase tracking-wider">Totales (activos)</td>
+                    <td className="px-2 py-2 text-right text-sm font-black text-indigo-700">
+                      {formatCOP(innerRecords.filter(r => r.estado !== 'cancelado').reduce((s, r) => s + (Number(r.valor_cxc) || 0), 0) || null)}
+                    </td>
+                    <td className="px-2 py-2 text-right text-sm font-black text-emerald-700">
+                      {formatCOP(innerRecords.filter(r => r.estado !== 'cancelado').reduce((s, r) => s + (Number(r.valor_cxp) || 0), 0) || null)}
+                    </td>
+                    <td colSpan={2} />
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
@@ -3659,12 +3134,6 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
                 Agregar
               </button>
             )}
-            <button onClick={() => setShowEditEnc(true)}
-              title="Editar remesa, manifiesto, CxC, CxP e intermediación de la planilla"
-              className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-bold border border-violet-200 transition">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-              Editar Planilla
-            </button>
             <button onClick={() => setShowChangePlaca(true)}
               title="Reasignar esta ruta a un vehículo diferente"
               className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold border border-amber-200 transition">
@@ -3708,19 +3177,15 @@ function RouteCard({ group, user, onEdit, onGroupUpdated }: {
   onGroupUpdated: (records: PlanillaHistorial[]) => void;
 }) {
   const [showDetail,    setShowDetail]    = useState(false);
-  const [showEditEnc,   setShowEditEnc]   = useState(false);
   const [localRecords,  setLocalRecords]  = useState<PlanillaHistorial[]>(group.records);
   const [currentGroup,  setCurrentGroup]  = useState<RouteGroup>(group);
 
   useEffect(() => { setLocalRecords(group.records); setCurrentGroup(group); }, [group.records]);
 
-  const allCancelled  = localRecords.every(r => r.estado_id === 'EST-16');
-  const activeRecords = localRecords.filter(r => r.estado_id !== 'EST-16');
-  const activeCount   = activeRecords.length;
-  const totalCajas    = activeRecords.reduce((s, r) => s + (Number(r.cajas)    || 0), 0);
-  const totalTulas    = activeRecords.reduce((s, r) => s + (Number(r.tulas)    || 0), 0);
-  const totalCanastas = activeRecords.reduce((s, r) => s + (Number(r.canastas) || 0), 0);
-  const totalCostales = activeRecords.reduce((s, r) => s + (Number(r.costales) || 0), 0);
+  const allCancelled = localRecords.every(r => r.estado === 'cancelado');
+  const activeCount  = localRecords.filter(r => r.estado !== 'cancelado').length;
+  const totalCxC = localRecords.filter(r => r.estado !== 'cancelado').reduce((s, r) => s + (Number(r.valor_cxc) || 0), 0);
+  const totalCxP = localRecords.filter(r => r.estado !== 'cancelado').reduce((s, r) => s + (Number(r.valor_cxp) || 0), 0);
 
   const handleGroupUpdated = (updated: PlanillaHistorial[], newGroupData?: Partial<RouteGroup>) => {
     setLocalRecords(updated);
@@ -3730,19 +3195,6 @@ function RouteCard({ group, user, onEdit, onGroupUpdated }: {
 
   return (
     <>
-      {showEditEnc && localRecords.length > 0 && (
-        <EditPlanillaModal
-          record={localRecords[0]}
-          onClose={() => setShowEditEnc(false)}
-          onSaved={updated => {
-            const encFields = { remesa: updated.remesa, manifiesto: updated.manifiesto, valor_cxc: updated.valor_cxc, valor_cxp: updated.valor_cxp, intermediacion: updated.intermediacion };
-            const updatedAll = localRecords.map(r => ({ ...r, ...encFields }));
-            setLocalRecords(updatedAll);
-            onGroupUpdated(updatedAll);
-            setShowEditEnc(false);
-          }}
-        />
-      )}
       {showDetail && (
         <RouteDetailDialog
           group={currentGroup} user={user}
@@ -3773,7 +3225,7 @@ function RouteCard({ group, user, onEdit, onGroupUpdated }: {
             <span className="text-slate-200">·</span>
             <span className="text-xs text-slate-400">{activeCount} activo(s) / {localRecords.length} total</span>
           </div>
-          <div className="space-y-1 text-xs mb-3">
+          <div className="space-y-1 text-xs mb-4">
             <div className="flex justify-between">
               <span className="text-slate-400 font-medium">Conductor</span>
               <span className="font-semibold text-slate-700 text-right max-w-[55%] truncate">{group.conductor_nombre || '—'}</span>
@@ -3783,48 +3235,20 @@ function RouteCard({ group, user, onEdit, onGroupUpdated }: {
               <span className="font-semibold text-slate-700 text-right max-w-[55%] truncate">{group.client_nombre || '—'}</span>
             </div>
           </div>
-          {/* Enc fields: Remesa, Manifiesto, CxC, Int., CxP */}
-          {(() => {
-            const enc = localRecords[0];
-            if (!enc) return null;
-            const remesa        = enc.remesa;
-            const manifiesto    = enc.manifiesto;
-            const cxc           = enc.valor_cxc;
-            const cxp           = enc.valor_cxp;
-            const interm        = enc.intermediacion != null ? Number(enc.intermediacion) : null;
-            if (!remesa && !manifiesto && !cxc && !cxp && interm == null) return null;
-            return (
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5 mb-3">
-                {remesa && <span className="text-[10px] text-slate-500"><span className="font-bold text-slate-600">Remesa:</span> {remesa}</span>}
-                {manifiesto && <span className="text-[10px] text-slate-500"><span className="font-bold text-slate-600">Manifiesto:</span> {manifiesto}</span>}
-                {cxc && <span className="text-[10px] font-bold text-indigo-700">CxC: {formatCOP(cxc)}</span>}
-                {interm != null && <span className="text-[10px] font-bold text-violet-600">Int.: {interm}%</span>}
-                {cxp && <span className="text-[10px] font-bold text-emerald-700">CxP: {formatCOP(cxp)}</span>}
-              </div>
-            );
-          })()}
-          {(totalCajas > 0 || totalTulas > 0 || totalCanastas > 0 || totalCostales > 0) && (
-            <div className="bg-slate-50 rounded-2xl p-3">
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Bultos activos</p>
-              <p className="text-xs font-black text-slate-700">
-                {[
-                  totalCajas    > 0 && `${totalCajas} cajas`,
-                  totalTulas    > 0 && `${totalTulas} tulas`,
-                  totalCanastas > 0 && `${totalCanastas} canastas`,
-                  totalCostales > 0 && `${totalCostales} costales`,
-                ].filter(Boolean).join(' · ')}
-              </p>
+          <div className="grid grid-cols-2 gap-2 bg-slate-50 rounded-2xl p-3">
+            <div>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">CxC Total</p>
+              <p className="text-sm font-black text-indigo-700">{formatCOP(totalCxC || null)}</p>
             </div>
-          )}
+            <div>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">CxP Total</p>
+              <p className="text-sm font-black text-emerald-700">{formatCOP(totalCxP || null)}</p>
+            </div>
+          </div>
         </div>
-        <div className="px-4 pb-4 flex gap-2">
-          <button onClick={() => setShowEditEnc(true)} title="Editar datos de planilla (remesa, manifiesto, valores)"
-            className="py-2 px-3 rounded-2xl bg-violet-50 hover:bg-violet-100 text-violet-700 text-xs font-bold border border-violet-200 transition flex items-center gap-1.5 shrink-0">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-            Editar
-          </button>
+        <div className="px-4 pb-4">
           <button onClick={() => setShowDetail(true)}
-            className="flex-1 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center justify-center gap-2">
+            className="w-full py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition flex items-center justify-center gap-2">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
             Ver Ruta
           </button>
@@ -3987,49 +3411,15 @@ function AsignacionPlacaTab({ user }: { user: User }) {
   );
 }
 
-// ── Dialog confirmación envío de correos ──────────────────────────────────────
-
-function EmailConfirmDialog({ open, plate, onSend, onSkip }: {
-  open: boolean; plate: string; onSend: () => void; onSkip: () => void;
-}) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-7 text-center">
-        <div className="w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center mx-auto mb-4">
-          <svg className="w-7 h-7 text-indigo-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-          </svg>
-        </div>
-        <p className="text-xs font-black text-indigo-600 uppercase tracking-widest mb-1">Notificación</p>
-        <h3 className="text-lg font-black text-slate-800 mb-2">¿Enviar correos ahora?</h3>
-        <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-          Planilla guardada para <span className="font-bold text-slate-700">{plate}</span>. ¿Desea enviar correo de confirmación a los confeccionistas ahora o guardar para enviar luego?
-        </p>
-        <div className="flex gap-3">
-          <button onClick={onSkip}
-            className="flex-1 px-4 py-2.5 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">
-            Guardar pendiente
-          </button>
-          <button onClick={onSend}
-            className="flex-1 px-4 py-2.5 rounded-2xl bg-indigo-600 text-white text-sm font-black hover:bg-indigo-700 transition">
-            Enviar ahora
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Modal guardar planilla ─────────────────────────────────────────────────────
 
-interface PlanillaModalData { remesa: string; manifiesto: string; valor_cxc: string; valor_cxp: string; intermediacion: number | null; }
+interface PlanillaModalData { remesa: string; manifiesto: string; valor_cxc: string; valor_cxp: string; }
 
 function GuardarPlanillaModal({ open, plate, totalItems, saving, onConfirm, onClose }: {
   open: boolean; plate: string; totalItems: number; saving: boolean;
   onConfirm: (d: PlanillaModalData) => void; onClose: () => void;
 }) {
-  const [form, setForm] = useState<PlanillaModalData>({ remesa: '', manifiesto: '', valor_cxc: '', valor_cxp: '', intermediacion: null });
+  const [form, setForm] = useState<PlanillaModalData>({ remesa: '', manifiesto: '', valor_cxc: '', valor_cxp: '' });
   const [fletes, setFletes] = useState<FleteIntermediacion[]>([]);
   const [intermediacion, setIntermediacion] = useState<number | null>(null);
 
@@ -4049,7 +3439,7 @@ function GuardarPlanillaModal({ open, plate, totalItems, saving, onConfirm, onCl
 
   useEffect(() => {
     if (!open) return;
-    setForm({ remesa: '', manifiesto: '', valor_cxc: '', valor_cxp: '', intermediacion: null });
+    setForm({ remesa: '', manifiesto: '', valor_cxc: '', valor_cxp: '' });
     setFletes([]);
     setIntermediacion(null);
     api.dogamaGetFletes().then((rows: FleteIntermediacion[]) => {
@@ -4150,7 +3540,7 @@ function GuardarPlanillaModal({ open, plate, totalItems, saving, onConfirm, onCl
             className="flex-1 px-4 py-2.5 rounded-2xl border-2 border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition">
             Cancelar
           </button>
-          <button onClick={() => onConfirm({ ...form, intermediacion })} disabled={saving}
+          <button onClick={() => onConfirm(form)} disabled={saving}
             className="flex-1 px-4 py-2.5 rounded-2xl bg-indigo-600 text-white text-sm font-black hover:bg-indigo-700 disabled:opacity-50 transition flex items-center justify-center gap-2">
             {saving ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : null}
             {saving ? 'Guardando…' : 'Guardar planilla'}
@@ -4185,44 +3575,6 @@ function FlowPlacaARegistros({ user, clients, assignments, despachos, citas, con
   const [selCita, setSelCita] = useState<Set<number>>(new Set());
   const [showModal, setShowModal] = useState(false);
   const [saving,    setSaving]    = useState(false);
-  const [emailDialog, setEmailDialog] = useState<{ open: boolean; plate: string }>({ open: false, plate: '' });
-  const pendingEncIdRef = useRef<number | null>(null);
-
-  const createNotifPendientes = async (encId: number): Promise<any[]> => {
-    const r = await api.dogamaCreateNotifCorreos(encId, user.id);
-    return r?.rows ?? [];
-  };
-
-  const handleEmailDialogSend = async () => {
-    const encId = pendingEncIdRef.current;
-    pendingEncIdRef.current = null;
-    setEmailDialog({ open: false, plate: '' });
-    if (!encId) { onSaved(); return; }
-    try {
-      const rows = await createNotifPendientes(encId);
-      if (rows.length === 0) { toast.info('No hay confeccionistas con correo para notificar'); onSaved(); return; }
-      // Enviar correos inmediatamente
-      let enviados = 0;
-      for (const row of rows) {
-        try { await api.dogamaSendNotifCorreo(row.id); enviados++; } catch { /* continuar */ }
-      }
-      if (enviados > 0) toast.success(`${enviados} correo(s) enviado(s) exitosamente`);
-      else toast.warning(`Notificaciones creadas pero no se pudieron enviar los correos`);
-    } catch { toast.error('Error al procesar notificaciones de correo'); }
-    onSaved();
-  };
-
-  const handleEmailDialogSkip = async () => {
-    const encId = pendingEncIdRef.current;
-    pendingEncIdRef.current = null;
-    setEmailDialog({ open: false, plate: '' });
-    if (!encId) { onSaved(); return; }
-    try {
-      const rows = await createNotifPendientes(encId);
-      if (rows.length > 0) toast.info(`${rows.length} notificación(es) guardada(s) como pendiente`);
-    } catch { /* no bloquear el flujo */ }
-    onSaved();
-  };
 
   // Material empaque form state
   const today = new Date().toLocaleDateString('en-CA');
@@ -4232,40 +3584,6 @@ function FlowPlacaARegistros({ user, clients, assignments, despachos, citas, con
   });
   const setMF = (k: keyof MatEmpForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setMatForm(p => ({ ...p, [k]: e.target.value }));
-
-  // Fletes para material empaque
-  const [matFletes, setMatFletes] = useState<FleteIntermediacion[]>([]);
-  const [matIntermed, setMatIntermed] = useState<number | null>(null);
-  const matActiveFlete = matFletes.find(f => f.estado_id === 'EST-01');
-  const matIntermOpts = useMemo<number[]>(() => {
-    if (!matActiveFlete) return [];
-    const minV = Number(matActiveFlete.valor_intermediacion_minimo ?? 0);
-    const maxV = Number(matActiveFlete.intermediacion_final ?? 0);
-    if (isNaN(minV) || isNaN(maxV)) return [];
-    const opts: number[] = [];
-    for (let i = Math.ceil(minV); i <= Math.floor(maxV); i++) opts.push(i);
-    if (opts.length === 0 && !isNaN(minV)) opts.push(Math.round(minV));
-    return opts;
-  }, [matActiveFlete]);
-
-  // Cargar fletes al llegar al paso 4 de material empaque
-  useEffect(() => {
-    if (step !== 4 || tipo !== 'material_empaque') return;
-    api.dogamaGetFletes().then((rows: FleteIntermediacion[]) => {
-      setMatFletes(rows);
-      const af = rows.find((f: FleteIntermediacion) => f.estado_id === 'EST-01');
-      if (af?.flete_minimo) setMatForm(p => p.valor_cxc ? p : { ...p, valor_cxc: String(Number(af.flete_minimo)) });
-      if (af?.valor_intermediacion_minimo != null) setMatIntermed(Math.ceil(Number(af.valor_intermediacion_minimo)));
-    }).catch(() => {});
-  }, [step, tipo]);
-
-  // Auto-calc CxP en material empaque
-  useEffect(() => {
-    if (matIntermed == null || !matForm.valor_cxc) return;
-    const cxc = Number(matForm.valor_cxc);
-    if (isNaN(cxc)) return;
-    setMatForm(p => ({ ...p, valor_cxp: String(Math.round(cxc - (cxc * matIntermed / 100))) }));
-  }, [matForm.valor_cxc, matIntermed]);
 
   const clientAssignments = assignments.filter(a => a.client_id === clientId);
   const selectedAssignment = assignments.find(a => a.vehicle_id === vehicleId);
@@ -4282,20 +3600,18 @@ function FlowPlacaARegistros({ user, clients, assignments, despachos, citas, con
         ...Array.from(selDesp).map(id => ({ tipo: 'despacho' as const, id })),
         ...Array.from(selCita).map(id => ({ tipo: 'cita' as const, id })),
       ];
-      const result = await api.dogamaCreatePlanillaHistorial({
+      await api.dogamaCreatePlanillaHistorial({
         vehicle_id: vehicleId,
         remesa:     formData.remesa     || null,
         manifiesto: formData.manifiesto || null,
         valor_cxc:  formData.valor_cxc  ? Number(formData.valor_cxc)  : null,
         valor_cxp:  formData.valor_cxp  ? Number(formData.valor_cxp)  : null,
-        intermediacion: formData.intermediacion ?? null,
         items,
         usuario_creacion: user.id,
       });
-      pendingEncIdRef.current = result?.enc?.id ?? null;
       toast.success(`Planilla guardada: ${items.length} registro(s) asignados a ${selectedAssignment.plate}`);
       setShowModal(false);
-      setEmailDialog({ open: true, plate: selectedAssignment.plate });
+      onSaved();
     } catch (e: any) {
       toast.error('Error al guardar: ' + (e?.message ?? 'Error desconocido'));
     } finally {
@@ -4315,7 +3631,6 @@ function FlowPlacaARegistros({ user, clients, assignments, despachos, citas, con
         manifiesto: matForm.manifiesto || null,
         valor_cxc: matForm.valor_cxc ? Number(matForm.valor_cxc) : null,
         valor_cxp: matForm.valor_cxp ? Number(matForm.valor_cxp) : null,
-        intermediacion: matIntermed ?? null,
         cajas: matForm.cajas ? Number(matForm.cajas) : null,
         tulas: matForm.tulas ? Number(matForm.tulas) : null,
         canastas: matForm.canastas ? Number(matForm.canastas) : null,
@@ -4408,12 +3723,6 @@ function FlowPlacaARegistros({ user, clients, assignments, despachos, citas, con
 
   return (
     <div className="max-w-5xl mx-auto">
-      <EmailConfirmDialog
-        open={emailDialog.open}
-        plate={emailDialog.plate}
-        onSend={handleEmailDialogSend}
-        onSkip={handleEmailDialogSkip}
-      />
       <GuardarPlanillaModal
         open={showModal}
         plate={selectedAssignment?.plate ?? ''}
@@ -4541,41 +3850,17 @@ function FlowPlacaARegistros({ user, clients, assignments, despachos, citas, con
                   className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" />
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">
-                Valor CxC
-                {matActiveFlete?.flete_minimo && (
-                  <span className="ml-2 text-[10px] font-normal text-slate-400">
-                    Flete mín: {formatCOP(matActiveFlete.flete_minimo)} — máx: {formatCOP(matActiveFlete.flete_maximo ?? '')}
-                  </span>
-                )}
-              </label>
-              <input type="number" value={matForm.valor_cxc} onChange={setMF('valor_cxc')} placeholder="0"
-                className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" />
-            </div>
-            {matIntermOpts.length > 0 && (
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">Intermediación (%)</label>
-                <select value={matIntermed ?? matIntermOpts[0]} onChange={e => setMatIntermed(Number(e.target.value))}
-                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white">
-                  {matIntermOpts.map(p => <option key={p} value={p}>{p}%</option>)}
-                </select>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Valor CxC</label>
+                <input type="number" value={matForm.valor_cxc} onChange={setMF('valor_cxc')} placeholder="0"
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" />
               </div>
-            )}
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">
-                Valor CxP
-                {matIntermed != null && matForm.valor_cxc && (
-                  <span className="ml-2 text-[10px] font-normal text-emerald-600">calculado automáticamente</span>
-                )}
-              </label>
-              <input type="number" value={matForm.valor_cxp}
-                readOnly={matIntermed != null && !!matForm.valor_cxc}
-                onChange={matIntermed != null && matForm.valor_cxc ? undefined : setMF('valor_cxp')}
-                placeholder="0"
-                className={`w-full text-sm border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 ${
-                  matIntermed != null && matForm.valor_cxc ? 'bg-slate-50 border-slate-100 text-slate-500 cursor-not-allowed' : 'border-slate-200'
-                }`} />
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">Valor CxP</label>
+                <input type="number" value={matForm.valor_cxp} onChange={setMF('valor_cxp')} placeholder="0"
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300" />
+              </div>
             </div>
             <p className="text-xs font-black text-slate-500 uppercase tracking-widest pt-1">Cantidades</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -4781,18 +4066,6 @@ function FlowRegistrosAPlaca({ user, assignments, despachos, citas, onBack, onSa
   const [placasCita, setPlacasCita] = useState<Record<number, string>>({});
   const [showModal, setShowModal] = useState(false);
   const [saving,    setSaving]    = useState(false);
-  const [emailDialog, setEmailDialog] = useState<{ open: boolean; encIds: number[]; plates: string }>({ open: false, encIds: [], plates: '' });
-
-  const handleEmailDialogSendB = async () => {
-    if (emailDialog.encIds.length > 0) {
-      try {
-        await Promise.all(emailDialog.encIds.map(eid => api.dogamaCreateNotifCorreos(eid, user.id)));
-        toast.success('Notificaciones de correo creadas correctamente');
-      } catch { toast.error('No se pudieron crear las notificaciones de correo'); }
-    }
-    setEmailDialog({ open: false, encIds: [], plates: '' });
-    onSaved();
-  };
 
   const shownDespachos = tipo !== 'citas'    ? despachos : [];
   const shownCitas     = tipo !== 'despachos' ? citas     : [];
@@ -4817,7 +4090,7 @@ function FlowRegistrosAPlaca({ user, assignments, despachos, citas, onBack, onSa
         byVehicle.get(item.vehicle_id)!.push(item);
       });
 
-      const results = await Promise.all(
+      await Promise.all(
         [...byVehicle.entries()].map(([vid, grp]) => {
           return api.dogamaCreatePlanillaHistorial({
             vehicle_id: vid,
@@ -4825,21 +4098,15 @@ function FlowRegistrosAPlaca({ user, assignments, despachos, citas, onBack, onSa
             manifiesto: formData.manifiesto || null,
             valor_cxc:  formData.valor_cxc  ? Number(formData.valor_cxc)  : null,
             valor_cxp:  formData.valor_cxp  ? Number(formData.valor_cxp)  : null,
-            intermediacion: formData.intermediacion ?? null,
             items: grp.map(i => ({ tipo: i.tipo, id: i.item_id })),
             usuario_creacion: user.id,
           });
         })
       );
 
-      const encIds = results.map((r: any) => r?.enc?.id).filter(Boolean) as number[];
-      const plates = [...byVehicle.entries()]
-        .map(([vid]) => assignments.find(a => a.vehicle_id === vid)?.plate ?? vid)
-        .join(', ');
-
       toast.success(`Asignaciones guardadas: ${allItems.length} registro(s) en ${byVehicle.size} placa(s)`);
       setShowModal(false);
-      setEmailDialog({ open: true, encIds, plates });
+      onSaved();
     } catch (e: any) {
       toast.error('Error al guardar: ' + (e?.message ?? 'Error desconocido'));
     } finally {
@@ -4902,12 +4169,6 @@ function FlowRegistrosAPlaca({ user, assignments, despachos, citas, onBack, onSa
 
   return (
     <div className="max-w-6xl mx-auto">
-      <EmailConfirmDialog
-        open={emailDialog.open}
-        plate={emailDialog.plates}
-        onSend={handleEmailDialogSendB}
-        onSkip={() => { setEmailDialog({ open: false, encIds: [], plates: '' }); onSaved(); }}
-      />
       <GuardarPlanillaModal
         open={showModal}
         plate={modalPlate}
@@ -4987,236 +4248,6 @@ function FlowRegistrosAPlaca({ user, assignments, despachos, citas, onBack, onSa
   );
 }
 
-// ── Correos Tab ────────────────────────────────────────────────────────────────
-
-interface NotifCorreo {
-  id: number;
-  enc_id: number | null;
-  confeccionista_id: number | null;
-  confeccionista_nombre: string | null;
-  confeccionista_email: string | null;
-  placa: string | null;
-  placa_actual: string | null;
-  fecha_cita: string | null;
-  conductor_nombre: string | null;
-  cedula_conductor: string | null;
-  celular_conductor: string | null;
-  lotes: string | null;
-  ruta_descripcion: string | null;
-  from_email: string | null;
-  from_provider: string | null;
-  estado: 'pendiente' | 'enviado' | 'cancelado';
-  sent_at: string | null;
-  created_at: string;
-  remesa: string | null;
-  manifiesto: string | null;
-  conf_nombre_actual: string | null;
-  conf_email_actual: string | null;
-  conf_ciudad: string | null;
-}
-
-const ESTADO_CORREO_LABELS: Record<string, { label: string; cls: string }> = {
-  pendiente:  { label: 'Pendiente',  cls: 'bg-amber-100 text-amber-700' },
-  enviado:    { label: 'Enviado',    cls: 'bg-emerald-100 text-emerald-700' },
-  cancelado:  { label: 'Cancelado', cls: 'bg-red-100 text-red-700' },
-};
-
-function CorreosTab({ user }: { user: User }) {
-  const [rows, setRows] = useState<NotifCorreo[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [filtroEstado, setFiltroEstado] = useState<string>('pendiente');
-  const [fechaDesde, setFechaDesde] = useState('');
-  const [fechaHasta, setFechaHasta] = useState('');
-  const [sending, setSending] = useState<number | null>(null);
-  const [updating, setUpdating] = useState<number | null>(null);
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const data = await api.dogamaGetNotifCorreos({
-        estado: filtroEstado === 'todos' ? undefined : filtroEstado,
-        fecha_desde: fechaDesde || undefined,
-        fecha_hasta: fechaHasta || undefined,
-      });
-      setRows(Array.isArray(data) ? data : []);
-    } catch { toast.error('Error al cargar notificaciones'); }
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, [filtroEstado, fechaDesde, fechaHasta]);
-
-  const handleSend = async (notif: NotifCorreo) => {
-    if (!notif.confeccionista_email && !notif.conf_email_actual) {
-      toast.error('El confeccionista no tiene correo registrado');
-      return;
-    }
-    setSending(notif.id);
-    try {
-      await api.dogamaSendNotifCorreo(notif.id);
-      toast.success(`Correo enviado a ${notif.confeccionista_email ?? notif.conf_email_actual}`);
-      setRows(prev => prev.map(r => r.id === notif.id ? { ...r, estado: 'enviado' } : r));
-    } catch (e: any) {
-      toast.error('Error al enviar: ' + (e?.message ?? 'Error desconocido'));
-    }
-    setSending(null);
-  };
-
-  const handleUpdateEstado = async (notif: NotifCorreo, estado: 'pendiente' | 'enviado' | 'cancelado') => {
-    setUpdating(notif.id);
-    try {
-      await api.dogamaUpdateNotifCorreo(notif.id, estado);
-      setRows(prev => prev.map(r => r.id === notif.id ? { ...r, estado } : r));
-    } catch { toast.error('Error al actualizar estado'); }
-    setUpdating(null);
-  };
-
-  const correosColumns: ColumnDef<NotifCorreo>[] = [
-    {
-      header: 'Confeccionista', key: 'confeccionista_nombre', sortable: true,
-      render: r => {
-        const nombre = r.conf_nombre_actual ?? r.confeccionista_nombre ?? '—';
-        return (
-          <div>
-            <p className="font-semibold text-slate-800 text-xs">{nombre}</p>
-            {r.conf_ciudad && <p className="text-[10px] text-slate-400">{r.conf_ciudad}</p>}
-          </div>
-        );
-      },
-      exportRender: r => r.conf_nombre_actual ?? r.confeccionista_nombre ?? '',
-    },
-    {
-      header: 'Email', key: 'confeccionista_email', sortable: true,
-      render: r => {
-        const correo = r.conf_email_actual ?? r.confeccionista_email;
-        return correo
-          ? <span className="text-indigo-700 font-medium text-xs">{correo}</span>
-          : <span className="text-red-400 text-[11px]">Sin correo</span>;
-      },
-      exportRender: r => r.conf_email_actual ?? r.confeccionista_email ?? '',
-    },
-    {
-      header: 'Lote(s)', key: 'lotes', sortable: true,
-      render: r => <span className="text-slate-600 text-xs">{r.lotes ?? '—'}</span>,
-    },
-    {
-      header: 'Fecha Cita', key: 'fecha_cita', sortable: true,
-      render: r => {
-        if (!r.fecha_cita) return <span className="text-slate-300">—</span>;
-        return <span className="text-slate-600 text-xs">{new Date(r.fecha_cita + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}</span>;
-      },
-    },
-    {
-      header: 'Placa', key: 'placa', sortable: true,
-      render: r => <span className="font-mono font-black text-slate-700 tracking-widest text-xs">{r.placa_actual ?? r.placa ?? '—'}</span>,
-      exportRender: r => r.placa_actual ?? r.placa ?? '',
-    },
-    {
-      header: 'Conductor', key: 'conductor_nombre', sortable: true,
-      render: r => <span className="text-slate-700 text-xs">{r.conductor_nombre ?? '—'}</span>,
-    },
-    {
-      header: 'Cédula', key: 'cedula_conductor', sortable: true,
-      render: r => <span className="text-slate-600 text-xs">{r.cedula_conductor ?? '—'}</span>,
-    },
-    {
-      header: 'Celular', key: 'celular_conductor', sortable: true,
-      render: r => <span className="text-slate-600 text-xs">{r.celular_conductor ?? '—'}</span>,
-    },
-    {
-      header: 'Estado', key: 'estado', sortable: true,
-      render: r => {
-        const meta = ESTADO_CORREO_LABELS[r.estado] ?? { label: r.estado, cls: 'bg-slate-100 text-slate-600' };
-        return (
-          <div>
-            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${meta.cls}`}>{meta.label}</span>
-            {r.sent_at && (
-              <p className="text-[10px] text-slate-400 mt-0.5">
-                {new Date(r.sent_at).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-              </p>
-            )}
-          </div>
-        );
-      },
-    },
-    {
-      header: 'Acciones', key: 'id',
-      render: r => {
-        const correo = r.conf_email_actual ?? r.confeccionista_email;
-        const isSending  = sending  === r.id;
-        const isUpdating = updating === r.id;
-        return (
-          <div className="flex gap-1.5 flex-wrap">
-            {r.estado === 'pendiente' && (
-              <>
-                <button onClick={() => handleSend(r)} disabled={isSending || !correo}
-                  title={!correo ? 'Sin correo registrado' : 'Enviar correo'}
-                  className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold hover:bg-indigo-700 disabled:opacity-40 transition flex items-center gap-1">
-                  {isSending
-                    ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    : <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                      </svg>}
-                  Enviar
-                </button>
-                <button onClick={() => handleUpdateEstado(r, 'cancelado')} disabled={isUpdating}
-                  className="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-[11px] font-bold hover:bg-red-100 disabled:opacity-40 transition">
-                  Cancelar
-                </button>
-              </>
-            )}
-            {r.estado === 'cancelado' && (
-              <button onClick={() => handleUpdateEstado(r, 'pendiente')} disabled={isUpdating}
-                className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-[11px] font-bold hover:bg-amber-100 disabled:opacity-40 transition">
-                Reactivar
-              </button>
-            )}
-            {r.estado === 'enviado' && (
-              <span className="text-[11px] text-emerald-600 font-bold">✓ Entregado</span>
-            )}
-          </div>
-        );
-      },
-    },
-  ];
-
-  return (
-    <div className="max-w-7xl mx-auto">
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-3 mb-5 items-center">
-        <div className="flex gap-1">
-          {(['pendiente', 'enviado', 'cancelado', 'todos'] as const).map(e => (
-            <button key={e} onClick={() => setFiltroEstado(e)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${filtroEstado === e ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-              {e === 'todos' ? 'Todos' : ESTADO_CORREO_LABELS[e]?.label}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-2 items-center">
-          <label className="text-xs font-bold text-slate-500">Desde</label>
-          <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)}
-            className="text-xs border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-          <label className="text-xs font-bold text-slate-500">Hasta</label>
-          <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)}
-            className="text-xs border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-        </div>
-        <button onClick={load} disabled={loading}
-          className="ml-auto px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition disabled:opacity-50">
-          {loading ? 'Cargando…' : 'Actualizar'}
-        </button>
-      </div>
-
-      <DataTable
-        data={rows}
-        columns={correosColumns}
-        loading={loading}
-        searchPlaceholder="Buscar confeccionista, placa, referencia..."
-        excelFileName="envio_correos_confeccionistas.xlsx"
-        excelSheetName="Correos"
-      />
-    </div>
-  );
-}
-
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function CitasDespachosCarga({ user }: Props) {
@@ -5232,7 +4263,6 @@ export default function CitasDespachosCarga({ user }: Props) {
           { key: 'asignacion', label: 'Asignación Placa × Planilla' },
           { key: 'despachos',  label: 'Despachos Dogama' },
           { key: 'citas',      label: 'Citas / Recogidas' },
-          { key: 'correos',    label: 'Envío de Correos' },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`px-5 py-2.5 text-sm font-bold rounded-t-2xl transition border-b-2 -mb-px ${
@@ -5244,7 +4274,6 @@ export default function CitasDespachosCarga({ user }: Props) {
       {tab === 'asignacion' && <AsignacionPlacaTab user={user} />}
       {tab === 'despachos'  && <DespachoTab user={user} />}
       {tab === 'citas'      && <CitasTab user={user} />}
-      {tab === 'correos'    && <CorreosTab user={user} />}
     </div>
   );
 }

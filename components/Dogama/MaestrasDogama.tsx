@@ -1895,13 +1895,344 @@ function FleteTab({ user }: { user: User }) {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
+const VARS_CORREO = [
+  { key: '{{confeccionista}}', label: 'Confeccionista' },
+  { key: '{{ciudad}}',         label: 'Ciudad' },
+  { key: '{{placa}}',          label: 'Placa' },
+  { key: '{{conductor}}',      label: 'Conductor' },
+  { key: '{{cedula}}',         label: 'Cédula conductor' },
+  { key: '{{celular}}',        label: 'Celular conductor' },
+  { key: '{{fecha}}',          label: 'Fecha cita' },
+  { key: '{{lotes}}',          label: 'Lote(s)' },
+  { key: '{{remesa}}',         label: 'Remesa' },
+  { key: '{{manifiesto}}',     label: 'Manifiesto' },
+];
+
+const EJEMPLO_VARS: Record<string, string> = {
+  '{{confeccionista}}': 'CREACIONES LYN',
+  '{{ciudad}}':         'DON MATIAS',
+  '{{placa}}':          'FSU230',
+  '{{conductor}}':      'KEINER MARQUEZ',
+  '{{cedula}}':         '1037524189',
+  '{{celular}}':        '304 3963491',
+  '{{fecha}}':          'martes, 24 de junio de 2026',
+  '{{lotes}}':          'L-31053, L-31033',
+  '{{remesa}}':         'M76879',
+  '{{manifiesto}}':     'M-87UYUI',
+};
+
+// ── Auxiliares de Mesa ────────────────────────────────────────────────────────
+
+interface AuxiliarMesa {
+  id: number;
+  nombre: string;
+  estado_id: string;
+  estado_nombre: string | null;
+  usuario_creacion: number | null;
+  usuario_nombre: string | null;
+  fecha_creacion: string;
+}
+
+function AuxiliaresMesaTab({ user }: { user: User }) {
+  const [rows, setRows] = useState<AuxiliarMesa[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState<{ open: boolean; editing: AuxiliarMesa | null }>({ open: false, editing: null });
+  const [form, setForm] = useState({ nombre: '', estado_id: 'EST-01' });
+  const [saving, setSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<AuxiliarMesa | null>(null);
+  const [estados, setEstados] = useState<{ id: string; name: string }[]>([]);
+
+  const canCreate = hasPermission(user, 'MAESTRAS_DOGAMA', 'create');
+  const canEdit   = hasPermission(user, 'MAESTRAS_DOGAMA', 'edit');
+  const canDelete = hasPermission(user, 'MAESTRAS_DOGAMA', 'delete');
+
+  useEffect(() => {
+    api.getEstados().then((d: any[]) => setEstados(Array.isArray(d) ? d : [])).catch(() => {});
+  }, []);
+
+  const load = async () => {
+    setLoading(true);
+    try { setRows(await api.dogamaGetAuxiliaresMesa() as AuxiliarMesa[]); }
+    catch { toast.error('Error al cargar auxiliares de mesa'); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const openNew  = () => { setForm({ nombre: '', estado_id: 'EST-01' }); setModal({ open: true, editing: null }); };
+  const openEdit = (r: AuxiliarMesa) => { setForm({ nombre: r.nombre, estado_id: r.estado_id }); setModal({ open: true, editing: r }); };
+
+  const handleSave = async () => {
+    if (!form.nombre.trim()) { toast.error('El nombre es obligatorio'); return; }
+    setSaving(true);
+    try {
+      if (modal.editing) {
+        await api.dogamaUpdateAuxiliarMesa(modal.editing.id, form);
+        toast.success('Actualizado');
+      } else {
+        await api.dogamaCreateAuxiliarMesa({ ...form, usuario_creacion: user.id });
+        toast.success('Creado');
+      }
+      setModal({ open: false, editing: null }); load();
+    } catch (e: any) { toast.error(e?.message || 'Error al guardar'); }
+    finally { setSaving(false); }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try { await api.dogamaDeleteAuxiliarMesa(deleteTarget.id); toast.success('Eliminado'); setDeleteTarget(null); load(); }
+    catch { toast.error('Error al eliminar'); }
+  };
+
+  const columns: ColumnDef<AuxiliarMesa>[] = [
+    { header: '#', key: 'id', sortable: true, render: r => <span className="text-slate-400 text-xs">{r.id}</span> },
+    { header: 'Nombre', key: 'nombre', sortable: true, render: r => <span className="font-semibold text-slate-800">{r.nombre}</span> },
+    { header: 'Estado', key: 'estado_id', sortable: true, render: r => (
+      <span className={`inline-flex px-2 py-0.5 rounded-lg text-[10px] font-bold ${r.estado_id === 'EST-01' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+        {r.estado_nombre ?? r.estado_id}
+      </span>
+    )},
+    { header: 'Creado por', key: 'usuario_nombre', sortable: false, render: r => <span className="text-slate-500 text-xs">{r.usuario_nombre ?? '—'}</span> },
+    { header: 'Fecha creación', key: 'fecha_creacion', sortable: true, render: r => (
+      <span className="text-slate-400 text-xs">{r.fecha_creacion ? new Date(r.fecha_creacion).toLocaleDateString('es-CO') : '—'}</span>
+    )},
+    { header: 'Acciones', key: 'acciones', sortable: false, render: r => (
+      <div className="flex gap-1">
+        {canEdit && (
+          <button onClick={() => openEdit(r)} title="Editar"
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-indigo-50 text-indigo-500 transition">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+        )}
+        {canDelete && (
+          <button onClick={() => setDeleteTarget(r)} title="Eliminar"
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-red-400 transition">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        )}
+      </div>
+    )},
+  ];
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h2 className="text-lg font-black text-slate-700">Auxiliares de Mesa</h2>
+          <p className="text-slate-400 text-xs">Personal auxiliar que apoya el cargue en mesa</p>
+        </div>
+        {canCreate && (
+          <button onClick={openNew}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/></svg>
+            Nuevo auxiliar
+          </button>
+        )}
+      </div>
+
+      <DataTable<AuxiliarMesa>
+        data={rows} columns={columns} loading={loading}
+        searchPlaceholder="Buscar auxiliar..."
+        excelFileName="auxiliares_mesa_dogama.xlsx" excelSheetName="Auxiliares"
+      />
+
+      {/* Modal crear/editar */}
+      {modal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100">
+              <h3 className="text-base font-black text-slate-800">{modal.editing ? 'Editar auxiliar' : 'Nuevo auxiliar'}</h3>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Nombre *</label>
+                <input value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                  placeholder="Nombre completo del auxiliar" autoFocus />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Estado</label>
+                <select value={form.estado_id} onChange={e => setForm(f => ({ ...f, estado_id: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                  {estados.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+              <button onClick={() => setModal({ open: false, editing: null })}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">
+                Cancelar
+              </button>
+              <button onClick={handleSave} disabled={saving}
+                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition disabled:opacity-50">
+                {saving ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm delete */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xs mx-4 p-6 text-center">
+            <p className="text-base font-bold text-slate-700 mb-2">¿Eliminar auxiliar?</p>
+            <p className="text-sm text-slate-500 mb-4"><b>{deleteTarget.nombre}</b></p>
+            <div className="flex justify-center gap-3">
+              <button onClick={() => setDeleteTarget(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">
+                Cancelar
+              </button>
+              <button onClick={confirmDelete}
+                className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-bold transition">
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PlantillaCorreoTab({ user }: { user: User }) {
+  const [subject, setSubject] = useState('');
+  const [body, setBody]       = useState('');
+  const [loading, setLoading] = useState(true);
+  const [saving,  setSaving]  = useState(false);
+  const [preview, setPreview] = useState(false);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    api.dogamaGetEmailTemplate().then((t: any) => {
+      if (t) { setSubject(t.subject ?? ''); setBody(t.body ?? ''); }
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const insertVar = (varKey: string) => {
+    const el = bodyRef.current;
+    if (!el) { setBody(b => b + varKey); return; }
+    const start = el.selectionStart ?? body.length;
+    const end   = el.selectionEnd   ?? body.length;
+    const newBody = body.slice(0, start) + varKey + body.slice(end);
+    setBody(newBody);
+    setTimeout(() => { el.focus(); el.setSelectionRange(start + varKey.length, start + varKey.length); }, 0);
+  };
+
+  const applyPreview = (text: string) =>
+    text.replace(/\{\{(\w+)\}\}/g, (match) => EJEMPLO_VARS[match] ?? match);
+
+  const handleSave = async () => {
+    if (!subject.trim() || !body.trim()) { toast.error('Asunto y cuerpo son obligatorios'); return; }
+    setSaving(true);
+    try {
+      await api.dogamaSaveEmailTemplate(subject, body, user.id);
+      toast.success('Plantilla guardada correctamente');
+    } catch { toast.error('Error al guardar la plantilla'); }
+    setSaving(false);
+  };
+
+  if (loading) return <div className="py-20 text-center text-slate-400 text-sm">Cargando plantilla…</div>;
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="text-base font-black text-slate-800">Plantilla de Correo</h3>
+            <p className="text-xs text-slate-400 mt-0.5">Esta plantilla se usa para todos los correos enviados a confeccionistas</p>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setPreview(p => !p)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition border ${preview ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+              {preview ? 'Editar' : 'Vista previa'}
+            </button>
+            <button onClick={handleSave} disabled={saving}
+              className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition disabled:opacity-50">
+              {saving ? 'Guardando…' : 'Guardar plantilla'}
+            </button>
+          </div>
+        </div>
+
+        {/* Variables disponibles */}
+        <div className="mb-4">
+          <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Variables — haga clic para insertar en el cuerpo</p>
+          <div className="flex flex-wrap gap-1.5">
+            {VARS_CORREO.map(v => (
+              <button key={v.key} onClick={() => insertVar(v.key)}
+                className="px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200 text-indigo-700 text-[11px] font-bold hover:bg-indigo-100 transition">
+                {v.label}
+                <span className="ml-1 text-indigo-400 font-normal">{v.key}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Asunto */}
+        <div className="mb-4">
+          <label className="block text-xs font-bold text-slate-600 mb-1.5">Asunto del correo</label>
+          <input
+            value={subject}
+            onChange={e => setSubject(e.target.value)}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            placeholder="Ej: Notificación de cita — {{placa}}"
+          />
+          {preview && (
+            <p className="mt-1.5 text-xs text-slate-500 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+              <span className="font-bold text-amber-700">Vista previa: </span>{applyPreview(subject)}
+            </p>
+          )}
+        </div>
+
+        {/* Cuerpo */}
+        <div>
+          <label className="block text-xs font-bold text-slate-600 mb-1.5">Cuerpo del correo</label>
+          {!preview ? (
+            <textarea
+              ref={bodyRef}
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              rows={14}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-y"
+              placeholder="Escriba el cuerpo del correo. Use los botones de variables para insertar datos dinámicos..."
+            />
+          ) : (
+            <div className="border border-slate-200 rounded-xl overflow-hidden">
+              {/* Encabezado simulado del email */}
+              <div className="bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-5 text-center">
+                <p className="text-indigo-200 text-[10px] font-bold uppercase tracking-widest">MILLA SIE7E GRUPO LOGÍSTICO</p>
+                <p className="text-white font-black text-lg mt-1">Notificación de Recogida</p>
+              </div>
+              {/* Cuerpo */}
+              <div className="px-6 py-5 bg-white text-sm text-slate-700 leading-relaxed whitespace-pre-line">
+                {applyPreview(body)}
+              </div>
+              {/* Pie */}
+              <div className="bg-slate-50 border-t border-slate-200 px-6 py-3 text-center">
+                <p className="text-slate-400 text-[11px]">MILLA SIE7E S.A.S. · OrbitM7 Sistema de Gestión Logística</p>
+                <p className="text-slate-400 text-[11px] mt-0.5">WhatsApp: 3011825161 · directorti@millasiete.com</p>
+              </div>
+            </div>
+          )}
+          <p className="text-[10px] text-slate-400 mt-1.5">
+            Los saltos de línea se respetan. Las variables entre {'{{'} {'}'} se reemplazan con datos reales al enviar.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const TABS = [
   { key: 'confeccionistas', label: 'Confeccionistas' },
   { key: 'marcas', label: 'Marcas Dogama' },
   { key: 'tipos-prenda', label: 'Tipos de Prendas' },
   { key: 'tipos-oc', label: 'Tipos OC' },
   { key: 'vinculacion-correo', label: 'Vinculación Correo' },
+  { key: 'plantilla-correo', label: 'Plantilla Correo' },
   { key: 'fletes', label: 'Flete y/o Int' },
+  { key: 'auxiliares-mesa', label: 'Auxiliares Mesa' },
 ];
 
 export default function MaestrasDogama({ user }: Props) {
@@ -1932,7 +2263,9 @@ export default function MaestrasDogama({ user }: Props) {
       {tab === 'tipos-prenda' && <CatalogTab user={user} table="dogama_tipos_prenda" label="Tipo de Prenda" />}
       {tab === 'tipos-oc' && <CatalogTab user={user} table="dogama_tipos_oc" label="Tipo OC" />}
       {tab === 'vinculacion-correo' && <VinculacionCorreoTab user={user} />}
+      {tab === 'plantilla-correo'  && <PlantillaCorreoTab user={user} />}
       {tab === 'fletes' && <FleteTab user={user} />}
+      {tab === 'auxiliares-mesa' && <AuxiliaresMesaTab user={user} />}
     </div>
   );
 }

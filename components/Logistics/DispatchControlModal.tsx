@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { Icons } from '../../constants';
 
 interface DispatchControlModalProps {
@@ -43,8 +43,9 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
     itemPickingModes,
     setItemPickingModes
 }) => {
-    if (!isOpen) return null;
+    const scanDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    if (!isOpen) return null;
 
     return (
         <div className="fixed inset-0 z-[700] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
@@ -75,17 +76,23 @@ const DispatchControlModal: React.FC<DispatchControlModalProps> = ({
                             onChange={(e) => {
                                 const val = e.target.value;
                                 if (val.includes('Ñ') || val.includes(':')) {
-                                    setTimeout(() => {
+                                    if (scanDebounceRef.current) clearTimeout(scanDebounceRef.current);
+                                    scanDebounceRef.current = setTimeout(() => {
                                         const finalVal = document.getElementById('m7-dispatch-barcode-input') as HTMLInputElement;
-                                        if (finalVal && (finalVal.value.includes('Ñ') || finalVal.value.includes(':'))) {
+                                        if (finalVal && finalVal.value && (finalVal.value.includes('Ñ') || finalVal.value.includes(':'))) {
                                             handleBarcodeScan(finalVal.value.trim());
                                             finalVal.value = '';
                                         }
-                                    }, 100);
+                                        scanDebounceRef.current = null;
+                                    }, 180);
                                 }
                             }}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
+                                    if (scanDebounceRef.current) {
+                                        clearTimeout(scanDebounceRef.current);
+                                        scanDebounceRef.current = null;
+                                    }
                                     const val = e.currentTarget.value.trim();
                                     if (val) {
                                         handleBarcodeScan(val);

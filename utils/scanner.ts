@@ -5,11 +5,35 @@
  * para extraer siempre el SKU real mas significativo.
  *
  * Formatos soportados:
- *  - PDF417 Ajover:   D403199:BL:1:A010236539  → D403199
+ *  - PDF417 Ajover (lectora A): D403199:BL:1:A010236539  → D403199
+ *  - PDF417 Ajover (lectora B): D403199ÑBLÑ1ÑA010236539  → D403199  (Ñ en lugar de :)
  *  - GS1-128:         (01)07898357... / \x1D prefijos
  *  - Hardware prefix: S4:D403199, ID:D403199, SKU:D403199
  *  - 1D barcodes:     codigo limpio sin separadores
  */
+
+/** Detecta el separador de campo del código de barras (: o Ñ) */
+export const detectBarcodeSep = (raw: string): ':' | 'Ñ' | null => {
+  const up = raw.toUpperCase();
+  if (up.includes('Ñ')) return 'Ñ';
+  if (up.includes(':')) return ':';
+  return null;
+};
+
+/**
+ * Extrae la cantidad embebida en el código de barras (campo después del tipo, antes del lote).
+ * Formato: SKU<sep>TIPO<sep>CANTIDAD<sep>LOTE<sep>...
+ * Retorna 1 si no se detecta cantidad válida.
+ */
+export const extractQtyFromBarcode = (raw: string): number => {
+  const sep = detectBarcodeSep(raw);
+  if (!sep) return 1;
+  const parts = raw.toUpperCase().split(sep).map(p => p.trim());
+  // Buscar primer campo numérico ≤4 dígitos después del primero (que es el SKU)
+  const found = parts.slice(1).find(p => p.length > 0 && p.length <= 4 && /^\d+$/.test(p));
+  return found ? Number(found) : 1;
+};
+
 export const cleanSkuM7 = (raw: string): string => {
   if (!raw) return '';
 
