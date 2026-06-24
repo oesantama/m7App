@@ -4801,7 +4801,7 @@ interface NotifCorreo {
   conductor_nombre: string | null;
   cedula_conductor: string | null;
   celular_conductor: string | null;
-  referencias: string | null;
+  lotes: string | null;
   ruta_descripcion: string | null;
   from_email: string | null;
   from_provider: string | null;
@@ -4895,8 +4895,8 @@ function CorreosTab({ user }: { user: User }) {
       exportRender: r => r.conf_email_actual ?? r.confeccionista_email ?? '',
     },
     {
-      header: 'Referencia(s)', key: 'referencias', sortable: true,
-      render: r => <span className="text-slate-600 text-xs">{r.referencias ?? '—'}</span>,
+      header: 'Lote(s)', key: 'lotes', sortable: true,
+      render: r => <span className="text-slate-600 text-xs">{r.lotes ?? '—'}</span>,
     },
     {
       header: 'Fecha Cita', key: 'fecha_cita', sortable: true,

@@ -1163,13 +1163,6 @@ const ensureDonamaTables = async () => {
       ADD COLUMN IF NOT EXISTS placa VARCHAR(20)
   `);
 
-  // ── 9. Columnas extra en dogama_notif_correos ──────────────────────────────
-  await pool.query(`
-    ALTER TABLE dogama_notif_correos
-      ADD COLUMN IF NOT EXISTS cedula_conductor  VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS celular_conductor VARCHAR(50),
-      ADD COLUMN IF NOT EXISTS referencias       TEXT
-  `);
 };
 
 // Alias para compatibilidad con llamadas previas
@@ -1436,15 +1429,27 @@ export const getNotifCorreos = async (req: Request, res: Response): Promise<void
     await ensureDonamaTables();
     const r = await pool.query(`
       SELECT nc.*,
-             dc.descripcion_conf AS conf_nombre_actual,
-             dc.correo           AS conf_email_actual,
-             dc.ciudad           AS conf_ciudad,
+             dc.descripcion_conf  AS conf_nombre_actual,
+             dc.correo            AS conf_email_actual,
+             dc.ciudad            AS conf_ciudad,
              enc.remesa, enc.manifiesto, enc.fecha AS enc_fecha,
-             v.plate             AS placa_actual
+             v.plate              AS placa_actual,
+             d.document_number    AS cedula_conductor,
+             d.phone              AS celular_conductor,
+             (
+               SELECT string_agg(DISTINCT COALESCE(dd.lote, cr.lote), ', ' ORDER BY COALESCE(dd.lote, cr.lote))
+               FROM dogama_planillas_historial ph
+               LEFT JOIN dogama_despachos dd       ON dd.id = ph.despacho_id AND ph.tipo = 'despacho'
+               LEFT JOIN dogama_citas_recogidas cr  ON cr.id = ph.cita_id    AND ph.tipo = 'cita'
+               WHERE ph.enc_id = nc.enc_id
+                 AND COALESCE(ph.confeccionista_id_directo, dd.confeccionista_id, cr.proveedor_id) = nc.confeccionista_id
+                 AND COALESCE(dd.lote, cr.lote) IS NOT NULL
+             ) AS lotes
       FROM dogama_notif_correos nc
       LEFT JOIN dogama_enc_planillas_historial enc ON enc.id = nc.enc_id
       LEFT JOIN dogama_confeccionistas dc ON dc.id = nc.confeccionista_id
-      LEFT JOIN vehicles v ON v.id = enc.vehicle_id
+      LEFT JOIN vehicles v  ON v.id  = enc.vehicle_id
+      LEFT JOIN drivers  d  ON d.id  = enc.conductor_id
       ${whereStr}
       ORDER BY nc.created_at DESC
       LIMIT 500
@@ -1470,11 +1475,9 @@ export const createNotifCorreos = async (req: Request, res: Response): Promise<v
     const enc = encR.rows[0];
 
     const conductorR = await pool.query(
-      `SELECT name, document_number, phone FROM drivers WHERE id=$1`, [enc.conductor_id]
+      `SELECT name FROM drivers WHERE id=$1`, [enc.conductor_id]
     );
-    const conductorNombre  = conductorR.rows[0]?.name            ?? null;
-    const cedulaConductor  = conductorR.rows[0]?.document_number ?? null;
-    const celularConductor = conductorR.rows[0]?.phone           ?? null;
+    const conductorNombre = conductorR.rows[0]?.name ?? null;
 
     // Confeccionistas únicos de la planilla
     const confR = await pool.query(`
@@ -1489,36 +1492,22 @@ export const createNotifCorreos = async (req: Request, res: Response): Promise<v
     const emailCfgR = await pool.query(
       `SELECT email, provider FROM dogama_email_config WHERE is_active=true ORDER BY created_at DESC LIMIT 1`
     );
-    const fromEmail   = emailCfgR.rows[0]?.email    ?? null;
+    const fromEmail    = emailCfgR.rows[0]?.email    ?? null;
     const fromProvider = emailCfgR.rows[0]?.provider ?? null;
 
     const inserted: any[] = [];
     for (const conf of confR.rows) {
-      // Referencias de este confeccionista en la planilla
-      const refR = await pool.query(`
-        SELECT COALESCE(dd.referencia, cr.referencia) AS ref
-        FROM dogama_planillas_historial ph
-        LEFT JOIN dogama_despachos dd      ON dd.id = ph.despacho_id AND ph.tipo='despacho'
-        LEFT JOIN dogama_citas_recogidas cr ON cr.id = ph.cita_id    AND ph.tipo='cita'
-        WHERE ph.enc_id = $1
-          AND COALESCE(ph.confeccionista_id_directo, dd.confeccionista_id, cr.proveedor_id) = $2
-          AND COALESCE(dd.referencia, cr.referencia) IS NOT NULL
-      `, [enc_id, conf.id]);
-      const referencias = refR.rows.map((x: any) => x.ref).filter(Boolean).join(', ') || null;
-
       const r = await pool.query(`
         INSERT INTO dogama_notif_correos
           (enc_id, confeccionista_id, confeccionista_nombre, confeccionista_email,
            placa, fecha_cita, conductor_nombre, ruta_descripcion,
-           cedula_conductor, celular_conductor, referencias,
            from_email, from_provider, estado, created_by)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pendiente',$14)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pendiente',$11)
         RETURNING *
       `, [
         enc_id, conf.id, conf.descripcion_conf, conf.correo ?? null,
         enc.plate ?? null, enc.fecha, conductorNombre,
         conf.ciudad ? `${enc.plate ?? ''} → ${conf.ciudad}` : (enc.plate ?? null),
-        cedulaConductor, celularConductor, referencias,
         fromEmail, fromProvider, created_by ?? null,
       ]);
       inserted.push(r.rows[0]);
