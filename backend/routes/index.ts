@@ -65,6 +65,7 @@ import capRoutes from './cap.routes.js';
 import noticiasRoutes from './noticias.routes.js';
 import dogamaRoutes from './dogama.routes.js';
 import helpdeskRoutes from './helpdesk.routes.js';
+import geoRoutes from './geo.routes.js';
 
 const router = Router();
 
@@ -133,6 +134,7 @@ router.use('/cap', capRoutes);
 router.use('/noticias', noticiasRoutes);
 router.use('/dogama', dogamaRoutes);
 router.use('/helpdesk', helpdeskRoutes);
+router.use('/geo', geoRoutes);
 
 // Endpoint seguro: devuelve la API key de Gemini del backend al frontend autenticado
 router.get('/config/gemini-key', (req: any, res) => {

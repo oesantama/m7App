@@ -39,6 +39,7 @@ export default function OperacionesFlotaManual({ user }: Props) {
   const [parseError, setParseError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [detectedFormat, setDetectedFormat] = useState<1 | 2>(1);
 
   // Results state
   const [activeTab, setActiveTab] = useState<'resumen' | 'detalle'>('resumen');
@@ -52,6 +53,18 @@ export default function OperacionesFlotaManual({ user }: Props) {
 
   const isSuperAdmin = user.role === 'SUPER_ADMIN' || user.role === 'ADMIN';
   const allowedIds = user.clientIds || [];
+
+  // Manual entry state
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [savingManual, setSavingManual] = useState(false);
+  const emptyManual = (): TdmRow & { clientId: string } => ({
+    clientId: '', manifiesto: '', fecha_operacion: today,
+    remesa: '', valor_cobrar: 0, valor_pagar: 0,
+    ciudad_origen: '', ciudad_destino: '', placa: '',
+  });
+  const [manualRow, setManualRow] = useState(emptyManual);
+  const setManual = (field: string, value: any) =>
+    setManualRow(prev => ({ ...prev, [field]: value }));
 
   useEffect(() => {
     api.getClients().then((res: any) => {
@@ -80,6 +93,68 @@ export default function OperacionesFlotaManual({ user }: Props) {
   };
 
   // ── Excel parsing ──────────────────────────────────────────────────────────
+
+  // Detecta si una celda tiene formato "CIUDAD DD/MM/YYYY" o "CIUDAD D/M/YYYY"
+  const TITULO_F2 = /^([A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ\s\.]+?)\s+(\d{1,2}\/\d{1,2}\/\d{4})\s*$/i;
+
+  const parseNumF2 = (v: any) =>
+    Number(String(v || '0').replace(/\./g, '').replace(/,/g, '.').replace(/[^0-9.-]/g, '')) || 0;
+
+  const parseFormat2 = (aoa: any[][], ciudadOrigen: string): TdmRow[] => {
+    const rows: TdmRow[] = [];
+    let i = 0;
+    while (i < aoa.length) {
+      // Buscar celda título: puede estar en columna 0 o 1
+      const rowCells = (aoa[i] || []).map(c => String(c ?? '').trim());
+      const titleCell = rowCells.find(c => TITULO_F2.test(c)) || '';
+      const m = titleCell.match(TITULO_F2);
+      if (m) {
+        const ciudadDestino = m[1].trim().toUpperCase();
+        const [dd, mm, yyyy] = m[2].split('/');
+        const fecha = `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+
+        // Leer hasta 12 filas del bloque, construir mapa label→valor
+        const block: Record<string, string> = {};
+        for (let j = i + 1; j < Math.min(i + 13, aoa.length); j++) {
+          const r = aoa[j] || [];
+          // Cada fila tiene pares [etiqueta, valor, etiqueta2, valor2]
+          for (let col = 0; col < r.length - 1; col += 2) {
+            const lbl = String(r[col] ?? '').trim().toUpperCase();
+            const val = String(r[col + 1] ?? '').trim();
+            if (lbl) block[lbl] = val;
+          }
+          // Si la siguiente fila empieza con otro título, parar
+          const nextTitle = String(r[0] ?? '').trim();
+          if (j > i + 1 && TITULO_F2.test(nextTitle)) break;
+        }
+
+        const manifiesto = block['MANIFIESTO'] || '';
+        if (!manifiesto) { i++; continue; }
+
+        rows.push({
+          manifiesto: manifiesto.toUpperCase(),
+          fecha_operacion: fecha,
+          remesa: block['REMESA'] || '',
+          valor_cobrar: parseNumF2(block['SOCODA']),   // SOCODA = valor CxC
+          valor_pagar:  parseNumF2(block['FLETE']),    // FLETE  = valor CxP
+          ciudad_origen: ciudadOrigen.trim().toUpperCase() || 'SIN CIUDAD',
+          ciudad_destino: ciudadDestino,
+          placa: (block['PLACA'] || '').toUpperCase(),
+        });
+      }
+      i++;
+    }
+    return rows;
+  };
+
+  const sheetHasFormat2 = (aoa: any[][]): boolean =>
+    aoa.slice(0, 8).some(row =>
+      (row || []).some(cell => {
+        const s = String(cell ?? '').trim();
+        return s.length > 5 && TITULO_F2.test(s);
+      })
+    );
+
   const parseFile = (file: File) => {
     setParseError('');
     setPreviewRows([]);
@@ -89,12 +164,43 @@ export default function OperacionesFlotaManual({ user }: Props) {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const wb = XLSX.read(data, { type: 'array', cellDates: true });
+
+        // ── Detectar formato 2 en CUALQUIER hoja del libro ────────────────────
+        const allAoas: Array<{ name: string; aoa: any[][] }> = wb.SheetNames.map(name => ({
+          name,
+          aoa: XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' }) as any[][],
+        }));
+
+        const f2Sheets = allAoas.filter(s => sheetHasFormat2(s.aoa));
+
+        if (f2Sheets.length > 0) {
+          setDetectedFormat(2);
+          const allRows: TdmRow[] = [];
+          for (const s of f2Sheets) {
+            allRows.push(...parseFormat2(s.aoa, 'GUARNE'));
+          }
+          if (allRows.length === 0) {
+            setParseError(`Formato 2 detectado (${f2Sheets.length} hoja(s)) pero no se encontraron bloques con MANIFIESTO.`);
+            return;
+          }
+          // Deduplicar por manifiesto
+          const seen = new Set<string>();
+          const unique = allRows.filter(r => {
+            if (seen.has(r.manifiesto)) return false;
+            seen.add(r.manifiesto);
+            return true;
+          });
+          setPreviewRows(unique);
+          return;
+        }
+
+        // ── Formato 1: columnas estándar (primera hoja) ───────────────────────
+        setDetectedFormat(1);
         const ws = wb.Sheets[wb.SheetNames[0]];
         const jsonRows: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' });
-
         if (jsonRows.length === 0) { setParseError('El archivo no tiene filas de datos.'); return; }
 
-        const normalize = (key: string): string => key.toLowerCase().replace(/\s+/g, '_');
+        const normalize = (key: string) => key.toLowerCase().replace(/\s+/g, '_');
         const mapped: TdmRow[] = [];
         const errs: string[] = [];
 
@@ -203,6 +309,41 @@ export default function OperacionesFlotaManual({ user }: Props) {
       setLoadingResults(false);
     }
   }, [filterFrom, filterTo, filterClient]);
+
+  const handleSaveManual = async () => {
+    if (!manualRow.clientId) { toast.error('Seleccione un cliente'); return; }
+    if (!manualRow.manifiesto.trim()) { toast.error('El manifiesto es obligatorio'); return; }
+    if (!manualRow.fecha_operacion) { toast.error('La fecha es obligatoria'); return; }
+    setSavingManual(true);
+    try {
+      const res = await api.uploadTdmManifiestos({
+        clientId: manualRow.clientId,
+        rows: [{
+          manifiesto: manualRow.manifiesto.trim().toUpperCase(),
+          fecha_operacion: manualRow.fecha_operacion,
+          remesa: manualRow.remesa.trim(),
+          valor_cobrar: Number(manualRow.valor_cobrar) || 0,
+          valor_pagar: Number(manualRow.valor_pagar) || 0,
+          ciudad_origen: manualRow.ciudad_origen.trim().toUpperCase() || 'SIN CIUDAD',
+          ciudad_destino: manualRow.ciudad_destino.trim().toUpperCase() || 'SIN CIUDAD',
+          placa: manualRow.placa.trim().toUpperCase(),
+        }],
+        uploadedBy: user.id,
+      });
+      if (res.success) {
+        toast.success(`Manifiesto ${manualRow.manifiesto} guardado correctamente`);
+        setManualRow(emptyManual());
+        setShowManualForm(false);
+        loadResults();
+      } else {
+        toast.error(res.error || 'Error al guardar');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error al guardar');
+    } finally {
+      setSavingManual(false);
+    }
+  };
 
   const handleDelete = async (id: number) => {
     setDeleting(id);
@@ -330,10 +471,19 @@ export default function OperacionesFlotaManual({ user }: Props) {
         {previewRows.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
-                Vista previa — {previewRows.length} filas
-              </p>
-              <button onClick={() => setPreviewRows([])}
+              <div className="flex items-center gap-2">
+                <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">
+                  Vista previa — {previewRows.length} filas
+                </p>
+                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                  detectedFormat === 2
+                    ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                    : 'bg-indigo-100 text-indigo-700 border border-indigo-200'
+                }`}>
+                  {detectedFormat === 2 ? 'Formato 2 — Bloque (origen: GUARNE)' : 'Formato 1 — Columnas'}
+                </span>
+              </div>
+              <button onClick={() => { setPreviewRows([]); setDetectedFormat(1); }}
                 className="text-[10px] font-black text-slate-400 hover:text-rose-500 uppercase tracking-widest transition-colors">
                 Limpiar
               </button>
@@ -381,6 +531,177 @@ export default function OperacionesFlotaManual({ user }: Props) {
                 className="flex items-center gap-2 px-8 py-3 bg-amber-500 text-white rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-amber-600 transition-all shadow-sm disabled:opacity-50">
                 <Upload size={15} />
                 {uploading ? 'Guardando...' : `Guardar ${previewRows.length} registros`}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Carga Manual ────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 space-y-5">
+        <button
+          onClick={() => setShowManualForm(v => !v)}
+          className="w-full flex items-center justify-between group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-indigo-50 rounded-2xl flex items-center justify-center">
+              <span className="text-indigo-600 text-base">✏️</span>
+            </div>
+            <div className="text-left">
+              <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Ingreso Manual</p>
+              <p className="text-xs text-slate-400 font-medium">Agregar un manifiesto individualmente</p>
+            </div>
+          </div>
+          <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${showManualForm ? 'rotate-180' : ''}`} />
+        </button>
+
+        {showManualForm && (
+          <div className="space-y-4 pt-2 border-t border-slate-100">
+            {/* Cliente */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Cliente *</label>
+                <div className="relative">
+                  <select value={manualRow.clientId} onChange={e => setManual('clientId', e.target.value)}
+                    className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-400 transition-all bg-white appearance-none pr-10">
+                    <option value="">-- Seleccionar cliente --</option>
+                    {clients.map(c => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Manifiesto */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Manifiesto *</label>
+                <input
+                  type="text"
+                  value={manualRow.manifiesto}
+                  onChange={e => setManual('manifiesto', e.target.value.toUpperCase())}
+                  placeholder="Ej. MANI-001"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm font-bold uppercase outline-none focus:border-indigo-400 transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Fecha */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha Operacion *</label>
+                <input
+                  type="date"
+                  value={manualRow.fecha_operacion}
+                  onChange={e => setManual('fecha_operacion', e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-400 transition-all"
+                />
+              </div>
+
+              {/* Remesa */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Remesa</label>
+                <input
+                  type="text"
+                  value={manualRow.remesa}
+                  onChange={e => setManual('remesa', e.target.value.toUpperCase())}
+                  placeholder="Ej. REM-001"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm font-bold uppercase outline-none focus:border-indigo-400 transition-all"
+                />
+              </div>
+
+              {/* Placa */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Placa</label>
+                <input
+                  type="text"
+                  value={manualRow.placa}
+                  onChange={e => setManual('placa', e.target.value.toUpperCase())}
+                  placeholder="Ej. ABC123"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm font-bold uppercase outline-none focus:border-indigo-400 transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Valor Cobrar */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor a Cobrar</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={manualRow.valor_cobrar || ''}
+                  onChange={e => setManual('valor_cobrar', Number(e.target.value) || 0)}
+                  placeholder="$0"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-emerald-400 transition-all"
+                />
+              </div>
+
+              {/* Valor Pagar */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor a Pagar</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={manualRow.valor_pagar || ''}
+                  onChange={e => setManual('valor_pagar', Number(e.target.value) || 0)}
+                  placeholder="$0"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-rose-400 transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Ciudad Origen */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ciudad Origen</label>
+                <input
+                  type="text"
+                  value={manualRow.ciudad_origen}
+                  onChange={e => setManual('ciudad_origen', e.target.value.toUpperCase())}
+                  placeholder="Ej. MEDELLIN"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm font-bold uppercase outline-none focus:border-indigo-400 transition-all"
+                />
+              </div>
+
+              {/* Ciudad Destino */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ciudad Destino</label>
+                <input
+                  type="text"
+                  value={manualRow.ciudad_destino}
+                  onChange={e => setManual('ciudad_destino', e.target.value.toUpperCase())}
+                  placeholder="Ej. BOGOTA"
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm font-bold uppercase outline-none focus:border-indigo-400 transition-all"
+                />
+              </div>
+            </div>
+
+            {/* Preview card */}
+            {manualRow.manifiesto && (
+              <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-5 py-3 flex flex-wrap gap-4 text-xs font-bold text-indigo-800">
+                <span>📋 {manualRow.manifiesto}</span>
+                {manualRow.fecha_operacion && <span>📅 {fmtDate(manualRow.fecha_operacion)}</span>}
+                {manualRow.remesa && <span>🔖 {manualRow.remesa}</span>}
+                {manualRow.placa && <span>🚛 {manualRow.placa}</span>}
+                {manualRow.valor_cobrar > 0 && <span className="text-emerald-700">💰 {fmt(manualRow.valor_cobrar)}</span>}
+                {manualRow.valor_pagar > 0 && <span className="text-rose-600">📤 {fmt(manualRow.valor_pagar)}</span>}
+                {manualRow.ciudad_origen && <span>📍 {manualRow.ciudad_origen} → {manualRow.ciudad_destino || '?'}</span>}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => { setManualRow(emptyManual()); setShowManualForm(false); }}
+                className="px-5 py-2.5 border border-slate-200 text-slate-600 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-50 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveManual}
+                disabled={savingManual}
+                className="flex items-center gap-2 px-8 py-2.5 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-sm disabled:opacity-50"
+              >
+                <Upload size={13} />
+                {savingManual ? 'Guardando...' : 'Guardar Manifiesto'}
               </button>
             </div>
           </div>

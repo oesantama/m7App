@@ -1655,6 +1655,11 @@ export const api = {
   deleteTdmManifiesto: (id: number) =>
     fetchJson(`${API_URL}/flota/tdm/manifiestos/${id}`, { method: 'DELETE' }),
 
+  lookupCities: (cities: string[]): Promise<{ mapping: Record<string, string> }> =>
+    fetchJson(`${API_URL}/geo/lookup-cities`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cities }),
+    }),
+
   // ─── MÓDULO CAPACITACIONES (cap_*) ──────────────────────────────────────────
   capGetCapacitaciones: (cedula?: string, cedulaSelf?: string) => {
     const p = new URLSearchParams();
