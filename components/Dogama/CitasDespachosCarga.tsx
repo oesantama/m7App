@@ -4799,6 +4799,9 @@ interface NotifCorreo {
   placa_actual: string | null;
   fecha_cita: string | null;
   conductor_nombre: string | null;
+  cedula_conductor: string | null;
+  celular_conductor: string | null;
+  referencias: string | null;
   ruta_descripcion: string | null;
   from_email: string | null;
   from_provider: string | null;
@@ -4867,10 +4870,117 @@ function CorreosTab({ user }: { user: User }) {
     setUpdating(null);
   };
 
-  const today = new Date().toLocaleDateString('en-CA');
+  const correosColumns: ColumnDef<NotifCorreo>[] = [
+    {
+      header: 'Confeccionista', key: 'confeccionista_nombre', sortable: true,
+      render: r => {
+        const nombre = r.conf_nombre_actual ?? r.confeccionista_nombre ?? '—';
+        return (
+          <div>
+            <p className="font-semibold text-slate-800 text-xs">{nombre}</p>
+            {r.conf_ciudad && <p className="text-[10px] text-slate-400">{r.conf_ciudad}</p>}
+          </div>
+        );
+      },
+      exportRender: r => r.conf_nombre_actual ?? r.confeccionista_nombre ?? '',
+    },
+    {
+      header: 'Email', key: 'confeccionista_email', sortable: true,
+      render: r => {
+        const correo = r.conf_email_actual ?? r.confeccionista_email;
+        return correo
+          ? <span className="text-indigo-700 font-medium text-xs">{correo}</span>
+          : <span className="text-red-400 text-[11px]">Sin correo</span>;
+      },
+      exportRender: r => r.conf_email_actual ?? r.confeccionista_email ?? '',
+    },
+    {
+      header: 'Referencia(s)', key: 'referencias', sortable: true,
+      render: r => <span className="text-slate-600 text-xs">{r.referencias ?? '—'}</span>,
+    },
+    {
+      header: 'Fecha Cita', key: 'fecha_cita', sortable: true,
+      render: r => {
+        if (!r.fecha_cita) return <span className="text-slate-300">—</span>;
+        return <span className="text-slate-600 text-xs">{new Date(r.fecha_cita + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}</span>;
+      },
+    },
+    {
+      header: 'Placa', key: 'placa', sortable: true,
+      render: r => <span className="font-mono font-black text-slate-700 tracking-widest text-xs">{r.placa_actual ?? r.placa ?? '—'}</span>,
+      exportRender: r => r.placa_actual ?? r.placa ?? '',
+    },
+    {
+      header: 'Conductor', key: 'conductor_nombre', sortable: true,
+      render: r => <span className="text-slate-700 text-xs">{r.conductor_nombre ?? '—'}</span>,
+    },
+    {
+      header: 'Cédula', key: 'cedula_conductor', sortable: true,
+      render: r => <span className="text-slate-600 text-xs">{r.cedula_conductor ?? '—'}</span>,
+    },
+    {
+      header: 'Celular', key: 'celular_conductor', sortable: true,
+      render: r => <span className="text-slate-600 text-xs">{r.celular_conductor ?? '—'}</span>,
+    },
+    {
+      header: 'Estado', key: 'estado', sortable: true,
+      render: r => {
+        const meta = ESTADO_CORREO_LABELS[r.estado] ?? { label: r.estado, cls: 'bg-slate-100 text-slate-600' };
+        return (
+          <div>
+            <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${meta.cls}`}>{meta.label}</span>
+            {r.sent_at && (
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                {new Date(r.sent_at).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      header: 'Acciones', key: 'id',
+      render: r => {
+        const correo = r.conf_email_actual ?? r.confeccionista_email;
+        const isSending  = sending  === r.id;
+        const isUpdating = updating === r.id;
+        return (
+          <div className="flex gap-1.5 flex-wrap">
+            {r.estado === 'pendiente' && (
+              <>
+                <button onClick={() => handleSend(r)} disabled={isSending || !correo}
+                  title={!correo ? 'Sin correo registrado' : 'Enviar correo'}
+                  className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold hover:bg-indigo-700 disabled:opacity-40 transition flex items-center gap-1">
+                  {isSending
+                    ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    : <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                      </svg>}
+                  Enviar
+                </button>
+                <button onClick={() => handleUpdateEstado(r, 'cancelado')} disabled={isUpdating}
+                  className="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-[11px] font-bold hover:bg-red-100 disabled:opacity-40 transition">
+                  Cancelar
+                </button>
+              </>
+            )}
+            {r.estado === 'cancelado' && (
+              <button onClick={() => handleUpdateEstado(r, 'pendiente')} disabled={isUpdating}
+                className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-[11px] font-bold hover:bg-amber-100 disabled:opacity-40 transition">
+                Reactivar
+              </button>
+            )}
+            {r.estado === 'enviado' && (
+              <span className="text-[11px] text-emerald-600 font-bold">✓ Entregado</span>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       {/* Filtros */}
       <div className="flex flex-wrap gap-3 mb-5 items-center">
         <div className="flex gap-1">
@@ -4895,126 +5005,14 @@ function CorreosTab({ user }: { user: User }) {
         </button>
       </div>
 
-      {loading && (
-        <div className="py-20 text-center text-slate-400">
-          <div className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-          <p className="text-sm">Cargando notificaciones…</p>
-        </div>
-      )}
-
-      {!loading && rows.length === 0 && (
-        <div className="py-20 text-center text-slate-400">
-          <p className="text-4xl mb-3">📭</p>
-          <p className="font-bold text-sm">No hay notificaciones</p>
-          <p className="text-xs mt-1 text-slate-400">Al guardar una planilla, puede crear notificaciones pendientes</p>
-        </div>
-      )}
-
-      {!loading && rows.length > 0 && (
-        <div className="overflow-x-auto rounded-2xl border border-slate-200">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-slate-50 border-b border-slate-200">
-                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Confeccionista</th>
-                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Placa</th>
-                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Fecha</th>
-                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Remesa / Manif.</th>
-                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Correo destino</th>
-                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Desde</th>
-                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Estado</th>
-                <th className="text-left px-3 py-2.5 font-bold text-slate-500 text-[11px] uppercase tracking-wide">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(r => {
-                const estadoMeta = ESTADO_CORREO_LABELS[r.estado] ?? { label: r.estado, cls: 'bg-slate-100 text-slate-600' };
-                const confNombre = r.conf_nombre_actual ?? r.confeccionista_nombre ?? '—';
-                const correo = r.conf_email_actual ?? r.confeccionista_email;
-                const placa = r.placa_actual ?? r.placa ?? '—';
-                const fechaStr = r.fecha_cita
-                  ? new Date(r.fecha_cita + 'T00:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
-                  : '—';
-                const isSending = sending === r.id;
-                const isUpdating = updating === r.id;
-                return (
-                  <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                    <td className="px-3 py-2.5">
-                      <p className="font-semibold text-slate-800">{confNombre}</p>
-                      {r.conf_ciudad && <p className="text-[10px] text-slate-400">{r.conf_ciudad}</p>}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="font-mono font-black text-slate-700 tracking-widest">{placa}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-600">{fechaStr}</td>
-                    <td className="px-3 py-2.5">
-                      {r.remesa && <p className="text-[11px] text-slate-500"><span className="font-bold text-slate-600">R:</span> {r.remesa}</p>}
-                      {r.manifiesto && <p className="text-[11px] text-slate-500"><span className="font-bold text-slate-600">M:</span> {r.manifiesto}</p>}
-                      {!r.remesa && !r.manifiesto && <span className="text-slate-300">—</span>}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      {correo
-                        ? <span className="text-indigo-700 font-medium">{correo}</span>
-                        : <span className="text-red-400 text-[11px]">Sin correo</span>}
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-500">{r.from_email ?? '—'}</td>
-                    <td className="px-3 py-2.5">
-                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${estadoMeta.cls}`}>
-                        {estadoMeta.label}
-                      </span>
-                      {r.sent_at && (
-                        <p className="text-[10px] text-slate-400 mt-0.5">
-                          {new Date(r.sent_at).toLocaleString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      )}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex gap-1.5 flex-wrap">
-                        {r.estado === 'pendiente' && (
-                          <>
-                            <button
-                              onClick={() => handleSend(r)}
-                              disabled={isSending || !correo}
-                              title={!correo ? 'Sin correo registrado' : 'Enviar correo'}
-                              className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold hover:bg-indigo-700 disabled:opacity-40 transition flex items-center gap-1">
-                              {isSending
-                                ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                : <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                                  </svg>}
-                              Enviar
-                            </button>
-                            <button
-                              onClick={() => handleUpdateEstado(r, 'cancelado')}
-                              disabled={isUpdating}
-                              className="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-[11px] font-bold hover:bg-red-100 disabled:opacity-40 transition">
-                              Cancelar
-                            </button>
-                          </>
-                        )}
-                        {r.estado === 'cancelado' && (
-                          <button
-                            onClick={() => handleUpdateEstado(r, 'pendiente')}
-                            disabled={isUpdating}
-                            className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-[11px] font-bold hover:bg-amber-100 disabled:opacity-40 transition">
-                            Reactivar
-                          </button>
-                        )}
-                        {r.estado === 'enviado' && (
-                          <span className="text-[11px] text-emerald-600 font-bold">✓ Entregado</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {!loading && rows.length > 0 && (
-        <p className="text-[11px] text-slate-400 mt-3 text-right">{rows.length} notificación(es)</p>
-      )}
+      <DataTable
+        data={rows}
+        columns={correosColumns}
+        loading={loading}
+        searchPlaceholder="Buscar confeccionista, placa, referencia..."
+        excelFileName="envio_correos_confeccionistas.xlsx"
+        excelSheetName="Correos"
+      />
     </div>
   );
 }

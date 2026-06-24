@@ -1162,6 +1162,14 @@ const ensureDonamaTables = async () => {
     ALTER TABLE flota_tdm_manifiestos
       ADD COLUMN IF NOT EXISTS placa VARCHAR(20)
   `);
+
+  // ── 9. Columnas extra en dogama_notif_correos ──────────────────────────────
+  await pool.query(`
+    ALTER TABLE dogama_notif_correos
+      ADD COLUMN IF NOT EXISTS cedula_conductor  VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS celular_conductor VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS referencias       TEXT
+  `);
 };
 
 // Alias para compatibilidad con llamadas previas
@@ -1461,8 +1469,12 @@ export const createNotifCorreos = async (req: Request, res: Response): Promise<v
     if (encR.rowCount === 0) { res.status(404).json({ error: 'Enc no encontrado' }); return; }
     const enc = encR.rows[0];
 
-    const conductorR = await pool.query(`SELECT name FROM drivers WHERE id=$1`, [enc.conductor_id]);
-    const conductorNombre = conductorR.rows[0]?.name ?? null;
+    const conductorR = await pool.query(
+      `SELECT name, document_number, phone FROM drivers WHERE id=$1`, [enc.conductor_id]
+    );
+    const conductorNombre  = conductorR.rows[0]?.name            ?? null;
+    const cedulaConductor  = conductorR.rows[0]?.document_number ?? null;
+    const celularConductor = conductorR.rows[0]?.phone           ?? null;
 
     // Confeccionistas únicos de la planilla
     const confR = await pool.query(`
@@ -1477,22 +1489,36 @@ export const createNotifCorreos = async (req: Request, res: Response): Promise<v
     const emailCfgR = await pool.query(
       `SELECT email, provider FROM dogama_email_config WHERE is_active=true ORDER BY created_at DESC LIMIT 1`
     );
-    const fromEmail = emailCfgR.rows[0]?.email ?? null;
+    const fromEmail   = emailCfgR.rows[0]?.email    ?? null;
     const fromProvider = emailCfgR.rows[0]?.provider ?? null;
 
     const inserted: any[] = [];
     for (const conf of confR.rows) {
+      // Referencias de este confeccionista en la planilla
+      const refR = await pool.query(`
+        SELECT COALESCE(dd.referencia, cr.referencia) AS ref
+        FROM dogama_planillas_historial ph
+        LEFT JOIN dogama_despachos dd      ON dd.id = ph.despacho_id AND ph.tipo='despacho'
+        LEFT JOIN dogama_citas_recogidas cr ON cr.id = ph.cita_id    AND ph.tipo='cita'
+        WHERE ph.enc_id = $1
+          AND COALESCE(ph.confeccionista_id_directo, dd.confeccionista_id, cr.proveedor_id) = $2
+          AND COALESCE(dd.referencia, cr.referencia) IS NOT NULL
+      `, [enc_id, conf.id]);
+      const referencias = refR.rows.map((x: any) => x.ref).filter(Boolean).join(', ') || null;
+
       const r = await pool.query(`
         INSERT INTO dogama_notif_correos
           (enc_id, confeccionista_id, confeccionista_nombre, confeccionista_email,
            placa, fecha_cita, conductor_nombre, ruta_descripcion,
+           cedula_conductor, celular_conductor, referencias,
            from_email, from_provider, estado, created_by)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'pendiente',$11)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'pendiente',$14)
         RETURNING *
       `, [
         enc_id, conf.id, conf.descripcion_conf, conf.correo ?? null,
         enc.plate ?? null, enc.fecha, conductorNombre,
         conf.ciudad ? `${enc.plate ?? ''} → ${conf.ciudad}` : (enc.plate ?? null),
+        cedulaConductor, celularConductor, referencias,
         fromEmail, fromProvider, created_by ?? null,
       ]);
       inserted.push(r.rows[0]);
