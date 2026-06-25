@@ -1376,6 +1376,33 @@ export const InformesGerenciales: React.FC = () => {
       }
     });
 
+    // Merge flota_tdm_manifiestos rows into RESUMEN VENTAS GENERALES
+    tdmFlotaRows.forEach(r => {
+      const clientObj = clients.find(c => String(c.id).trim().toUpperCase() === String(r.client_id || '').trim().toUpperCase());
+      const clientBaseName = clientObj ? String(clientObj.name).trim().toUpperCase() : String(r.client_id || 'S/I').trim().toUpperCase();
+      const client = `TDM ${clientBaseName}`;
+      const cobrar = Number(r.valor_cobrar) || 0;
+      const pagar = Number(r.valor_pagar) || 0;
+      const plate = r.placa ? String(r.placa).trim().toUpperCase() : '';
+      const date = r.fecha_operacion ? String(r.fecha_operacion).trim().slice(0, 10) : '';
+      if (!clientsMap[client]) {
+        clientsMap[client] = {
+          ventaTotal: 0, ingTerceros: 0,
+          vehicles: new Set(), workedDates: new Set(), vehicleDays: new Set(),
+          invoicedSameMonth: 0, totalPaymentDays: 0, paymentDaysCount: 0,
+          totalRecDays: 0, recDaysCount: 0, totalEgrDays: 0, egrDaysCount: 0,
+          totalManRecDays: 0, manRecDaysCount: 0, receivedValue: 0, receivedDiffMonth: 0,
+        };
+      }
+      clientsMap[client].ventaTotal += cobrar;
+      clientsMap[client].ingTerceros += pagar;
+      if (plate) clientsMap[client].vehicles.add(plate);
+      if (date) {
+        clientsMap[client].workedDates.add(date);
+        if (plate) clientsMap[client].vehicleDays.add(`${plate}_${date}`);
+      }
+    });
+
     // Calculate total sales of all clients combined
     let grandTotalSales = 0;
     Object.values(clientsMap).forEach(node => {
@@ -1589,6 +1616,34 @@ export const InformesGerenciales: React.FC = () => {
       }
     });
 
+    // Merge flota_tdm_manifiestos rows
+    tdmFlotaRows.forEach(r => {
+      const clientObj = clients.find(c => String(c.id).trim().toUpperCase() === String(r.client_id || '').trim().toUpperCase());
+      const clientBaseName = clientObj ? String(clientObj.name).trim().toUpperCase() : String(r.client_id || 'S/I').trim().toUpperCase();
+      const client = `TDM ${clientBaseName}`;
+      const cobrar = Number(r.valor_cobrar) || 0;
+      const pagar = Number(r.valor_pagar) || 0;
+      const plate = r.placa ? String(r.placa).trim().toUpperCase() : '';
+      const date = r.fecha_operacion ? String(r.fecha_operacion).trim().slice(0, 10) : '';
+      if (!clientsMap[client]) {
+        clientsMap[client] = {
+          ventaTotal: 0, ingTerceros: 0,
+          vehicles: new Set(), workedDates: new Set(), vehicleDays: new Set(),
+          invoicedSameMonth: 0, totalPaymentDays: 0, paymentDaysCount: 0,
+          totalRecDays: 0, recDaysCount: 0, totalEgrDays: 0, egrDaysCount: 0,
+          totalManRecDays: 0, manRecDaysCount: 0, receivedValue: 0, receivedDiffMonth: 0,
+        };
+      }
+      clientsMap[client].ventaTotal += cobrar;
+      clientsMap[client].ingTerceros += pagar;
+      if (plate) clientsMap[client].vehicles.add(plate);
+      if (date) {
+        clientsMap[client].workedDates.add(date);
+        if (plate) clientsMap[client].vehicleDays.add(`${plate}_${date}`);
+      }
+    });
+
+
     // Calculate total sales of all clients combined
     let grandTotalSales = 0;
     Object.values(clientsMap).forEach(node => {
@@ -1756,6 +1811,31 @@ export const InformesGerenciales: React.FC = () => {
       });
     });
 
+    // Merge tdmFlotaRows for INT detail
+    tdmFlotaRows.forEach(r => {
+      const clientObj = clients.find(c => String(c.id).trim().toUpperCase() === String(r.client_id || '').trim().toUpperCase());
+      const clientBaseName = clientObj ? String(clientObj.name).trim().toUpperCase() : String(r.client_id || 'S/I').trim().toUpperCase();
+      const rowClient = `TDM ${clientBaseName}`;
+      if (targetClient !== 'GENERAL' && rowClient !== targetClient) return;
+      const plate = r.placa ? String(r.placa).trim().toUpperCase() : 'SIN PLACA';
+      const cobrar = Number(r.valor_cobrar) || 0;
+      const pagar = Number(r.valor_pagar) || 0;
+      const mapKey = targetClient === 'GENERAL' ? `${plate}_${rowClient}` : plate;
+      if (!platesMap[mapKey]) {
+        platesMap[mapKey] = { plate, clientName: rowClient, ventaTotal: 0, ingTerceros: 0, manifestCount: 0, manifests: [] };
+      }
+      platesMap[mapKey].ventaTotal += cobrar;
+      platesMap[mapKey].ingTerceros += pagar;
+      platesMap[mapKey].manifestCount += 1;
+      const ip = cobrar - pagar;
+      const intVal = cobrar > 0 ? (ip / cobrar) * 100 : 0;
+      platesMap[mapKey].manifests.push({
+        manifest_number: String(r.manifiesto || 'S/I'),
+        manifest_date: String(r.fecha_operacion || 'S/I').slice(0, 10),
+        venta: cobrar, ingTerceros: pagar, ingresosPropios: ip, int: intVal
+      });
+    });
+
     const rawPlates = Object.values(platesMap).map(p => {
       const ingresosPropios = p.ventaTotal - p.ingTerceros;
       const int = p.ventaTotal > 0 ? (ingresosPropios / p.ventaTotal) * 100 : 0;
@@ -1884,6 +1964,28 @@ export const InformesGerenciales: React.FC = () => {
         venta: ventaRecord,
         facturado: invoicedInSameMonth,
         factMesPct: currentFactMesPct
+      });
+    });
+
+    // Merge tdmFlotaRows for % Fact. Mes detail
+    tdmFlotaRows.forEach(r => {
+      const clientObj = clients.find(c => String(c.id).trim().toUpperCase() === String(r.client_id || '').trim().toUpperCase());
+      const clientBaseName = clientObj ? String(clientObj.name).trim().toUpperCase() : String(r.client_id || 'S/I').trim().toUpperCase();
+      const rowClient = `TDM ${clientBaseName}`;
+      if (targetClient !== 'GENERAL' && rowClient !== targetClient) return;
+      const plate = r.placa ? String(r.placa).trim().toUpperCase() : 'SIN PLACA';
+      const cobrar = Number(r.valor_cobrar) || 0;
+      const mapKey = targetClient === 'GENERAL' ? `${plate}_${rowClient}` : plate;
+      if (!platesMap[mapKey]) {
+        platesMap[mapKey] = { plate, clientName: rowClient, ventaTotal: 0, facturadoTotal: 0, manifestCount: 0, manifests: [] };
+      }
+      platesMap[mapKey].ventaTotal += cobrar;
+      platesMap[mapKey].manifestCount += 1;
+      platesMap[mapKey].manifests.push({
+        manifest_number: String(r.manifiesto || 'S/I'),
+        manifest_date: String(r.fecha_operacion || 'S/I').slice(0, 10),
+        invoice_date: 'S/I',
+        venta: cobrar, facturado: 0, factMesPct: 0
       });
     });
 
