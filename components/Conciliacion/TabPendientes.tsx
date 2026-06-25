@@ -275,9 +275,9 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
     const handleCloseCycle = (plate?: string) => {
         if (!selectedDoc) return;
 
-        // Sobrecostos pendientes — siempre bloquean
+        // Sobrecostos pendientes — siempre bloquean (excluir explícitamente los aprobados)
         const pendingSurchInScope = routeSurcharges.filter(s =>
-            (s.status_id === 'PENDIENTE' || s.status_id === 'EST-01' || !s.status_id) &&
+            s.status_id !== 'APROBADO' && s.status_id !== 'EST-02' &&
             (!plate || s.plate === plate)
         );
         if (pendingSurchInScope.length > 0) {
