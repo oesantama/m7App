@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import pool from '../config/database.js';
 import { syncDriveCumplidos } from './drive-gemini.service.js';
 import { scrapeTransportandoReports } from './scraper.service.js';
+import { whatsappCronRunner } from './whatsapp-cron.service.js';
 
 /**
  * Retrocede N días hábiles (lunes-viernes) desde una fecha dada.
@@ -282,6 +283,11 @@ export const runFacturacionPendienteIndividual = async (): Promise<string[]> => 
 
 export const initScheduler = () => {
     console.log('[M7-SCHEDULER] Inicializando Motor de Tareas Programadas...');
+
+    // WhatsApp alertas corren en todos los entornos donde Evolution esté disponible
+    whatsappCronRunner.loadAndSchedule().catch(err =>
+        console.warn('[WA-CRON] loadAndSchedule falló en arranque:', err.message)
+    );
 
     if (process.env.NODE_ENV !== 'production') {
         console.log('[M7-SCHEDULER] Entorno no es de producción (NODE_ENV no es production). Cron jobs desactivados.');

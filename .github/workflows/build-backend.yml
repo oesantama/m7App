@@ -71,3 +71,15 @@ jobs:
             -H "X-GitHub-Api-Version: 2022-11-28" \
             "https://api.github.com/user/packages/container/${PACKAGE_NAME}" \
             -d '{"visibility":"public"}' | cat
+
+      - name: Trigger Coolify redeploy (backend)
+        env:
+          WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_BACKEND }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        run: |
+          if [ -n "$WEBHOOK_URL" ]; then
+            curl -s -X GET "$WEBHOOK_URL" \
+              -H "Authorization: Bearer $COOLIFY_TOKEN" || true
+          else
+            echo "COOLIFY_WEBHOOK_BACKEND no configurado, saltando redeploy automático"
+          fi

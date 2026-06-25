@@ -845,6 +845,20 @@ export const api = {
   }),
   deleteNotificacionConfig: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/notificaciones-config/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
+  // Alertas WhatsApp
+  getAlertasWhatsapp: (): Promise<{ success: boolean; data: any[] }> =>
+    fetchJson(`${API_URL}/alertas-whatsapp?_t=${Date.now()}`),
+  saveAlertaWhatsapp: (data: any): Promise<{ success: boolean; message?: string; error?: string }> =>
+    fetchJson(`${API_URL}/alertas-whatsapp`, {
+      method: data.id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  deleteAlertaWhatsapp: (id: string): Promise<{ success: boolean }> =>
+    fetchJson(`${API_URL}/alertas-whatsapp/${id}`, { method: 'DELETE' }),
+  sendTestAlertaWhatsapp: (id: string): Promise<{ success: boolean; message?: string; error?: string }> =>
+    fetchJson(`${API_URL}/alertas-whatsapp/${id}/test`, { method: 'POST' }),
+
   // Tipos de Vehículo
   getTiposVehiculo: () => fetchJson(`${API_URL}/tipos-vehiculo?_t=${Date.now()}`),
   saveTipoVehiculo: (data: any) => fetchJson(`${API_URL}/tipos-vehiculo`, {

@@ -1,4 +1,38 @@
 services:
+  evolution-podman:
+    build:
+      context: .
+      dockerfile: Dockerfile.evolution.dev
+    restart: unless-stopped
+    ports:
+      - "8082:8080"
+    volumes:
+      - evolution_instances_dev:/evolution/instances
+      - evolution_store_dev:/evolution/store
+    environment:
+      - SERVER_URL=http://localhost:8082
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=B3B896F8-9862-4467-9C17-A038848C1726
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://m7_admin:m7_master_password@postgres-podman:5432/m7_logistica?schema=evolution
+      - DATABASE_CONNECTION_CLIENT_NAME=evolution_m7
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=false
+      - DATABASE_SAVE_MESSAGE_UPDATE=false
+      - DATABASE_SAVE_DATA_CONTACTS=false
+      - DATABASE_SAVE_DATA_CHATS=false
+      - CACHE_REDIS_ENABLED=false
+      - QRCODE_LIMIT=30
+      - DEL_INSTANCE=false
+      - LOG_LEVEL=ERROR
+      - TZ=America/Bogota
+      - CONFIG_SESSION_PHONE_VERSION=
+    networks:
+      m7-podman-network:
+        aliases:
+          - evolution
+
   backend-podman:
     build:
       context: .
@@ -96,3 +130,5 @@ networks:
 volumes:
   m7_podman_data:
     name: m7_logistica_podman_data
+  evolution_instances_dev:
+  evolution_store_dev:

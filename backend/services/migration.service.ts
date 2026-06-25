@@ -1750,6 +1750,51 @@ export const restoreSystem = async () => {
         ADD COLUMN IF NOT EXISTS firmado_por TEXT;
     `);
 
+    // ── ALERTAS WHATSAPP ────────────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS alertas_whatsapp (
+        id              TEXT PRIMARY KEY,
+        name            TEXT NOT NULL,
+        description     TEXT,
+        phone_numbers   TEXT[]          DEFAULT '{}',
+        message_template TEXT,
+        cron_expression TEXT            DEFAULT '0 8 * * 1-5',
+        tipo_evento     TEXT            DEFAULT 'MANUAL',
+        adjunto_tipo    TEXT            DEFAULT 'ninguno',
+        status_id       TEXT            DEFAULT 'EST-01',
+        last_run        TIMESTAMPTZ,
+        next_run        TIMESTAMPTZ,
+        created_by      TEXT,
+        updated_by      TEXT,
+        created_at      TIMESTAMPTZ     DEFAULT NOW(),
+        updated_at      TIMESTAMPTZ     DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_alertas_whatsapp_status
+        ON alertas_whatsapp (status_id);
+    `);
+    // Página en el menú — Configuración Maestros
+    await client.query(`
+      INSERT INTO pages (id, name, route, parent_id, module_id, status_id)
+      VALUES ('PAG-WA01', 'ALERTAS WHATSAPP', 'alertas-whatsapp', 'MOD-04', 'MOD-04', 'EST-01')
+      ON CONFLICT (id) DO NOTHING;
+    `);
+
+    // ── WHATSAPP QUICK REPLIES ──────────────────────────────────────────
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS whatsapp_quick_replies (
+        id         SERIAL PRIMARY KEY,
+        user_id    VARCHAR(100) NOT NULL,
+        title      VARCHAR(255) NOT NULL,
+        content    TEXT         NOT NULL,
+        created_at TIMESTAMPTZ  DEFAULT NOW()
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_wqr_user ON whatsapp_quick_replies (user_id);
+    `);
+
     // RESCATE DE DATOS: Recupera rutas huérfanas y repara fechas nulas
     await recoverOrphanedRoutes(client);
     await seedGhMiscelaneos(client);

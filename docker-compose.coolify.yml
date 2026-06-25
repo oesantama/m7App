@@ -1,4 +1,36 @@
 services:
+  m7-evolution:
+    image: atendai/evolution-api:v2.2.3
+    restart: always
+    expose:
+      - '8080'
+    volumes:
+      - evolution_instances:/evolution/instances
+      - evolution_store:/evolution/store
+    environment:
+      - SERVER_URL=https://evolution.m7apps.com
+      - AUTHENTICATION_TYPE=apikey
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      - DATABASE_ENABLED=false
+      - QRCODE_LIMIT=30
+      - DEL_INSTANCE=false
+      - LOG_LEVEL=ERROR
+      - TZ=America/Bogota
+      - CONFIG_SESSION_PHONE_VERSION=
+    networks:
+      m7-network:
+        aliases:
+          - evolution
+      coolify:
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.m7-evolution.rule=Host(`evolution.m7apps.com`)"
+      - "traefik.http.routers.m7-evolution.entrypoints=https"
+      - "traefik.http.routers.m7-evolution.tls=true"
+      - "traefik.http.services.m7-evolution.loadbalancer.server.port=8080"
+    mem_limit: 512m
+    memswap_limit: 512m
+
   m7app-backend:
     build:
       context: .

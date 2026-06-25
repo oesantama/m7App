@@ -9,7 +9,7 @@ interface WhatsAppCenterProps {
 }
 
 const WhatsAppConnect: React.FC<WhatsAppCenterProps> = ({ user }) => {
-    const [status, setStatus] = useState<'DISCONNECTED' | 'SCAN_QR' | 'CONNECTED' | 'ERROR'>('DISCONNECTED');
+    const [status, setStatus] = useState<'DISCONNECTED' | 'CONNECTING' | 'SCAN_QR' | 'CONNECTED' | 'ERROR'>('DISCONNECTED');
     const [qr, setQr] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -32,6 +32,9 @@ const WhatsAppConnect: React.FC<WhatsAppCenterProps> = ({ user }) => {
     const [showSessionDetails, setShowSessionDetails] = useState(false);
     const [sessionInfo, setSessionInfo] = useState<any>(null);
 
+    const [ownerJid, setOwnerJid] = useState<string | null>(null);
+    const [showDisconnectModal, setShowDisconnectModal] = useState(false);
+
     const fetchStatus = async () => {
         if (!user?.id) return;
         try {
@@ -39,7 +42,8 @@ const WhatsAppConnect: React.FC<WhatsAppCenterProps> = ({ user }) => {
             setStatus(data.status);
             setQr(data.qr || null);
             setError(data.message || null);
-            
+            if (data.ownerJid) setOwnerJid(data.ownerJid);
+
             if (data.status === 'CONNECTED') {
                 const logs = await api.getWhatsAppHistory(user.id);
                 setHistory(logs);
@@ -91,12 +95,13 @@ const WhatsAppConnect: React.FC<WhatsAppCenterProps> = ({ user }) => {
     };
 
     const handleDisconnect = async () => {
-        if (!confirm('¿Desvincular tu WhatsApp personal? Tendrás que escanear el QR de nuevo.')) return;
         try {
             setLoading(true);
+            setShowDisconnectModal(false);
             await api.disconnectWhatsApp(user.id);
             toast.success("Sesión desvinculada");
             setQr(null);
+            setOwnerJid(null);
             setStatus('DISCONNECTED');
             setActiveView('status');
         } catch (e) {
@@ -199,9 +204,11 @@ const WhatsAppConnect: React.FC<WhatsAppCenterProps> = ({ user }) => {
     useEffect(() => {
         fetchStatus();
         fetchQuickReplies();
-        const interval = setInterval(fetchStatus, 15000);
+        // Polling frecuente mientras conecta o espera escaneo, normal cuando conectado
+        const intervalMs = (status === 'CONNECTING' || status === 'SCAN_QR') ? 4000 : 15000;
+        const interval = setInterval(fetchStatus, intervalMs);
         return () => clearInterval(interval);
-    }, [user?.id]);
+    }, [user?.id, status]);
 
     useEffect(() => {
         if (activeView === 'crm' && status === 'CONNECTED') {
@@ -274,12 +281,18 @@ const WhatsAppConnect: React.FC<WhatsAppCenterProps> = ({ user }) => {
                                                 <p className="text-xs font-bold text-slate-700">{user?.name}</p>
                                             </div>
                                             <div className="p-6 bg-slate-50 rounded-3xl text-left border border-slate-100">
-                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Mensajes Hoy</p>
+                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Número Vinculado</p>
+                                                <p className="text-xs font-bold text-slate-700 font-mono">
+                                                    {ownerJid ? ownerJid.replace('@s.whatsapp.net', '').replace('@c.us', '') : '—'}
+                                                </p>
+                                            </div>
+                                            <div className="p-6 bg-slate-50 rounded-3xl text-left border border-slate-100 col-span-2">
+                                                <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Mensajes Enviados (sesión)</p>
                                                 <p className="text-xs font-bold text-slate-700">{history.length}</p>
                                             </div>
                                         </div>
-                                        <button 
-                                            onClick={handleDisconnect}
+                                        <button
+                                            onClick={() => setShowDisconnectModal(true)}
                                             className="w-full py-5 bg-rose-50 text-rose-600 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-rose-100 hover:bg-rose-600 hover:text-white transition-all shadow-sm"
                                         >
                                             Desvincular Línea Corporativa
@@ -294,19 +307,32 @@ const WhatsAppConnect: React.FC<WhatsAppCenterProps> = ({ user }) => {
                                         ) : (
                                             <div className="w-64 h-64 bg-slate-50 rounded-[2.5rem] flex flex-col items-center justify-center mx-auto border-4 border-dashed border-slate-100">
                                                 <Icons.Loader className="w-10 h-10 text-emerald-500 animate-spin mb-4" />
-                                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Generando Protocolo...</p>
+                                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
+                                                    {status === 'CONNECTING' ? 'Generando código QR...' : 'En espera...'}
+                                                </p>
+                                                {status === 'CONNECTING' && (
+                                                    <p className="text-[9px] text-slate-300 mt-2 text-center max-w-[12rem]">Puede tomar hasta 30 segundos la primera vez</p>
+                                                )}
                                             </div>
                                         )}
                                         <div className="space-y-4">
-                                            <p className="text-sm font-bold text-slate-500 leading-relaxed max-w-sm mx-auto">
-                                                Escanea con tu WhatsApp para habilitar la **Inteligencia Logística Orbit**.
-                                            </p>
-                                            <button 
-                                                onClick={handleConnect}
-                                                className="px-10 py-5 bg-emerald-500 text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:bg-emerald-400 transition-all flex items-center gap-4 mx-auto"
-                                            >
-                                                <Icons.Settings /> Obtener Nuevo Enlace
-                                            </button>
+                                            {status === 'SCAN_QR' && (
+                                                <p className="text-sm font-bold text-slate-500 leading-relaxed max-w-sm mx-auto">
+                                                    Escanea con tu WhatsApp para habilitar la inteligencia logística Orbit.
+                                                </p>
+                                            )}
+                                            {status === 'CONNECTING' ? (
+                                                <div className="flex items-center justify-center gap-3 px-10 py-5 bg-slate-100 text-slate-400 rounded-3xl text-xs font-black uppercase tracking-widest">
+                                                    <Icons.Loader className="animate-spin w-4 h-4" /> Iniciando motor...
+                                                </div>
+                                            ) : (
+                                                <button
+                                                    onClick={handleConnect}
+                                                    className="px-10 py-5 bg-emerald-500 text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:bg-emerald-400 transition-all flex items-center gap-4 mx-auto"
+                                                >
+                                                    <Icons.Settings /> Obtener Nuevo Enlace
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -695,6 +721,38 @@ const WhatsAppConnect: React.FC<WhatsAppCenterProps> = ({ user }) => {
                 </div>
             )}
 
+            {/* Modal Confirmación Desvinculación */}
+            {showDisconnectModal && (
+                <div className="fixed inset-0 z-[700] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-sm p-10 shadow-2xl border border-slate-100 animate-in zoom-in-95 duration-200 flex flex-col items-center text-center gap-8">
+                        <div className="w-20 h-20 bg-rose-50 text-rose-500 rounded-[1.5rem] flex items-center justify-center text-4xl shadow-inner">
+                            <Icons.X />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tighter">¿Desvincular línea?</h3>
+                            <p className="text-xs text-slate-400 font-medium leading-relaxed max-w-[18rem] mx-auto">
+                                Se cerrará la sesión de <span className="text-slate-700 font-bold">{ownerJid ? ownerJid.replace('@s.whatsapp.net','').replace('@c.us','') : 'tu WhatsApp'}</span>. Tendrás que escanear el QR de nuevo para reconectar.
+                            </p>
+                        </div>
+                        <div className="flex gap-4 w-full">
+                            <button
+                                onClick={() => setShowDisconnectModal(false)}
+                                className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleDisconnect}
+                                disabled={loading}
+                                className="flex-1 py-4 bg-rose-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-700 transition-all shadow-lg shadow-rose-200 disabled:opacity-50"
+                            >
+                                {loading ? 'Desvinculando...' : 'Confirmar'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Modal Detalles de Sesión */}
             {showSessionDetails && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-300">
@@ -732,11 +790,8 @@ const WhatsAppConnect: React.FC<WhatsAppCenterProps> = ({ user }) => {
                                 </div>
                             </div>
 
-                            <button 
-                                onClick={() => {
-                                    handleDisconnect();
-                                    setShowSessionDetails(false);
-                                }}
+                            <button
+                                onClick={() => { setShowSessionDetails(false); setShowDisconnectModal(true); }}
                                 className="w-full py-5 bg-rose-50 text-rose-600 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-rose-100 hover:bg-rose-600 hover:text-white transition-all"
                             >
                                 Forzar Desvinculación

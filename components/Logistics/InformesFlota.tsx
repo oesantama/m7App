@@ -255,7 +255,9 @@ const InteractiveBarCard = ({
                   <Cell key={i} fill={colors[i % colors.length]}
                     opacity={activeIdx === null || activeIdx === i ? 1 : 0.45} />
                 ))}
-                <LabelList dataKey="value" position="top" style={{ fontSize: 10, fontWeight: 'bold', fill: '#475569' }} />
+                <LabelList dataKey="value" position="top"
+                  formatter={(v: number) => `${v} (${total > 0 ? ((v / total) * 100).toFixed(1) : 0}%)`}
+                  style={{ fontSize: 9, fontWeight: 'bold', fill: '#475569' }} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>

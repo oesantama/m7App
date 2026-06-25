@@ -31,18 +31,11 @@ export const reconnect = async (req: Request, res: Response) => {
   if (!userId) return res.status(400).json({ error: "Falta userId" });
 
   try {
-    const statusInfo = await evolutionService.getQR(`user_${userId}`);
-    res.json({ 
-      success: true, 
-      message: 'Intento de conexión iniciado',
-      ...statusInfo 
-    });
+    const statusInfo = await evolutionService.forceNewQR(`user_${userId}`);
+    res.json({ success: true, ...statusInfo });
   } catch (err: any) {
     console.error('[M7-WHATSAPP-CTRL] Error al iniciar sesión:', err);
-    res.status(500).json({ 
-      success: false,
-      error: "No se pudo iniciar la sesión",
-    });
+    res.status(500).json({ success: false, error: "No se pudo iniciar la sesión" });
   }
 };
 

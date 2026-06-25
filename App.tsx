@@ -41,6 +41,7 @@ const lazyWithRetry = (componentImport: () => Promise<any>) =>
 const Layout = lazyWithRetry(() => import('./components/Layout'));
 const MasterModule = lazyWithRetry(() => import('./components/MasterModule'));
 const WhatsAppConnect = lazyWithRetry(() => import('./components/WhatsAppConnect'));
+const AlertasWhatsapp = lazyWithRetry(() => import('./components/AlertasWhatsapp'));
 const GestionDocumentosL = lazyWithRetry(() => import('./components/GestionDocumentosL'));
 const RoutePlanner = lazyWithRetry(() => import('./components/RoutePlanner'));
 const LogisticsDispatch = lazyWithRetry(() => import('./components/LogisticsDispatch'));
@@ -578,6 +579,15 @@ const App: React.FC = () => {
   const renderContent = () => {
     const availableVehiclesCount = vehicles.filter(v => v.status === 'Disponible' || v.status === 'Available').length;
 
+    // Páginas con componentes dedicados — tienen prioridad absoluta sobre MasterModule
+    if (String(activeTab).toLowerCase() === 'alertas-whatsapp') {
+      return (
+        <React.Suspense fallback={<div className="p-10 text-center text-slate-400 text-sm">Cargando Alertas WhatsApp...</div>}>
+          <AlertasWhatsapp />
+        </React.Suspense>
+      );
+    }
+
     // DETECCIÓN DINÁMICA DE MÓDULOS MAESTROS (Nuclear Sync)
     const masterCat = getMasterCategoryFromRoute(activeTab, activePageId);
     if (masterCat) {
@@ -717,6 +727,12 @@ const App: React.FC = () => {
         );
       case 'whatsapp-status':
         return <WhatsAppConnect user={user} />;
+      case 'alertas-whatsapp':
+        return (
+          <React.Suspense fallback={<div className="p-10 text-center text-slate-400 text-sm">Cargando Alertas WhatsApp...</div>}>
+            <AlertasWhatsapp />
+          </React.Suspense>
+        );
       case 'documentos':
         return (
           <GestionDocumentosL
