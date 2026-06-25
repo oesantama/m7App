@@ -1,4 +1,10 @@
 FROM atendai/evolution-api:v2.2.3
+
+# Remove DATABASE_URL from all .env files at image build time.
+# This ensures Prisma CLI does NOT override the DATABASE_URL env var
+# with the hardcoded default (postgresql://user:password@postgres:5432/evolution).
+RUN find /evolution -name ".env" -exec sed -i '/DATABASE_URL/d' {} \; 2>/dev/null || true
+
 COPY evolution-entrypoint.sh /usr/local/bin/evolution-entrypoint.sh
 RUN chmod +x /usr/local/bin/evolution-entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/evolution-entrypoint.sh"]

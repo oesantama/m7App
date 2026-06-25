@@ -1,7 +1,8 @@
 services:
   m7-evolution:
-    image: atendai/evolution-api:v2.2.3
-    pull_policy: always
+    build:
+      context: .
+      dockerfile: Dockerfile.evolution
     restart: always
     expose:
       - '8080'
