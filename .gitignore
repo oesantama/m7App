@@ -25,8 +25,14 @@ legacy_sources/
 .wwebjs_auth/
 .wwebjs_cache/
 
+# ── Dockerfiles de desarrollo local (no van a producción) ────────────────────
+Dockerfile.evolution.dev
+Dockerfile.*.dev
+Dockerfile.*.local
+
 # ── Configuración local del editor / herramientas ─────────────────────────────
 .claude/settings.local.json
+.claude/projects/
 
 # ── Scripts de Diagnóstico y Temporales ──────────────────────────────────────
 *.cjs
