@@ -1,8 +1,6 @@
 services:
   m7-evolution:
-    build:
-      context: .
-      dockerfile: Dockerfile.evolution
+    image: atendai/evolution-api:v2.2.3
     restart: always
     expose:
       - '8080'
@@ -13,10 +11,12 @@ services:
       - SERVER_URL=https://evolution.m7apps.com
       - AUTHENTICATION_TYPE=apikey
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
-      # Base de datos — usa el mismo postgres del proyecto
+      # Base de datos — base "evolution" en el mismo postgres con credenciales por defecto de Evolution.
+      # Prerequisito SQL en postgres: CREATE USER "user" WITH PASSWORD 'password';
+      #   CREATE DATABASE evolution; GRANT ALL PRIVILEGES ON DATABASE evolution TO "user";
       - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@m7-postgres:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql://user:password@postgres:5432/evolution
       # Solo guarda estado de instancias (NO mensajes ni contactos — evita llenar la BD)
       - DATABASE_SAVE_DATA_INSTANCE=true
       - DATABASE_SAVE_DATA_NEW_MESSAGE=false
