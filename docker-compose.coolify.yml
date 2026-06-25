@@ -11,8 +11,18 @@ services:
       - SERVER_URL=https://evolution.m7apps.com
       - AUTHENTICATION_TYPE=apikey
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
-      - DATABASE_ENABLED=false
+      # Base de datos — usa el mismo postgres del proyecto
+      - DATABASE_ENABLED=true
       - DATABASE_PROVIDER=postgresql
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@m7-postgres:5432/${POSTGRES_DB}
+      # Solo guarda estado de instancias (NO mensajes ni contactos — evita llenar la BD)
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=false
+      - DATABASE_SAVE_MESSAGE_UPDATE=false
+      - DATABASE_SAVE_DATA_CONTACTS=false
+      - DATABASE_SAVE_DATA_CHATS=false
+      - DATABASE_SAVE_DATA_LABELS=false
+      - DATABASE_SAVE_DATA_HISTORIC=false
       - QRCODE_LIMIT=30
       - DEL_INSTANCE=false
       - LOG_LEVEL=ERROR
