@@ -33,6 +33,13 @@ services:
       - LOG_LEVEL=ERROR
       - TZ=America/Bogota
       - CONFIG_SESSION_PHONE_VERSION=
+      # Deshabilitar Redis (no hay servicio Redis en este stack)
+      - CACHE_REDIS_ENABLED=false
+      - CACHE_LOCAL_ENABLED=true
+      # Deshabilitar RabbitMQ
+      - RABBITMQ_ENABLED=false
+      # Telemetría deshabilitada
+      - TELEMETRY_ENABLED=false
     networks:
       m7-network:
         aliases:
