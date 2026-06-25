@@ -1,14 +1,14 @@
 services:
   m7-evolution:
-    image: atendai/evolution-api:v2.2.3
+    build:
+      context: .
+      dockerfile: Dockerfile.evolution
     restart: always
     expose:
       - '8080'
     volumes:
       - evolution_instances:/evolution/instances
       - evolution_store:/evolution/store
-    command: >
-      sh -c "sed -i '/^DATABASE_URL=/d' /evolution/.env 2>/dev/null || true; npm start"
     environment:
       - SERVER_URL=https://evolution.m7apps.com
       - AUTHENTICATION_TYPE=apikey
