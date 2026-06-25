@@ -12,6 +12,7 @@ services:
       - AUTHENTICATION_TYPE=apikey
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
       - DATABASE_ENABLED=false
+      - DATABASE_PROVIDER=postgresql
       - QRCODE_LIMIT=30
       - DEL_INSTANCE=false
       - LOG_LEVEL=ERROR
