@@ -1,15 +1,22 @@
 #!/bin/sh
-set -e
+echo "[EVO] evolution-entrypoint.sh starting"
+echo "[EVO] DATABASE_URL prefix: ${DATABASE_URL:0:40}..."
 
-# Patch DATABASE_URL in Evolution's internal .env files before Prisma runs migrations.
-# This is needed because Prisma CLI reads the .env file directly and overrides process.env.
 if [ -n "$DATABASE_URL" ]; then
-  for f in /evolution/.env /evolution/prisma/.env; do
-    if [ -f "$f" ]; then
-      sed -i "s|^DATABASE_URL=.*|DATABASE_URL=$DATABASE_URL|g" "$f"
-      echo "[EVOLUTION] Patched DATABASE_URL in $f"
+  for DIR in /evolution /evolution/prisma /app /app/prisma; do
+    if [ -d "$DIR" ]; then
+      if [ -f "$DIR/.env" ]; then
+        grep -v "^DATABASE_URL" "$DIR/.env" > /tmp/_evo_tmp 2>/dev/null && \
+          mv /tmp/_evo_tmp "$DIR/.env" || true
+      fi
+      echo "DATABASE_URL=$DATABASE_URL" >> "$DIR/.env"
+      echo "[EVO] Set DATABASE_URL in $DIR/.env"
     fi
   done
 fi
 
-exec npm start
+echo "[EVO] Running database migrations..."
+cd /evolution && npm run db:deploy
+
+echo "[EVO] Starting application..."
+exec node dist/main.js
