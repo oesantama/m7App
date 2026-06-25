@@ -1,12 +1,6 @@
 FROM atendai/evolution-api:v2.2.3
-
-# Patch the db:deploy npm script to add --no-env-file flag.
-# This forces Prisma CLI to use process.env.DATABASE_URL (from docker-compose)
-# instead of loading any .env file that has hardcoded default credentials.
-RUN sed -i \
-  's/npx prisma migrate deploy --schema/npx prisma migrate deploy --no-env-file --schema/g' \
-  /evolution/package.json
-
+# Delete all .env files at build time so Prisma cannot load them
+RUN find /evolution -name ".env" -type f -delete 2>/dev/null; true
 COPY evolution-entrypoint.sh /usr/local/bin/evolution-entrypoint.sh
 RUN chmod +x /usr/local/bin/evolution-entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/evolution-entrypoint.sh"]
