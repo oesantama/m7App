@@ -1750,6 +1750,15 @@ export const restoreSystem = async () => {
       ALTER TABLE return_approval_batches ADD COLUMN IF NOT EXISTS confirmed_by_name TEXT;
       ALTER TABLE return_approval_batch_items ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
       ALTER TABLE return_approval_batch_items ADD COLUMN IF NOT EXISTS approved_by_name TEXT;
+
+      -- Campos para recepción de devoluciones bodega (rediseño flujo)
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS vendedor TEXT;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS numero_planilla TEXT;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS fecha_placa DATE;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS conciliacion_confirmada_at TIMESTAMPTZ;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS conciliacion_confirmada_by TEXT;
+      ALTER TABLE delivery_return_items ADD COLUMN IF NOT EXISTS article_id TEXT;
+      ALTER TABLE delivery_return_items ADD COLUMN IF NOT EXISTS un_code TEXT;
     `);
 
     await client.query('COMMIT');

@@ -2,129 +2,100 @@ import React from 'react';
 import { api } from '../../services/api';
 import { ReturnCard, RETURN_REASONS } from './ReturnCard';
 import { Icons } from '../../constants';
-import { Search } from 'lucide-react';
-
-const isReturnPartial = (ret: any) => {
-    const validItems = (ret.items || []).filter((i: any) => (i.sku || i.article_id));
-    return validItems.some((i: any) => {
-        const returned  = i.quantity_returned ?? i.qty ?? 0;
-        const expected  = i.expected_qty ?? (i.quantity_returned ?? i.qty ?? 0);
-        const delivered = i.quantity_delivered ?? 0;
-        return delivered > 0 || returned < expected;
-    });
-};
-
-interface Client { id: string; name: string; }
-type Tab = 'rutas' | 'legalizacion' | 'aprobacion';
+import { DataTable } from '../shared/DataTable';
+import { cleanSkuM7, extractQtyFromBarcode } from '../../utils/scanner';
 
 // ─── TIPOS ───────────────────────────────────────────────────────────────────
+interface Client { id: string; name: string; }
+type Tab = 'recibir' | 'legalizacion' | 'aprobacion' | 'historial';
+
 interface BodegaReturn {
     invoiceNumber: string; documentId: string | number;
     conductorName?: string; vehiclePlate?: string;
     legalizadoAt: string; externalDocId?: string; items: any[];
 }
-interface ActivePlate {
-    plate: string; vehicle_id: string; driver_name?: string; invoice_count: number;
-}
-interface PlateInvoice {
-    invoice_id: string; customer_name?: string; address?: string;
-    city?: string; item_count: number; total_qty: number; items: any[];
-}
 interface PendingReturn {
     id: number; invoice_id: string; return_reason?: string; notes?: string;
     status: string; created_at: string; vehicle_plate?: string;
-    driver_name?: string; client_id?: string; external_doc_id?: string; items: any[];
+    driver_name?: string; client_id?: string; items: any[];
 }
 interface ApprovalBatch {
     id: number; batch_code: string; client_id: string; notes?: string;
-    status: string; created_by?: string; created_at: string; sent_at?: string;
+    status: string; created_by?: string; created_at: string;
     total_items: number; approved_items: number;
     email_proveedor?: string; email_sent_at?: string;
     confirmed_at?: string; confirmed_by_name?: string;
 }
-
-// ─── STEP DE REGISTRO DESDE RUTA ─────────────────────────────────────────────
-type RouteStep = 'plate' | 'invoice' | 'form';
-
-interface RouteReturnForm {
-    plate: string; vehicleId: string; driverName: string;
-    invoice: PlateInvoice | null;
-    returnType: 'COMPLETA' | 'PARCIAL';
-    returnReason: string; notes: string;
-    itemQtys: Record<string, number>; // article_id → qty a devolver
+interface InvoiceItem {
+    article_id: string; article_name: string; barcode: string; sku: string;
+    un_code: string; unit: string; expected_qty: number;
+    factor_inter: number; factor_std: number;
+    uom_inter_name: string; uom_std_name: string;
 }
-
-const EMPTY_FORM: RouteReturnForm = {
-    plate: '', vehicleId: '', driverName: '',
-    invoice: null, returnType: 'COMPLETA', returnReason: '', notes: '', itemQtys: {},
-};
+interface InvoiceData {
+    invoice: {
+        invoice_id: string; order_number: string; customer_name: string;
+        client_ref: string; vehicle_plate: string; numero_planilla: string;
+        fecha_placa: string; plan_type: string; client_id: string;
+    };
+    items: InvoiceItem[];
+}
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
-    const [tab, setTab]               = React.useState<Tab>('rutas');
-    const [loading, setLoading]       = React.useState(false);
-    const [toast, setToast]           = React.useState<{ msg: string; ok: boolean } | null>(null);
+    const [tab, setTab]         = React.useState<Tab>('recibir');
+    const [loading, setLoading] = React.useState(false);
+    const [toast, setToast]     = React.useState<{ msg: string; ok: boolean } | null>(null);
 
     // Client selector
-    const [clients, setClients]           = React.useState<Client[]>([]);
-    const [selectedClientId, setSelectedClientId] = React.useState<string>('');
-    const [clientsReady, setClientsReady] = React.useState(false);
+    const [clients, setClients]                   = React.useState<Client[]>([]);
+    const [selectedClientId, setSelectedClientId] = React.useState('');
+    const [clientsReady, setClientsReady]         = React.useState(false);
 
-    // Tab: Post-Legalización
-    const [bodegaReturns, setBodegaReturns]   = React.useState<BodegaReturn[]>([]);
-    const [processingId, setProcessingId]     = React.useState<string | null>(null);
+    // ── Tab: Post-Legalización ────────────────────────────────────────────────
+    const [bodegaReturns, setBodegaReturns]     = React.useState<BodegaReturn[]>([]);
+    const [processingId, setProcessingId]       = React.useState<string | null>(null);
     const [searchLegalizacion, setSearchLegalizacion] = React.useState('');
 
-    // Tab: De Rutas (flujo multi-step)
-    const [routeStep, setRouteStep]           = React.useState<RouteStep>('plate');
-    const [activePlates, setActivePlates]     = React.useState<ActivePlate[]>([]);
-    const [plateInvoices, setPlateInvoices]   = React.useState<PlateInvoice[]>([]);
-    const [routeForm, setRouteForm]           = React.useState<RouteReturnForm>(EMPTY_FORM);
-    const [savingRoute, setSavingRoute]       = React.useState(false);
-    const [plateSearch, setPlateSearch]       = React.useState('');
-
-    // Tab: Aprobación
-    const [pendingReturns, setPendingReturns] = React.useState<PendingReturn[]>([]);
-    const [batches, setBatches]               = React.useState<ApprovalBatch[]>([]);
+    // ── Tab: Aprobación ───────────────────────────────────────────────────────
+    const [pendingReturns, setPendingReturns]       = React.useState<PendingReturn[]>([]);
+    const [batches, setBatches]                     = React.useState<ApprovalBatch[]>([]);
     const [selectedReturnIds, setSelectedReturnIds] = React.useState<Set<number>>(new Set());
-    const [batchNotes, setBatchNotes]         = React.useState('');
-    const [creatingBatch, setCreatingBatch]   = React.useState(false);
-    const [batchTab, setBatchTab]             = React.useState<'pending' | 'batches'>('pending');
+    const [batchNotes, setBatchNotes]               = React.useState('');
+    const [creatingBatch, setCreatingBatch]         = React.useState(false);
+    const [batchTab, setBatchTab]                   = React.useState<'pending' | 'batches'>('pending');
+    const [emailModal, setEmailModal]               = React.useState<{ batch: ApprovalBatch } | null>(null);
+    const [emailInput, setEmailInput]               = React.useState('');
+    const [nombreInput, setNombreInput]             = React.useState('');
+    const [sendingEmail, setSendingEmail]           = React.useState(false);
 
-    // Modal envío email proveedor
-    const [emailModal, setEmailModal]         = React.useState<{ batch: ApprovalBatch } | null>(null);
-    const [emailInput, setEmailInput]         = React.useState('');
-    const [nombreInput, setNombreInput]       = React.useState('');
-    const [sendingEmail, setSendingEmail]     = React.useState(false);
+    // ── Tab: Recibir devolución ───────────────────────────────────────────────
+    const [invoiceSearch, setInvoiceSearch]         = React.useState('');
+    const [searchingInvoice, setSearchingInvoice]   = React.useState(false);
+    const [invoiceData, setInvoiceData]             = React.useState<InvoiceData | null>(null);
+    const [vendedor, setVendedor]                   = React.useState('');
+    const [returnType, setReturnType]               = React.useState<'COMPLETA' | 'PARCIAL'>('COMPLETA');
+    const [returnReason, setReturnReason]           = React.useState('');
+    const [returnNotes, setReturnNotes]             = React.useState('');
+    const [scannedQtys, setScannedQtys]             = React.useState<Record<string, number>>({});
+    const [pickingModes, setPickingModes]           = React.useState<Record<string, 'UND' | 'CAJA' | 'STD'>>({});
+    const [lastScanned, setLastScanned]             = React.useState<string | null>(null);
+    const [savingReturn, setSavingReturn]           = React.useState(false);
+    const [barcodeRaw, setBarcodeRaw]               = React.useState('');
+    const barcodeRef = React.useRef<HTMLInputElement>(null);
+
+    // ── Tab: Historial ────────────────────────────────────────────────────────
+    const [history, setHistory]         = React.useState<any[]>([]);
+    const [histLoading, setHistLoading] = React.useState(false);
+    const [histFrom, setHistFrom]       = React.useState('');
+    const [histTo, setHistTo]           = React.useState('');
 
     const showToast = (msg: string, ok = true) => {
         setToast({ msg, ok });
         setTimeout(() => setToast(null), 3500);
     };
 
-    const handleSendEmail = async () => {
-        if (!emailModal) return;
-        const email = emailInput.trim();
-        if (!email || !email.includes('@')) { showToast('Ingresa un email válido', false); return; }
-        setSendingEmail(true);
-        try {
-            await api.sendApprovalBatchEmail(emailModal.batch.id, email, nombreInput.trim());
-            showToast(`Email enviado a ${email}`);
-            setBatches(prev => prev.map(b =>
-                b.id === emailModal.batch.id
-                    ? { ...b, status: 'enviado', email_proveedor: email, email_sent_at: new Date().toISOString() }
-                    : b
-            ));
-            setEmailModal(null);
-            setEmailInput(''); setNombreInput('');
-        } catch (e: any) {
-            showToast(e.message || 'Error enviando email', false);
-        } finally {
-            setSendingEmail(false);
-        }
-    };
-
-    // ── Clientes ─────────────────────────────────────────────────────────────
+    // ── Clientes ──────────────────────────────────────────────────────────────
     React.useEffect(() => {
         const allowedIds: string[] = user?.clientIds?.length
             ? user.clientIds : user?.clientId ? [user.clientId] : [];
@@ -138,33 +109,174 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         }).catch(() => setClientsReady(true));
     }, [user]);
 
-    // ── Carga inicial al cambiar cliente ─────────────────────────────────────
+    // ── Carga inicial al cambiar cliente ──────────────────────────────────────
     const loadAll = React.useCallback(async (clientId: string) => {
         if (!clientId) return;
         setLoading(true);
         try {
-            const [br, ap, pl, bt] = await Promise.all([
+            const [br, ap, bt] = await Promise.all([
                 api.getPendingBodegaReturns(clientId).catch(() => ({ data: [] })),
                 api.getApprovalPendingReturns(clientId).catch(() => ({ data: [] })),
-                api.getRouteActivePlates(clientId).catch(() => ({ data: [] })),
                 api.getApprovalBatches(clientId).catch(() => ({ data: [] })),
             ]);
             setBodegaReturns(Array.isArray(br) ? br : (br?.data ?? []));
             setPendingReturns(ap?.data ?? []);
-            setActivePlates(pl?.data ?? []);
             setBatches(bt?.data ?? []);
         } finally { setLoading(false); }
     }, []);
 
     React.useEffect(() => {
         if (selectedClientId) {
-            setBodegaReturns([]); setPendingReturns([]); setActivePlates([]); setBatches([]);
-            setRouteStep('plate'); setRouteForm(EMPTY_FORM);
+            setBodegaReturns([]); setPendingReturns([]); setBatches([]);
             loadAll(selectedClientId);
         }
     }, [selectedClientId, loadAll]);
 
-    // ── Confirmar devolución Post-Legalización ────────────────────────────────
+    // ── Historial ─────────────────────────────────────────────────────────────
+    const loadHistory = React.useCallback(async () => {
+        setHistLoading(true);
+        try {
+            const res = await api.getBodegaReturnsHistory({
+                clientId: selectedClientId || undefined,
+                dateFrom: histFrom || undefined,
+                dateTo:   histTo   || undefined,
+            });
+            setHistory(res?.data ?? []);
+        } catch { showToast('Error cargando historial', false); }
+        finally { setHistLoading(false); }
+    }, [selectedClientId, histFrom, histTo]);
+
+    React.useEffect(() => {
+        if (tab === 'historial') loadHistory();
+    }, [tab, loadHistory]);
+
+    // ── Buscar factura para recibir ───────────────────────────────────────────
+    const handleSearchInvoice = async () => {
+        const inv = invoiceSearch.trim();
+        if (!inv) return;
+        setSearchingInvoice(true);
+        setInvoiceData(null);
+        setScannedQtys({}); setPickingModes({}); setLastScanned(null);
+        setVendedor(''); setReturnType('COMPLETA'); setReturnReason(''); setReturnNotes('');
+        try {
+            const res = await api.getInvoiceReturnData(inv);
+            if (!res?.success) throw new Error(res?.error ?? 'No encontrada');
+            setInvoiceData(res);
+            // inicializar cantidades según tipo completa
+            const init: Record<string, number> = {};
+            res.items.forEach((it: InvoiceItem) => { init[it.article_id] = it.expected_qty; });
+            setScannedQtys(init);
+            setTimeout(() => barcodeRef.current?.focus(), 100);
+        } catch (e: any) {
+            showToast(e.message ?? 'Factura no encontrada', false);
+        } finally { setSearchingInvoice(false); }
+    };
+
+    // Cuando cambia a PARCIAL: resetear cantidades a 0
+    const handleChangeReturnType = (rt: 'COMPLETA' | 'PARCIAL') => {
+        setReturnType(rt);
+        if (rt === 'COMPLETA' && invoiceData) {
+            const init: Record<string, number> = {};
+            invoiceData.items.forEach(it => { init[it.article_id] = it.expected_qty; });
+            setScannedQtys(init);
+        } else if (rt === 'PARCIAL') {
+            const init: Record<string, number> = {};
+            invoiceData?.items.forEach(it => { init[it.article_id] = 0; });
+            setScannedQtys(init ?? {});
+        }
+    };
+
+    // ── Scanner de código de barras ───────────────────────────────────────────
+    const handleBarcodeScan = (raw: string) => {
+        if (!invoiceData || returnType !== 'PARCIAL') return;
+        const sku = cleanSkuM7(raw);
+        const item = invoiceData.items.find(it =>
+            it.sku.toUpperCase() === sku.toUpperCase() ||
+            it.article_id.toUpperCase() === sku.toUpperCase() ||
+            it.barcode.toUpperCase() === sku.toUpperCase()
+        ) ?? invoiceData.items.find(it =>
+            // retry con ' ↔ -
+            it.sku.toUpperCase() === sku.replaceAll("'", '-').toUpperCase() ||
+            it.sku.toUpperCase() === sku.replaceAll('-', "'").toUpperCase()
+        );
+        if (!item) { showToast(`SKU no encontrado: ${sku}`, false); return; }
+
+        const embeddedQty = extractQtyFromBarcode(raw);
+        const mode = pickingModes[item.article_id] ?? 'UND';
+        let qty = embeddedQty;
+        if (mode === 'CAJA') qty = (item.factor_inter || 1) * embeddedQty;
+        else if (mode === 'STD') qty = (item.factor_std || 1) * embeddedQty;
+
+        const max = item.expected_qty;
+        const current = scannedQtys[item.article_id] ?? 0;
+        const next = Math.min(current + qty, max);
+
+        setScannedQtys(prev => ({ ...prev, [item.article_id]: next }));
+        setLastScanned(item.article_id);
+        showToast(`${item.article_name}: ${next}/${max} ${item.unit}`);
+    };
+
+    const handleManualAdd = (articleId: string, qty: number) => {
+        if (!invoiceData) return;
+        const item = invoiceData.items.find(it => it.article_id === articleId);
+        if (!item) return;
+        const max = item.expected_qty;
+        setScannedQtys(prev => ({ ...prev, [articleId]: Math.min((prev[articleId] ?? 0) + qty, max) }));
+        setLastScanned(articleId);
+    };
+
+    const handleManualSet = (articleId: string, val: string) => {
+        const n = parseInt(val) || 0;
+        const item = invoiceData?.items.find(it => it.article_id === articleId);
+        const max = item?.expected_qty ?? 9999;
+        setScannedQtys(prev => ({ ...prev, [articleId]: Math.max(0, Math.min(n, max)) }));
+    };
+
+    // ── Guardar devolución ────────────────────────────────────────────────────
+    const handleSaveReturn = async () => {
+        if (!invoiceData) return;
+        if (!vendedor.trim()) { showToast('El vendedor es obligatorio', false); return; }
+        if (!returnReason) { showToast('Seleccione el motivo de devolución', false); return; }
+
+        const items = invoiceData.items
+            .filter(it => (scannedQtys[it.article_id] ?? 0) > 0)
+            .map(it => ({
+                article_id:   it.article_id,
+                sku:          it.sku,
+                un_code:      it.un_code,
+                article_name: it.article_name,
+                return_qty:   scannedQtys[it.article_id] ?? 0,
+                expected_qty: it.expected_qty,
+                unit:         it.unit,
+            }));
+
+        if (items.length === 0) { showToast('Ingrese al menos un artículo con cantidad', false); return; }
+
+        setSavingReturn(true);
+        try {
+            await api.registerRouteReturn({
+                invoiceId:       invoiceData.invoice.invoice_id,
+                vehiclePlate:    invoiceData.invoice.vehicle_plate || undefined,
+                returnType,
+                returnReason,
+                notes:           returnNotes,
+                items,
+                createdBy:       user?.id,
+                vendedor:        vendedor.trim(),
+                numeroPlanilla:  invoiceData.invoice.numero_planilla || undefined,
+                fechaPlaca:      invoiceData.invoice.fecha_placa || undefined,
+            });
+            showToast(`Devolución de ${invoiceData.invoice.invoice_id} registrada`);
+            // Reset
+            setInvoiceData(null); setInvoiceSearch(''); setVendedor('');
+            setReturnType('COMPLETA'); setReturnReason(''); setReturnNotes('');
+            setScannedQtys({}); setPickingModes({}); setLastScanned(null);
+            loadAll(selectedClientId);
+        } catch (e: any) { showToast(e?.message ?? 'Error al guardar', false); }
+        finally { setSavingReturn(false); }
+    };
+
+    // ── Post-Legalización ─────────────────────────────────────────────────────
     const handleConfirmBodega = async (ret: BodegaReturn, obs: string, reason: string) => {
         setProcessingId(`b-${ret.invoiceNumber}`);
         try {
@@ -180,60 +292,6 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         finally { setProcessingId(null); }
     };
 
-    // ── Flujo De Rutas ────────────────────────────────────────────────────────
-    const handleSelectPlate = async (p: ActivePlate) => {
-        setRouteForm({ ...EMPTY_FORM, plate: p.plate, vehicleId: p.vehicle_id, driverName: p.driver_name || '' });
-        setPlateInvoices([]);
-        setRouteStep('invoice');
-        setLoading(true);
-        try {
-            const res = await api.getRoutePlateInvoices(p.plate, selectedClientId);
-            setPlateInvoices(res?.data ?? []);
-        } catch { showToast('Error cargando facturas', false); }
-        finally { setLoading(false); }
-    };
-
-    const handleSelectInvoice = (inv: PlateInvoice) => {
-        const qtys: Record<string, number> = {};
-        inv.items.forEach((it: any) => { qtys[it.article_id] = it.expected_qty || 0; });
-        setRouteForm(f => ({ ...f, invoice: inv, itemQtys: qtys, returnType: 'COMPLETA' }));
-        setRouteStep('form');
-    };
-
-    const handleSaveRouteReturn = async () => {
-        if (!routeForm.invoice || !routeForm.returnReason) {
-            showToast('Seleccione motivo de devolución', false); return;
-        }
-        setSavingRoute(true);
-        try {
-            const items = routeForm.invoice.items.map((it: any) => ({
-                article_id: it.article_id,
-                article_name: it.article_name,
-                return_qty: routeForm.returnType === 'COMPLETA'
-                    ? (it.expected_qty || 0)
-                    : (routeForm.itemQtys[it.article_id] ?? 0),
-                delivered_qty: routeForm.returnType === 'COMPLETA'
-                    ? 0
-                    : Math.max(0, (it.expected_qty || 0) - (routeForm.itemQtys[it.article_id] ?? 0)),
-                unit: it.unit || 'und',
-            }));
-            await api.registerRouteReturn({
-                invoiceId: routeForm.invoice.invoice_id,
-                vehiclePlate: routeForm.plate,
-                returnType: routeForm.returnType,
-                returnReason: routeForm.returnReason,
-                notes: routeForm.notes,
-                items,
-                createdBy: user?.id,
-            });
-            showToast(`Devolución de ${routeForm.invoice.invoice_id} registrada`);
-            setRouteForm(EMPTY_FORM);
-            setRouteStep('plate');
-            loadAll(selectedClientId);
-        } catch (e: any) { showToast(e?.message ?? 'Error al guardar', false); }
-        finally { setSavingRoute(false); }
-    };
-
     // ── Lote de aprobación ────────────────────────────────────────────────────
     const handleCreateBatch = async () => {
         if (selectedReturnIds.size === 0) { showToast('Seleccione al menos una devolución', false); return; }
@@ -246,24 +304,59 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                 createdBy: user?.name ?? user?.email,
             });
             showToast(`Lote ${res.batchCode} creado con ${selectedReturnIds.size} devoluciones`);
-            setSelectedReturnIds(new Set());
-            setBatchNotes('');
+            setSelectedReturnIds(new Set()); setBatchNotes('');
             loadAll(selectedClientId);
         } catch (e: any) { showToast(e?.message ?? 'Error al crear lote', false); }
         finally { setCreatingBatch(false); }
     };
 
+    const handleSendEmail = async () => {
+        if (!emailModal) return;
+        const email = emailInput.trim();
+        if (!email || !email.includes('@')) { showToast('Ingresa un email válido', false); return; }
+        setSendingEmail(true);
+        try {
+            await api.sendApprovalBatchEmail(emailModal.batch.id, email, nombreInput.trim());
+            showToast(`Email enviado a ${email}`);
+            setBatches(prev => prev.map(b =>
+                b.id === emailModal.batch.id
+                    ? { ...b, status: 'enviado', email_proveedor: email, email_sent_at: new Date().toISOString() }
+                    : b
+            ));
+            setEmailModal(null); setEmailInput(''); setNombreInput('');
+        } catch (e: any) { showToast(e.message || 'Error enviando email', false); }
+        finally { setSendingEmail(false); }
+    };
+
+    // ── Totales para badge ─────────────────────────────────────────────────────
     const selectedClientName = clients.find(c => c.id === selectedClientId)?.name ?? '';
-    const tabs: { id: Tab; label: string; count: number }[] = [
-        { id: 'rutas',       label: 'De Rutas',          count: activePlates.length },
-        { id: 'legalizacion',label: 'Post-Legalización', count: bodegaReturns.length },
-        { id: 'aprobacion',  label: 'Por Aprobar',       count: pendingReturns.length },
+    const tabs: { id: Tab; label: string; count?: number }[] = [
+        { id: 'recibir',      label: 'Recibir Devolución' },
+        { id: 'legalizacion', label: 'Post-Legalización', count: bodegaReturns.length },
+        { id: 'aprobacion',   label: 'Por Aprobar',       count: pendingReturns.length },
+        { id: 'historial',    label: 'Historial' },
+    ];
+
+    // ── Columnas Excel historial ───────────────────────────────────────────────
+    const historyColumns = [
+        { header: 'FECHA',            key: 'fecha' },
+        { header: 'CLIENTE',          key: 'customer_name' },
+        { header: 'CODIGO CLIENTE',   key: 'codigo_cliente' },
+        { header: 'VENDEDOR',         key: 'vendedor' },
+        { header: 'FECHA Y PLACA',    key: 'fecha_placa', render: (r: any) => r.fecha_placa ? `${r.fecha_placa?.split('T')[0] ?? ''} ${r.placa ?? ''}`.trim() : (r.placa ?? '') },
+        { header: 'NUMERO PLANILLA',  key: 'numero_planilla' },
+        { header: 'REMISION',         key: 'remision' },
+        { header: 'PEDIDO',           key: 'pedido' },
+        { header: 'REFERENCIA',       key: 'referencia' },
+        { header: 'UM',               key: 'um' },
+        { header: 'CANTIDAD',         key: 'cantidad' },
+        { header: 'MOTIVO DEVOLUCION',key: 'motivo_devolucion' },
+        { header: 'UNIDAD NEGOCIO',   key: 'unidad_negocio' },
     ];
 
     return (
         <>
         <div className="min-h-screen bg-slate-50/50 p-4 md:p-6">
-            {/* Toast */}
             {toast && (
                 <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-xl shadow-xl text-[11px] font-black text-white transition-all
                     ${toast.ok ? 'bg-emerald-600' : 'bg-rose-600'}`}>
@@ -271,10 +364,9 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                 </div>
             )}
 
-            {/* Header */}
             <div className="mb-5">
                 <h1 className="text-xl font-black text-slate-900 tracking-tight">Devoluciones — Bodega</h1>
-                <p className="text-[11px] text-slate-500 mt-0.5">Confirma recepción física de mercancía devuelta</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Recepción, seguimiento y aprobación de mercancía devuelta</p>
             </div>
 
             {/* Client selector */}
@@ -300,18 +392,16 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                 )}
             </div>
 
-            {!selectedClientId ? (
-                <EmptyState msg="Selecciona un cliente" />
-            ) : (
+            {!clientsReady ? null : (
                 <>
                     {/* Tabs */}
-                    <div className="flex gap-2 mb-5">
+                    <div className="flex flex-wrap gap-2 mb-5">
                         {tabs.map(t => (
                             <button key={t.id} onClick={() => setTab(t.id)}
                                 className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5
                                     ${tab === t.id ? 'bg-slate-900 text-white shadow' : 'bg-white border border-slate-200 text-slate-500 hover:border-slate-300'}`}>
                                 {t.label}
-                                {t.count > 0 && (
+                                {(t.count ?? 0) > 0 && (
                                     <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-black
                                         ${tab === t.id ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'}`}>
                                         {t.count}
@@ -325,336 +415,343 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                         </button>
                     </div>
 
-                    {loading ? (
-                        <div className="flex justify-center items-center py-20">
-                            <Icons.Loader className="w-6 h-6 text-slate-400 animate-spin" />
-                        </div>
-                    ) : (
-                        <>
-                            {/* ── TAB: DE RUTAS ── */}
-                            {tab === 'rutas' && (
-                                <div className="max-w-2xl">
-                                    {/* Breadcrumb */}
-                                    <div className="flex items-center gap-2 mb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                        <button onClick={() => { setRouteStep('plate'); setRouteForm(EMPTY_FORM); }}
-                                            className={routeStep !== 'plate' ? 'text-indigo-600 hover:underline' : ''}>
-                                            Placa
-                                        </button>
-                                        {routeStep !== 'plate' && <>
-                                            <span>›</span>
-                                            <button onClick={() => { setRouteStep('invoice'); }}
-                                                className={routeStep === 'form' ? 'text-indigo-600 hover:underline' : ''}>
-                                                Factura
-                                            </button>
-                                        </>}
-                                        {routeStep === 'form' && <>
-                                            <span>›</span><span className="text-slate-600">Registrar</span>
-                                        </>}
+                    {/* ══════════════════════════════════════════════════════════
+                        TAB: RECIBIR DEVOLUCIÓN
+                    ══════════════════════════════════════════════════════════ */}
+                    {tab === 'recibir' && (
+                        <div className="max-w-2xl space-y-4">
+                            {/* Buscador de factura */}
+                            <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">
+                                    Número de Factura / Remisión
+                                </p>
+                                <div className="flex gap-2">
+                                    <input
+                                        value={invoiceSearch}
+                                        onChange={e => setInvoiceSearch(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleSearchInvoice()}
+                                        placeholder="Ej: AFE7826049"
+                                        className="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-400 uppercase"
+                                    />
+                                    <button onClick={handleSearchInvoice} disabled={searchingInvoice}
+                                        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                                        {searchingInvoice
+                                            ? <Icons.Loader className="w-3.5 h-3.5 animate-spin" />
+                                            : <Icons.Search className="w-3.5 h-3.5" />}
+                                        Buscar
+                                    </button>
+                                </div>
+                            </div>
+
+                            {invoiceData && (
+                                <>
+                                    {/* Info de la factura */}
+                                    <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
+                                        <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-[11px]">
+                                            <div><span className="text-indigo-400 font-black uppercase tracking-widest text-[9px]">Factura</span>
+                                                <p className="font-black text-indigo-900 font-mono">{invoiceData.invoice.invoice_id}</p></div>
+                                            <div><span className="text-indigo-400 font-black uppercase tracking-widest text-[9px]">Cliente</span>
+                                                <p className="font-bold text-slate-700 text-xs">{invoiceData.invoice.customer_name}</p></div>
+                                            <div><span className="text-indigo-400 font-black uppercase tracking-widest text-[9px]">Planilla</span>
+                                                <p className="font-bold text-slate-700 font-mono">{invoiceData.invoice.numero_planilla || '—'}</p></div>
+                                            <div><span className="text-indigo-400 font-black uppercase tracking-widest text-[9px]">Placa</span>
+                                                <p className="font-bold text-slate-700">{invoiceData.invoice.vehicle_plate || '—'}</p></div>
+                                            <div><span className="text-indigo-400 font-black uppercase tracking-widest text-[9px]">Pedido</span>
+                                                <p className="font-bold text-slate-700 font-mono">{invoiceData.invoice.order_number || '—'}</p></div>
+                                            <div><span className="text-indigo-400 font-black uppercase tracking-widest text-[9px]">Plan</span>
+                                                <p className="font-bold text-slate-700">{invoiceData.invoice.plan_type || '—'}</p></div>
+                                        </div>
                                     </div>
 
-                                    {/* Step 1: Seleccionar placa */}
-                                    {routeStep === 'plate' && (
-                                        activePlates.length === 0
-                                            ? <EmptyState msg="No hay vehículos activos en ruta" />
-                                            : <>
-                                                <input
-                                                    value={plateSearch}
-                                                    onChange={e => setPlateSearch(e.target.value)}
-                                                    placeholder="Buscar placa o conductor..."
-                                                    className="w-full mb-3 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] outline-none focus:border-indigo-400 font-bold"
-                                                />
-                                                <div className="grid gap-2">
-                                                    {activePlates
-                                                        .filter(p => {
-                                                            const q = plateSearch.toLowerCase();
-                                                            return !q || p.plate.toLowerCase().includes(q) || (p.driver_name || '').toLowerCase().includes(q);
-                                                        })
-                                                        .map(p => (
-                                                            <button key={p.plate} onClick={() => handleSelectPlate(p)}
-                                                                className="bg-white border-2 border-slate-100 rounded-2xl px-4 py-3 flex items-center justify-between hover:border-indigo-300 hover:bg-indigo-50/30 transition-all text-left">
-                                                                <div>
-                                                                    <p className="text-[13px] font-black text-slate-900">{p.plate}</p>
-                                                                    {p.driver_name && <p className="text-[10px] text-slate-500 mt-0.5">👤 {p.driver_name}</p>}
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <span className="text-[9px] bg-amber-100 text-amber-700 font-black px-2 py-0.5 rounded-full">
-                                                                        {p.invoice_count} fact.
-                                                                    </span>
-                                                                    <Icons.ChevronDown className="w-4 h-4 text-slate-400 -rotate-90" />
-                                                                </div>
-                                                            </button>
-                                                        ))}
-                                                </div>
-                                            </>
-                                    )}
-
-                                    {/* Step 2: Seleccionar factura */}
-                                    {routeStep === 'invoice' && (
-                                        plateInvoices.length === 0
-                                            ? <EmptyState msg="No hay facturas en ruta para esta placa" />
-                                            : <div className="grid gap-2">
-                                                {plateInvoices.map(inv => (
-                                                    <button key={inv.invoice_id} onClick={() => handleSelectInvoice(inv)}
-                                                        className="bg-white border-2 border-slate-100 rounded-2xl px-4 py-3 flex items-center justify-between hover:border-indigo-300 hover:bg-indigo-50/30 transition-all text-left">
-                                                        <div>
-                                                            <p className="text-[12px] font-black text-slate-900">{inv.invoice_id}</p>
-                                                            {inv.customer_name && <p className="text-[9px] text-slate-500 mt-0.5">{inv.customer_name}</p>}
-                                                            {inv.address && <p className="text-[8px] text-slate-400">{inv.address}{inv.city ? `, ${inv.city}` : ''}</p>}
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[9px] bg-slate-100 text-slate-600 font-black px-2 py-0.5 rounded-full">{inv.item_count} art.</span>
-                                                            <Icons.ChevronDown className="w-4 h-4 text-slate-400 -rotate-90" />
-                                                        </div>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                    )}
-
-                                    {/* Step 3: Formulario de devolución */}
-                                    {routeStep === 'form' && routeForm.invoice && (
-                                        <div className="bg-white border-2 border-slate-100 rounded-2xl p-5 space-y-4">
-                                            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                                                <div>
-                                                    <p className="text-[12px] font-black text-slate-900">{routeForm.invoice.invoice_id}</p>
-                                                    <p className="text-[9px] text-slate-500">🚛 {routeForm.plate} · 👤 {routeForm.driverName || '—'}</p>
-                                                </div>
-                                            </div>
-
-                                            {/* Tipo de devolución */}
-                                            <div>
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Tipo de Devolución</p>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    {(['COMPLETA', 'PARCIAL'] as const).map(t => (
-                                                        <button key={t} onClick={() => setRouteForm(f => ({ ...f, returnType: t }))}
-                                                            className={`py-2.5 rounded-xl border-2 text-[10px] font-black uppercase transition-all
-                                                                ${routeForm.returnType === t
-                                                                    ? t === 'COMPLETA' ? 'bg-rose-50 border-rose-400 text-rose-700' : 'bg-orange-50 border-orange-400 text-orange-700'
-                                                                    : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300'}`}>
-                                                            {t === 'COMPLETA' ? '📦 Completa' : '⚠️ Parcial'}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            {/* Cantidades parciales */}
-                                            {routeForm.returnType === 'PARCIAL' && (
-                                                <div>
-                                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Cantidad a Devolver por Artículo</p>
-                                                    <div className="space-y-2">
-                                                        {routeForm.invoice.items.map((it: any) => (
-                                                            <div key={it.article_id} className="flex items-center gap-3 bg-slate-50 rounded-xl px-3 py-2">
-                                                                <div className="flex-1 min-w-0">
-                                                                    <p className="text-[10px] font-black text-slate-700 truncate">{it.article_id}</p>
-                                                                    {it.article_name && <p className="text-[8px] text-slate-400">{it.article_name}</p>}
-                                                                    <p className="text-[8px] text-slate-400">Esperado: {it.expected_qty} {it.unit}</p>
-                                                                </div>
-                                                                <input
-                                                                    type="number" min={0} max={it.expected_qty}
-                                                                    value={routeForm.itemQtys[it.article_id] ?? 0}
-                                                                    onChange={e => setRouteForm(f => ({
-                                                                        ...f, itemQtys: { ...f.itemQtys, [it.article_id]: Math.min(it.expected_qty, Math.max(0, Number(e.target.value))) }
-                                                                    }))}
-                                                                    className="w-20 px-2 py-1.5 border border-slate-200 rounded-lg text-[11px] font-black text-center outline-none focus:border-orange-400"
-                                                                />
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* Motivo */}
-                                            <div>
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Motivo <span className="text-rose-500">*</span></p>
-                                                <select value={routeForm.returnReason}
-                                                    onChange={e => setRouteForm(f => ({ ...f, returnReason: e.target.value }))}
-                                                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 outline-none focus:border-rose-400">
-                                                    <option value="">— Seleccionar motivo —</option>
-                                                    {RETURN_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-                                                </select>
-                                            </div>
-
-                                            {/* Notas */}
-                                            <div>
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">Observaciones</p>
-                                                <textarea
-                                                    value={routeForm.notes}
-                                                    onChange={e => setRouteForm(f => ({ ...f, notes: e.target.value }))}
-                                                    placeholder="Detalle adicional..."
-                                                    rows={3}
-                                                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 outline-none focus:border-rose-400 resize-none"
-                                                />
-                                            </div>
-
-                                            {/* Acciones */}
-                                            <div className="flex gap-3 pt-1">
-                                                <button onClick={() => setRouteStep('invoice')}
-                                                    className="px-4 py-2.5 bg-slate-100 text-slate-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">
-                                                    Atrás
-                                                </button>
-                                                <button onClick={handleSaveRouteReturn}
-                                                    disabled={savingRoute || !routeForm.returnReason}
-                                                    className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                                                    {savingRoute ? <Icons.Loader className="w-3.5 h-3.5 animate-spin" /> : null}
-                                                    Registrar Devolución
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* ── TAB: POST-LEGALIZACIÓN ── */}
-                            {tab === 'legalizacion' && (
-                                bodegaReturns.length === 0
-                                    ? <EmptyState msg="No hay devoluciones post-legalización pendientes" />
-                                    : <div className="space-y-4 max-w-2xl">
-                                        <div className="relative">
-                                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                    {/* Campos: vendedor, tipo, motivo, notas */}
+                                    <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+                                        {/* VENDEDOR — obligatorio */}
+                                        <div>
+                                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                                                Vendedor <span className="text-rose-500">*</span>
+                                            </label>
                                             <input
-                                                value={searchLegalizacion}
-                                                onChange={e => setSearchLegalizacion(e.target.value)}
-                                                placeholder="Buscar por factura, placa, 'completa' o 'parcial'..."
-                                                className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-slate-100 rounded-2xl text-[11px] outline-none focus:border-rose-400 font-bold shadow-sm transition-all"
+                                                value={vendedor}
+                                                onChange={e => setVendedor(e.target.value)}
+                                                placeholder="Nombre del vendedor"
+                                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
                                             />
                                         </div>
 
-                                        <div className="grid gap-3">
-                                            {bodegaReturns
-                                                .filter(ret => {
-                                                    const q = searchLegalizacion.toLowerCase().trim();
-                                                    if (!q) return true;
-
-                                                    const isPart = isReturnPartial(ret);
-                                                    const statusStr = isPart ? 'parcial' : 'completa';
-                                                    const statusStrAlt = isPart ? 'parcial' : 'completo';
-
-                                                    return (
-                                                        ret.invoiceNumber?.toLowerCase().includes(q) ||
-                                                        ret.vehiclePlate?.toLowerCase().includes(q) ||
-                                                        ret.conductorName?.toLowerCase().includes(q) ||
-                                                        ret.externalDocId?.toLowerCase().includes(q) ||
-                                                        statusStr.includes(q) ||
-                                                        statusStrAlt.includes(q)
-                                                    );
-                                                })
-                                                .map(ret => (
-                                                    <ReturnCard
-                                                        key={ret.invoiceNumber}
-                                                        type="legalizacion"
-                                                        invoiceId={ret.invoiceNumber}
-                                                        conductorName={ret.conductorName}
-                                                        vehiclePlate={ret.vehiclePlate}
-                                                        createdAt={ret.legalizadoAt}
-                                                        externalDocId={ret.externalDocId}
-                                                        items={ret.items ?? []}
-                                                        isProcessing={processingId === `b-${ret.invoiceNumber}`}
-                                                        onConfirm={(obs, reason) => handleConfirmBodega(ret, obs, reason)}
-                                                    />
+                                        {/* Tipo devolución */}
+                                        <div>
+                                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                                                Tipo de Devolución
+                                            </label>
+                                            <div className="flex gap-2">
+                                                {(['COMPLETA', 'PARCIAL'] as const).map(rt => (
+                                                    <button key={rt} onClick={() => handleChangeReturnType(rt)}
+                                                        className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
+                                                            ${returnType === rt ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-500 border border-slate-200'}`}>
+                                                        {rt}
+                                                    </button>
                                                 ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Motivo */}
+                                        <div>
+                                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                                                Motivo de Devolución <span className="text-rose-500">*</span>
+                                            </label>
+                                            <select value={returnReason} onChange={e => setReturnReason(e.target.value)}
+                                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
+                                                <option value="">— Seleccionar motivo —</option>
+                                                {RETURN_REASONS.map((r: string) => (
+                                                    <option key={r} value={r}>{r}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {/* Observaciones */}
+                                        <div>
+                                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                                                Observaciones
+                                            </label>
+                                            <input value={returnNotes} onChange={e => setReturnNotes(e.target.value)}
+                                                placeholder="Opcional"
+                                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                            />
                                         </div>
                                     </div>
-                            )}
 
-                            {/* ── TAB: POR APROBAR ── */}
-                            {tab === 'aprobacion' && (
-                                <div className="max-w-2xl space-y-4">
+                                    {/* Scanner (solo visible en PARCIAL) */}
+                                    {returnType === 'PARCIAL' && (
+                                        <div className="bg-slate-900 rounded-2xl p-4 flex items-center gap-3">
+                                            <Icons.Scan className="w-5 h-5 text-emerald-400 shrink-0" />
+                                            <div className="flex-1">
+                                                <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-1">
+                                                    Lectora de Código de Barras
+                                                </p>
+                                                <input
+                                                    ref={barcodeRef}
+                                                    value={barcodeRaw}
+                                                    onChange={e => setBarcodeRaw(e.target.value)}
+                                                    onKeyDown={e => {
+                                                        if (e.key === 'Enter' && barcodeRaw.trim()) {
+                                                            handleBarcodeScan(barcodeRaw.trim());
+                                                            setBarcodeRaw('');
+                                                        }
+                                                    }}
+                                                    placeholder="Escanear o escribir código..."
+                                                    className="w-full bg-slate-800 text-emerald-300 placeholder-slate-500 font-mono text-sm px-3 py-2 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Artículos */}
+                                    <div className="space-y-2">
+                                        {invoiceData.items.map(item => {
+                                            const qty    = scannedQtys[item.article_id] ?? 0;
+                                            const max    = item.expected_qty;
+                                            const done   = qty >= max;
+                                            const mode   = pickingModes[item.article_id] ?? 'UND';
+                                            const isLast = lastScanned === item.article_id;
+
+                                            return (
+                                                <div key={item.article_id}
+                                                    className={`bg-white rounded-2xl border-2 p-4 transition-all ${done ? 'border-emerald-300' : isLast ? 'border-amber-300' : 'border-slate-100'}`}>
+                                                    {isLast && (
+                                                        <div className="flex items-center gap-1 mb-1.5">
+                                                            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                                            <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">Último escaneado</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="flex justify-between items-start gap-3">
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-[13px] font-black text-slate-900 leading-tight truncate">{item.article_name}</p>
+                                                            <div className="flex gap-2 mt-0.5 flex-wrap">
+                                                                <span className="text-[9px] text-slate-400 font-mono">{item.article_id}</span>
+                                                                {item.un_code && <span className="text-[8px] bg-slate-100 text-slate-500 font-black px-1.5 py-0.5 rounded">{item.un_code}</span>}
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right shrink-0">
+                                                            <p className={`text-xl font-black tabular-nums ${done ? 'text-emerald-600' : 'text-slate-700'}`}>
+                                                                {qty} <span className="text-[11px] text-slate-300">/</span> {max}
+                                                            </p>
+                                                            <p className="text-[9px] font-black text-slate-400 uppercase">{item.unit}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Controles de cantidad */}
+                                                    <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+                                                        {/* Modo: UND / CAJA / STD */}
+                                                        {returnType === 'PARCIAL' && (
+                                                            <>
+                                                                <button onClick={() => setPickingModes(p => ({ ...p, [item.article_id]: 'UND' }))}
+                                                                    className={`flex-1 py-1.5 rounded-xl text-[9px] font-black uppercase flex flex-col items-center gap-0.5 transition-all
+                                                                        ${mode === 'UND' ? 'bg-slate-900 text-white ring-2 ring-slate-900 ring-offset-1' : 'bg-slate-50 text-slate-400 border border-slate-200'}`}>
+                                                                    <span>x1</span><span className="text-[7px] opacity-70">{item.unit}</span>
+                                                                </button>
+                                                                {(item.factor_inter ?? 0) > 1 && (
+                                                                    <button onClick={() => setPickingModes(p => ({ ...p, [item.article_id]: 'CAJA' }))}
+                                                                        className={`flex-1 py-1.5 rounded-xl text-[9px] font-black uppercase flex flex-col items-center gap-0.5 transition-all
+                                                                            ${mode === 'CAJA' ? 'bg-indigo-600 text-white ring-2 ring-indigo-600 ring-offset-1' : 'bg-indigo-50 text-indigo-400 border border-indigo-100'}`}>
+                                                                        <span>x{item.factor_inter}</span><span className="text-[7px] opacity-70">{item.uom_inter_name}</span>
+                                                                    </button>
+                                                                )}
+                                                                {(item.factor_std ?? 0) > 1 && item.factor_std !== item.factor_inter && (
+                                                                    <button onClick={() => setPickingModes(p => ({ ...p, [item.article_id]: 'STD' }))}
+                                                                        className={`flex-1 py-1.5 rounded-xl text-[9px] font-black uppercase flex flex-col items-center gap-0.5 transition-all
+                                                                            ${mode === 'STD' ? 'bg-amber-500 text-white ring-2 ring-amber-500 ring-offset-1' : 'bg-amber-50 text-amber-400 border border-amber-100'}`}>
+                                                                        <span>x{item.factor_std}</span><span className="text-[7px] opacity-70">{item.uom_std_name}</span>
+                                                                    </button>
+                                                                )}
+                                                            </>
+                                                        )}
+
+                                                        {/* Input manual de cantidad */}
+                                                        {returnType === 'PARCIAL' && (
+                                                            <>
+                                                                <input
+                                                                    type="number" min={0} max={item.expected_qty}
+                                                                    value={qty}
+                                                                    onChange={e => handleManualSet(item.article_id, e.target.value)}
+                                                                    className="w-14 text-center border border-slate-200 rounded-xl text-sm font-black focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                                                />
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const mult = mode === 'CAJA' ? (item.factor_inter || 1) : mode === 'STD' ? (item.factor_std || 1) : 1;
+                                                                        handleManualAdd(item.article_id, mult);
+                                                                    }}
+                                                                    className="px-3 py-1.5 rounded-xl bg-emerald-500 text-white text-[9px] font-black uppercase flex items-center gap-1">
+                                                                    <Icons.Plus className="w-3 h-3" /> +
+                                                                </button>
+                                                            </>
+                                                        )}
+
+                                                        {/* Modo COMPLETA: solo muestra qty total */}
+                                                        {returnType === 'COMPLETA' && (
+                                                            <div className="flex-1 flex items-center justify-center">
+                                                                <span className="text-[9px] text-emerald-600 font-black uppercase">✓ Devolución completa</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Botón confirmar */}
+                                    <button onClick={handleSaveReturn} disabled={savingReturn}
+                                        className="w-full py-4 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2">
+                                        {savingReturn
+                                            ? <><Icons.Loader className="w-4 h-4 animate-spin" /> Guardando…</>
+                                            : <><Icons.Package className="w-4 h-4" /> Confirmar Recepción de Devolución</>}
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ══════════════════════════════════════════════════════════
+                        TAB: POST-LEGALIZACIÓN
+                    ══════════════════════════════════════════════════════════ */}
+                    {tab === 'legalizacion' && (
+                        <div className="max-w-2xl space-y-3">
+                            {loading ? (
+                                <div className="flex justify-center py-20"><Icons.Loader className="w-6 h-6 text-slate-400 animate-spin" /></div>
+                            ) : bodegaReturns.length === 0 ? (
+                                <EmptyState msg="No hay devoluciones post-legalización pendientes" />
+                            ) : (
+                                <>
+                                    <input value={searchLegalizacion} onChange={e => setSearchLegalizacion(e.target.value)}
+                                        placeholder="Buscar factura..."
+                                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] outline-none focus:border-indigo-400 font-bold mb-1" />
+                                    {bodegaReturns
+                                        .filter(r => !searchLegalizacion || r.invoiceNumber.toLowerCase().includes(searchLegalizacion.toLowerCase()))
+                                        .map(ret => (
+                                            <ReturnCard key={ret.invoiceNumber} ret={ret}
+                                                processing={processingId === `b-${ret.invoiceNumber}`}
+                                                onConfirm={(obs, reason) => handleConfirmBodega(ret, obs, reason)} />
+                                        ))}
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {/* ══════════════════════════════════════════════════════════
+                        TAB: POR APROBAR
+                    ══════════════════════════════════════════════════════════ */}
+                    {tab === 'aprobacion' && (
+                        <div className="max-w-2xl">
+                            {!selectedClientId ? (
+                                <EmptyState msg="Selecciona un cliente" />
+                            ) : (
+                                <>
                                     {/* Sub-tabs */}
-                                    <div className="flex gap-2">
-                                        <button onClick={() => setBatchTab('pending')}
-                                            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5
-                                                ${batchTab === 'pending' ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500'}`}>
-                                            Pendientes
-                                            {pendingReturns.length > 0 && (
-                                                <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-black ${batchTab === 'pending' ? 'bg-white/20' : 'bg-amber-100 text-amber-700'}`}>
-                                                    {pendingReturns.length}
-                                                </span>
-                                            )}
-                                        </button>
-                                        <button onClick={() => setBatchTab('batches')}
-                                            className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5
-                                                ${batchTab === 'batches' ? 'bg-slate-800 text-white' : 'bg-white border border-slate-200 text-slate-500'}`}>
-                                            Lotes Creados
-                                            {batches.length > 0 && (
-                                                <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-black ${batchTab === 'batches' ? 'bg-white/20' : 'bg-slate-100 text-slate-600'}`}>
-                                                    {batches.length}
-                                                </span>
-                                            )}
-                                        </button>
+                                    <div className="flex gap-2 mb-4">
+                                        {(['pending', 'batches'] as const).map(bt => (
+                                            <button key={bt} onClick={() => setBatchTab(bt)}
+                                                className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all
+                                                    ${batchTab === bt ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-500'}`}>
+                                                {bt === 'pending' ? `Pendientes (${pendingReturns.length})` : `Lotes (${batches.length})`}
+                                            </button>
+                                        ))}
                                     </div>
 
                                     {batchTab === 'pending' && (
-                                        <>
-                                            {pendingReturns.length === 0 ? (
-                                                <EmptyState msg="No hay devoluciones pendientes de agrupar" />
-                                            ) : (
-                                                <>
-                                                    {/* Selección y crear lote */}
-                                                    <div className="bg-white border-2 border-slate-100 rounded-2xl p-4 space-y-3">
-                                                        <div className="flex items-center justify-between">
-                                                            <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest">
-                                                                {selectedReturnIds.size} de {pendingReturns.length} seleccionadas
-                                                            </p>
-                                                            <div className="flex gap-3">
-                                                                <button onClick={() => setSelectedReturnIds(new Set(pendingReturns.map(r => r.id)))}
-                                                                    className="text-[8px] font-black text-indigo-500 hover:text-indigo-700 uppercase tracking-widest">Todas</button>
-                                                                <button onClick={() => setSelectedReturnIds(new Set())}
-                                                                    className="text-[8px] font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest">Ninguna</button>
-                                                            </div>
-                                                        </div>
-                                                        <textarea
-                                                            value={batchNotes}
-                                                            onChange={e => setBatchNotes(e.target.value)}
-                                                            placeholder="Notas del lote (ej: devoluciones semana 20)..."
-                                                            rows={2}
-                                                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-700 outline-none focus:border-indigo-400 resize-none"
-                                                        />
-                                                        <button onClick={handleCreateBatch}
-                                                            disabled={creatingBatch || selectedReturnIds.size === 0}
-                                                            className="w-full py-2.5 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-indigo-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                                                            {creatingBatch ? <Icons.Loader className="w-3.5 h-3.5 animate-spin" /> : null}
-                                                            Crear Lote de Aprobación ({selectedReturnIds.size})
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Lista de devoluciones */}
-                                                    <div className="space-y-2">
-                                                        {pendingReturns.map(ret => {
-                                                            const checked = selectedReturnIds.has(ret.id);
-                                                            return (
-                                                                <label key={ret.id}
-                                                                    className={`flex items-start gap-3 bg-white border-2 rounded-2xl px-4 py-3 cursor-pointer transition-all
-                                                                        ${checked ? 'border-indigo-300 bg-indigo-50/30' : 'border-slate-100 hover:border-slate-200'}`}>
-                                                                    <input type="checkbox" checked={checked} className="mt-0.5 w-4 h-4 accent-indigo-600 shrink-0"
+                                        loading ? <div className="flex justify-center py-20"><Icons.Loader className="w-6 h-6 text-slate-400 animate-spin" /></div>
+                                        : pendingReturns.length === 0 ? <EmptyState msg="No hay devoluciones pendientes de aprobación" />
+                                        : (
+                                            <>
+                                                <div className="space-y-2 mb-4">
+                                                    {pendingReturns.map(ret => {
+                                                        const sel = selectedReturnIds.has(ret.id);
+                                                        const isPart = ret.status === 'EST-17' || ret.status === 'PARCIAL';
+                                                        return (
+                                                            <label key={ret.id}
+                                                                className={`block bg-white border-2 rounded-2xl px-4 py-3 cursor-pointer transition-all
+                                                                    ${sel ? 'border-indigo-400 bg-indigo-50/30' : 'border-slate-100 hover:border-slate-200'}`}>
+                                                                <div className="flex items-start gap-3">
+                                                                    <input type="checkbox" checked={sel}
                                                                         onChange={() => setSelectedReturnIds(prev => {
-                                                                            const next = new Set(prev);
-                                                                            next.has(ret.id) ? next.delete(ret.id) : next.add(ret.id);
-                                                                            return next;
-                                                                        })} />
+                                                                            const n = new Set(prev);
+                                                                            n.has(ret.id) ? n.delete(ret.id) : n.add(ret.id);
+                                                                            return n;
+                                                                        })}
+                                                                        className="mt-0.5 w-4 h-4 accent-indigo-600 cursor-pointer shrink-0" />
                                                                     <div className="flex-1 min-w-0">
                                                                         <div className="flex items-center gap-2 flex-wrap">
-                                                                            <span className="text-[11px] font-black text-slate-900">{ret.invoice_id}</span>
-                                                                            {ret.external_doc_id && <span className="text-[8px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">{ret.external_doc_id}</span>}
+                                                                            <span className="text-[12px] font-black text-slate-900 font-mono">{ret.invoice_id}</span>
                                                                             <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase
-                                                                                ${ret.status === 'PROCESSED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                                                                                {ret.status === 'PROCESSED' ? '✅ Recibida' : '⏳ Pendiente'}
+                                                                                ${isPart ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
+                                                                                {isPart ? 'Parcial' : 'Completa'}
                                                                             </span>
                                                                         </div>
-                                                                        {ret.vehicle_plate && <p className="text-[9px] text-slate-500 mt-0.5">🚛 {ret.vehicle_plate} · 👤 {ret.driver_name || '—'}</p>}
-                                                                        {ret.return_reason && <p className="text-[9px] text-slate-500 mt-0.5">📌 {ret.return_reason}</p>}
+                                                                        {ret.return_reason && <p className="text-[10px] text-slate-500 mt-0.5">{ret.return_reason}</p>}
                                                                         <p className="text-[8px] text-slate-400 mt-0.5">
                                                                             {new Date(ret.created_at).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' })}
+                                                                            {ret.vehicle_plate && ` · ${ret.vehicle_plate}`}
                                                                         </p>
                                                                     </div>
-                                                                    <span className="text-[9px] font-black text-slate-500 shrink-0">
-                                                                        {(ret.items || []).length} art.
-                                                                    </span>
-                                                                </label>
-                                                            );
-                                                        })}
+                                                                </div>
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </div>
+                                                {selectedReturnIds.size > 0 && (
+                                                    <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+                                                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                                            {selectedReturnIds.size} devolución(es) seleccionada(s)
+                                                        </p>
+                                                        <input value={batchNotes} onChange={e => setBatchNotes(e.target.value)}
+                                                            placeholder="Notas del lote (opcional)"
+                                                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                                                        <button onClick={handleCreateBatch} disabled={creatingBatch}
+                                                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-widest rounded-xl flex items-center justify-center gap-2">
+                                                            {creatingBatch ? <><Icons.Loader className="w-3.5 h-3.5 animate-spin" /> Creando…</> : <><Icons.Package className="w-3.5 h-3.5" /> Crear Lote</>}
+                                                        </button>
                                                     </div>
-                                                </>
-                                            )}
-                                        </>
+                                                )}
+                                            </>
+                                        )
                                     )}
 
                                     {batchTab === 'batches' && (
@@ -668,9 +765,9 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                                                 <div className="flex items-center gap-2 flex-wrap">
                                                                     <span className="text-[12px] font-black text-slate-900 font-mono">{b.batch_code}</span>
                                                                     <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase
-                                                                        ${b.status === 'procesado' ? 'bg-emerald-100 text-emerald-700'
-                                                                        : b.status === 'aprobado'  ? 'bg-blue-100 text-blue-700'
-                                                                        : b.status === 'enviado'   ? 'bg-indigo-100 text-indigo-700'
+                                                                        ${b.status === 'aprobado'         ? 'bg-emerald-100 text-emerald-700'
+                                                                        : b.status === 'aprobado_parcial' ? 'bg-teal-100 text-teal-700'
+                                                                        : b.status === 'enviado'          ? 'bg-indigo-100 text-indigo-700'
                                                                         : 'bg-amber-100 text-amber-700'}`}>
                                                                         {b.status}
                                                                     </span>
@@ -679,6 +776,16 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                                                 <p className="text-[8px] text-slate-400 mt-1">
                                                                     👤 {b.created_by || '—'} · {new Date(b.created_at).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' })}
                                                                 </p>
+                                                                {b.confirmed_at && (
+                                                                    <p className="text-[8px] text-emerald-600 font-bold mt-0.5">
+                                                                        ✅ Confirmado por {b.confirmed_by_name || 'Proveedor'} · {new Date(b.confirmed_at).toLocaleDateString('es-CO')}
+                                                                    </p>
+                                                                )}
+                                                                {b.email_sent_at && !b.confirmed_at && (
+                                                                    <p className="text-[8px] text-indigo-500 font-bold mt-0.5">
+                                                                        📧 Email enviado a {b.email_proveedor}
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                             <div className="text-right shrink-0">
                                                                 <p className="text-[10px] font-black text-slate-700">{b.total_items} facturas</p>
@@ -687,16 +794,6 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                                                 )}
                                                             </div>
                                                         </div>
-                                                        {b.confirmed_at && (
-                                                            <p className="text-[8px] text-emerald-600 font-bold mt-1">
-                                                                ✅ Confirmado por {b.confirmed_by_name || 'Proveedor'} · {new Date(b.confirmed_at).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' })}
-                                                            </p>
-                                                        )}
-                                                        {b.email_sent_at && !b.confirmed_at && (
-                                                            <p className="text-[8px] text-indigo-500 font-bold mt-1">
-                                                                📧 Email enviado a {b.email_proveedor} · {new Date(b.email_sent_at).toLocaleDateString('es-CO', { day:'2-digit', month:'short' })}
-                                                            </p>
-                                                        )}
                                                         <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-2">
                                                             <span className="text-[8px] text-slate-400 font-mono flex-1">
                                                                 <strong className="text-slate-700">{b.batch_code}</strong>
@@ -718,15 +815,53 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                                 ))}
                                             </div>
                                     )}
-                                </div>
+                                </>
                             )}
-                        </>
+                        </div>
+                    )}
+
+                    {/* ══════════════════════════════════════════════════════════
+                        TAB: HISTORIAL
+                    ══════════════════════════════════════════════════════════ */}
+                    {tab === 'historial' && (
+                        <div>
+                            {/* Filtros de fecha */}
+                            <div className="flex flex-wrap gap-3 mb-4 items-end">
+                                <div>
+                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Desde</label>
+                                    <input type="date" value={histFrom} onChange={e => setHistFrom(e.target.value)}
+                                        className="border border-slate-200 rounded-xl px-3 py-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                                </div>
+                                <div>
+                                    <label className="block text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Hasta</label>
+                                    <input type="date" value={histTo} onChange={e => setHistTo(e.target.value)}
+                                        className="border border-slate-200 rounded-xl px-3 py-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+                                </div>
+                                <button onClick={loadHistory} disabled={histLoading}
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-1.5">
+                                    <Icons.RefreshCw className={`w-3.5 h-3.5 ${histLoading ? 'animate-spin' : ''}`} />
+                                    Aplicar
+                                </button>
+                            </div>
+
+                            {histLoading ? (
+                                <div className="flex justify-center py-20"><Icons.Loader className="w-6 h-6 text-slate-400 animate-spin" /></div>
+                            ) : (
+                                <DataTable
+                                    data={history}
+                                    columns={historyColumns}
+                                    searchPlaceholder="Buscar por factura, cliente, referencia..."
+                                    excelFileName={`DEVOLUCIONES_${selectedClientId || 'TODOS'}_${new Date().toISOString().split('T')[0]}.xlsx`}
+                                    excelSheetName="Devoluciones"
+                                />
+                            )}
+                        </div>
                     )}
                 </>
             )}
         </div>
 
-        {/* ── Modal envío email al proveedor ───────────────────────────────── */}
+        {/* ── Modal envío email al proveedor ───────────────────────────────────── */}
         {emailModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
                 <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
@@ -741,32 +876,20 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                     </div>
                     <div className="p-6 space-y-4">
                         <div>
-                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
-                                Nombre del proveedor
-                            </label>
-                            <input
-                                type="text"
-                                value={nombreInput}
-                                onChange={e => setNombreInput(e.target.value)}
+                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Nombre del proveedor</label>
+                            <input type="text" value={nombreInput} onChange={e => setNombreInput(e.target.value)}
                                 placeholder="Ej: Distribuidora XYZ"
-                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                            />
+                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
                         </div>
                         <div>
-                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
-                                Email del proveedor *
-                            </label>
-                            <input
-                                type="email"
-                                value={emailInput}
-                                onChange={e => setEmailInput(e.target.value)}
+                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Email del proveedor *</label>
+                            <input type="email" value={emailInput} onChange={e => setEmailInput(e.target.value)}
                                 placeholder="proveedor@empresa.com"
                                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                                onKeyDown={e => e.key === 'Enter' && handleSendEmail()}
-                            />
+                                onKeyDown={e => e.key === 'Enter' && handleSendEmail()} />
                         </div>
                         <p className="text-[9px] text-slate-400">
-                            Se enviará un correo con el detalle del lote y un enlace válido por 7 días para que el proveedor confirme el recibo.
+                            Se enviará un correo con el detalle del lote y un enlace válido por 7 días para confirmar el recibo.
                         </p>
                         <div className="flex gap-3 pt-1">
                             <button onClick={() => setEmailModal(null)}
@@ -775,7 +898,9 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                             </button>
                             <button onClick={handleSendEmail} disabled={sendingEmail}
                                 className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
-                                {sendingEmail ? <><Icons.Loader className="w-3.5 h-3.5 animate-spin" /> Enviando…</> : <><Icons.Send className="w-3.5 h-3.5" /> Enviar Email</>}
+                                {sendingEmail
+                                    ? <><Icons.Loader className="w-3.5 h-3.5 animate-spin" /> Enviando…</>
+                                    : <><Icons.Send className="w-3.5 h-3.5" /> Enviar Email</>}
                             </button>
                         </div>
                     </div>

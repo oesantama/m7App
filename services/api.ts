@@ -321,6 +321,21 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email_proveedor, nombre_proveedor }),
     }),
+  getInvoiceReturnData: (invoiceNumber: string) =>
+    fetchJson(`${API_URL}/dispatch/invoice-return-data/${encodeURIComponent(invoiceNumber)}`),
+  getBodegaReturnsHistory: (params?: { clientId?: string; dateFrom?: string; dateTo?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.clientId) qs.set('clientId', params.clientId);
+    if (params?.dateFrom) qs.set('dateFrom', params.dateFrom);
+    if (params?.dateTo)   qs.set('dateTo',   params.dateTo);
+    return fetchJson(`${API_URL}/dispatch/bodega-returns-history${qs.toString() ? '?' + qs : ''}`);
+  },
+  confirmReturnConciliation: (id: number | string, data: { confirmedBy: string; observaciones?: string }) =>
+    fetchJson(`${API_URL}/dispatch/returns/${id}/confirm-conciliation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
 
   // ── Consulta de Inventario / Kardex ───────────────────────────────────────
   getInventoryStock: (params?: { clientId?: string; articleId?: string; location?: string; dateFrom?: string; dateTo?: string }) => {
@@ -964,10 +979,10 @@ export const api = {
     body: JSON.stringify(data)
   }),
   deleteDocument: (id: string, user: string) => fetchJson(`${API_URL}/documents/${id}?user=${encodeURIComponent(user)}`, { method: 'DELETE' }),
-  updateDocumentStatus: (id: string, status: string, user: string) => fetchJson(`${API_URL}/documents/status/${id}`, {
+  updateDocumentStatus: (id: string, status: string, user: string, planType?: string) => fetchJson(`${API_URL}/documents/status/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status, user })
+    body: JSON.stringify({ status, user, planType })
   }),
   processDocumentLPayment: (data: any) => fetchJson(`${API_URL}/documents/payments-l`, {
     method: 'POST',

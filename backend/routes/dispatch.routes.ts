@@ -26,7 +26,10 @@ import {
     getHistoryFiltersData,
     sendApprovalBatchEmail,
     getPublicReturnApproval,
-    confirmPublicReturnApproval
+    confirmPublicReturnApproval,
+    getInvoiceReturnData,
+    getBodegaReturnsHistory,
+    confirmReturnConciliation,
 } from '../controllers/dispatch.controller.js';
 
 const router = Router();
@@ -68,6 +71,11 @@ router.post('/approval-batches',         createApprovalBatch);
 router.get('/approval-batches',          getApprovalBatches);
 router.get('/approval-batch/:batchCode', getApprovalBatchByCode);
 router.post('/approval-batches/:id/send-email', sendApprovalBatchEmail);
+
+// Recepcion bodega / historial / conciliacion
+router.get('/invoice-return-data/:invoiceNumber', getInvoiceReturnData);
+router.get('/bodega-returns-history',             getBodegaReturnsHistory);
+router.post('/returns/:id/confirm-conciliation',  confirmReturnConciliation);
 
 // Rutas públicas (sin JWT) — accesibles vía /api/dispatch/public/...
 router.get('/public/return-approval/:batchCode/:token',         getPublicReturnApproval);

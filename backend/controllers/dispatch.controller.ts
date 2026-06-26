@@ -1145,6 +1145,93 @@ export const getPendingBodegaReturns = async (req: Request, res: Response) => {
     }
 };
 
+// ─── GET /api/dispatch/invoice-return-data/:invoiceNumber ────────────────────
+// Busca una factura por número para pre-cargar datos al registrar devolución bodega.
+// No requiere placa ni estado EST-11 — funciona con cualquier factura del sistema.
+export const getInvoiceReturnData = async (req: Request, res: Response) => {
+    try {
+        const invoiceNumber = String(req.params.invoiceNumber || '');
+        if (!invoiceNumber) return res.status(400).json({ error: 'invoiceNumber requerido' });
+
+        const inv = invoiceNumber.trim().toUpperCase();
+
+        // Buscar items de la factura con datos de planilla, artículo y factores de conversión
+        const result = await pool.query(`
+            SELECT
+                di.invoice           AS invoice_id,
+                di.order_number,
+                di.customer_name,
+                di.client_ref,
+                di.address,
+                di.city,
+                di.un_code,
+                di.unit,
+                di.expected_qty,
+                di.article_id,
+                COALESCE(a.name, di.article_id) AS article_name,
+                COALESCE(a.barcode, di.article_id) AS barcode,
+                COALESCE(a.sku, di.article_id)     AS sku,
+                COALESCE(a.factor_inter, 0)::numeric AS factor_inter,
+                COALESCE(a.factor_std, 1)::numeric   AS factor_std,
+                COALESCE(a.uom_std, di.unit, 'UND')  AS uom_std,
+                COALESCE(ui.name, 'CAJA')            AS uom_inter_name,
+                COALESCE(us.name, 'STD')             AS uom_std_name,
+                dl.vehicle_plate,
+                dl.external_doc_id   AS numero_planilla,
+                dl.delivery_date     AS fecha_placa,
+                dl.plan_type,
+                dl.client_id
+            FROM document_items di
+            JOIN documents_l dl ON dl.id = di.document_id
+            LEFT JOIN articles a ON TRIM(UPPER(a.id)) = TRIM(UPPER(di.article_id))
+            LEFT JOIN unidades_medida ui ON ui.id = a.uom_inter_id
+            LEFT JOIN unidades_medida us ON us.id = a.uom_std
+            WHERE TRIM(UPPER(di.invoice)) = $1
+               OR TRIM(UPPER(di.order_number)) = $1
+            ORDER BY di.article_id
+        `, [inv]);
+
+        if (!result.rowCount) {
+            return res.status(404).json({ error: `Factura "${invoiceNumber}" no encontrada en el sistema` });
+        }
+
+        const first = result.rows[0];
+        res.json({
+            success: true,
+            invoice: {
+                invoice_id:      first.invoice_id,
+                order_number:    first.order_number,
+                customer_name:   first.customer_name,
+                client_ref:      first.client_ref,
+                address:         first.address,
+                city:            first.city,
+                vehicle_plate:   first.vehicle_plate,
+                numero_planilla: first.numero_planilla,
+                fecha_placa:     first.fecha_placa,
+                plan_type:       first.plan_type,
+                client_id:       first.client_id,
+            },
+            items: result.rows.map(r => ({
+                article_id:    r.article_id,
+                article_name:  r.article_name,
+                barcode:       r.barcode,
+                sku:           r.sku,
+                un_code:       r.un_code,
+                unit:          r.unit,
+                expected_qty:  Number(r.expected_qty),
+                factor_inter:  Number(r.factor_inter),
+                factor_std:    Number(r.factor_std),
+                uom_std:       r.uom_std,
+                uom_inter_name: r.uom_inter_name,
+                uom_std_name:  r.uom_std_name,
+            })),
+        });
+    } catch (err: any) {
+        console.error('[M7-DEVOL] getInvoiceReturnData:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
 // ─── GET /api/dispatch/route-active-plates ────────────────────────────────────
 // Placas con vehículos actualmente en ruta y con facturas sin entregar (EST-11)
 export const getRouteActivePlates = async (req: Request, res: Response) => {
@@ -1220,64 +1307,88 @@ export const getRoutePlateInvoices = async (req: Request, res: Response) => {
 };
 
 // ─── POST /api/dispatch/register-route-return ─────────────────────────────────
-// Registra devolución iniciada desde bodega para una factura en ruta
+// Registra devolución iniciada desde bodega. vehiclePlate es opcional (se toma del plan si existe).
 export const registerRouteReturn = async (req: Request, res: Response) => {
-    const { invoiceId, vehiclePlate, returnType, returnReason, notes, items, createdBy } = req.body;
-    if (!invoiceId || !vehiclePlate || !returnType) {
-        return res.status(400).json({ success: false, error: 'invoiceId, vehiclePlate y returnType son requeridos' });
+    const {
+        invoiceId, vehiclePlate, returnType, returnReason, notes, items, createdBy,
+        vendedor, numeroPlanilla, fechaPlaca,
+    } = req.body;
+    if (!invoiceId || !returnType) {
+        return res.status(400).json({ success: false, error: 'invoiceId y returnType son requeridos' });
+    }
+    if (!vendedor || !String(vendedor).trim()) {
+        return res.status(400).json({ success: false, error: 'vendedor es obligatorio' });
     }
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
 
-        // Obtener vehicle_id y driver_id de la placa
-        const vRes = await client.query(
-            `SELECT v.id AS vehicle_id, a.driver_id
-             FROM vehicles v
-             LEFT JOIN assignments a ON a.vehicle_id::text = v.id::text AND a.is_active = true
-             WHERE v.plate = $1 LIMIT 1`,
-            [vehiclePlate]
-        );
-        const vehicleId = vRes.rows[0]?.vehicle_id || null;
-        const driverId  = vRes.rows[0]?.driver_id  || null;
+        // Buscar vehicle_id / driver_id por placa (si viene)
+        let vehicleId: string | null = null;
+        let driverId:  string | null = null;
+        const plateToUse = vehiclePlate || null;
+        if (plateToUse) {
+            const vRes = await client.query(
+                `SELECT v.id AS vehicle_id, a.driver_id
+                 FROM vehicles v
+                 LEFT JOIN assignments a ON a.vehicle_id::text = v.id::text AND a.is_active = true
+                 WHERE v.plate = $1 LIMIT 1`,
+                [plateToUse]
+            );
+            vehicleId = vRes.rows[0]?.vehicle_id || null;
+            driverId  = vRes.rows[0]?.driver_id  || null;
+        }
 
-        // Crear cabecera delivery_return
+        // Cabecera delivery_return
         const retRes = await client.query(
-            `INSERT INTO delivery_returns (invoice_id, vehicle_id, driver_id, return_reason, notes, status, created_at)
-             VALUES ($1, $2, $3, $4, $5, 'PENDING', CURRENT_TIMESTAMP)
+            `INSERT INTO delivery_returns
+                (invoice_id, vehicle_id, driver_id, return_reason, notes, status,
+                 vendedor, numero_planilla, fecha_placa, created_at)
+             VALUES ($1,$2,$3,$4,$5,'PENDING',$6,$7,$8,CURRENT_TIMESTAMP)
              RETURNING id`,
-            [invoiceId, vehicleId, driverId, returnReason || null, notes || null]
+            [invoiceId, vehicleId, driverId, returnReason || null, notes || null,
+             String(vendedor).trim(), numeroPlanilla || null, fechaPlaca || null]
         );
         const returnId = retRes.rows[0].id;
 
-        // Insertar ítems
+        // Ítems con article_id y un_code
         const itemsArr = Array.isArray(items) ? items : [];
         for (const item of itemsArr) {
+            const qty = Number(item.return_qty ?? item.quantity_returned ?? 0);
+            if (qty <= 0) continue;
             await client.query(
-                `INSERT INTO delivery_return_items (return_id, sku, article_name, quantity_returned, quantity_delivered, unit, notes)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                [returnId, item.article_id || item.sku, item.article_name || null,
-                 item.return_qty || item.quantity_returned || 0,
-                 item.delivered_qty || 0,
-                 item.unit || 'und', item.notes || null]
+                `INSERT INTO delivery_return_items
+                    (return_id, sku, article_id, un_code, article_name,
+                     quantity_returned, quantity_delivered, unit, notes)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+                [
+                    returnId,
+                    item.sku || item.article_id,
+                    item.article_id || null,
+                    item.un_code    || null,
+                    item.article_name || null,
+                    qty,
+                    Number(item.delivered_qty ?? item.expected_qty ?? 0),
+                    item.unit || 'UND',
+                    item.notes || null,
+                ]
             );
         }
 
-        // Marcar item_status en document_items según returnType
-        const newStatus = returnType === 'COMPLETA' ? 'EST-16' : 'EST-17'; // EST-16=devuelto, EST-17=parcial
+        // Marcar item_status en document_items
+        const newStatus = returnType === 'COMPLETA' ? 'EST-16' : 'EST-17';
         await client.query(
             `UPDATE document_items SET item_status = $1
-             WHERE TRIM(COALESCE(NULLIF(invoice,''), order_number)) = $2
-                OR CONCAT(document_id::text, '_', TRIM(COALESCE(NULLIF(invoice,''), order_number))) = $2`,
-            [newStatus, invoiceId]
+             WHERE TRIM(UPPER(COALESCE(NULLIF(invoice,''), order_number))) = $2`,
+            [newStatus, invoiceId.trim().toUpperCase()]
         );
 
-        // Log en route_modifications_log
+        // Log
         await client.query(
             `INSERT INTO route_modifications_log (invoice_id, action, user_id, previous_plate, details)
-             VALUES ($1, 'BODEGA_RETURN', $2, $3, $4)`,
-            [invoiceId, createdBy || null, vehiclePlate,
-             JSON.stringify({ returnType, returnReason, notes, timestamp: new Date().toISOString() })]
+             VALUES ($1,'BODEGA_RETURN',$2,$3,$4)`,
+            [invoiceId, createdBy || null, plateToUse || 'BODEGA',
+             JSON.stringify({ returnType, returnReason, vendedor, notes, timestamp: new Date().toISOString() })]
         );
 
         await client.query('COMMIT');
@@ -1554,6 +1665,94 @@ export const getHistoryFiltersData = async (req: Request, res: Response) => {
         res.json({ success: true, drivers: dRes.rows, vehicles: vRes.rows });
     } catch (err: any) {
         res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// ─── GET /api/dispatch/bodega-returns-history ─────────────────────────────────
+// Historial de devoluciones registradas por bodega — para DataTable y export Excel
+export const getBodegaReturnsHistory = async (req: Request, res: Response) => {
+    try {
+        const { clientId, dateFrom, dateTo } = req.query as Record<string, string>;
+        const params: any[] = [];
+        const filters: string[] = [];
+
+        if (clientId) {
+            params.push(clientId);
+            filters.push(`dl.client_id = $${params.length}`);
+        }
+        if (dateFrom) {
+            params.push(dateFrom);
+            filters.push(`dr.created_at::date >= $${params.length}`);
+        }
+        if (dateTo) {
+            params.push(dateTo);
+            filters.push(`dr.created_at::date <= $${params.length}`);
+        }
+
+        const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
+
+        const result = await pool.query(`
+            SELECT
+                dr.id,
+                dr.created_at::date                    AS fecha,
+                dri.customer_name,
+                dri.client_ref                         AS codigo_cliente,
+                dr.vendedor,
+                dl.delivery_date::date                 AS fecha_placa,
+                v.plate                                AS placa,
+                dr.numero_planilla,
+                dr.invoice_id                          AS remision,
+                dri.order_number                       AS pedido,
+                dri.article_id                         AS referencia,
+                dri.un_code,
+                dri.unit                               AS um,
+                dri.quantity_returned                  AS cantidad,
+                dr.return_reason                       AS motivo_devolucion,
+                dl.plan_type                           AS unidad_negocio,
+                dr.status,
+                dr.conciliacion_confirmada_at,
+                dr.conciliacion_confirmada_by,
+                batch.batch_code,
+                batch.status                           AS batch_status,
+                batch.confirmed_at                     AS proveedor_confirmed_at
+            FROM delivery_returns dr
+            JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+            LEFT JOIN vehicles v ON v.id::text = dr.vehicle_id::text
+            LEFT JOIN documents_l dl ON dl.external_doc_id = dr.numero_planilla
+            LEFT JOIN return_approval_batch_items rabi ON rabi.return_id::text = dr.id::text
+            LEFT JOIN return_approval_batches batch ON batch.id = rabi.batch_id
+            ${where}
+            ORDER BY dr.created_at DESC, dri.article_id
+        `, params);
+
+        res.json({ success: true, data: result.rows });
+    } catch (err: any) {
+        console.error('[M7-DEVOL-HIST]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ─── POST /api/dispatch/returns/:id/confirm-conciliation ──────────────────────
+// Conciliación confirma que ya revisó y acepta la devolución registrada por bodega
+export const confirmReturnConciliation = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { confirmedBy, valor, observaciones } = req.body;
+
+        // Actualizar cabecera de la devolución
+        await pool.query(`
+            UPDATE delivery_returns
+            SET conciliacion_confirmada_at = NOW(),
+                conciliacion_confirmada_by = $1,
+                status = 'CONCILIADO',
+                notes = CASE WHEN $3::text != '' THEN COALESCE(notes,'') || E'\n[Conciliación]: ' || $3 ELSE notes END
+            WHERE id::text = $2
+        `, [confirmedBy || null, String(id), observaciones || '']);
+
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error('[M7-DEVOL-CONCIL]', err.message);
+        res.status(500).json({ error: err.message });
     }
 };
 
