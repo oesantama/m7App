@@ -1,8 +1,18 @@
 services:
   m7-evolution:
-    build:
-      context: .
-      dockerfile: Dockerfile.evolution
+    image: atendai/evolution-api:v2.2.3
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "[EVO] Starting. DB: ${DATABASE_URL:0:55}..."
+        cd /evolution
+        rm -rf ./prisma/migrations 2>/dev/null
+        cp -r ./prisma/postgresql-migrations ./prisma/migrations
+        find /evolution -name ".env" -type f -delete 2>/dev/null || true
+        echo "[EVO] Running migrations..."
+        npx prisma migrate deploy --schema ./prisma/postgresql-schema.prisma
+        echo "[EVO] Starting app..."
+        exec node dist/main.js
     restart: always
     expose:
       - '8080'
