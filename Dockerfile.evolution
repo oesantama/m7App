@@ -1,4 +1,4 @@
-FROM atendai/evolution-api:v2.2.3
+FROM atendai/evolution-api:latest
 # Delete all .env files at build time so Prisma cannot load them
 RUN find /evolution -name ".env" -type f -delete 2>/dev/null; true
 COPY evolution-entrypoint.sh /usr/local/bin/evolution-entrypoint.sh
