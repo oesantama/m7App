@@ -39,6 +39,8 @@ interface ApprovalBatch {
     id: number; batch_code: string; client_id: string; notes?: string;
     status: string; created_by?: string; created_at: string; sent_at?: string;
     total_items: number; approved_items: number;
+    email_proveedor?: string; email_sent_at?: string;
+    confirmed_at?: string; confirmed_by_name?: string;
 }
 
 // ─── STEP DE REGISTRO DESDE RUTA ─────────────────────────────────────────────
@@ -89,9 +91,37 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
     const [creatingBatch, setCreatingBatch]   = React.useState(false);
     const [batchTab, setBatchTab]             = React.useState<'pending' | 'batches'>('pending');
 
+    // Modal envío email proveedor
+    const [emailModal, setEmailModal]         = React.useState<{ batch: ApprovalBatch } | null>(null);
+    const [emailInput, setEmailInput]         = React.useState('');
+    const [nombreInput, setNombreInput]       = React.useState('');
+    const [sendingEmail, setSendingEmail]     = React.useState(false);
+
     const showToast = (msg: string, ok = true) => {
         setToast({ msg, ok });
         setTimeout(() => setToast(null), 3500);
+    };
+
+    const handleSendEmail = async () => {
+        if (!emailModal) return;
+        const email = emailInput.trim();
+        if (!email || !email.includes('@')) { showToast('Ingresa un email válido', false); return; }
+        setSendingEmail(true);
+        try {
+            await api.sendApprovalBatchEmail(emailModal.batch.id, email, nombreInput.trim());
+            showToast(`Email enviado a ${email}`);
+            setBatches(prev => prev.map(b =>
+                b.id === emailModal.batch.id
+                    ? { ...b, status: 'enviado', email_proveedor: email, email_sent_at: new Date().toISOString() }
+                    : b
+            ));
+            setEmailModal(null);
+            setEmailInput(''); setNombreInput('');
+        } catch (e: any) {
+            showToast(e.message || 'Error enviando email', false);
+        } finally {
+            setSendingEmail(false);
+        }
     };
 
     // ── Clientes ─────────────────────────────────────────────────────────────
@@ -231,6 +261,7 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
     ];
 
     return (
+        <>
         <div className="min-h-screen bg-slate-50/50 p-4 md:p-6">
             {/* Toast */}
             {toast && (
@@ -656,14 +687,32 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                                                 )}
                                                             </div>
                                                         </div>
+                                                        {b.confirmed_at && (
+                                                            <p className="text-[8px] text-emerald-600 font-bold mt-1">
+                                                                ✅ Confirmado por {b.confirmed_by_name || 'Proveedor'} · {new Date(b.confirmed_at).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' })}
+                                                            </p>
+                                                        )}
+                                                        {b.email_sent_at && !b.confirmed_at && (
+                                                            <p className="text-[8px] text-indigo-500 font-bold mt-1">
+                                                                📧 Email enviado a {b.email_proveedor} · {new Date(b.email_sent_at).toLocaleDateString('es-CO', { day:'2-digit', month:'short' })}
+                                                            </p>
+                                                        )}
                                                         <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-2">
                                                             <span className="text-[8px] text-slate-400 font-mono flex-1">
-                                                                ID para Salida Proveedor: <strong className="text-slate-700">{b.batch_code}</strong>
+                                                                <strong className="text-slate-700">{b.batch_code}</strong>
                                                             </span>
                                                             <button onClick={() => navigator.clipboard.writeText(b.batch_code).then(() => showToast('Código copiado'))}
                                                                 className="text-[8px] font-black text-indigo-500 hover:text-indigo-700 uppercase tracking-widest px-2 py-1 bg-indigo-50 rounded-lg">
                                                                 Copiar
                                                             </button>
+                                                            {!b.confirmed_at && (
+                                                                <button
+                                                                    onClick={() => { setEmailModal({ batch: b }); setEmailInput(b.email_proveedor || ''); setNombreInput(''); }}
+                                                                    className="text-[8px] font-black text-emerald-600 hover:text-emerald-800 uppercase tracking-widest px-2 py-1 bg-emerald-50 hover:bg-emerald-100 rounded-lg flex items-center gap-1">
+                                                                    <Icons.Send className="w-3 h-3" />
+                                                                    {b.email_sent_at ? 'Reenviar' : 'Enviar Email'}
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 ))}
@@ -676,6 +725,64 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                 </>
             )}
         </div>
+
+        {/* ── Modal envío email al proveedor ───────────────────────────────── */}
+        {emailModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                    <div className="bg-gradient-to-r from-slate-900 to-emerald-900 px-6 py-4 flex items-center justify-between">
+                        <div>
+                            <p className="text-[9px] font-black text-emerald-300 uppercase tracking-widest mb-0.5">Enviar al Proveedor</p>
+                            <p className="text-white font-black text-sm font-mono">{emailModal.batch.batch_code}</p>
+                        </div>
+                        <button onClick={() => setEmailModal(null)} className="text-slate-400 hover:text-white">
+                            <Icons.X className="w-5 h-5" />
+                        </button>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div>
+                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                                Nombre del proveedor
+                            </label>
+                            <input
+                                type="text"
+                                value={nombreInput}
+                                onChange={e => setNombreInput(e.target.value)}
+                                placeholder="Ej: Distribuidora XYZ"
+                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                                Email del proveedor *
+                            </label>
+                            <input
+                                type="email"
+                                value={emailInput}
+                                onChange={e => setEmailInput(e.target.value)}
+                                placeholder="proveedor@empresa.com"
+                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                                onKeyDown={e => e.key === 'Enter' && handleSendEmail()}
+                            />
+                        </div>
+                        <p className="text-[9px] text-slate-400">
+                            Se enviará un correo con el detalle del lote y un enlace válido por 7 días para que el proveedor confirme el recibo.
+                        </p>
+                        <div className="flex gap-3 pt-1">
+                            <button onClick={() => setEmailModal(null)}
+                                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-[10px] font-black text-slate-500 hover:bg-slate-50 uppercase tracking-widest">
+                                Cancelar
+                            </button>
+                            <button onClick={handleSendEmail} disabled={sendingEmail}
+                                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
+                                {sendingEmail ? <><Icons.Loader className="w-3.5 h-3.5 animate-spin" /> Enviando…</> : <><Icons.Send className="w-3.5 h-3.5" /> Enviar Email</>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
+        </>
     );
 };
 

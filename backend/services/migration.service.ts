@@ -1740,6 +1740,18 @@ export const restoreSystem = async () => {
       ALTER TABLE training_sessions ADD COLUMN IF NOT EXISTS asistencia_drive_path TEXT;
     `);
 
+    // Columnas para flujo completo de aprobación de devoluciones por proveedor
+    await client.query(`
+      ALTER TABLE return_approval_batches ADD COLUMN IF NOT EXISTS email_proveedor TEXT;
+      ALTER TABLE return_approval_batches ADD COLUMN IF NOT EXISTS token_confirmacion TEXT;
+      ALTER TABLE return_approval_batches ADD COLUMN IF NOT EXISTS vencimiento_token TIMESTAMPTZ;
+      ALTER TABLE return_approval_batches ADD COLUMN IF NOT EXISTS email_sent_at TIMESTAMPTZ;
+      ALTER TABLE return_approval_batches ADD COLUMN IF NOT EXISTS confirmed_at TIMESTAMPTZ;
+      ALTER TABLE return_approval_batches ADD COLUMN IF NOT EXISTS confirmed_by_name TEXT;
+      ALTER TABLE return_approval_batch_items ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+      ALTER TABLE return_approval_batch_items ADD COLUMN IF NOT EXISTS approved_by_name TEXT;
+    `);
+
     await client.query('COMMIT');
 
     // FASE FINAL: SINCRONIZACIÓN NUCLEAR DE MENÚS (REUBICACIÓN LOGÍSTICA)

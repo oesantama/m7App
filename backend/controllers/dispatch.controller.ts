@@ -3,6 +3,7 @@ import { Request, Response } from 'express';
 import pool from '../config/database.js';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import { sendEmail } from '../services/notification.service.js';
 import { logMovement } from '../utils/kardex.js';
 import { clearInvoicesCache } from './document.controller.js';
 
@@ -1553,5 +1554,256 @@ export const getHistoryFiltersData = async (req: Request, res: Response) => {
         res.json({ success: true, drivers: dRes.rows, vehicles: vRes.rows });
     } catch (err: any) {
         res.status(500).json({ success: false, error: err.message });
+    }
+};
+
+// ─── POST /api/dispatch/approval-batches/:id/send-email ──────────────────────
+// Envía email al proveedor con link de confirmación y genera token
+export const sendApprovalBatchEmail = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { email_proveedor, nombre_proveedor } = req.body;
+
+        if (!email_proveedor) return res.status(400).json({ error: 'email_proveedor es requerido' });
+
+        const batchRes = await pool.query(`SELECT * FROM return_approval_batches WHERE id::text = $1`, [id]);
+        if (!batchRes.rowCount) return res.status(404).json({ error: 'Lote no encontrado' });
+        const batch = batchRes.rows[0];
+
+        // Generar token único + vencimiento 7 días
+        const token = uuidv4().replace(/-/g, '');
+        const vencimiento = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+        // Obtener ítems del lote con detalle de artículos
+        const itemsRes = await pool.query(`
+            SELECT
+                rabi.id, rabi.invoice_id, rabi.return_reason, rabi.return_type,
+                dr.notes,
+                v.plate AS vehicle_plate,
+                d.name AS driver_name,
+                COALESCE(json_agg(json_build_object(
+                    'sku', dri.sku,
+                    'article_name', dri.article_name,
+                    'quantity_returned', dri.quantity_returned,
+                    'unit', dri.unit
+                )) FILTER (WHERE dri.id IS NOT NULL), '[]') AS items
+            FROM return_approval_batch_items rabi
+            LEFT JOIN delivery_returns dr ON dr.id::text = rabi.return_id::text
+            LEFT JOIN vehicles v ON v.id::text = dr.vehicle_id::text
+            LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
+            LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+            WHERE rabi.batch_id::text = $1
+            GROUP BY rabi.id, dr.notes, dr.status, dr.created_at, v.plate, d.name
+            ORDER BY rabi.invoice_id
+        `, [id]);
+
+        const appUrl = process.env.APP_URL || 'https://orbitm7.m7apps.com';
+        const link = `${appUrl}/public/return-approval/${batch.batch_code}/${token}`;
+        const fechaVenc = vencimiento.toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
+
+        // Construir tabla de ítems HTML
+        const filasItems = itemsRes.rows.map((item: any) => {
+            const arts = Array.isArray(item.items) ? item.items : [];
+            const artRows = arts.length
+                ? arts.map((a: any) => `<tr>
+                    <td style="padding:6px 10px;font-size:11px;color:#64748b">${item.invoice_id}</td>
+                    <td style="padding:6px 10px;font-size:11px;color:#64748b">${a.sku || '—'}</td>
+                    <td style="padding:6px 10px;font-size:12px;font-weight:700;color:#1e293b">${a.article_name || '—'}</td>
+                    <td style="padding:6px 10px;font-size:12px;text-align:center;color:#0d3b3b;font-weight:800">${a.quantity_returned} ${a.unit || ''}</td>
+                    <td style="padding:6px 10px;font-size:11px;color:#64748b">${item.return_reason || '—'}</td>
+                  </tr>`).join('')
+                : `<tr><td colspan="5" style="padding:8px 10px;font-size:11px;color:#94a3b8">Sin artículos registrados</td></tr>`;
+            return artRows;
+        }).join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Solicitud de Aprobación — Devoluciones ${batch.batch_code}</title></head>
+<body style="margin:0;padding:0;background:#f1f5f9;font-family:Arial,sans-serif">
+<div style="max-width:680px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
+  <!-- Header -->
+  <div style="background:linear-gradient(135deg,#0f172a 0%,#064e3b 100%);padding:32px 36px 28px">
+    <div style="font-size:11px;font-weight:900;color:#6ee7b7;text-transform:uppercase;letter-spacing:3px;margin-bottom:10px">
+      Milla 7 S.A.S. — OrbitM7
+    </div>
+    <h1 style="color:#fff;font-size:22px;font-weight:900;margin:0 0 6px;text-transform:uppercase">
+      Solicitud de Aprobación de Devoluciones
+    </h1>
+    <p style="color:#94a3b8;font-size:12px;margin:0">Lote: <strong style="color:#6ee7b7">${batch.batch_code}</strong></p>
+  </div>
+
+  <!-- Body -->
+  <div style="padding:32px 36px">
+    <p style="font-size:14px;color:#475569;margin:0 0 20px">
+      Estimado(a) <strong>${nombre_proveedor || 'Proveedor'}</strong>,<br><br>
+      Le informamos que hemos registrado las siguientes devoluciones de mercancía en nuestro sistema.
+      Por favor revise los detalles y confirme el recibido a través del enlace al final de este correo.
+    </p>
+
+    <!-- Tabla ítems -->
+    <div style="border-radius:10px;overflow:hidden;border:1px solid #e2e8f0;margin-bottom:24px">
+      <table style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="background:#0f172a">
+            <th style="padding:10px;font-size:10px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:.05em;text-align:left">Factura</th>
+            <th style="padding:10px;font-size:10px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:.05em;text-align:left">SKU</th>
+            <th style="padding:10px;font-size:10px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:.05em;text-align:left">Artículo</th>
+            <th style="padding:10px;font-size:10px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:.05em;text-align:center">Cant.</th>
+            <th style="padding:10px;font-size:10px;font-weight:900;color:#fff;text-transform:uppercase;letter-spacing:.05em;text-align:left">Motivo</th>
+          </tr>
+        </thead>
+        <tbody>${filasItems || '<tr><td colspan="5" style="padding:16px;text-align:center;color:#94a3b8;font-size:12px">Sin ítems en este lote</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    <!-- Info lote -->
+    <div style="background:#f8fafc;border-radius:10px;padding:16px 20px;margin-bottom:28px;border:1px solid #e2e8f0">
+      <div style="display:flex;gap:32px;flex-wrap:wrap">
+        <div><span style="display:block;font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">Total facturas</span>
+          <strong style="font-size:16px;color:#0f172a">${itemsRes.rowCount}</strong></div>
+        <div><span style="display:block;font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">Link válido hasta</span>
+          <strong style="font-size:13px;color:#dc2626">${fechaVenc}</strong></div>
+        <div><span style="display:block;font-size:9px;font-weight:900;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em">Código lote</span>
+          <strong style="font-size:13px;color:#0f172a;font-family:monospace">${batch.batch_code}</strong></div>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <div style="text-align:center;margin-bottom:28px">
+      <a href="${link}" style="display:inline-block;background:linear-gradient(135deg,#059669,#0d9488);color:#fff;font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;padding:16px 40px;border-radius:12px;text-decoration:none;box-shadow:0 4px 16px rgba(5,150,105,0.3)">
+        ✓ Confirmar Recibo de Devoluciones
+      </a>
+      <p style="font-size:10px;color:#94a3b8;margin:12px 0 0">O copia este enlace en tu navegador:<br>
+        <span style="color:#059669;font-family:monospace;font-size:10px;word-break:break-all">${link}</span>
+      </p>
+    </div>
+
+    <hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 20px"/>
+    <p style="font-size:11px;color:#94a3b8;margin:0">
+      Este correo fue generado automáticamente por <strong>OrbitM7 — Milla 7 S.A.S.</strong><br>
+      Soporte: <a href="mailto:directorti@millasiete.com" style="color:#059669">directorti@millasiete.com</a> | WhatsApp: 3011825161
+    </p>
+  </div>
+</div>
+</body></html>`;
+
+        // Guardar token y email en BD
+        await pool.query(`
+            UPDATE return_approval_batches
+            SET email_proveedor=$1, token_confirmacion=$2, vencimiento_token=$3,
+                email_sent_at=NOW(), status='enviado'
+            WHERE id::text=$4
+        `, [email_proveedor, token, vencimiento, id]);
+
+        await sendEmail(
+            email_proveedor,
+            `Solicitud de Aprobación de Devoluciones — ${batch.batch_code}`,
+            html
+        );
+
+        res.json({ success: true, batch_code: batch.batch_code, email: email_proveedor, vencimiento });
+    } catch (err: any) {
+        console.error('[M7-DEVOL-EMAIL]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ─── GET /public/return-approval/:batchCode/:token (sin auth) ─────────────────
+export const getPublicReturnApproval = async (req: Request, res: Response) => {
+    try {
+        const { batchCode, token } = req.params;
+        const batchRes = await pool.query(
+            `SELECT * FROM return_approval_batches WHERE batch_code=$1 AND token_confirmacion=$2`,
+            [batchCode, token]
+        );
+        if (!batchRes.rowCount) return res.status(404).json({ error: 'Enlace inválido o no encontrado' });
+        const batch = batchRes.rows[0];
+
+        if (batch.vencimiento_token && new Date(batch.vencimiento_token) < new Date()) {
+            return res.status(410).json({ error: 'Este enlace ha vencido. Contacte a Milla 7.' });
+        }
+
+        const itemsRes = await pool.query(`
+            SELECT
+                rabi.id, rabi.invoice_id, rabi.return_reason, rabi.return_type,
+                rabi.approved, rabi.approval_notes, rabi.approved_at, rabi.approved_by_name,
+                dr.notes,
+                v.plate AS vehicle_plate,
+                d.name  AS driver_name,
+                COALESCE(json_agg(json_build_object(
+                    'sku', dri.sku, 'article_name', dri.article_name,
+                    'quantity_returned', dri.quantity_returned, 'unit', dri.unit
+                )) FILTER (WHERE dri.id IS NOT NULL), '[]') AS items
+            FROM return_approval_batch_items rabi
+            LEFT JOIN delivery_returns dr ON dr.id::text = rabi.return_id::text
+            LEFT JOIN vehicles v ON v.id::text = dr.vehicle_id::text
+            LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
+            LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+            WHERE rabi.batch_id::text = $1
+            GROUP BY rabi.id, dr.notes, dr.status, dr.created_at, v.plate, d.name
+            ORDER BY rabi.invoice_id
+        `, [String(batch.id)]);
+
+        // No devolver el token en la respuesta
+        const { token_confirmacion: _t, ...batchSafe } = batch;
+        res.json({ success: true, batch: batchSafe, items: itemsRes.rows });
+    } catch (err: any) {
+        console.error('[M7-DEVOL-PUBLIC]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ─── POST /public/return-approval/:batchCode/:token/confirm (sin auth) ────────
+export const confirmPublicReturnApproval = async (req: Request, res: Response) => {
+    try {
+        const { batchCode, token } = req.params;
+        const { nombre_confirmador, observaciones_generales, items } = req.body;
+        // items: [{ id, approved: boolean, approval_notes: string }]
+
+        const batchRes = await pool.query(
+            `SELECT * FROM return_approval_batches WHERE batch_code=$1 AND token_confirmacion=$2`,
+            [batchCode, token]
+        );
+        if (!batchRes.rowCount) return res.status(404).json({ error: 'Enlace inválido' });
+        const batch = batchRes.rows[0];
+
+        if (batch.vencimiento_token && new Date(batch.vencimiento_token) < new Date()) {
+            return res.status(410).json({ error: 'Este enlace ha vencido' });
+        }
+        if (batch.confirmed_at) {
+            return res.status(409).json({ error: 'Este lote ya fue confirmado', confirmed_at: batch.confirmed_at });
+        }
+
+        // Actualizar cada ítem
+        if (Array.isArray(items)) {
+            for (const item of items) {
+                await pool.query(`
+                    UPDATE return_approval_batch_items
+                    SET approved=$1, approval_notes=$2, approved_at=NOW(), approved_by_name=$3
+                    WHERE id::text=$4
+                `, [item.approved, item.approval_notes || null, nombre_confirmador || 'Proveedor', String(item.id)]);
+            }
+        }
+
+        // Verificar si todos los ítems fueron aprobados
+        const checkRes = await pool.query(
+            `SELECT COUNT(*) as total, COUNT(*) FILTER (WHERE approved=true) as aprobados
+             FROM return_approval_batch_items WHERE batch_id::text=$1`, [String(batch.id)]
+        );
+        const { total, aprobados } = checkRes.rows[0];
+        const nuevoStatus = parseInt(aprobados) === parseInt(total) ? 'aprobado' : 'aprobado_parcial';
+
+        await pool.query(`
+            UPDATE return_approval_batches
+            SET status=$1, confirmed_at=NOW(), confirmed_by_name=$2,
+                notes = COALESCE(notes,'') || CASE WHEN $3::text != '' THEN E'\n[Proveedor]: ' || $3 ELSE '' END
+            WHERE id::text=$4
+        `, [nuevoStatus, nombre_confirmador || 'Proveedor', observaciones_generales || '', String(batch.id)]);
+
+        console.log(`[M7-DEVOL] Lote ${batchCode} confirmado por ${nombre_confirmador} — status: ${nuevoStatus}`);
+        res.json({ success: true, status: nuevoStatus, total, aprobados });
+    } catch (err: any) {
+        console.error('[M7-DEVOL-CONFIRM]', err.message);
+        res.status(500).json({ error: err.message });
     }
 };

@@ -80,6 +80,7 @@ const PublicSurvey = lazyWithRetry(() => import('./components/GestionHumana/Publ
 const PublicTraining = lazyWithRetry(() => import('./components/GestionHumana/PublicTraining'));
 const PublicVisitForm = lazyWithRetry(() => import('./components/GestionHumana/PublicVisitForm'));
 const PublicNoticiaPage = lazyWithRetry(() => import('./components/Noticias/PublicNoticiaPage'));
+const ReturnApprovalPage = lazyWithRetry(() => import('./components/ReturnApprovalPage'));
 const CfgCiudades = lazyWithRetry(() => import('./components/Configuracion/Ciudades'));
 const ProvClientes = lazyWithRetry(() => import('./components/Configuracion/ProvClientes'));
 const GestionDocumental = lazyWithRetry(() => import('./components/documents/GestionDocumental'));
@@ -561,6 +562,17 @@ const App: React.FC = () => {
     return (
       <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"/></div>}>
         <PublicNoticiaPage />
+      </React.Suspense>
+    );
+  }
+
+  // /public/return-approval/:batchCode/:token — sin auth, para proveedores
+  const raMatch = window.location.pathname.match(/^\/public\/return-approval\/([^/]+)\/([^/]+)$/);
+  if (raMatch) {
+    const [, raBatchCode, raToken] = raMatch;
+    return (
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"/></div>}>
+        <ReturnApprovalPage batchCode={raBatchCode} token={raToken} />
       </React.Suspense>
     );
   }

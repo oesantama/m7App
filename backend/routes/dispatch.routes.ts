@@ -23,7 +23,10 @@ import {
     getApprovalBatches,
     getApprovalBatchByCode,
     getUnifiedHistory,
-    getHistoryFiltersData
+    getHistoryFiltersData,
+    sendApprovalBatchEmail,
+    getPublicReturnApproval,
+    confirmPublicReturnApproval
 } from '../controllers/dispatch.controller.js';
 
 const router = Router();
@@ -64,5 +67,10 @@ router.get('/approval-pending',          getApprovalPendingReturns);
 router.post('/approval-batches',         createApprovalBatch);
 router.get('/approval-batches',          getApprovalBatches);
 router.get('/approval-batch/:batchCode', getApprovalBatchByCode);
+router.post('/approval-batches/:id/send-email', sendApprovalBatchEmail);
+
+// Rutas públicas (sin JWT) — accesibles vía /api/dispatch/public/...
+router.get('/public/return-approval/:batchCode/:token',         getPublicReturnApproval);
+router.post('/public/return-approval/:batchCode/:token/confirm', confirmPublicReturnApproval);
 
 export default router;

@@ -315,6 +315,12 @@ export const api = {
     fetchJson(`${API_URL}/dispatch/approval-batches${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ''}`),
   getApprovalBatchByCode: (batchCode: string) =>
     fetchJson(`${API_URL}/dispatch/approval-batch/${encodeURIComponent(batchCode)}`),
+  sendApprovalBatchEmail: (id: number, email_proveedor: string, nombre_proveedor: string) =>
+    fetchJson(`${API_URL}/dispatch/approval-batches/${id}/send-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email_proveedor, nombre_proveedor }),
+    }),
 
   // ── Consulta de Inventario / Kardex ───────────────────────────────────────
   getInventoryStock: (params?: { clientId?: string; articleId?: string; location?: string; dateFrom?: string; dateTo?: string }) => {
