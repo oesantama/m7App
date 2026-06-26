@@ -62,9 +62,12 @@ function getDept(city: string): string {
 }
 
 function yesterday(): { from: string; to: string } {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  const iso = d.toISOString().slice(0, 10);
+  // Obtener la fecha actual en Colombia (UTC-5) para evitar el desfase de zona horaria.
+  // Si el cron dispara a las 7 PM Colombia, en UTC ya es medianoche del día siguiente.
+  const bogotaHoy = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+  const [y, m, d] = bogotaHoy.split('-').map(Number);
+  const ayer = new Date(y, m - 1, d - 1);
+  const iso = `${ayer.getFullYear()}-${String(ayer.getMonth() + 1).padStart(2, '0')}-${String(ayer.getDate()).padStart(2, '0')}`;
   return { from: iso, to: iso };
 }
 
