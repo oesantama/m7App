@@ -276,15 +276,14 @@ const TrainingAdmin: React.FC = () => {
                                 </button>
                             </div>
                         </div>
-                        <div className="flex-grow p-6 bg-slate-50/50">
-                            <DataTable 
-                                data={attendance}
+                        <div className="flex-grow p-6 bg-slate-50/50 overflow-y-auto">
+                            <DataTable
+                                data={attendance.map(({ signature_b64, ...row }: any) => row)}
                                 columns={[
                                     { header: 'NOMBRE', key: 'full_name', render: (row: any) => <span className="font-black text-slate-900 text-xs uppercase">{row.full_name}</span> },
                                     { header: 'CÉDULA', key: 'document_number', render: (row: any) => <span className="font-bold text-slate-600 text-xs">{row.document_number}</span> },
                                     { header: 'CARGO', key: 'job_title', render: (row: any) => <span className="font-bold text-slate-500 text-[11px] uppercase">{row.job_title}</span> },
                                     { header: 'FECHA', key: 'registered_at', render: (row: any) => <span className="font-bold text-slate-400 text-[10px]">{new Date(row.registered_at).toLocaleString()}</span> },
-                                    { header: 'FIRMA', key: 'signature_b64', render: (row: any) => <img src={row.signature_b64} alt="firma" className="h-8 mx-auto" />, sortable: false }
                                 ]}
                                 searchPlaceholder="Buscar asistente..."
                                 excelFileName={`Asistencias_${selectedSession?.topic}_${new Date().toISOString().split('T')[0]}.xlsx`}
