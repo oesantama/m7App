@@ -196,7 +196,39 @@ function AsistenciaForm({ noticiaId, onOk }: { noticiaId: string; onOk: () => vo
   const [errorMsg, setErrorMsg]     = useState('');
   const cedulaRef = useRef<HTMLInputElement>(null);
 
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
+  const isDrawing   = useRef(false);
+  const hasSig      = useRef(false);
+
   useEffect(() => { cedulaRef.current?.focus(); }, []);
+
+  const clearCanvas = () => {
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx && canvasRef.current) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    hasSig.current = false;
+  };
+  const getPos = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current) return { x: 0, y: 0 };
+    const rect = canvasRef.current.getBoundingClientRect();
+    const scaleX = canvasRef.current.width / rect.width;
+    const scaleY = canvasRef.current.height / rect.height;
+    if ('touches' in e) return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
+    return { x: ((e as React.MouseEvent).clientX - rect.left) * scaleX, y: ((e as React.MouseEvent).clientY - rect.top) * scaleY };
+  };
+  const startDraw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    isDrawing.current = true;
+    const pos = getPos(e);
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx) { ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
+  };
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing.current) return;
+    e.preventDefault();
+    const pos = getPos(e);
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx) { ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#0f172a'; ctx.lineTo(pos.x, pos.y); ctx.stroke(); hasSig.current = true; }
+  };
+  const stopDraw = () => { isDrawing.current = false; };
 
   const checkCedula = async () => {
     const ced = cedula.trim();
@@ -224,13 +256,18 @@ function AsistenciaForm({ noticiaId, onOk }: { noticiaId: string; onOk: () => vo
       setErrorMsg('Nombre y cédula son obligatorios.');
       return;
     }
+    const firma_b64 = hasSig.current && canvasRef.current ? canvasRef.current.toDataURL('image/png') : null;
+    if (!firma_b64) {
+      setErrorMsg('La firma es obligatoria.');
+      return;
+    }
     setAsistState('submitting');
     setErrorMsg('');
     try {
       const r = await fetch(`${API_URL}/noticias/public/${noticiaId}/asistencia`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre_completo: nombre.trim(), cedula: cedula.trim(), cargo: cargo.trim() }),
+        body: JSON.stringify({ nombre_completo: nombre.trim(), cedula: cedula.trim(), cargo: cargo.trim(), firma_b64 }),
       });
       if (r.status === 409) {
         setAsistState('already_registered');
@@ -344,6 +381,19 @@ function AsistenciaForm({ noticiaId, onOk }: { noticiaId: string; onOk: () => vo
               disabled={asistState === 'submitting'}
             />
           </div>
+
+          {/* Canvas de Firma */}
+          <div>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+              <label style={labelStyle}>Firma <span style={{color:'#ef4444'}}>*</span></label>
+              <button type="button" onClick={clearCanvas} style={{fontSize:9,fontWeight:900,color:'#f87171',background:'none',border:'none',cursor:'pointer',textTransform:'uppercase'}}>Limpiar</button>
+            </div>
+            <canvas ref={canvasRef} width={460} height={90}
+              style={{width:'100%',height:70,background:'white',border:'1.5px solid #e2e8f0',borderRadius:10,cursor:'crosshair',touchAction:'none',display:'block',boxSizing:'border-box'}}
+              onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+              onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}/>
+          </div>
+
           {errorMsg && (
             <p style={{margin:0,fontSize:12,color:'#dc2626',fontWeight:700}}>{errorMsg}</p>
           )}

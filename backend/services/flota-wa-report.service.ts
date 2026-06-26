@@ -304,11 +304,10 @@ function buildHtml(rows: FlotaRow[], tdm: TdmSummary, m7sum: M7Summary, fecha: s
     </div>
   </div>`;
 
-  // Limitar a 12 items por gráfica para que quepan en una sola página
-  const m7ClientChart  = m7ClientList.slice(0, 12);
-  const tdmClientChart = tdmClientList.slice(0, 12);
-  const m7DeptChart    = m7DeptList.slice(0, 12);
-  const tdmDeptChart   = tdmDeptList.slice(0, 12);
+  const m7ClientChart  = m7ClientList;
+  const tdmClientChart = tdmClientList;
+  const m7DeptChart    = m7DeptList;
+  const tdmDeptChart   = tdmDeptList;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
