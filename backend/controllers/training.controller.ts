@@ -1,5 +1,11 @@
 import { Request, Response } from 'express';
+import { exec } from 'child_process';
 import pool from '../config/database.js';
+import { generateAsistenciaPDF, uploadAsistenciaToDrive } from '../services/asistencia-pdf.service.js';
+
+function checkRclone(): Promise<boolean> {
+  return new Promise(resolve => exec('which rclone', err => resolve(!err)));
+}
 
 // --- CATEGORÍAS ---
 export const getCategories = async (req: Request, res: Response) => {
@@ -218,8 +224,7 @@ export const getPublicSession = async (req: Request, res: Response) => {
 export const registerPublicAttendance = async (req: Request, res: Response) => {
   const { sessionId, fullName, documentNumber, jobTitle, signatureB64 } = req.body;
   try {
-    // Validar expiración de nuevo por seguridad
-    const sess = await pool.query('SELECT expires_at FROM training_sessions WHERE id = $1', [sessionId]);
+    const sess = await pool.query('SELECT * FROM training_sessions WHERE id = $1', [sessionId]);
     if (sess.rowCount > 0 && sess.rows[0].expires_at && new Date(sess.rows[0].expires_at) < new Date()) {
         return res.status(410).json({ error: "No es posible registrar asistencia. El tiempo ha expirado." });
     }
@@ -228,9 +233,165 @@ export const registerPublicAttendance = async (req: Request, res: Response) => {
       INSERT INTO training_attendance (session_id, full_name, document_number, job_title, signature_b64, registered_at)
       VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP)
     `, [sessionId, fullName, documentNumber, jobTitle, signatureB64]);
-    
+
     res.json({ success: true, message: "Asistencia registrada con éxito" });
+
+    // Auto-upload a Drive en background
+    if (sess.rowCount > 0) {
+      triggerSessionAsistenciaDrive(sessionId, sess.rows[0]).catch(e =>
+        console.error('[TRAINING-ASIST-AUTO]', e.message)
+      );
+    }
   } catch (err: any) {
     res.status(500).json({ error: "Error al registrar asistencia" });
+  }
+};
+
+async function triggerSessionAsistenciaDrive(sessionId: string, sess: any): Promise<void> {
+  if (!(await checkRclone())) {
+    console.log('[TRAINING-ASIST-AUTO] rclone no disponible, omitiendo Drive upload');
+    return;
+  }
+
+  // Solo subir si hay firmas nuevas pendientes
+  const pendingRes = await pool.query(
+    'SELECT COUNT(*) FROM training_attendance WHERE session_id=$1 AND signature_b64 IS NOT NULL',
+    [sessionId]
+  );
+  if (parseInt(pendingRes.rows[0].count) === 0) {
+    console.log(`[TRAINING-ASIST] Sin firmas pendientes para sesión ${sessionId}, omitiendo upload`);
+    return;
+  }
+
+  const attRes = await pool.query(
+    'SELECT id, full_name AS nombre_completo, document_number AS cedula, job_title AS cargo, signature_b64 AS firma_b64, registered_at AS fecha_registro FROM training_attendance WHERE session_id=$1 ORDER BY registered_at ASC',
+    [sessionId]
+  );
+  if (!attRes.rowCount) return;
+
+  const pdf = await generateAsistenciaPDF(attRes.rows, {
+    titulo: sess.topic,
+    instructor: sess.instructor,
+    tipo: sess.location_type,
+    fecha_sesion: sess.scheduled_at
+      ? new Date(sess.scheduled_at).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })
+      : undefined,
+  });
+  const { drive_path } = await uploadAsistenciaToDrive(pdf, sess.topic);
+
+  await pool.query('UPDATE training_sessions SET asistencia_drive_path=$1 WHERE id=$2', [drive_path, sessionId]);
+  await pool.query('UPDATE training_attendance SET signature_b64 = NULL WHERE session_id=$1', [sessionId]);
+  console.log(`[TRAINING-ASIST] Drive actualizado para sesión ${sessionId} (${attRes.rowCount} registros)`);
+}
+
+// Descarga PDF de asistencia de una sesión — primero sincroniza pendientes, luego baja desde Drive
+export const downloadSessionPDF = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const sessRes = await pool.query('SELECT * FROM training_sessions WHERE id = $1', [id]);
+    if (!sessRes.rowCount) return res.status(404).json({ error: 'Sesión no encontrada' });
+    const sess = sessRes.rows[0];
+
+    // Sincronizar solo si hay firmas pendientes
+    await triggerSessionAsistenciaDrive(id, sess).catch(e =>
+      console.warn('[TRAINING-PDF] sync Drive falló:', e.message)
+    );
+
+    // Releer la ruta actualizada
+    const updated = await pool.query('SELECT asistencia_drive_path FROM training_sessions WHERE id=$1', [id]);
+    const drivePath: string | null = updated.rows[0]?.asistencia_drive_path || null;
+
+    const safeName = sess.topic.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50);
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="Asistencia_${safeName}.pdf"` });
+
+    if (drivePath && await checkRclone()) {
+      console.log(`[TRAINING-PDF] Sirviendo desde Drive: ${drivePath}`);
+      const { spawn } = await import('child_process');
+      const proc = spawn('rclone', ['cat', `gdrive_cumplidos:${drivePath}`]);
+      proc.stdout.pipe(res);
+      proc.stderr.on('data', (d) => console.error('[TRAINING-PDF-STREAM]', d.toString()));
+      proc.on('error', () => res.status(500).end());
+      return;
+    }
+
+    // Fallback: generar desde DB
+    console.warn(`[TRAINING-PDF] Sin ruta Drive para sesión ${id}, generando desde DB`);
+    const attRes = await pool.query(
+      'SELECT full_name AS nombre_completo, document_number AS cedula, job_title AS cargo, signature_b64 AS firma_b64, registered_at AS fecha_registro FROM training_attendance WHERE session_id = $1 ORDER BY registered_at ASC',
+      [id]
+    );
+    const pdf = await generateAsistenciaPDF(attRes.rows, {
+      titulo: sess.topic,
+      instructor: sess.instructor,
+      tipo: sess.location_type,
+      fecha_sesion: sess.scheduled_at ? new Date(sess.scheduled_at).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' }) : undefined,
+    });
+    res.send(pdf);
+  } catch (err: any) {
+    console.error('[TRAINING-PDF]', err.message);
+    res.status(500).json({ error: 'Error generando PDF' });
+  }
+};
+
+// Sube PDF de asistencia a Drive
+export const uploadSessionPDFToDrive = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const sessRes = await pool.query('SELECT * FROM training_sessions WHERE id = $1', [id]);
+    if (!sessRes.rowCount) return res.status(404).json({ error: 'Sesión no encontrada' });
+    const sess = sessRes.rows[0];
+
+    const attRes = await pool.query(
+      'SELECT full_name AS nombre_completo, document_number AS cedula, job_title AS cargo, signature_b64 AS firma_b64, registered_at AS fecha_registro FROM training_attendance WHERE session_id = $1 ORDER BY registered_at ASC',
+      [id]
+    );
+
+    const pdf = await generateAsistenciaPDF(attRes.rows, {
+      titulo: sess.topic,
+      instructor: sess.instructor,
+      tipo: sess.location_type,
+      fecha_sesion: sess.scheduled_at ? new Date(sess.scheduled_at).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' }) : undefined,
+    });
+
+    const { drive_path, drive_link } = await uploadAsistenciaToDrive(pdf, sess.topic);
+    res.json({ success: true, drive_path, drive_link, total: attRes.rowCount });
+  } catch (err: any) {
+    console.error('[TRAINING-DRIVE]', err.message);
+    res.status(500).json({ error: 'Error subiendo PDF a Drive' });
+  }
+};
+
+// Migración masiva: genera y sube PDFs de todas las sesiones que tienen asistentes
+export const migrateAllSessionsPDF = async (req: Request, res: Response) => {
+  try {
+    const sessRes = await pool.query(`
+      SELECT DISTINCT s.id, s.topic, s.instructor, s.location_type, s.scheduled_at
+      FROM training_sessions s
+      JOIN training_attendance a ON a.session_id = s.id
+    `);
+
+    const results: { id: string; topic: string; link: string; total: number }[] = [];
+    for (const sess of sessRes.rows) {
+      try {
+        const attRes = await pool.query(
+          'SELECT full_name AS nombre_completo, document_number AS cedula, job_title AS cargo, signature_b64 AS firma_b64, registered_at AS fecha_registro FROM training_attendance WHERE session_id = $1 ORDER BY registered_at ASC',
+          [sess.id]
+        );
+        const pdf = await generateAsistenciaPDF(attRes.rows, {
+          titulo: sess.topic,
+          instructor: sess.instructor,
+          tipo: sess.location_type,
+          fecha_sesion: sess.scheduled_at ? new Date(sess.scheduled_at).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' }) : undefined,
+        });
+        const { drive_link } = await uploadAsistenciaToDrive(pdf, sess.topic);
+        results.push({ id: sess.id, topic: sess.topic, link: drive_link, total: attRes.rowCount ?? 0 });
+      } catch (e: any) {
+        results.push({ id: sess.id, topic: sess.topic, link: '', total: 0 });
+      }
+    }
+    res.json({ success: true, migrated: results.length, results });
+  } catch (err: any) {
+    console.error('[TRAINING-MIGRATE]', err.message);
+    res.status(500).json({ error: 'Error en migración masiva' });
   }
 };

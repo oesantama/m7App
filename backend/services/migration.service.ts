@@ -1715,6 +1715,26 @@ export const restoreSystem = async () => {
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, route = EXCLUDED.route;
     `);
 
+    // Tabla de asistencias para Noticias y Avisos
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS noticia_asistencia (
+        id SERIAL PRIMARY KEY,
+        noticia_id INTEGER NOT NULL REFERENCES noticias(id) ON DELETE CASCADE,
+        nombre_completo VARCHAR(255) NOT NULL,
+        cedula VARCHAR(30) NOT NULL,
+        cargo VARCHAR(150),
+        firma_b64 TEXT,
+        fecha_registro TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_noticia_asistencia_noticia ON noticia_asistencia(noticia_id);
+    `);
+
+    // Columnas nuevas en noticias (permite_asistencia + ruta Drive del PDF combinado)
+    await client.query(`
+      ALTER TABLE noticias ADD COLUMN IF NOT EXISTS permite_asistencia BOOLEAN DEFAULT FALSE NOT NULL;
+      ALTER TABLE noticias ADD COLUMN IF NOT EXISTS asistencia_drive_path TEXT;
+    `);
+
     await client.query('COMMIT');
 
     // FASE FINAL: SINCRONIZACIÓN NUCLEAR DE MENÚS (REUBICACIÓN LOGÍSTICA)

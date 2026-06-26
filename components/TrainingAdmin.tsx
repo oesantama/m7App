@@ -15,6 +15,9 @@ const TrainingAdmin: React.FC = () => {
     const [loadingAttendance, setLoadingAttendance] = useState(false);
     const [extendSession, setExtendSession] = useState<any>(null);
     const [newExpiresAt, setNewExpiresAt] = useState('');
+    const [pdfLoading, setPdfLoading] = useState(false);
+    const [driveLoading, setDriveLoading] = useState(false);
+    const [migrateLoading, setMigrateLoading] = useState(false);
 
     // Form State
     const [form, setForm] = useState({
@@ -102,6 +105,41 @@ const TrainingAdmin: React.FC = () => {
         }
     };
 
+    const downloadPDF = async () => {
+        if (!selectedSession) return;
+        setPdfLoading(true);
+        try {
+            const tok = localStorage.getItem('token') || localStorage.getItem('m7_token') || '';
+            const res = await fetch(`${API_URL}/training/sessions/${selectedSession.id}/pdf`, { headers: { Authorization: `Bearer ${tok}` } });
+            if (!res.ok) throw new Error('Error generando PDF');
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = `Asistencia_${selectedSession.topic}.pdf`; a.click();
+            URL.revokeObjectURL(url);
+            toast.success('PDF descargado');
+        } catch (e: any) { toast.error('Error al generar PDF'); }
+        finally { setPdfLoading(false); }
+    };
+
+    const uploadDrive = async () => {
+        if (!selectedSession) return;
+        setDriveLoading(true);
+        try {
+            const res = await fetchJson(`${API_URL}/training/sessions/${selectedSession.id}/upload-drive`, { method: 'POST' });
+            if (res.drive_link) { toast.success('Subido a Drive', { description: `${res.total} asistentes` }); }
+        } catch (e: any) { toast.error('Error subiendo a Drive'); }
+        finally { setDriveLoading(false); }
+    };
+
+    const migrateAll = async () => {
+        setMigrateLoading(true);
+        try {
+            const res = await fetchJson(`${API_URL}/training/sessions/migrate-all`, { method: 'POST' });
+            toast.success(`Migración completada: ${res.migrated} sesiones subidas a Drive`);
+        } catch (e: any) { toast.error('Error en migración'); }
+        finally { setMigrateLoading(false); }
+    };
+
     const copyRegistrationLink = (token: string) => {
         const link = `${window.location.origin}/attendance/register/${token}`;
         navigator.clipboard.writeText(link);
@@ -128,13 +166,23 @@ const TrainingAdmin: React.FC = () => {
                         </p>
                     </div>
                 </div>
-                <button 
-                    onClick={() => setShowModal(true)}
-                    className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95 flex items-center gap-3"
-                >
-                    <Icons.Plus className="w-5 h-5" />
-                    Nueva Capacitación
-                </button>
+                <div className="flex gap-3 flex-wrap">
+                    <button
+                        onClick={migrateAll}
+                        disabled={migrateLoading}
+                        className="px-6 py-4 bg-amber-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-amber-400 transition-all active:scale-95 flex items-center gap-3 disabled:opacity-50"
+                    >
+                        {migrateLoading ? <Icons.Loader className="w-5 h-5 animate-spin" /> : <Icons.Upload className="w-5 h-5" />}
+                        Migrar a Drive
+                    </button>
+                    <button
+                        onClick={() => setShowModal(true)}
+                        className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-blue-600 transition-all active:scale-95 flex items-center gap-3"
+                    >
+                        <Icons.Plus className="w-5 h-5" />
+                        Nueva Capacitación
+                    </button>
+                </div>
             </div>
 
             {/* Grid de Sesiones */}
@@ -200,14 +248,31 @@ const TrainingAdmin: React.FC = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setSelectedSession(null)}></div>
                     <div className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[2.5rem] shadow-2xl z-10 overflow-hidden flex flex-col relative animate-in zoom-in-95 duration-300">
-                        <div className="p-8 bg-slate-900 text-white flex justify-between items-center">
+                        <div className="p-6 bg-slate-900 text-white flex flex-wrap justify-between items-center gap-3">
                             <div>
                                 <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">Listado de Asistencia</p>
-                                <h2 className="text-xl font-black uppercase tracking-tight">{selectedSession.topic}</h2>
+                                <h2 className="text-lg font-black uppercase tracking-tight line-clamp-1">{selectedSession.topic}</h2>
+                                <p className="text-[9px] text-slate-400 mt-0.5">{attendance.length} asistentes registrados</p>
                             </div>
-                            <div className="flex gap-3">
-                                <button onClick={() => setSelectedSession(null)} className="w-10 h-10 flex items-center justify-center bg-white/10 rounded-xl hover:bg-red-500 transition-all">
-                                    <Icons.Plus className="w-5 h-5 rotate-45" />
+                            <div className="flex gap-2 flex-wrap">
+                                <button
+                                    onClick={downloadPDF}
+                                    disabled={pdfLoading || attendance.length === 0}
+                                    className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-500 transition-all disabled:opacity-40 flex items-center gap-2"
+                                >
+                                    {pdfLoading ? <Icons.Loader className="w-3 h-3 animate-spin" /> : <Icons.FileText className="w-3 h-3" />}
+                                    PDF
+                                </button>
+                                <button
+                                    onClick={uploadDrive}
+                                    disabled={driveLoading || attendance.length === 0}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-blue-500 transition-all disabled:opacity-40 flex items-center gap-2"
+                                >
+                                    {driveLoading ? <Icons.Loader className="w-3 h-3 animate-spin" /> : <Icons.Upload className="w-3 h-3" />}
+                                    Drive
+                                </button>
+                                <button onClick={() => setSelectedSession(null)} className="w-9 h-9 flex items-center justify-center bg-white/10 rounded-xl hover:bg-red-500 transition-all">
+                                    <Icons.Plus className="w-4 h-4 rotate-45" />
                                 </button>
                             </div>
                         </div>

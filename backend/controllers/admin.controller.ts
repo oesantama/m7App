@@ -321,11 +321,27 @@ export const runCron = async (req: any, res: Response) => {
                 break;
             case 'transportandoScrape':
                 scheduler.manualRunTransportandoScrape().then(resLogs => {
-                    scraper.activeScraperLogs.push("[COMPLETADO] Scraping finalizado.");
+                    scraper.activeScraperLogs.push("[COMPLETADO] Scraping de manifiestos (General) finalizado.");
                 }).catch(err => {
-                    scraper.activeScraperLogs.push(`[ERROR CRÍTICO] Scraping falló: ${err.message}`);
+                    scraper.activeScraperLogs.push(`[ERROR CRÍTICO] Scraping de manifiestos (General) falló: ${err.message}`);
                 });
-                logs = ["Iniciando importación en segundo plano...", "Por favor, mantén esta ventana abierta y observa la terminal de logs."];
+                logs = ["Iniciando importación general en segundo plano...", "Por favor, mantén esta ventana abierta y observa la terminal de logs."];
+                return res.json({ success: true, logs, isBackground: true });
+            case 'transportandoRecaudosScrape':
+                scheduler.manualRunTransportandoRecaudosScrape().then(resLogs => {
+                    scraper.activeScraperLogs.push("[COMPLETADO] Scraping de recaudos finalizado.");
+                }).catch(err => {
+                    scraper.activeScraperLogs.push(`[ERROR CRÍTICO] Scraping de recaudos falló: ${err.message}`);
+                });
+                logs = ["Iniciando importación de recaudos en segundo plano...", "Por favor, mantén esta ventana abierta y observa la terminal de logs."];
+                return res.json({ success: true, logs, isBackground: true });
+            case 'transportandoEgresosScrape':
+                scheduler.manualRunTransportandoEgresosScrape().then(resLogs => {
+                    scraper.activeScraperLogs.push("[COMPLETADO] Scraping de egresos finalizado.");
+                }).catch(err => {
+                    scraper.activeScraperLogs.push(`[ERROR CRÍTICO] Scraping de egresos falló: ${err.message}`);
+                });
+                logs = ["Iniciando importación de egresos en segundo plano...", "Por favor, mantén esta ventana abierta y observa la terminal de logs."];
                 return res.json({ success: true, logs, isBackground: true });
             default:
                 return res.status(404).json({ error: "Cron no encontrado" });

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import * as trainingController from '../controllers/training.controller.js';
-import { requirePermission } from '../middleware/auth.middleware.js';
+import { requirePermission, authenticateToken } from '../middleware/auth.middleware.js';
 
 
 const router = Router();
@@ -20,6 +20,11 @@ router.patch('/sessions/:id/extend', requirePermission('CAPACITACIONES', 'edit')
 // Rutas Públicas (Sin requirePermission/Bypass JWT en server.ts)
 router.get('/public/session/:token', trainingController.getPublicSession);
 router.post('/public/attendance', trainingController.registerPublicAttendance);
+
+// PDF + Drive de asistencia por sesión
+router.get('/sessions/:id/pdf',          requirePermission('CAPACITACIONES', 'view'),   trainingController.downloadSessionPDF);
+router.post('/sessions/:id/upload-drive', requirePermission('CAPACITACIONES', 'edit'),  trainingController.uploadSessionPDFToDrive);
+router.post('/sessions/migrate-all',      requirePermission('CAPACITACIONES', 'edit'),  trainingController.migrateAllSessionsPDF);
 
 // Existentes
 router.post('/courses', requirePermission('CAPACITACIONES', 'create'), trainingController.saveCourse);

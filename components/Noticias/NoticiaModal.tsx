@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Icons } from '../../constants';
 import { API_URL } from '../../services/api';
 
@@ -9,6 +9,7 @@ interface Noticia {
   link?: string;
   archivo_nombre?: string;
   archivo_tipo?: string;
+  permite_asistencia?: boolean;
 }
 interface Props {
   noticias: Noticia[];
@@ -269,6 +270,100 @@ export default function NoticiaModal({ noticias, userId, onAllSeen }: Props) {
   const [phase, setPhase]         = useState<Phase>('entering');
   const [lightbox, setLightbox]   = useState(false);
 
+  // Asistencia
+  const [asistForm, setAsistForm]       = useState({ nombre: '', cedula: '', cargo: '' });
+  const [asistSaving, setAsistSaving]   = useState(false);
+  const [asistDone, setAsistDone]       = useState(false);
+  const [alreadySigned, setAlreadySigned] = useState<string | null>(null); // nombre de quien ya firmó
+  const [checkingCedula, setCheckingCedula] = useState(false);
+  const [contentViewed, setContentViewed] = useState(false);
+  const [blockWarn, setBlockWarn]       = useState(false);
+  const asistSectionRef = useRef<HTMLDivElement>(null);
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
+  const isDrawing   = useRef(false);
+  const hasSig      = useRef(false);
+
+  const clearCanvas = () => {
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx && canvasRef.current) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    hasSig.current = false;
+  };
+  const getPos = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current!.getBoundingClientRect();
+    const scaleX = canvasRef.current!.width / rect.width;
+    const scaleY = canvasRef.current!.height / rect.height;
+    if ('touches' in e) return { x: (e.touches[0].clientX - rect.left) * scaleX, y: (e.touches[0].clientY - rect.top) * scaleY };
+    return { x: ((e as React.MouseEvent).clientX - rect.left) * scaleX, y: ((e as React.MouseEvent).clientY - rect.top) * scaleY };
+  };
+  const startDraw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    isDrawing.current = true;
+    const pos = getPos(e);
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx) { ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
+  };
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing.current) return;
+    e.preventDefault();
+    const pos = getPos(e);
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx) { ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#0f172a'; ctx.lineTo(pos.x, pos.y); ctx.stroke(); hasSig.current = true; }
+  };
+  const stopDraw = () => { isDrawing.current = false; };
+
+  const checkCedula = async (cedula: string) => {
+    if (!current?.permite_asistencia || !cedula.trim()) return;
+    setCheckingCedula(true);
+    try {
+      const tok = localStorage.getItem('token') || localStorage.getItem('m7_token') || '';
+      const res = await fetch(`${API_URL}/noticias/${current.id}/asistencia/check?cedula=${encodeURIComponent(cedula.trim())}`, {
+        headers: { Authorization: `Bearer ${tok}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.registered) {
+          setAlreadySigned(data.nombre);
+          setAsistDone(true);
+        }
+      }
+    } catch { /* silencioso */ }
+    finally { setCheckingCedula(false); }
+  };
+
+  const submitAsistencia = async () => {
+    if (!current?.permite_asistencia) return;
+    if (!asistForm.nombre.trim() || !asistForm.cedula.trim()) return;
+    setAsistSaving(true);
+    try {
+      const tok = localStorage.getItem('token') || localStorage.getItem('m7_token') || '';
+      const firma_b64 = hasSig.current && canvasRef.current ? canvasRef.current.toDataURL('image/png') : null;
+      const res = await fetch(`${API_URL}/noticias/${current.id}/asistencia`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` },
+        body: JSON.stringify({ nombre_completo: asistForm.nombre, cedula: asistForm.cedula, cargo: asistForm.cargo, firma_b64 }),
+      });
+      if (res.status === 409) {
+        const data = await res.json();
+        setAlreadySigned(data.nombre);
+        setAsistDone(true);
+        return;
+      }
+      if (res.ok) setAsistDone(true);
+    } catch { /* silencioso */ }
+    finally { setAsistSaving(false); }
+  };
+
+  // Reset al cambiar de noticia
+  useEffect(() => {
+    setAsistForm({ nombre: '', cedula: '', cargo: '' });
+    setAsistDone(false);
+    setAlreadySigned(null);
+    setBlockWarn(false);
+    // Si no tiene archivo adjunto, el contenido se considera visto de inmediato
+    setContentViewed(!current?.permite_asistencia || !current?.archivo_nombre);
+    clearCanvas();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id]);
+
   useEffect(() => {
     const seen = getSeenIds(userId);
     const pending = noticias.filter(n => !seen.has(n.id));
@@ -287,8 +382,17 @@ export default function NoticiaModal({ noticias, userId, onAllSeen }: Props) {
     return () => clearTimeout(t);
   }, [phase, current]);
 
+  const isPreview = userId.startsWith('__preview_');
+  const mustSign  = !!(current?.permite_asistencia && !asistDone && !isPreview);
+
   const handleClose = () => {
     if (!current) return;
+    if (mustSign) {
+      setBlockWarn(true);
+      // Scroll al formulario de asistencia
+      setTimeout(() => asistSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+      return;
+    }
     markSeen(userId, current.id);
     setLightbox(false);
     setPhase('closing');
@@ -340,6 +444,7 @@ export default function NoticiaModal({ noticias, userId, onAllSeen }: Props) {
           to  {opacity:1;transform:translateY(0)}
         }
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes nmPulse { 0%,100%{box-shadow:0 0 0 0 rgba(79,70,229,0.4)} 50%{box-shadow:0 0 0 6px rgba(79,70,229,0)} }
         .nm-body::-webkit-scrollbar { width: 6px; }
         .nm-body::-webkit-scrollbar-track { background: #f8fafc; }
         .nm-body::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
@@ -376,15 +481,16 @@ export default function NoticiaModal({ noticias, userId, onAllSeen }: Props) {
                 background:'linear-gradient(135deg,#0f172a 0%,#064e3b 60%,#0f172a 100%)',
                 padding:'28px 28px 22px', position:'relative', flexShrink:0,
               }}>
-                <button onClick={handleClose} style={{
+                <button onClick={handleClose} title={mustSign ? 'Debes registrar tu asistencia primero' : 'Cerrar'} style={{
                   position:'absolute', top:14, right:14,
                   width:40, height:40, borderRadius:'50%',
-                  background:'rgba(255,255,255,0.1)', border:'none', cursor:'pointer',
-                  display:'flex', alignItems:'center', justifyContent:'center', color:'white',
-                }}
-                  onMouseOver={e=>(e.currentTarget.style.background='rgba(239,68,68,0.6)')}
-                  onMouseOut={e=>(e.currentTarget.style.background='rgba(255,255,255,0.1)')}>
-                  <Icons.X className="w-4 h-4"/>
+                  background: mustSign ? 'rgba(244,63,94,0.25)' : 'rgba(255,255,255,0.1)',
+                  border: mustSign ? '2px solid rgba(244,63,94,0.4)' : 'none',
+                  cursor: mustSign ? 'not-allowed' : 'pointer',
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  color: mustSign ? '#fda4af' : 'white',
+                }}>
+                  {mustSign ? <Icons.Lock className="w-4 h-4"/> : <Icons.X className="w-4 h-4"/>}
                 </button>
 
                 <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:14,
@@ -451,16 +557,102 @@ export default function NoticiaModal({ noticias, userId, onAllSeen }: Props) {
                         <Icons.Download className="w-3 h-3"/>
                         Descargar
                       </button>
-                      <button onClick={()=>setLightbox(true)} style={{
+                      <button onClick={()=>{ setLightbox(true); setContentViewed(true); }} style={{
                         display:'flex',alignItems:'center',gap:5,padding:'7px 14px',
-                        borderRadius:10,background:'#f0fdf4',
-                        color:'#059669',border:'none',cursor:'pointer',
+                        borderRadius:10,background: current.permite_asistencia && !contentViewed ? '#4f46e5' : '#f0fdf4',
+                        color: current.permite_asistencia && !contentViewed ? 'white' : '#059669',
+                        border:'none',cursor:'pointer',
                         fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:.5,
+                        animation: current.permite_asistencia && !contentViewed ? 'nmPulse 1.2s ease-in-out infinite' : 'none',
                       }}>
                         <Icons.Eye className="w-3 h-3"/>
-                        Ver
+                        {current.permite_asistencia && !contentViewed ? 'Ver documento *' : 'Ver'}
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {/* Formulario de asistencia — aparece solo después de ver el contenido */}
+                {current.permite_asistencia && !isPreview && contentViewed && (
+                  <div ref={asistSectionRef} style={{borderRadius:16,
+                    background: blockWarn && !asistDone ? '#fff1f2' : '#f0f0ff',
+                    border: `2px solid ${blockWarn && !asistDone ? '#fecdd3' : '#c7d2fe'}`,
+                    padding:20, animation:'nmFade .4s ease-out .1s both'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom: blockWarn && !asistDone ? 10 : 14}}>
+                      <div style={{width:24,height:24,background: blockWarn && !asistDone ? '#f43f5e' : '#4f46e5',borderRadius:7,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                        <Icons.Edit className="w-3 h-3 text-white"/>
+                      </div>
+                      <span style={{fontSize:11,fontWeight:900,color: blockWarn && !asistDone ? '#be123c' : '#3730a3',textTransform:'uppercase',letterSpacing:2}}>
+                        {blockWarn && !asistDone ? '⚠ Debes registrar tu asistencia para continuar' : 'Registrar mi Asistencia'}
+                      </span>
+                    </div>
+                    {blockWarn && !asistDone && (
+                      <p style={{fontSize:10,color:'#f43f5e',fontWeight:700,marginBottom:12,paddingLeft:32}}>
+                        Completa el formulario a continuación y confirma tu asistencia para poder cerrar este aviso.
+                      </p>
+                    )}
+
+                    {asistDone ? (
+                      <div style={{textAlign:'center',padding:'14px 0'}}>
+                        <div style={{width:44,height:44,background:'#dcfce7',borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 10px'}}>
+                          <Icons.Check className="w-6 h-6 text-emerald-600"/>
+                        </div>
+                        {alreadySigned ? (
+                          <>
+                            <p style={{fontSize:13,fontWeight:900,color:'#059669'}}>¡Ya tienes asistencia registrada!</p>
+                            <p style={{fontSize:11,color:'#6b7280',marginTop:4}}>
+                              Registrado como: <strong style={{color:'#374151'}}>{alreadySigned}</strong>
+                            </p>
+                            <p style={{fontSize:10,color:'#9ca3af',marginTop:2}}>Ya puedes cerrar este aviso.</p>
+                          </>
+                        ) : (
+                          <p style={{fontSize:12,fontWeight:800,color:'#059669'}}>¡Asistencia registrada exitosamente!</p>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:10}}>
+                          <input value={asistForm.nombre} onChange={e => setAsistForm(f => ({...f, nombre: e.target.value}))}
+                            placeholder="Nombre completo *"
+                            style={{padding:'10px 14px',borderRadius:12,border:'2px solid #c7d2fe',background:'white',fontSize:11,fontWeight:700,color:'#1e1b4b',outline:'none'}}/>
+                          <div style={{position:'relative'}}>
+                            <input value={asistForm.cedula}
+                              onChange={e => setAsistForm(f => ({...f, cedula: e.target.value}))}
+                              onBlur={e => checkCedula(e.target.value)}
+                              placeholder="Cédula *"
+                              style={{padding:'10px 14px',paddingRight:36,borderRadius:12,border:'2px solid #c7d2fe',background:'white',fontSize:11,fontWeight:700,color:'#1e1b4b',outline:'none',width:'100%',boxSizing:'border-box'}}/>
+                            {checkingCedula && (
+                              <div style={{position:'absolute',right:10,top:'50%',transform:'translateY(-50%)',width:14,height:14,border:'2px solid #a5b4fc',borderTopColor:'#4f46e5',borderRadius:'50%',animation:'spin .8s linear infinite'}}/>
+                            )}
+                          </div>
+                        </div>
+                        <input value={asistForm.cargo} onChange={e => setAsistForm(f => ({...f, cargo: e.target.value}))}
+                          placeholder="Cargo (opcional)"
+                          style={{width:'100%',padding:'10px 14px',borderRadius:12,border:'2px solid #c7d2fe',background:'white',fontSize:11,fontWeight:700,color:'#1e1b4b',outline:'none',marginBottom:10,boxSizing:'border-box'}}/>
+
+                        {/* Canvas firma */}
+                        <div style={{marginBottom:10}}>
+                          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:4}}>
+                            <span style={{fontSize:9,fontWeight:900,color:'#6366f1',textTransform:'uppercase',letterSpacing:1}}>Firma</span>
+                            <button onClick={clearCanvas} style={{fontSize:9,fontWeight:900,color:'#f87171',background:'none',border:'none',cursor:'pointer',textTransform:'uppercase'}}>Limpiar</button>
+                          </div>
+                          <canvas ref={canvasRef} width={460} height={90}
+                            style={{width:'100%',height:70,background:'white',border:'2px solid #c7d2fe',borderRadius:10,cursor:'crosshair',touchAction:'none',display:'block'}}
+                            onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+                            onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}/>
+                        </div>
+
+                        <button onClick={submitAsistencia}
+                          disabled={asistSaving || !asistForm.nombre.trim() || !asistForm.cedula.trim()}
+                          style={{width:'100%',padding:'11px',borderRadius:12,background: asistSaving || !asistForm.nombre.trim() || !asistForm.cedula.trim() ? '#a5b4fc' : '#4f46e5',
+                            color:'white',border:'none',cursor:'pointer',fontSize:10,fontWeight:900,textTransform:'uppercase',letterSpacing:1,
+                            display:'flex',alignItems:'center',justifyContent:'center',gap:6}}>
+                          {asistSaving
+                            ? <><div style={{width:14,height:14,border:'2px solid rgba(255,255,255,0.3)',borderTopColor:'white',borderRadius:'50%',animation:'spin .8s linear infinite'}}/> Registrando...</>
+                            : <><Icons.Check className="w-3.5 h-3.5"/> Confirmar Asistencia</>}
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -469,13 +661,18 @@ export default function NoticiaModal({ noticias, userId, onAllSeen }: Props) {
                   <button onClick={handleClose}
                     style={{
                       display:'flex',alignItems:'center',gap:8,padding:'12px 36px',
-                      borderRadius:14,background:'#0f172a',color:'white',border:'none',
-                      cursor:'pointer',fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:1,
-                    }}
-                    onMouseOver={e=>(e.currentTarget.style.background='#059669')}
-                    onMouseOut={e=>(e.currentTarget.style.background='#0f172a')}>
-                    Cerrar
-                    <Icons.ArrowRight className="w-3.5 h-3.5"/>
+                      borderRadius:14,
+                      background: mustSign ? '#fecdd3' : '#0f172a',
+                      color: mustSign ? '#be123c' : 'white',
+                      border: mustSign ? '2px solid #fda4af' : 'none',
+                      cursor: mustSign ? 'not-allowed' : 'pointer',
+                      fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:1,
+                    }}>
+                    {mustSign ? (
+                      <><Icons.Lock className="w-3.5 h-3.5"/> Registra tu asistencia para cerrar</>
+                    ) : (
+                      <>Cerrar <Icons.ArrowRight className="w-3.5 h-3.5"/></>
+                    )}
                   </button>
                 </div>
               </div>

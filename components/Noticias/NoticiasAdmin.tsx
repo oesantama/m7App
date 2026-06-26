@@ -18,12 +18,13 @@ interface Noticia {
   tipo_acceso: 'INTERNO' | 'EXTERNO' | 'AMBOS';
   fecha_vencimiento: string;
   estado: 'ACTIVO' | 'INACTIVO';
+  permite_asistencia?: boolean;
 }
 
 const BLANK: Noticia = {
   titulo: '', descripcion: '', link: '',
   archivo_drive_id: '', archivo_drive_path: '', archivo_nombre: '', archivo_tipo: '',
-  tipo_acceso: 'AMBOS', fecha_vencimiento: '', estado: 'ACTIVO',
+  tipo_acceso: 'AMBOS', fecha_vencimiento: '', estado: 'ACTIVO', permite_asistencia: false,
 };
 
 interface Props { user: User; }
@@ -66,6 +67,25 @@ export default function NoticiasAdmin({ user }: Props) {
   const [deletingArchivo, setDeletingArchivo] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Asistencia por noticia
+  const [asistModal, setAsistModal] = useState<Noticia | null>(null);
+  const [asistencia, setAsistencia] = useState<any[]>([]);
+  const [asistForm, setAsistForm] = useState({ nombre: '', cedula: '', cargo: '' });
+  const [asistSaving, setAsistSaving] = useState(false);
+  const [asistPdfLoading, setAsistPdfLoading] = useState(false);
+  const [asistDriveLoading, setAsistDriveLoading] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isDrawing = useRef(false);
+  const hasSignature = useRef(false);
+
+  useEffect(() => {
+    if (asistModal && canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      hasSignature.current = false;
+    }
+  }, [asistModal]);
+
   const canCreate = hasPermission(user, 'NOTICIAS', 'create');
   const canEdit   = hasPermission(user, 'NOTICIAS', 'edit');
   const canDelete = hasPermission(user, 'NOTICIAS', 'delete');
@@ -102,7 +122,7 @@ export default function NoticiasAdmin({ user }: Props) {
   const handleUpload = async (file: File) => {
     setUploading(true);
     try {
-      const r = await api.noticiasUpload(file);
+      const r = await api.noticiasUpload(file, modal?.titulo || '');
       setF({ archivo_drive_path: r.archivo_drive_path, archivo_nombre: r.archivo_nombre, archivo_tipo: r.archivo_tipo });
       toast.success('Archivo subido al Drive');
     } catch (e: any) { toast.error(e.message || 'Error al subir archivo'); }
@@ -138,6 +158,107 @@ export default function NoticiasAdmin({ user }: Props) {
   const copyPublicLink = (n: Noticia) => {
     const url = `${window.location.origin}/publico/noticia?id=${n.id}`;
     navigator.clipboard.writeText(url).then(() => toast.success('Enlace público copiado'));
+  };
+
+  // ── Asistencia helpers ──────────────────────────────────────────────────────
+  const fetchJson = async (url: string, opts: RequestInit = {}) => {
+    const tok = localStorage.getItem('token') || localStorage.getItem('m7_token') || '';
+    const r = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}`, ...(opts.headers || {}) } });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  };
+
+  const openAsistModal = async (noticia: Noticia) => {
+    setAsistModal(noticia);
+    setAsistForm({ nombre: '', cedula: '', cargo: '' });
+    setAsistencia([]);
+    if (!noticia.id) return;
+    try {
+      const data = await fetchJson(`${API_URL}/noticias/${noticia.id}/asistencia`);
+      setAsistencia(data);
+    } catch { toast.error('Error cargando asistencia'); }
+  };
+
+  const addAsistencia = async () => {
+    if (!asistModal?.id) return;
+    if (!asistForm.nombre.trim() || !asistForm.cedula.trim()) { toast.error('Nombre y cédula son requeridos'); return; }
+    let firma_b64: string | null = null;
+    if (canvasRef.current && hasSignature.current) firma_b64 = canvasRef.current.toDataURL('image/png');
+    setAsistSaving(true);
+    try {
+      const row = await fetchJson(`${API_URL}/noticias/${asistModal.id}/asistencia`, {
+        method: 'POST',
+        body: JSON.stringify({ nombre_completo: asistForm.nombre, cedula: asistForm.cedula, cargo: asistForm.cargo, firma_b64 }),
+      });
+      setAsistencia(prev => [...prev, row]);
+      setAsistForm({ nombre: '', cedula: '', cargo: '' });
+      const ctx = canvasRef.current?.getContext('2d');
+      if (ctx && canvasRef.current) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      hasSignature.current = false;
+      toast.success('Asistencia registrada');
+    } catch { toast.error('Error al registrar'); }
+    finally { setAsistSaving(false); }
+  };
+
+  const deleteAsistRow = async (asistId: number) => {
+    if (!asistModal?.id) return;
+    try {
+      await fetchJson(`${API_URL}/noticias/${asistModal.id}/asistencia/${asistId}`, { method: 'DELETE' });
+      setAsistencia(prev => prev.filter((r: any) => r.id !== asistId));
+      toast.success('Registro eliminado');
+    } catch { toast.error('Error al eliminar'); }
+  };
+
+  const downloadAsistenciaPDF = async () => {
+    if (!asistModal?.id) return;
+    setAsistPdfLoading(true);
+    try {
+      const tok = localStorage.getItem('token') || localStorage.getItem('m7_token') || '';
+      const res = await fetch(`${API_URL}/noticias/${asistModal.id}/asistencia/pdf`, { headers: { Authorization: `Bearer ${tok}` } });
+      if (!res.ok) throw new Error('Error');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `Asistencia_${(asistModal.titulo || 'noticia').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40)}.pdf`; a.click();
+      URL.revokeObjectURL(url);
+      toast.success('PDF descargado');
+    } catch { toast.error('Error generando PDF'); }
+    finally { setAsistPdfLoading(false); }
+  };
+
+  const uploadAsistenciaDrive = async () => {
+    if (!asistModal?.id) return;
+    setAsistDriveLoading(true);
+    try {
+      const res = await fetchJson(`${API_URL}/noticias/${asistModal.id}/asistencia/upload-drive`, { method: 'POST' });
+      toast.success(`Subido a Drive · ${res.total} asistente(s)`);
+    } catch { toast.error('Error subiendo a Drive'); }
+    finally { setAsistDriveLoading(false); }
+  };
+
+  const getCanvasPos = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const rect = canvasRef.current!.getBoundingClientRect();
+    if ('touches' in e) return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+    return { x: (e as React.MouseEvent).clientX - rect.left, y: (e as React.MouseEvent).clientY - rect.top };
+  };
+  const startDraw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    isDrawing.current = true;
+    const pos = getCanvasPos(e);
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx) { ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
+  };
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing.current) return;
+    e.preventDefault();
+    const pos = getCanvasPos(e);
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx) { ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.strokeStyle = '#1e293b'; ctx.lineTo(pos.x, pos.y); ctx.stroke(); hasSignature.current = true; }
+  };
+  const stopDraw = () => { isDrawing.current = false; };
+  const clearCanvas = () => {
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx && canvasRef.current) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    hasSignature.current = false;
   };
 
   const tipoIcon = (tipo: string) => {
@@ -240,6 +361,12 @@ export default function NoticiasAdmin({ user }: Props) {
                       </button>
                     )}
                   </div>
+                  {n.id && n.permite_asistencia && (
+                    <button onClick={() => openAsistModal(n)}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 bg-indigo-50 text-indigo-600 rounded-2xl text-[9px] font-black uppercase hover:bg-indigo-100 transition-all mt-2">
+                      <Icons.Users className="w-3 h-3" /> Ver Asistencia
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -323,6 +450,19 @@ export default function NoticiasAdmin({ user }: Props) {
                     <option value="INACTIVO">Inactivo</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Toggle permite_asistencia */}
+              <div className="flex items-center justify-between p-4 bg-indigo-50 rounded-2xl border-2 border-indigo-100">
+                <div>
+                  <p className="text-xs font-black text-indigo-900 uppercase tracking-widest">Registro de Asistencia</p>
+                  <p className="text-[9px] text-indigo-500 font-bold mt-0.5">Los usuarios podrán firmar asistencia al ver este aviso. Se genera PDF automático en Drive.</p>
+                </div>
+                <button type="button"
+                  onClick={() => setF({ permite_asistencia: !modal.permite_asistencia })}
+                  className={`w-12 h-6 rounded-full transition-all flex-shrink-0 ml-4 relative ${modal.permite_asistencia ? 'bg-indigo-600' : 'bg-slate-200'}`}>
+                  <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${modal.permite_asistencia ? 'left-6' : 'left-0.5'}`} />
+                </button>
               </div>
 
               <div className="space-y-1.5">
@@ -461,6 +601,98 @@ export default function NoticiasAdmin({ user }: Props) {
                   ? <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Eliminando...</>
                   : 'Eliminar del Drive'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL ASISTENCIA ── */}
+      {asistModal && (
+        <div className="fixed inset-0 z-[120] bg-slate-950/80 backdrop-blur-xl flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-3xl rounded-[3rem] shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-300 max-h-[95vh]">
+
+            {/* Header */}
+            <div className="p-6 bg-slate-900 text-white flex-shrink-0">
+              <div className="flex flex-wrap justify-between items-start gap-3">
+                <div>
+                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Asistencia</p>
+                  <h2 className="text-base font-black uppercase tracking-tight line-clamp-2 leading-tight">{asistModal.titulo}</h2>
+                  <p className="text-[9px] text-slate-400 mt-1">{asistencia.length} asistente(s) registrado(s)</p>
+                </div>
+                <div className="flex gap-2 flex-wrap">
+                  <button onClick={downloadAsistenciaPDF} disabled={asistPdfLoading || asistencia.length === 0}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-500 transition-all disabled:opacity-40 flex items-center gap-1.5">
+                    {asistPdfLoading ? <Icons.Loader className="w-3 h-3 animate-spin" /> : <Icons.FileText className="w-3 h-3" />} PDF
+                  </button>
+                  <span className="text-[8px] text-indigo-300 font-bold hidden sm:block">Drive: automático</span>
+                  <button onClick={() => setAsistModal(null)} className="w-9 h-9 flex items-center justify-center bg-white/10 rounded-xl hover:bg-red-500 transition-all">
+                    <Icons.X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Lista de asistencia */}
+              {asistencia.length > 0 ? (
+                <div className="space-y-2">
+                  {asistencia.map((row: any, i: number) => (
+                    <div key={row.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100">
+                      <span className="w-6 h-6 flex items-center justify-center bg-indigo-100 text-indigo-700 rounded-full text-[9px] font-black flex-shrink-0">{i + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-black text-slate-900">{row.nombre_completo}</p>
+                        <p className="text-[9px] text-slate-400 font-bold">CC {row.cedula}{row.cargo ? ` · ${row.cargo}` : ''}</p>
+                      </div>
+                      {row.firma_b64 && (
+                        <img src={row.firma_b64} alt="firma" className="h-8 w-16 object-contain border border-slate-200 rounded-lg bg-white" />
+                      )}
+                      <p className="text-[8px] text-slate-300 hidden sm:block">{new Date(row.fecha_registro).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' })}</p>
+                      <button onClick={() => deleteAsistRow(row.id)}
+                        className="p-1.5 hover:bg-rose-100 rounded-xl transition-all flex-shrink-0">
+                        <Icons.Trash className="w-3 h-3 text-rose-400" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-slate-300 font-black uppercase text-xs py-6">Sin registros aún</p>
+              )}
+
+              {/* Formulario nuevo asistente */}
+              <div className="border-2 border-dashed border-indigo-100 rounded-3xl p-5 space-y-4">
+                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Registrar asistente</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <input value={asistForm.nombre} onChange={e => setAsistForm(f => ({ ...f, nombre: e.target.value }))}
+                    placeholder="Nombre completo *"
+                    className="bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-900 text-xs outline-none focus:border-indigo-400 transition-all" />
+                  <input value={asistForm.cedula} onChange={e => setAsistForm(f => ({ ...f, cedula: e.target.value }))}
+                    placeholder="Cédula *"
+                    className="bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-900 text-xs outline-none focus:border-indigo-400 transition-all" />
+                  <input value={asistForm.cargo} onChange={e => setAsistForm(f => ({ ...f, cargo: e.target.value }))}
+                    placeholder="Cargo (opcional)"
+                    className="bg-slate-50 border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold text-slate-900 text-xs outline-none focus:border-indigo-400 transition-all" />
+                </div>
+
+                {/* Canvas firma */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Firma (opcional)</p>
+                    <button onClick={clearCanvas} type="button" className="text-[9px] font-black text-rose-400 uppercase hover:text-rose-600 transition-all">Limpiar</button>
+                  </div>
+                  <canvas
+                    ref={canvasRef}
+                    width={500} height={120}
+                    className="w-full h-24 bg-slate-50 border-2 border-slate-200 rounded-2xl cursor-crosshair touch-none"
+                    onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
+                    onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
+                  />
+                </div>
+
+                <button onClick={addAsistencia} disabled={asistSaving}
+                  className="w-full py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-indigo-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                  {asistSaving ? <><Icons.Loader className="w-4 h-4 animate-spin" /> Guardando...</> : <><Icons.Plus className="w-4 h-4" /> Registrar Asistencia</>}
+                </button>
+              </div>
             </div>
           </div>
         </div>

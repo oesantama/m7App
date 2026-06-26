@@ -1758,9 +1758,10 @@ export const api = {
   }),
   noticiasDelete: (id: number) => fetchJson(`${API_URL}/noticias/${id}`, { method: 'DELETE' }),
   noticiasDeleteArchivo: (id: number) => fetchJson(`${API_URL}/noticias/${id}/archivo`, { method: 'DELETE' }),
-  noticiasUpload: (file: File) => {
+  noticiasUpload: (file: File, titulo?: string) => {
     const fd = new FormData();
     fd.append('archivo', file);
+    if (titulo) fd.append('titulo', titulo);
     return fetchJson(`${API_URL}/noticias/upload`, { method: 'POST', body: fd });
   },
   noticiasGetFeed: () => fetchJson(`${API_URL}/noticias/feed`),

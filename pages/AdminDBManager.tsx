@@ -944,9 +944,9 @@ const AdminDBManager: React.FC = () => {
                           </div>
                       </div>
                       <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
-                          <h4 className="font-bold text-slate-800">Importación Transportando</h4>
-                          <p className="text-xs text-slate-500">Bot automático de web scraping para descargar informes desde el portal TMS de Transportando y cargarlos a la BD local.</p>
-                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Diariamente, 05:00 AM</p>
+                          <h4 className="font-bold text-slate-800">Importación Transportando (General)</h4>
+                          <p className="text-xs text-slate-500">Bot automático de web scraping para descargar informes generales de manifiestos desde el portal TMS de Transportando y cargarlos a la BD local.</p>
+                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Diariamente, 04:00 AM</p>
                           <div className="mt-auto pt-2">
                               <button 
                                   onClick={() => handleRunCron('transportandoScrape')}
@@ -954,6 +954,36 @@ const AdminDBManager: React.FC = () => {
                                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
                               >
                                   {runningCrons['transportandoScrape'] ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
+                              </button>
+                          </div>
+                      </div>
+
+                      <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
+                          <h4 className="font-bold text-slate-800">Importación Transportando (Recaudos)</h4>
+                          <p className="text-xs text-slate-500">Bot automático de web scraping para descargar informes consecutivos de recaudos e integrarlos automáticamente.</p>
+                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Diariamente, 04:15 AM</p>
+                          <div className="mt-auto pt-2">
+                              <button 
+                                  onClick={() => handleRunCron('transportandoRecaudosScrape')}
+                                  disabled={runningCrons['transportandoRecaudosScrape']}
+                                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
+                              >
+                                  {runningCrons['transportandoRecaudosScrape'] ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
+                              </button>
+                          </div>
+                      </div>
+
+                      <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
+                          <h4 className="font-bold text-slate-800">Importación Transportando (Egresos)</h4>
+                          <p className="text-xs text-slate-500">Bot automático de web scraping para descargar informes consecutivos de egresos e integrarlos automáticamente.</p>
+                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Diariamente, 04:30 AM</p>
+                          <div className="mt-auto pt-2">
+                              <button 
+                                  onClick={() => handleRunCron('transportandoEgresosScrape')}
+                                  disabled={runningCrons['transportandoEgresosScrape']}
+                                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
+                              >
+                                  {runningCrons['transportandoEgresosScrape'] ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
                               </button>
                           </div>
                       </div>
