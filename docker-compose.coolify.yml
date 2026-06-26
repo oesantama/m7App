@@ -11,6 +11,7 @@ services:
       - evolution_store:/evolution/store
     environment:
       - SERVER_URL=https://evolution.m7apps.com
+      - SERVER_TYPE=http
       - AUTHENTICATION_TYPE=apikey
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
       # Base de datos — base "evolution" en el mismo postgres con credenciales por defecto de Evolution.
