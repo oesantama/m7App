@@ -96,6 +96,8 @@ export const scrapeTransportandoReports = async (
         }
         log(`Navegando al módulo de informes: ${reportUrl}...`);
         await page.goto(reportUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+        // Esperar a que la SPA (Vue) se monte e inicialice completamente
+        await new Promise(r => setTimeout(r, 4000));
 
         // 3. CALCULAR LOS MESES A CONSULTAR (Desde Enero hasta el mes actual)
         const currentDate = new Date();
@@ -266,40 +268,26 @@ export const scrapeTransportandoReports = async (
                     el2.dispatchEvent(new Event('input', { bubbles: true }));
                     el2.dispatchEvent(new Event('change', { bubbles: true }));
                 }, inputs[0], inputs[1]);
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 800));
 
                 log(`Haciendo clic en la fecha de inicio y escribiendo: ${startFormatted}...`);
                 await inputs[0].focus();
                 await inputs[0].click();
-                await new Promise(r => setTimeout(r, 600));
-                await page.keyboard.type(startFormatted, { delay: 50 });
-                await new Promise(r => setTimeout(r, 500));
-                
-                log(`Cambiando al campo de fecha fin y escribiendo: ${endFormatted}...`);
-                await inputs[1].focus();
-                await inputs[1].click();
-                await new Promise(r => setTimeout(r, 600));
-                await page.keyboard.type(endFormatted, { delay: 50 });
-                await new Promise(r => setTimeout(r, 500));
-                
-                log(`Confirmando fechas en el calendario...`);
-                await page.keyboard.press('Enter');
                 await new Promise(r => setTimeout(r, 800));
-
-                // Fallback directo por DOM para garantizar que los modelos reactivos de Vue reciban el valor
-                await page.evaluate((sVal, eVal) => {
-                    const rangeInputs = Array.from(document.querySelectorAll('input.el-range-input')) as HTMLInputElement[];
-                    if (rangeInputs.length >= 2) {
-                        rangeInputs[0].value = sVal;
-                        rangeInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
-                        rangeInputs[0].dispatchEvent(new Event('change', { bubbles: true }));
-                        
-                        rangeInputs[1].value = eVal;
-                        rangeInputs[1].dispatchEvent(new Event('input', { bubbles: true }));
-                        rangeInputs[1].dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                }, startFormatted, endFormatted);
-                await new Promise(r => setTimeout(r, 500));
+                await page.keyboard.type(startFormatted, { delay: 50 });
+                await new Promise(r => setTimeout(r, 800));
+                
+                log(`Presionando Tab para cambiar al campo de fecha fin...`);
+                await page.keyboard.press('Tab');
+                await new Promise(r => setTimeout(r, 800));
+                
+                log(`Escribiendo fecha fin: ${endFormatted}...`);
+                await page.keyboard.type(endFormatted, { delay: 50 });
+                await new Promise(r => setTimeout(r, 800));
+                
+                log(`Confirmando rango de fechas con Enter...`);
+                await page.keyboard.press('Enter');
+                await new Promise(r => setTimeout(r, 1000));
             }
 
             // Esperar a que el calendario y cualquier dropdown se cierre, enviando Escape por seguridad
@@ -336,80 +324,97 @@ export const scrapeTransportandoReports = async (
             if (targetButtonHandle) {
                 await targetButtonHandle.scrollIntoView();
                 await new Promise(r => setTimeout(r, 500));
-                await targetButtonHandle.click();
+                await page.evaluate(el => (el as HTMLElement).click(), targetButtonHandle);
                 log(`Se hizo clic exitosamente en el botón "Obtener informe".`);
             } else {
                 log(`ERROR: No se encontró el botón "Obtener informe" en la página.`);
             }
 
-            log(`Esperando a que la tabla de resultados cargue...`);
-            
-            // Esperar hasta 40 segundos a que aparezca el botón de Excel o el texto de "no hay datos"
-            let excelButtonFound = false;
-            let noDataFound = false;
-            for (let i = 0; i < 40; i++) {
-                await new Promise(r => setTimeout(r, 1000));
-                
-                // 1. Verificar si apareció el botón de Excel
-                excelButtonFound = await page.evaluate(() => {
-                    const btns = Array.from(document.querySelectorAll('button, a'));
-                    return btns.some(b => {
-                        const txt = b.textContent?.toLowerCase() || '';
-                        return txt.includes('descargar excel') || txt.includes('exportar excel');
-                    });
-                });
-                if (excelButtonFound) break;
-
-                // 2. Verificar si apareció un texto de "no hay datos"
-                noDataFound = await page.evaluate(() => {
-                    const pageText = document.body.textContent?.toLowerCase() || '';
-                    return pageText.includes('no hay datos') || 
-                           pageText.includes('sin datos') || 
-                           pageText.includes('no se encontraron') || 
-                           pageText.includes('no data');
-                });
-                if (noDataFound) {
-                    log(`Información: No se encontraron datos para el periodo ${start} al ${end} (indicado por la plataforma).`);
-                    break;
-                }
-            }
-
-            if (noDataFound) {
-                continue; // Saltar al siguiente mes
-            }
-
-            if (!excelButtonFound) {
-                log(`ADVERTENCIA: El botón de descarga de Excel no apareció después de 40 segundos para el periodo ${start} al ${end}. La consulta pudo no retornar datos o falló.`);
-                continue; // Saltar al siguiente mes
-            }
-
-            log(`Intentando descargar el archivo Excel del informe para el periodo ${start} al ${end}...`);
-            const excelButtons = await page.$$('button, a');
-            let excelButtonHandle: any = null;
-            for (const btn of excelButtons) {
-                const text = await page.evaluate(el => el.textContent, btn);
-                if (text && (text.toLowerCase().includes('descargar excel') || text.toLowerCase().includes('exportar excel'))) {
-                    excelButtonHandle = btn;
-                    break;
-                }
-            }
-
-            if (excelButtonHandle) {
-                await excelButtonHandle.scrollIntoView();
-                await new Promise(r => setTimeout(r, 500));
-                await excelButtonHandle.click();
-                log(`Se hizo clic exitosamente en el botón de descarga de Excel.`);
-            } else {
-                log(`ERROR: No se pudo hacer clic en el botón de descarga de Excel.`);
-            }
-
-            // Esperar archivo descargado
             let downloadedFilePath: string | null = null;
-            try {
-                log(`Esperando a que finalice la descarga del archivo...`);
-                downloadedFilePath = await waitForDownload(downloadPath, 45000);
-                log(`Descarga finalizada. Archivo temporal guardado en: ${downloadedFilePath}`);
 
+            if (reportType === 'manifiestos') {
+                log(`Esperando a que la tabla de resultados cargue...`);
+                
+                // Esperar hasta 40 segundos a que aparezca el botón de Excel o el texto de "no hay datos"
+                let excelButtonFound = false;
+                let noDataFound = false;
+                for (let i = 0; i < 40; i++) {
+                    await new Promise(r => setTimeout(r, 1000));
+                    
+                    // 1. Verificar si apareció el botón de Excel
+                    excelButtonFound = await page.evaluate(() => {
+                        const btns = Array.from(document.querySelectorAll('button, a'));
+                        return btns.some(b => {
+                            const txt = b.textContent?.toLowerCase() || '';
+                            return txt.includes('descargar excel') || txt.includes('exportar excel');
+                        });
+                    });
+                    if (excelButtonFound) break;
+
+                    // 2. Verificar si apareció un texto de "no hay datos"
+                    noDataFound = await page.evaluate(() => {
+                        const pageText = document.body.textContent?.toLowerCase() || '';
+                        return pageText.includes('no hay datos') || 
+                               pageText.includes('sin datos') || 
+                               pageText.includes('no se encontraron') || 
+                               pageText.includes('no data');
+                    });
+                    if (noDataFound) {
+                        log(`Información: No se encontraron datos para el periodo ${start} al ${end} (indicado por la plataforma).`);
+                        break;
+                    }
+                }
+
+                if (noDataFound) {
+                    continue; // Saltar al siguiente mes
+                }
+
+                if (!excelButtonFound) {
+                    log(`ADVERTENCIA: El botón de descarga de Excel no apareció después de 40 segundos para el periodo ${start} al ${end}. La consulta pudo no retornar datos o falló.`);
+                    continue; // Saltar al siguiente mes
+                }
+
+                log(`Intentando descargar el archivo Excel del informe para el periodo ${start} al ${end}...`);
+                const excelButtons = await page.$$('button, a');
+                let excelButtonHandle: any = null;
+                for (const btn of excelButtons) {
+                    const text = await page.evaluate(el => el.textContent, btn);
+                    if (text && (text.toLowerCase().includes('descargar excel') || text.toLowerCase().includes('exportar excel'))) {
+                        excelButtonHandle = btn;
+                        break;
+                    }
+                }
+
+                if (excelButtonHandle) {
+                    await excelButtonHandle.scrollIntoView();
+                    await new Promise(r => setTimeout(r, 500));
+                    await page.evaluate(el => (el as HTMLElement).click(), excelButtonHandle);
+                    log(`Se hizo clic exitosamente en el botón de descarga de Excel.`);
+                } else {
+                    log(`ERROR: No se pudo hacer clic en el botón de descarga de Excel.`);
+                }
+
+                try {
+                    log(`Esperando a que finalice la descarga del archivo...`);
+                    downloadedFilePath = await waitForDownload(downloadPath, 45000);
+                    log(`Descarga finalizada. Archivo temporal guardado en: ${downloadedFilePath}`);
+                } catch (err: any) {
+                    log(`ERROR: Falló la descarga del archivo Excel para el periodo ${start} al ${end}: ${err.message}`);
+                    continue;
+                }
+            } else {
+                // Para recaudos y egresos, el archivo se descarga inmediatamente al hacer clic en "Obtener informe"
+                try {
+                    log(`Esperando a que finalice la descarga del archivo (descarga directa en Obtener informe)...`);
+                    downloadedFilePath = await waitForDownload(downloadPath, 25000);
+                    log(`Descarga finalizada. Archivo temporal guardado en: ${downloadedFilePath}`);
+                } catch (err: any) {
+                    log(`Información: No se detectó ninguna descarga de archivo para el periodo ${start} al ${end} tras 25 segundos. Es posible que no existan datos o el servidor falló.`);
+                    continue; // Saltar al siguiente mes
+                }
+            }
+
+            try {
                 // LEER EL EXCEL RECIEN DESCARGADO
                 log(`Subiendo y parseando los datos a la BD local M7...`);
                 const buf = fs.readFileSync(downloadedFilePath);

@@ -54,7 +54,7 @@ async function executeWithCronLog(taskName: string, taskFunction: () => Promise<
         let details = 'Ejecución exitosa';
         if (Array.isArray(resultLogs) && resultLogs.length > 0) {
             details = resultLogs.join(' | ');
-            if (details.length > 1000) details = details.substring(0, 997) + '...';
+            if (details.length > 50000) details = details.substring(0, 49997) + '...';
         }
         
         if (cronLogId) {
@@ -365,8 +365,8 @@ export const initScheduler = () => {
     });
     console.log('[M7-SCHEDULER] Tarea "Facturación Pendiente Individual" programada: Lunes a Sábado 10:00 AM');
 
-    // Scraping e importación automática desde Transportando: Todos los días a las 4:00 AM
-    cron.schedule('0 4 * * *', async () => {
+    // Scraping e importación automática desde Transportando: Todos los días a las 3:00 AM
+    cron.schedule('0 3 * * *', async () => {
         console.log('[M7-SCHEDULER] Ejecutando cron de Importación de Manifiestos desde Transportando (General)...');
         await executeWithCronLog('Importacion_Transportando', async () => {
             const logs = await scrapeTransportandoReports('manifiestos');
@@ -376,10 +376,10 @@ export const initScheduler = () => {
     }, {
         timezone: 'America/Bogota'
     });
-    console.log('[M7-SCHEDULER] Tarea "Importación Transportando (General)" programada: Diariamente 04:00 AM');
+    console.log('[M7-SCHEDULER] Tarea "Importación Transportando (General)" programada: Diariamente 03:00 AM');
 
-    // Scraping e importación automática desde Transportando (Recaudos): Todos los días a las 4:15 AM
-    cron.schedule('15 4 * * *', async () => {
+    // Scraping e importación automática desde Transportando (Recaudos): Todos los días a las 3:30 AM
+    cron.schedule('30 3 * * *', async () => {
         console.log('[M7-SCHEDULER] Ejecutando cron de Importación de Recaudos desde Transportando...');
         await executeWithCronLog('Importacion_Transportando_Recaudos', async () => {
             const logs = await scrapeTransportandoReports('recaudos');
@@ -389,10 +389,10 @@ export const initScheduler = () => {
     }, {
         timezone: 'America/Bogota'
     });
-    console.log('[M7-SCHEDULER] Tarea "Importación Transportando (Recaudos)" programada: Diariamente 04:15 AM');
+    console.log('[M7-SCHEDULER] Tarea "Importación Transportando (Recaudos)" programada: Diariamente 03:30 AM');
 
-    // Scraping e importación automática desde Transportando (Egresos): Todos los días a las 4:30 AM
-    cron.schedule('30 4 * * *', async () => {
+    // Scraping e importación automática desde Transportando (Egresos): Todos los días a las 4:00 AM
+    cron.schedule('0 4 * * *', async () => {
         console.log('[M7-SCHEDULER] Ejecutando cron de Importación de Egresos desde Transportando...');
         await executeWithCronLog('Importacion_Transportando_Egresos', async () => {
             const logs = await scrapeTransportandoReports('egresos');
@@ -402,7 +402,7 @@ export const initScheduler = () => {
     }, {
         timezone: 'America/Bogota'
     });
-    console.log('[M7-SCHEDULER] Tarea "Importación Transportando (Egresos)" programada: Diariamente 04:30 AM');
+    console.log('[M7-SCHEDULER] Tarea "Importación Transportando (Egresos)" programada: Diariamente 04:00 AM');
 
     // Validación de Novedades no subidas a Drive: Todos los días a las 11:00 AM
     cron.schedule('0 11 * * *', async () => {

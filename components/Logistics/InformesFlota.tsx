@@ -167,7 +167,7 @@ const truncateName = (str: string, maxLen: number = 18) => {
 };
 
 const InteractiveBarCard = ({
-  title, data, colors, rawRows, primaryGroup, secondaryGroup, dateRange, dualColumns, learnedDepts
+  title, data, colors, rawRows, primaryGroup, secondaryGroup, dateRange, dualColumns, learnedDepts, grandTotal
 }: {
   title: string;
   data: any[];
@@ -178,9 +178,11 @@ const InteractiveBarCard = ({
   dateRange: string;
   dualColumns?: boolean;
   learnedDepts?: Record<string, string>;
+  grandTotal?: number;
 }) => {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
   const total = data.reduce((s, d) => s + d.value, 0);
+  const baseTotal = grandTotal ?? total;
 
   const selected = activeIdx !== null ? data[activeIdx] : null;
 
@@ -247,7 +249,7 @@ const InteractiveBarCard = ({
               <Tooltip
                 cursor={{ fill: '#f1f5f9' }}
                 formatter={(v: any, name: string) => [
-                  `${v} viajes (${((v / total) * 100).toFixed(1)}%)`, 'Viajes'
+                  `${v} viajes (${((v / baseTotal) * 100).toFixed(1)}%)`, 'Viajes'
                 ]}
               />
               <Bar dataKey="value" onClick={(e, idx) => setActiveIdx(prev => prev === idx ? null : idx)} cursor="pointer">
@@ -256,7 +258,7 @@ const InteractiveBarCard = ({
                     opacity={activeIdx === null || activeIdx === i ? 1 : 0.45} />
                 ))}
                 <LabelList dataKey="value" position="top"
-                  formatter={(v: number) => `${v} (${total > 0 ? ((v / total) * 100).toFixed(1) : 0}%)`}
+                  formatter={(v: number) => `${v} (${baseTotal > 0 ? ((v / baseTotal) * 100).toFixed(1) : 0}%)`}
                   style={{ fontSize: 9, fontWeight: 'bold', fill: '#475569' }} />
               </Bar>
             </BarChart>
@@ -302,7 +304,7 @@ const InteractiveBarCard = ({
               <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-slate-100 flex flex-col justify-center">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">% del Total</p>
                 <p className="text-xl font-black text-slate-700">
-                  {selected ? ((selected.value / total) * 100).toFixed(1) : '100.0'}%
+                  {selected ? ((selected.value / baseTotal) * 100).toFixed(1) : ((total / baseTotal) * 100).toFixed(1)}%
                 </p>
               </div>
               <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-slate-100 flex flex-col justify-center">
@@ -314,10 +316,9 @@ const InteractiveBarCard = ({
             </div>
 
             {detailBreakdown.length > 0 && (() => {
-              const base = selected ? selected.value : total;
               const tableData = detailBreakdown.map((row: any) => ({
                 ...row,
-                pct: parseFloat(((row.qty / base) * 100).toFixed(1)),
+                pct: parseFloat(((row.qty / baseTotal) * 100).toFixed(1)),
               }));
               const colLabel = selected ? secondaryLabel : primaryLabel;
               const columns = dualColumns
@@ -514,12 +515,12 @@ export default function InformesFlota({ user: _user }: Props) {
             Haz clic en una tajada para ver detalle del cliente
           </p>
 
-          <InteractiveBarCard title="🏢 Flota M7 — Por Cliente" data={m7Data} colors={COLORS} rawRows={m7Rows} primaryGroup="client" secondaryGroup="department" dateRange={`${from} a ${to}`} learnedDepts={learnedDepts} />
-          <InteractiveBarCard title="⭐ Flota TDM — Por Cliente" data={tdmData} colors={TDM_COLORS} rawRows={tdmRows} primaryGroup="client" secondaryGroup="department" dateRange={`${from} a ${to}`} learnedDepts={learnedDepts} />
-          
+          <InteractiveBarCard title="🏢 Flota M7 — Por Cliente" data={m7Data} colors={COLORS} rawRows={m7Rows} primaryGroup="client" secondaryGroup="department" dateRange={`${from} a ${to}`} learnedDepts={learnedDepts} grandTotal={totalViajes} />
+          <InteractiveBarCard title="⭐ Flota TDM — Por Cliente" data={tdmData} colors={TDM_COLORS} rawRows={tdmRows} primaryGroup="client" secondaryGroup="department" dateRange={`${from} a ${to}`} learnedDepts={learnedDepts} grandTotal={totalViajes} />
+
           <div className="grid grid-cols-1 gap-6">
-            <InteractiveBarCard title="🏙️ Flota M7 — Por Departamento" data={m7DeptData} colors={CITY_COLORS} rawRows={m7Rows} primaryGroup="department" secondaryGroup="client" dateRange={`${from} a ${to}`} dualColumns learnedDepts={learnedDepts} />
-            <InteractiveBarCard title="🗺️ Flota TDM — Por Departamento" data={tdmDeptData} colors={TDM_COLORS.slice().reverse()} rawRows={tdmRows} primaryGroup="department" secondaryGroup="client" dateRange={`${from} a ${to}`} dualColumns learnedDepts={learnedDepts} />
+            <InteractiveBarCard title="🏙️ Flota M7 — Por Departamento" data={m7DeptData} colors={CITY_COLORS} rawRows={m7Rows} primaryGroup="department" secondaryGroup="client" dateRange={`${from} a ${to}`} dualColumns learnedDepts={learnedDepts} grandTotal={totalViajes} />
+            <InteractiveBarCard title="🗺️ Flota TDM — Por Departamento" data={tdmDeptData} colors={TDM_COLORS.slice().reverse()} rawRows={tdmRows} primaryGroup="department" secondaryGroup="client" dateRange={`${from} a ${to}`} dualColumns learnedDepts={learnedDepts} grandTotal={totalViajes} />
           </div>
 
           {/* Gráfica comparativa */}

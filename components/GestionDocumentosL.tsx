@@ -1114,7 +1114,12 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                                   <p><span className="text-slate-900">ESTADO:</span> {getStatusLabel(doc.status || '')}</p>
                                   {(doc.status === DocStatus.PENDING || doc.status === 'PENDIENTE' || doc.status === 'Pendiente') && (
                                      <button 
-                                       onClick={(e) => { e.stopPropagation(); setDocToChangeStatus(doc); setSelectedStatus(doc.status || ''); }}
+                                       onClick={(e) => { 
+                                         e.stopPropagation(); 
+                                         setDocToChangeStatus(doc); 
+                                         setSelectedStatus(doc.status || ''); 
+
+                                       }}
                                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-white text-blue-500 border border-slate-200 hover:bg-blue-50 hover:border-blue-200 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all shadow-sm opacity-0 group-hover/status:opacity-100"
                                      >
                                         <Icons.RefreshCw className="w-2.5 h-2.5" /> ESTADO
@@ -1375,7 +1380,6 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                 ))}
               </select>
             </div>
-
             <div className="flex flex-col gap-4">
               <button
                 onClick={handleUpdateStatus}

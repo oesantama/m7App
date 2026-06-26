@@ -48,7 +48,25 @@ const parseNum = (val: any) => {
 
 const cleanStr = (val: any) => {
   if (val === null || val === undefined) return '';
-  return String(val).trim();
+  let str = String(val).trim();
+  if (str.endsWith('.0')) {
+    const raw = str.slice(0, -2);
+    if (!isNaN(Number(raw))) {
+      str = raw;
+    }
+  }
+  return str;
+};
+
+const getExcelVal = (row: any, keys: string[]): any => {
+  if (!row) return undefined;
+  for (const k of Object.keys(row)) {
+    const cleanK = k.trim().toLowerCase();
+    if (keys.some(tk => tk.toLowerCase() === cleanK)) {
+      return row[k];
+    }
+  }
+  return undefined;
 };
 
 /**
@@ -356,8 +374,8 @@ export const uploadReceiptDates = async (req: Request, res: Response) => {
 
     let updatedCount = 0;
     for (const row of records) {
-      const receiptNum = cleanStr(row.consecutive || row['Consecutivo']);
-      const receiptDate = parseDate(row.date || row['Fecha']);
+      const receiptNum = cleanStr(getExcelVal(row, ['consecutive', 'consecutivo', 'recibo', 'numero', 'nro']));
+      const receiptDate = parseDate(getExcelVal(row, ['date', 'fecha', 'fecha recibo', 'fecha_recibo']));
 
       if (!receiptNum || !receiptDate) continue;
 
@@ -397,8 +415,8 @@ export const uploadEgressDates = async (req: Request, res: Response) => {
 
     let updatedCount = 0;
     for (const row of records) {
-      const egressNum = cleanStr(row.consecutive || row['Consecutivo']);
-      const egressDate = parseDate(row.date || row['Fecha']);
+      const egressNum = cleanStr(getExcelVal(row, ['consecutive', 'consecutivo', 'egreso', 'numero', 'nro']));
+      const egressDate = parseDate(getExcelVal(row, ['date', 'fecha', 'fecha egreso', 'fecha_egreso']));
 
       if (!egressNum || !egressDate) continue;
 

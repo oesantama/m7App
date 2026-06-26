@@ -35,19 +35,21 @@ const ProcessPaymentLModal: React.FC<ProcessPaymentLModalProps> = ({ document, o
           return;
         }
 
-        // Validaciones C4 (Doc L) y C6 (Placa)
-        // XLSX utils: C4 is index [3][2], C6 is index [5][2] (0-indexed)
-        const excelDocL = String(rawData[3]?.[2] || '').trim();
-        const excelPlate = String(rawData[5]?.[2] || '').trim();
+        const excelDocL = String(rawData[3]?.[2] || '').trim().toUpperCase();
+        const excelPlate = String(rawData[5]?.[2] || '').trim().toUpperCase();
 
-        if (excelDocL !== document.externalDocId) {
-          toast.error(`Conflicto de Documento: El Excel dice ${excelDocL} pero el seleccionado es ${document.externalDocId}`);
+        const cleanTargetDocL = String(document.externalDocId || '').trim().toUpperCase();
+        const cleanTargetPlate = String(document.vehicleData || '').trim().toUpperCase();
+        const cleanTargetPlate2 = String((document as any).vehicle_plate || '').trim().toUpperCase();
+
+        if (excelDocL !== cleanTargetDocL) {
+          toast.error(`Conflicto de Documento: El Excel dice "${excelDocL}" pero el seleccionado es "${cleanTargetDocL}"`);
           setLoading(false);
           return;
         }
 
-        if (excelPlate !== document.vehicleData && (document as any).vehicle_plate !== excelPlate) {
-          toast.error(`Conflicto de Placa: El Excel dice ${excelPlate} pero el documento tiene ${document.vehicleData}`);
+        if (excelPlate !== cleanTargetPlate && excelPlate !== cleanTargetPlate2) {
+          toast.error(`Conflicto de Placa: El Excel dice "${excelPlate}" pero el documento tiene "${cleanTargetPlate}"`);
           setLoading(false);
           return;
         }

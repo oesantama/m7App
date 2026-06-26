@@ -86,6 +86,11 @@ const CHART_COLORS = [
   '#f43f5e', // Rose
 ];
 
+// Intermediación real: si rawPct >= 20 → divide en 2; si < 20 → resta 10 (mínimo 0)
+function calcIntReal(rawPct: number): number {
+  return rawPct >= 20 ? rawPct / 2 : Math.max(0, rawPct - 10);
+}
+
 export const InformesGerenciales: React.FC = () => {
   // Tabs state: 'informes' | 'consultas' | 'cargar'
   const [activeTab, setActiveTab] = useState<'informes' | 'consultas' | 'cargar'>('informes');
@@ -1414,7 +1419,7 @@ export const InformesGerenciales: React.FC = () => {
       const ventaTotal = node.ventaTotal;
       const ingTerceros = node.ingTerceros;
       const ingresosPropios = ventaTotal - ingTerceros;
-      const int = ventaTotal > 0 ? (ingresosPropios / ventaTotal) * 100 : 0;
+      const int = calcIntReal(ventaTotal > 0 ? (ingresosPropios / ventaTotal) * 100 : 0);
       const vehiculosCount = node.vehicles.size;
       const workedDaysCount = node.workedDates.size;
       const totalVehicleUtilizations = node.vehicleDays.size;
@@ -1655,7 +1660,7 @@ export const InformesGerenciales: React.FC = () => {
       const ventaTotal = node.ventaTotal;
       const ingTerceros = node.ingTerceros;
       const ingresosPropios = ventaTotal - ingTerceros;
-      const int = ventaTotal > 0 ? (ingresosPropios / ventaTotal) * 100 : 0;
+      const int = calcIntReal(ventaTotal > 0 ? (ingresosPropios / ventaTotal) * 100 : 0);
       const vehiculosCount = node.vehicles.size;
       const workedDaysCount = node.workedDates.size;
       const totalVehicleUtilizations = node.vehicleDays.size;
@@ -1828,7 +1833,7 @@ export const InformesGerenciales: React.FC = () => {
       platesMap[mapKey].ingTerceros += pagar;
       platesMap[mapKey].manifestCount += 1;
       const ip = cobrar - pagar;
-      const intVal = cobrar > 0 ? (ip / cobrar) * 100 : 0;
+      const intVal = calcIntReal(cobrar > 0 ? (ip / cobrar) * 100 : 0);
       platesMap[mapKey].manifests.push({
         manifest_number: String(r.manifiesto || 'S/I'),
         manifest_date: String(r.fecha_operacion || 'S/I').slice(0, 10),
@@ -2032,7 +2037,7 @@ export const InformesGerenciales: React.FC = () => {
       const totalVenta = tdmTableData.reduce((sum, item) => sum + item.ventaTotal, 0);
       const totalIngTerceros = tdmTableData.reduce((sum, item) => sum + item.ingTerceros, 0);
       const totalIngresosPropios = tdmTableData.reduce((sum, item) => sum + item.ingresosPropios, 0);
-      const overallInt = totalVenta > 0 ? (totalIngresosPropios / totalVenta) * 100 : 0;
+      const overallInt = calcIntReal(totalVenta > 0 ? (totalIngresosPropios / totalVenta) * 100 : 0);
       
       const totalInvoicedSameMonth = tdmTableData.reduce((sum, item) => sum + item.invoicedSameMonthVal, 0);
       const overallInvoicedSameMonthPct = totalVenta > 0 ? (totalInvoicedSameMonth / totalVenta) * 100 : 0;
@@ -2288,7 +2293,7 @@ export const InformesGerenciales: React.FC = () => {
       const totalVenta = tdmTableData.reduce((sum, item) => sum + item.ventaTotal, 0);
       const totalIngTerceros = tdmTableData.reduce((sum, item) => sum + item.ingTerceros, 0);
       const totalIngresosPropios = tdmTableData.reduce((sum, item) => sum + item.ingresosPropios, 0);
-      const overallInt = totalVenta > 0 ? (totalIngresosPropios / totalVenta) * 100 : 0;
+      const overallInt = calcIntReal(totalVenta > 0 ? (totalIngresosPropios / totalVenta) * 100 : 0);
       
       const totalInvoicedSameMonth = tdmTableData.reduce((sum, item) => sum + item.invoicedSameMonthVal, 0);
       const overallInvoicedSameMonthPct = totalVenta > 0 ? (totalInvoicedSameMonth / totalVenta) * 100 : 0;
@@ -2464,7 +2469,7 @@ export const InformesGerenciales: React.FC = () => {
       const totalVentas = vehiclesData.reduce((sum, item) => sum + item.ventaTotal, 0);
       const totalIngTerceros = vehiclesData.reduce((sum, item) => sum + item.ingTerceros, 0);
       const totalIngresosPropios = totalVentas - totalIngTerceros;
-      const overallInt = totalVentas > 0 ? (totalIngresosPropios / totalVentas) : 0;
+      const overallInt = calcIntReal(totalVentas > 0 ? (totalIngresosPropios / totalVentas) * 100 : 0) / 100;
       const totalManifests = vehiclesData.reduce((sum, item) => sum + item.manifestCount, 0);
 
       const totalRow: any = {
@@ -4822,7 +4827,7 @@ export const InformesGerenciales: React.FC = () => {
                       const totalVentas = sortedData.reduce((sum: number, item: any) => sum + item.ventaTotal, 0);
                       const totalIngTerceros = sortedData.reduce((sum: number, item: any) => sum + item.ingTerceros, 0);
                       const totalIngresosPropios = totalVentas - totalIngTerceros;
-                      const overallInt = totalVentas > 0 ? (totalIngresosPropios / totalVentas) : 0;
+                      const overallInt = calcIntReal(totalVentas > 0 ? (totalIngresosPropios / totalVentas) * 100 : 0) / 100;
                       const totalManifests = sortedData.reduce((sum: number, item: any) => sum + item.manifestCount, 0);
 
                       const totalRow: any = {

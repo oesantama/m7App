@@ -297,7 +297,7 @@ export const api = {
     fetchJson(`${API_URL}/dispatch/route-active-plates${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ''}`),
   getRoutePlateInvoices: (plate: string, clientId?: string) =>
     fetchJson(`${API_URL}/dispatch/route-plate-invoices/${encodeURIComponent(plate)}${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ''}`),
-  registerRouteReturn: (data: { invoiceId: string; vehiclePlate: string; returnType: 'COMPLETA' | 'PARCIAL'; returnReason?: string; notes?: string; items?: any[]; createdBy?: string }) =>
+  registerRouteReturn: (data: { invoiceId: string; vehiclePlate?: string; returnType: 'COMPLETA' | 'PARCIAL'; returnReason?: string; notes?: string; items?: any[]; createdBy?: string; vendedor?: string; numeroPlanilla?: string; fechaPlaca?: string }) =>
     fetchJson(`${API_URL}/dispatch/register-route-return`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

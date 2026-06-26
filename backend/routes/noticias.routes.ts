@@ -33,4 +33,8 @@ router.get('/public/feed',       n.getNoticiasPublicas);
 router.get('/public/:id',        n.getNoticiaPublicaById);
 router.get('/public/:id/stream', n.streamArchivoNoticia);
 
+// Asistencia pública (sin JWT) — para links externos sin sesión activa
+router.get('/public/:id/asistencia/check', n.checkNoticiaAsistencia);
+router.post('/public/:id/asistencia',      n.registerNoticiaAsistencia);
+
 export default router;

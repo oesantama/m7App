@@ -75,7 +75,7 @@ async function queryFlota(from: string, to: string): Promise<FlotaRow[]> {
   const result = await pool.query(
     `WITH manifests AS (
         SELECT TRIM(client_name) AS client_name, 1 AS quantity,
-               CASE WHEN UPPER(TRIM(client_name)) LIKE '%TDM%' THEN 'TDM' ELSE 'M7' END AS operator,
+               'M7' AS operator,
                COALESCE(UPPER(TRIM(city)), 'SIN CIUDAD') AS city
         FROM management_orders
         WHERE manifest_date::date BETWEEN $1 AND $2
@@ -147,13 +147,11 @@ function hBars(items: [string, number][], total: number, color: string, maxLabel
 }
 
 function buildHtml(rows: FlotaRow[], tdm: TdmSummary, m7sum: M7Summary, fecha: string, logoSrc: string): string {
-  // Agregados
   const m7Rows  = rows.filter(r => r.operator === 'M7');
   const tdmRows = rows.filter(r => r.operator === 'TDM');
   const totalM7  = m7Rows.reduce((s, r) => s + r.quantity, 0);
   const totalTDM = tdmRows.reduce((s, r) => s + r.quantity, 0);
   const total    = totalM7 + totalTDM;
-  const uniqueClients = new Set(rows.map(r => r.client_name)).size;
 
   // M7 por cliente
   const m7Client = new Map<string, number>();
@@ -175,31 +173,23 @@ function buildHtml(rows: FlotaRow[], tdm: TdmSummary, m7sum: M7Summary, fecha: s
   tdmRows.forEach(r => { const d = getDept(r.city); tdmDept.set(d, (tdmDept.get(d) || 0) + r.quantity); });
   const tdmDeptList = [...tdmDept.entries()].sort((a, b) => b[1] - a[1]);
 
-  // Tabla completa: todos los clientes
-  const allClients = new Map<string, { q: number; op: string; depts: Map<string, number> }>();
-  rows.forEach(r => {
-    const cur = allClients.get(r.client_name);
-    const dept = getDept(r.city);
-    if (!cur) {
-      const dm = new Map<string, number>(); dm.set(dept, r.quantity);
-      allClients.set(r.client_name, { q: r.quantity, op: r.operator, depts: dm });
-    } else {
-      cur.q += r.quantity;
-      cur.depts.set(dept, (cur.depts.get(dept) || 0) + r.quantity);
-    }
-  });
-  const allClientList = [...allClients.entries()].sort((a, b) => b[1].q - a[1].q);
+  const uniqueClients = new Set(rows.map(r => r.client_name)).size;
 
-  const tableRows = allClientList.map(([name, { q, op, depts }], i) => {
-    const topDept = [...depts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
-    return `<tr class="${i % 2 === 0 ? 'even' : ''}">
-      <td>${name.slice(0, 40)}</td>
-      <td class="op-${op.toLowerCase()}">${op}</td>
-      <td class="num">${q}</td>
-      <td class="num pctc">${pct(q, total)}</td>
-      <td>${topDept}</td>
-    </tr>`;
-  }).join('');
+  // Intermediaciones como porcentaje de margen: (cobrar - pagar) / cobrar × 100
+  const m7IntPct       = m7sum.total_cobrar > 0 ? (m7sum.total_cobrar - m7sum.total_pagar) / m7sum.total_cobrar * 100 : 0;
+  const tdmIntTotalPct = tdm.total_cobrar   > 0 ? (tdm.total_cobrar   - tdm.total_pagar)   / tdm.total_cobrar   * 100 : 0;
+  // TDM Real: si Total >= 20 → Total/2; si Total < 20 → Total - 10
+  const tdmIntRealPct = tdmIntTotalPct >= 20
+    ? tdmIntTotalPct / 2
+    : Math.max(0, tdmIntTotalPct - 10);
+  const fmtPct = (n: number) => `${n.toFixed(1)}%`;
+
+  // Barras comparativas (altura proporcional, mín 4px)
+  const totalCli = m7ClientList.length + tdmClientList.length || 1;
+  const m7CliH  = Math.round((m7ClientList.length / Math.max(m7ClientList.length, tdmClientList.length, 1)) * 60);
+  const tdmCliH = Math.max(Math.round((tdmClientList.length / Math.max(m7ClientList.length, tdmClientList.length, 1)) * 60), 4);
+  const m7ViaH  = Math.round((totalM7 / Math.max(totalM7, totalTDM, 1)) * 60);
+  const tdmViaH = Math.max(Math.round((totalTDM / Math.max(totalM7, totalTDM, 1)) * 60), 4);
 
   const HEADER = `
   <div class="hdr">
@@ -213,248 +203,156 @@ function buildHtml(rows: FlotaRow[], tdm: TdmSummary, m7sum: M7Summary, fecha: s
     <div style="background:rgba(255,255,255,.12);padding:5px 14px;border-radius:18px;font-size:9.5px;font-weight:700;color:#7fdbff">MILLA SIE7E</div>
   </div>`;
 
-  const fmtK = (n: number) => n >= 1_000_000 ? `$${(n/1_000_000).toFixed(1)}M` : n >= 1_000 ? `$${(n/1_000).toFixed(0)}K` : `$${fmt(n)}`;
+  // Fila 1: viajes y clientes | Fila 2: intermediaciones
   const KPIS = `
-  <div class="kpis">
-    <div class="kpi" style="background:linear-gradient(135deg,#4f46e5,#6366f1)"><div class="kv">${fmt(total)}</div><div class="kt">Total Viajes</div></div>
-    <div class="kpi" style="background:linear-gradient(135deg,#059669,#10b981)"><div class="kv">${fmt(totalM7)}</div><div class="kt">Viajes M7</div></div>
-    <div class="kpi" style="background:linear-gradient(135deg,#d97706,#f59e0b)"><div class="kv">${fmt(totalTDM)}</div><div class="kt">Viajes TDM</div></div>
-    <div class="kpi" style="background:linear-gradient(135deg,#0891b2,#06b6d4)"><div class="kv">${uniqueClients}</div><div class="kt">Clientes</div></div>
-    ${m7sum.total_cobrar > 0 ? `
-    <div class="kpi" style="background:linear-gradient(135deg,#065f46,#059669)"><div class="kv">${fmtK(m7sum.total_cobrar)}</div><div class="kt">M7 Cobrar</div></div>
-    <div class="kpi" style="background:linear-gradient(135deg,#1e3a8a,#2563eb)"><div class="kv">${fmtK(m7sum.total_pagar)}</div><div class="kt">M7 Pagar</div></div>` : ''}
-    ${tdm.total_manifiestos > 0 ? `
-    <div class="kpi" style="background:linear-gradient(135deg,#92400e,#b45309)"><div class="kv">${fmtK(tdm.total_cobrar)}</div><div class="kt">TDM Cobrar</div></div>
-    <div class="kpi" style="background:linear-gradient(135deg,#9f1239,#e11d48)"><div class="kv">${fmtK(tdm.total_pagar)}</div><div class="kt">TDM Pagar</div></div>` : ''}
+  <div style="background:var(--bg);padding:5px 20px 0">
+    <div style="display:flex;gap:4px;margin-bottom:4px">
+      <div class="kpi" style="background:linear-gradient(135deg,#4f46e5,#6366f1)"><div class="kv">${fmt(total)}</div><div class="kt">Total Viajes</div></div>
+      <div class="kpi" style="background:linear-gradient(135deg,#059669,#10b981)"><div class="kv">${fmt(totalM7)}</div><div class="kt">Viajes M7</div></div>
+      <div class="kpi" style="background:linear-gradient(135deg,#d97706,#f59e0b)"><div class="kv">${fmt(totalTDM)}</div><div class="kt">Viajes TDM</div></div>
+      <div class="kpi" style="background:linear-gradient(135deg,#0f766e,#14b8a6)"><div class="kv">${uniqueClients}</div><div class="kt">Total Clientes</div></div>
+      <div class="kpi" style="background:linear-gradient(135deg,#0891b2,#06b6d4)"><div class="kv">${m7ClientList.length}</div><div class="kt">M7 Clientes</div></div>
+      <div class="kpi" style="background:linear-gradient(135deg,#92400e,#b45309)"><div class="kv">${tdmClientList.length}</div><div class="kt">TDM Clientes</div></div>
+    </div>
+    <div style="display:flex;gap:4px;padding-bottom:5px">
+      <div class="kpi" style="background:linear-gradient(135deg,#065f46,#059669)"><div class="kv">${fmtPct(m7IntPct)}</div><div class="kt">M7 Intermediación</div></div>
+      <div class="kpi" style="background:linear-gradient(135deg,#6d28d9,#7c3aed)"><div class="kv">${fmtPct(tdmIntTotalPct)}</div><div class="kt">TDM Intermed. Total</div></div>
+      <div class="kpi" style="background:linear-gradient(135deg,#9f1239,#e11d48)"><div class="kv">${fmtPct(tdmIntRealPct)}</div><div class="kt">TDM Intermed. Real</div></div>
+    </div>
   </div>`;
 
-  // Tabla M7 por cliente (página 1)
-  const m7ClientTableRows = m7ClientList.map(([name, q], i) => `
-    <tr class="${i % 2 === 0 ? 'even' : ''}">
-      <td>${name.slice(0, 40)}</td>
-      <td class="num">${q}</td>
-      <td class="num pctc">${pct(q, totalM7)}</td>
-    </tr>`).join('');
+  // Gráfica comparativa M7 vs TDM
+  const COMPARATIVO = `
+  <div style="padding:4px 20px 3px;background:var(--bg)">
+    <div class="sec">📊 Comparativo M7 vs TDM</div>
+    <div style="display:flex;gap:20px;align-items:flex-start;margin-top:4px">
+      <!-- Clientes -->
+      <div style="flex:1;text-align:center">
+        <div style="font-size:7px;font-weight:700;color:var(--acc2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px">Clientes</div>
+        <div style="display:flex;align-items:flex-end;justify-content:center;gap:18px;height:72px;border-bottom:1.5px solid #99cccc">
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;height:100%">
+            <span style="font-size:9px;font-weight:900;color:var(--m7c)">${m7ClientList.length}</span>
+            <span style="font-size:6.5px;font-weight:700;color:var(--acc2)">${pct(m7ClientList.length, totalCli)}</span>
+            <div style="width:38px;height:${m7CliH}px;background:linear-gradient(180deg,var(--acc3),var(--acc2));border-radius:4px 4px 0 0"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;height:100%">
+            <span style="font-size:9px;font-weight:900;color:var(--tdmc)">${tdmClientList.length}</span>
+            <span style="font-size:6.5px;font-weight:700;color:#b36000">${pct(tdmClientList.length, totalCli)}</span>
+            <div style="width:38px;height:${tdmCliH}px;background:linear-gradient(180deg,#f5a623,#b36000);border-radius:4px 4px 0 0"></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:center;gap:18px;margin-top:3px">
+          <span style="font-size:6.5px;font-weight:700;color:var(--m7c);width:38px;text-align:center">M7</span>
+          <span style="font-size:6.5px;font-weight:700;color:var(--tdmc);width:38px;text-align:center">TDM</span>
+        </div>
+      </div>
+      <!-- Viajes -->
+      <div style="flex:1;text-align:center">
+        <div style="font-size:7px;font-weight:700;color:var(--acc2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px">Viajes</div>
+        <div style="display:flex;align-items:flex-end;justify-content:center;gap:18px;height:72px;border-bottom:1.5px solid #99cccc">
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;height:100%">
+            <span style="font-size:9px;font-weight:900;color:var(--m7c)">${fmt(totalM7)}</span>
+            <span style="font-size:6.5px;font-weight:700;color:var(--acc2)">${pct(totalM7, total)}</span>
+            <div style="width:38px;height:${m7ViaH}px;background:linear-gradient(180deg,var(--acc3),var(--acc2));border-radius:4px 4px 0 0"></div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;height:100%">
+            <span style="font-size:9px;font-weight:900;color:var(--tdmc)">${fmt(totalTDM)}</span>
+            <span style="font-size:6.5px;font-weight:700;color:#b36000">${pct(totalTDM, total)}</span>
+            <div style="width:38px;height:${tdmViaH}px;background:linear-gradient(180deg,#f5a623,#b36000);border-radius:4px 4px 0 0"></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:center;gap:18px;margin-top:3px">
+          <span style="font-size:6.5px;font-weight:700;color:var(--m7c);width:38px;text-align:center">M7</span>
+          <span style="font-size:6.5px;font-weight:700;color:var(--tdmc);width:38px;text-align:center">TDM</span>
+        </div>
+      </div>
+      <!-- Tabla resumen -->
+      <div style="flex:2;font-size:8px">
+        <table style="width:100%;border-collapse:collapse;font-size:7.5px">
+          <thead><tr style="background:var(--pri);color:#fff">
+            <th style="padding:3px 5px;text-align:left">Operador</th>
+            <th style="padding:3px 5px;text-align:right">Clientes</th>
+            <th style="padding:3px 5px;text-align:right">% Cli.</th>
+            <th style="padding:3px 5px;text-align:right">Viajes</th>
+            <th style="padding:3px 5px;text-align:right">% Viaj.</th>
+          </tr></thead>
+          <tbody>
+            <tr style="background:#e8f7f7">
+              <td style="padding:2.5px 5px;color:var(--m7c);font-weight:800">Milla 7</td>
+              <td style="padding:2.5px 5px;text-align:right">${m7ClientList.length}</td>
+              <td style="padding:2.5px 5px;text-align:right;color:#4a7a7a">${pct(m7ClientList.length, totalCli)}</td>
+              <td style="padding:2.5px 5px;text-align:right">${fmt(totalM7)}</td>
+              <td style="padding:2.5px 5px;text-align:right;color:#4a7a7a">${pct(totalM7, total)}</td>
+            </tr>
+            <tr>
+              <td style="padding:2.5px 5px;color:var(--tdmc);font-weight:800">TDM</td>
+              <td style="padding:2.5px 5px;text-align:right">${tdmClientList.length}</td>
+              <td style="padding:2.5px 5px;text-align:right;color:#4a7a7a">${pct(tdmClientList.length, totalCli)}</td>
+              <td style="padding:2.5px 5px;text-align:right">${fmt(totalTDM)}</td>
+              <td style="padding:2.5px 5px;text-align:right;color:#4a7a7a">${pct(totalTDM, total)}</td>
+            </tr>
+            <tr style="background:#c2eaea;font-weight:800">
+              <td style="padding:2.5px 5px">TOTAL</td>
+              <td style="padding:2.5px 5px;text-align:right">${uniqueClients}</td>
+              <td style="padding:2.5px 5px;text-align:right">100%</td>
+              <td style="padding:2.5px 5px;text-align:right">${fmt(total)}</td>
+              <td style="padding:2.5px 5px;text-align:right">100%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
 
-  // Tabla TDM por cliente (página 1)
-  const tdmClientTableRows = tdmClientList.map(([name, q], i) => `
-    <tr class="${i % 2 === 0 ? 'even' : ''}">
-      <td>${name.replace(/^TDM\s*/i, '').slice(0, 40)}</td>
-      <td class="num">${q}</td>
-      <td class="num pctc">${pct(q, totalTDM)}</td>
-    </tr>`).join('');
-
-  // Tabla M7 por departamento: cliente + cant + dpto principal + % (página 2)
-  const m7DeptTableRows = m7ClientList.map(([name, q], i) => {
-    const topDept = [...(allClients.get(name)?.depts.entries() || [])].sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
-    return `<tr class="${i % 2 === 0 ? 'even' : ''}">
-      <td>${name.slice(0, 36)}</td>
-      <td class="num">${q}</td>
-      <td>${topDept}</td>
-      <td class="num pctc">${pct(q, totalM7)}</td>
-    </tr>`;
-  }).join('');
-
-  // Tabla TDM por departamento: cliente + cant + dpto principal + % (página 2)
-  const tdmDeptTableRows = tdmClientList.map(([name, q], i) => {
-    const topDept = [...(allClients.get(name)?.depts.entries() || [])].sort((a, b) => b[1] - a[1])[0]?.[0] || '—';
-    return `<tr class="${i % 2 === 0 ? 'even' : ''}">
-      <td>${name.replace(/^TDM\s*/i, '').slice(0, 36)}</td>
-      <td class="num">${q}</td>
-      <td>${topDept}</td>
-      <td class="num pctc">${pct(q, totalTDM)}</td>
-    </tr>`;
-  }).join('');
-
-  // Variables para barras comparativas
-  const totalCli = m7ClientList.length + tdmClientList.length || 1;
-  const m7CliH   = Math.round((m7ClientList.length / Math.max(m7ClientList.length, tdmClientList.length, 1)) * 56);
-  const tdmCliH  = Math.max(Math.round((tdmClientList.length / Math.max(m7ClientList.length, tdmClientList.length, 1)) * 56), 4);
-  const m7ViaH   = Math.round((totalM7 / Math.max(totalM7, totalTDM, 1)) * 56);
-  const tdmViaH  = Math.max(Math.round((totalTDM / Math.max(totalM7, totalTDM, 1)) * 56), 4);
+  // Limitar a 12 items por gráfica para que quepan en una sola página
+  const m7ClientChart  = m7ClientList.slice(0, 12);
+  const tdmClientChart = tdmClientList.slice(0, 12);
+  const m7DeptChart    = m7DeptList.slice(0, 12);
+  const tdmDeptChart   = tdmDeptList.slice(0, 12);
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
-/* ── Paleta corporativa Milla 7 ── */
 :root{--pri:#0a3535;--acc:#00b4b4;--acc2:#007a7a;--acc3:#00d4d4;--bg:#f0fafa;--wh:#fff;--txt:#0a3535;--m7c:#00b4b4;--tdmc:#e67e00}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;color:var(--txt);background:var(--wh);width:794px}
 .hdr{background:linear-gradient(135deg,var(--pri) 0%,#0f4a4a 100%);color:var(--wh);padding:10px 20px;display:flex;align-items:center;justify-content:space-between}
-.kpis{display:flex;flex-wrap:wrap;gap:5px;padding:6px 20px 4px;background:var(--bg)}
-.kpi{flex:1;min-width:72px;border-radius:7px;padding:6px 9px;color:var(--wh)}
-.kv{font-size:14px;font-weight:900;line-height:1}
-.kt{font-size:6px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-top:2px;opacity:.9}
+.kpi{flex:1;border-radius:6px;padding:5px 7px;color:var(--wh)}
+.kv{font-size:12px;font-weight:900;line-height:1}
+.kt{font-size:5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-top:2px;opacity:.9}
 .sec{font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--acc2);border-bottom:2px solid var(--acc);padding-bottom:2px;margin-bottom:4px}
-.g2{display:flex;gap:12px;padding:5px 20px}
-.col{flex:1;min-width:0}
-.pb{page-break-before:always}
-table{width:100%;border-collapse:collapse;font-size:7.5px}
-thead tr{background:var(--pri);color:var(--wh)}
-thead th{padding:3px 5px;text-align:left;font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:.2px}
-tbody tr.ev{background:#e8f7f7}
-tbody td{padding:2.5px 5px;border-bottom:1px solid #cce8e8;color:var(--txt)}
-.num{text-align:right;font-weight:600}.pct{color:#4a7a7a;font-size:7px}
-.m7{color:var(--m7c);font-weight:800}.tdm{color:var(--tdmc);font-weight:800}
-.total-row{background:#c2eaea!important;font-weight:800}
+.charts{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:5px 10px;padding:5px 20px;align-content:start}
+.chart-cell{min-width:0;overflow:hidden}
 .ftr{background:var(--pri);color:#80d4d4;font-size:7.5px;padding:5px 20px;display:flex;justify-content:space-between}
 .ftr strong{color:var(--acc3)}
 </style></head><body>
 
-<!-- ══════════ PÁGINA 1: Clientes ══════════ -->
 ${HEADER}
 ${KPIS}
+${COMPARATIVO}
 
-<!-- ── Comparativo M7 vs TDM ── -->
-<div style="padding:5px 20px 3px;background:var(--bg)">
-  <div class="sec">📊 Comparativo M7 vs TDM — Clientes y Viajes</div>
-  <div style="display:flex;gap:16px;align-items:flex-start;margin-top:5px">
-
-    <!-- Gráfica: Cantidad de Clientes -->
-    <div style="flex:1;text-align:center">
-      <div style="font-size:7px;font-weight:700;text-transform:uppercase;color:var(--acc2);margin-bottom:4px;letter-spacing:.5px">Cantidad de Clientes</div>
-      <div style="display:flex;align-items:flex-end;justify-content:center;gap:22px;height:80px;border-bottom:1.5px solid #99cccc;padding-bottom:0">
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;height:100%">
-          <span style="font-size:9px;font-weight:900;color:var(--m7c)">${m7ClientList.length}</span>
-          <span style="font-size:7.5px;font-weight:700;color:var(--acc2)">${pct(m7ClientList.length, totalCli)}</span>
-          <div style="width:42px;height:${m7CliH}px;background:linear-gradient(180deg,var(--acc3),var(--acc2));border-radius:4px 4px 0 0"></div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;height:100%">
-          <span style="font-size:9px;font-weight:900;color:var(--tdmc)">${tdmClientList.length}</span>
-          <span style="font-size:7.5px;font-weight:700;color:#b36000">${pct(tdmClientList.length, totalCli)}</span>
-          <div style="width:42px;height:${tdmCliH}px;background:linear-gradient(180deg,#f5a623,#b36000);border-radius:4px 4px 0 0"></div>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:center;gap:22px;margin-top:3px">
-        <span style="font-size:7px;font-weight:700;color:var(--m7c);width:42px;text-align:center">Milla 7</span>
-        <span style="font-size:7px;font-weight:700;color:var(--tdmc);width:42px;text-align:center">TDM</span>
-      </div>
-    </div>
-
-    <!-- Gráfica: Cantidad de Viajes -->
-    <div style="flex:1;text-align:center">
-      <div style="font-size:7px;font-weight:700;text-transform:uppercase;color:var(--acc2);margin-bottom:4px;letter-spacing:.5px">Cantidad de Viajes</div>
-      <div style="display:flex;align-items:flex-end;justify-content:center;gap:22px;height:80px;border-bottom:1.5px solid #99cccc;padding-bottom:0">
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;height:100%">
-          <span style="font-size:9px;font-weight:900;color:var(--m7c)">${fmt(totalM7)}</span>
-          <span style="font-size:7.5px;font-weight:700;color:var(--acc2)">${pct(totalM7, total)}</span>
-          <div style="width:42px;height:${m7ViaH}px;background:linear-gradient(180deg,var(--acc3),var(--acc2));border-radius:4px 4px 0 0"></div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;height:100%">
-          <span style="font-size:9px;font-weight:900;color:var(--tdmc)">${fmt(totalTDM)}</span>
-          <span style="font-size:7.5px;font-weight:700;color:#b36000">${pct(totalTDM, total)}</span>
-          <div style="width:42px;height:${tdmViaH}px;background:linear-gradient(180deg,#f5a623,#b36000);border-radius:4px 4px 0 0"></div>
-        </div>
-      </div>
-      <div style="display:flex;justify-content:center;gap:22px;margin-top:3px">
-        <span style="font-size:7px;font-weight:700;color:var(--m7c);width:42px;text-align:center">Milla 7</span>
-        <span style="font-size:7px;font-weight:700;color:var(--tdmc);width:42px;text-align:center">TDM</span>
-      </div>
-    </div>
-
-    <!-- Tabla comparativa -->
-    <div style="flex:1.8">
-      <table>
-        <thead><tr><th>Operador</th><th>Clientes</th><th>% Cli.</th><th>Viajes</th><th>% Viaj.</th></tr></thead>
-        <tbody>
-          <tr class="ev">
-            <td class="m7">Milla 7</td>
-            <td class="num">${m7ClientList.length}</td>
-            <td class="num pct">${pct(m7ClientList.length, totalCli)}</td>
-            <td class="num">${fmt(totalM7)}</td>
-            <td class="num pct">${pct(totalM7, total)}</td>
-          </tr>
-          <tr>
-            <td class="tdm">TDM</td>
-            <td class="num">${tdmClientList.length}</td>
-            <td class="num pct">${pct(tdmClientList.length, totalCli)}</td>
-            <td class="num">${fmt(totalTDM)}</td>
-            <td class="num pct">${pct(totalTDM, total)}</td>
-          </tr>
-          <tr class="total-row">
-            <td style="font-weight:800">TOTAL</td>
-            <td class="num">${m7ClientList.length + tdmClientList.length}</td>
-            <td class="num">100%</td>
-            <td class="num">${fmt(total)}</td>
-            <td class="num">100%</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- Gráficas por cliente -->
-<div class="g2">
-  <div class="col">
+<!-- 4 gráficas en cuadrícula 2×2 -->
+<div class="charts">
+  <div class="chart-cell">
     <div class="sec">🏢 M7 — Por Cliente (${m7ClientList.length})</div>
-    ${hBars(m7ClientList, totalM7, 'linear-gradient(90deg,var(--acc3),var(--acc2))')}
+    ${hBars(m7ClientChart, totalM7, 'linear-gradient(90deg,var(--acc3),var(--acc2))')}
   </div>
-  <div class="col">
+  <div class="chart-cell">
     <div class="sec">⭐ TDM — Por Cliente (${tdmClientList.length})</div>
-    ${tdmClientList.length ? hBars(tdmClientList, totalTDM, 'linear-gradient(90deg,#f5a623,#b36000)') : '<p style="color:#80a0a0;font-size:9px;padding:6px 0">Sin datos TDM</p>'}
+    ${tdmClientList.length ? hBars(tdmClientChart, totalTDM, 'linear-gradient(90deg,#f5a623,#b36000)') : '<p style="color:#80a0a0;font-size:9px;padding:6px 0">Sin datos TDM</p>'}
   </div>
-</div>
-
-<!-- Tablas por cliente -->
-<div class="g2" style="align-items:flex-start">
-  <div class="col">
-    <div class="sec">📋 M7 — Detalle Clientes</div>
-    <table>
-      <thead><tr><th>Cliente</th><th>Cant.</th><th>%</th></tr></thead>
-      <tbody>${m7ClientTableRows}</tbody>
-    </table>
+  <div class="chart-cell">
+    <div class="sec">📍 M7 — Por Departamento (${m7DeptList.length})</div>
+    ${hBars(m7DeptChart, totalM7, 'linear-gradient(90deg,var(--acc3),var(--acc2))')}
   </div>
-  <div class="col">
-    <div class="sec">📋 TDM — Detalle Clientes</div>
-    ${tdmClientList.length ? `<table>
-      <thead><tr><th>Cliente</th><th>Cant.</th><th>%</th></tr></thead>
-      <tbody>${tdmClientTableRows}</tbody>
-    </table>` : '<p style="color:#80a0a0;font-size:9px;padding:6px 0">Sin datos TDM</p>'}
+  <div class="chart-cell">
+    <div class="sec">📍 TDM — Por Departamento (${tdmDeptList.length})</div>
+    ${tdmDeptList.length ? hBars(tdmDeptChart, totalTDM, 'linear-gradient(90deg,#f5a623,#b36000)') : '<p style="color:#80a0a0;font-size:9px;padding:6px 0">Sin datos TDM</p>'}
   </div>
 </div>
 
 <div class="ftr">
-  <span><strong>OrbitM7</strong> — Milla 7 S.A.S. &nbsp;|&nbsp; Página 1 de 2</span>
-  <span>Total: <strong>${fmt(total)}</strong> &nbsp;M7: <strong>${fmt(totalM7)}</strong> &nbsp;TDM: <strong>${fmt(totalTDM)}</strong></span>
-</div>
-
-<!-- ══════════ PÁGINA 2: Departamentos ══════════ -->
-<div class="pb"></div>
-${HEADER}
-
-<!-- Gráficas por departamento -->
-<div class="g2">
-  <div class="col">
-    <div class="sec">📍 M7 — Por Departamento (${m7DeptList.length})</div>
-    ${hBars(m7DeptList, totalM7, 'linear-gradient(90deg,var(--acc3),var(--acc2))')}
-  </div>
-  <div class="col">
-    <div class="sec">📍 TDM — Por Departamento (${tdmDeptList.length})</div>
-    ${tdmDeptList.length ? hBars(tdmDeptList, totalTDM, 'linear-gradient(90deg,#f5a623,#b36000)') : '<p style="color:#80a0a0;font-size:9px;padding:6px 0">Sin datos TDM</p>'}
-  </div>
-</div>
-
-<!-- Tablas: cliente + departamento -->
-<div class="g2" style="align-items:flex-start">
-  <div class="col">
-    <div class="sec">📍 M7 — Cliente por Departamento</div>
-    <table>
-      <thead><tr><th>Cliente</th><th>Cant.</th><th>Departamento</th><th>%</th></tr></thead>
-      <tbody>${m7DeptTableRows}</tbody>
-    </table>
-  </div>
-  <div class="col">
-    <div class="sec">📍 TDM — Cliente por Departamento</div>
-    ${tdmClientList.length ? `<table>
-      <thead><tr><th>Cliente</th><th>Cant.</th><th>Departamento</th><th>%</th></tr></thead>
-      <tbody>${tdmDeptTableRows}</tbody>
-    </table>` : '<p style="color:#80a0a0;font-size:9px;padding:6px 0">Sin datos TDM</p>'}
-  </div>
-</div>
-
-<div class="ftr" style="margin-top:8px">
-  <span><strong>OrbitM7</strong> — Milla 7 S.A.S. &nbsp;|&nbsp; Página 2 de 2</span>
-  <span>Fecha: ${fecha} &nbsp;|&nbsp; Total: <strong>${fmt(total)}</strong> viajes</span>
+  <span><strong>OrbitM7</strong> — Milla 7 S.A.S.</span>
+  <span>Fecha: ${fecha} &nbsp;|&nbsp; Total: <strong>${fmt(total)}</strong> viajes &nbsp;|&nbsp; M7: <strong>${fmt(totalM7)}</strong> &nbsp;TDM: <strong>${fmt(totalTDM)}</strong></span>
 </div>
 
 </body></html>`;

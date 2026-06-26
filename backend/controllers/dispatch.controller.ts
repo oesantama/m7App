@@ -1195,6 +1195,63 @@ export const getInvoiceReturnData = async (req: Request, res: Response) => {
             return res.status(404).json({ error: `Factura "${invoiceNumber}" no encontrada en el sistema` });
         }
 
+        // Devoluciones previas para esta factura (suma de qty devuelta por artículo)
+        const prevReturnsResult = await pool.query(`
+            SELECT
+                dr.id              AS return_id,
+                dr.return_reason,
+                dr.status          AS return_status,
+                dr.created_at,
+                dr.vendedor,
+                dri.article_id,
+                SUM(dri.quantity_returned::numeric) AS qty_returned
+            FROM delivery_returns dr
+            JOIN delivery_return_items dri ON dr.id::text = dri.return_id
+            WHERE TRIM(UPPER(dr.invoice_id)) = $1
+            GROUP BY dr.id, dr.return_reason, dr.status, dr.created_at, dr.vendedor, dri.article_id
+            ORDER BY dr.created_at DESC
+        `, [inv]);
+
+        // Mapa article_id → total ya devuelto
+        const returnedByArticle: Record<string, number> = {};
+        for (const row of prevReturnsResult.rows) {
+            const aid = String(row.article_id || '').trim().toUpperCase();
+            returnedByArticle[aid] = (returnedByArticle[aid] || 0) + Number(row.qty_returned);
+        }
+
+        // Devoluciones previas agrupadas por return_id (para mostrar historial)
+        const prevReturnsMap: Record<string, any> = {};
+        for (const row of prevReturnsResult.rows) {
+            if (!prevReturnsMap[row.return_id]) {
+                prevReturnsMap[row.return_id] = {
+                    return_id:     row.return_id,
+                    return_reason: row.return_reason,
+                    status:        row.return_status,
+                    created_at:    row.created_at,
+                    vendedor:      row.vendedor,
+                    items:         [],
+                };
+            }
+            prevReturnsMap[row.return_id].items.push({
+                article_id:   row.article_id,
+                qty_returned: Number(row.qty_returned),
+            });
+        }
+        const previousReturns = Object.values(prevReturnsMap);
+
+        // Estado global de la factura respecto a devoluciones
+        const allItems = result.rows;
+        const totalExpected = allItems.reduce((s, r) => s + Number(r.expected_qty), 0);
+        const totalReturned = allItems.reduce((s, r) => {
+            const aid = String(r.article_id || '').trim().toUpperCase();
+            return s + (returnedByArticle[aid] || 0);
+        }, 0);
+
+        let returnStatus: 'none' | 'partial' | 'complete' = 'none';
+        if (totalReturned > 0) {
+            returnStatus = totalReturned >= totalExpected ? 'complete' : 'partial';
+        }
+
         const first = result.rows[0];
         res.json({
             success: true,
@@ -1211,20 +1268,29 @@ export const getInvoiceReturnData = async (req: Request, res: Response) => {
                 plan_type:       first.plan_type,
                 client_id:       first.client_id,
             },
-            items: result.rows.map(r => ({
-                article_id:    r.article_id,
-                article_name:  r.article_name,
-                barcode:       r.barcode,
-                sku:           r.sku,
-                un_code:       r.un_code,
-                unit:          r.unit,
-                expected_qty:  Number(r.expected_qty),
-                factor_inter:  Number(r.factor_inter),
-                factor_std:    Number(r.factor_std),
-                uom_std:       r.uom_std,
-                uom_inter_name: r.uom_inter_name,
-                uom_std_name:  r.uom_std_name,
-            })),
+            returnStatus,
+            previousReturns,
+            items: result.rows.map(r => {
+                const aid = String(r.article_id || '').trim().toUpperCase();
+                const qty_returned = returnedByArticle[aid] || 0;
+                const remaining = Math.max(0, Number(r.expected_qty) - qty_returned);
+                return {
+                    article_id:    r.article_id,
+                    article_name:  r.article_name,
+                    barcode:       r.barcode,
+                    sku:           r.sku,
+                    un_code:       r.un_code,
+                    unit:          r.unit,
+                    expected_qty:  Number(r.expected_qty),
+                    qty_returned,
+                    remaining_qty: remaining,
+                    factor_inter:  Number(r.factor_inter),
+                    factor_std:    Number(r.factor_std),
+                    uom_std:       r.uom_std,
+                    uom_inter_name: r.uom_inter_name,
+                    uom_std_name:  r.uom_std_name,
+                };
+            }),
         });
     } catch (err: any) {
         console.error('[M7-DEVOL] getInvoiceReturnData:', err.message);
@@ -1317,7 +1383,7 @@ export const registerRouteReturn = async (req: Request, res: Response) => {
         return res.status(400).json({ success: false, error: 'invoiceId y returnType son requeridos' });
     }
     if (!vendedor || !String(vendedor).trim()) {
-        return res.status(400).json({ success: false, error: 'vendedor es obligatorio' });
+        return res.status(400).json({ success: false, error: 'El código del vendedor es obligatorio' });
     }
     const client = await pool.connect();
     try {
@@ -1695,14 +1761,14 @@ export const getBodegaReturnsHistory = async (req: Request, res: Response) => {
             SELECT
                 dr.id,
                 dr.created_at::date                    AS fecha,
-                dri.customer_name,
-                dri.client_ref                         AS codigo_cliente,
+                di.customer_name,
+                di.client_ref                          AS codigo_cliente,
                 dr.vendedor,
                 dl.delivery_date::date                 AS fecha_placa,
                 v.plate                                AS placa,
                 dr.numero_planilla,
                 dr.invoice_id                          AS remision,
-                dri.order_number                       AS pedido,
+                di.order_number                        AS pedido,
                 dri.article_id                         AS referencia,
                 dri.un_code,
                 dri.unit                               AS um,
@@ -1717,8 +1783,11 @@ export const getBodegaReturnsHistory = async (req: Request, res: Response) => {
                 batch.confirmed_at                     AS proveedor_confirmed_at
             FROM delivery_returns dr
             JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+            LEFT JOIN document_items di
+                   ON TRIM(UPPER(COALESCE(di.invoice, di.order_number))) = TRIM(UPPER(dr.invoice_id))
+                  AND TRIM(UPPER(di.article_id)) = TRIM(UPPER(dri.article_id))
+            LEFT JOIN documents_l dl ON dl.id = di.document_id
             LEFT JOIN vehicles v ON v.id::text = dr.vehicle_id::text
-            LEFT JOIN documents_l dl ON dl.external_doc_id = dr.numero_planilla
             LEFT JOIN return_approval_batch_items rabi ON rabi.return_id::text = dr.id::text
             LEFT JOIN return_approval_batches batch ON batch.id = rabi.batch_id
             ${where}

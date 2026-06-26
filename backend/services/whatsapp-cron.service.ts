@@ -2,6 +2,8 @@ import cron from 'node-cron';
 import pool from '../config/database.js';
 import { evolutionService } from './evolution.service.js';
 import { generateFlotaReportPdf } from './flota-wa-report.service.js';
+import { generateCierreFactReport } from './cierre-fact-report.service.js';
+import { generateSobrecostoReport } from './sobrecosto-report.service.js';
 
 // Nombre de instancia fijo se resuelve dinámicamente al momento de enviar
 const INSTANCE_OVERRIDE = process.env.WA_ALERTS_INSTANCE || '';
@@ -15,6 +17,7 @@ interface AlertaWA {
   tipo_evento: string;
   adjunto_tipo: string;
   status_id: string;
+  client_id?: string;
 }
 
 const activeJobs = new Map<string, ReturnType<typeof cron.schedule>>();
@@ -47,9 +50,24 @@ class WhatsAppCronRunner {
     await evolutionService.ensureInstance(INSTANCE);
     const message = buildMessage(alerta.message_template || alerta.name, alerta);
 
-    // Generar adjunto si aplica
+    // Generar adjunto según tipo de evento o adjunto_tipo
     let pdfAttachment: { base64: string; fileName: string; caption: string } | null = null;
-    if (alerta.adjunto_tipo === 'informe_flota') {
+
+    if (alerta.tipo_evento === 'CIERRE_FACT') {
+      try {
+        pdfAttachment = await generateCierreFactReport(alerta.client_id || undefined);
+        console.log(`[WA-CRON] PDF CierreFact generado: ${pdfAttachment.fileName}`);
+      } catch (err: any) {
+        console.error('[WA-CRON] Error generando PDF cierre-fact:', err.message);
+      }
+    } else if (alerta.tipo_evento === 'SOBRECOSTO') {
+      try {
+        pdfAttachment = await generateSobrecostoReport(alerta.client_id || undefined);
+        console.log(`[WA-CRON] PDF Sobrecosto generado: ${pdfAttachment.fileName}`);
+      } catch (err: any) {
+        console.error('[WA-CRON] Error generando PDF sobrecosto:', err.message);
+      }
+    } else if (alerta.adjunto_tipo === 'informe_flota') {
       try {
         pdfAttachment = await generateFlotaReportPdf();
         console.log(`[WA-CRON] PDF generado: ${pdfAttachment.fileName}`);

@@ -6,7 +6,7 @@ export const getAlertasWhatsapp = async (_req: Request, res: Response) => {
   try {
     const result = await pool.query(`
       SELECT id, name, description, phone_numbers, message_template,
-             cron_expression, tipo_evento, adjunto_tipo, status_id,
+             cron_expression, tipo_evento, adjunto_tipo, status_id, client_id,
              last_run, next_run, created_by, updated_by, created_at, updated_at
       FROM alertas_whatsapp
       ORDER BY name ASC
@@ -36,9 +36,9 @@ export const saveAlertaWhatsapp = async (req: Request, res: Response) => {
     await pool.query(`
       INSERT INTO alertas_whatsapp
         (id, name, description, phone_numbers, message_template,
-         cron_expression, tipo_evento, adjunto_tipo, status_id, created_by, updated_by,
+         cron_expression, tipo_evento, adjunto_tipo, status_id, client_id, created_by, updated_by,
          created_at, updated_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, NOW(), NOW())
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12, NOW(), NOW())
       ON CONFLICT (id) DO UPDATE SET
         name             = $2,
         description      = $3,
@@ -48,7 +48,8 @@ export const saveAlertaWhatsapp = async (req: Request, res: Response) => {
         tipo_evento      = $7,
         adjunto_tipo     = $8,
         status_id        = $9,
-        updated_by       = $11,
+        client_id        = $10,
+        updated_by       = $12,
         updated_at       = NOW()
     `, [
       a.id,
@@ -60,6 +61,7 @@ export const saveAlertaWhatsapp = async (req: Request, res: Response) => {
       a.tipoEvento || 'MANUAL',
       a.adjuntoTipo || 'ninguno',
       a.statusId || 'EST-01',
+      a.clientId || null,
       a.createdBy || a.updatedBy || 'System',
       a.updatedBy || 'System',
     ]);

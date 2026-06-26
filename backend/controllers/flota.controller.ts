@@ -13,7 +13,7 @@ export const getFlotaReport = async (req: Request, res: Response) => {
                 SELECT
                     TRIM(client_name) AS client_name,
                     1 AS quantity,
-                    CASE WHEN UPPER(TRIM(client_name)) LIKE '%TDM%' THEN 'TDM' ELSE 'M7' END AS operator,
+                    'M7' AS operator,
                     COALESCE(UPPER(TRIM(city)), 'SIN CIUDAD') AS city
                 FROM management_orders
                 WHERE manifest_date::date BETWEEN $1 AND $2

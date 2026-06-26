@@ -29,6 +29,7 @@ interface ApprovalBatch {
 interface InvoiceItem {
     article_id: string; article_name: string; barcode: string; sku: string;
     un_code: string; unit: string; expected_qty: number;
+    qty_returned: number; remaining_qty: number;
     factor_inter: number; factor_std: number;
     uom_inter_name: string; uom_std_name: string;
 }
@@ -38,6 +39,12 @@ interface InvoiceData {
         client_ref: string; vehicle_plate: string; numero_planilla: string;
         fecha_placa: string; plan_type: string; client_id: string;
     };
+    returnStatus: 'none' | 'partial' | 'complete';
+    previousReturns: Array<{
+        return_id: number; return_reason: string; status: string;
+        created_at: string; vendedor: string;
+        items: Array<{ article_id: string; qty_returned: number }>;
+    }>;
     items: InvoiceItem[];
 }
 
@@ -162,9 +169,9 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
             const res = await api.getInvoiceReturnData(inv);
             if (!res?.success) throw new Error(res?.error ?? 'No encontrada');
             setInvoiceData(res);
-            // inicializar cantidades según tipo completa
+            // inicializar cantidades: COMPLETA pone remaining_qty (lo que falta), PARCIAL en 0
             const init: Record<string, number> = {};
-            res.items.forEach((it: InvoiceItem) => { init[it.article_id] = it.expected_qty; });
+            res.items.forEach((it: InvoiceItem) => { init[it.article_id] = it.remaining_qty; });
             setScannedQtys(init);
             setTimeout(() => barcodeRef.current?.focus(), 100);
         } catch (e: any) {
@@ -177,7 +184,8 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         setReturnType(rt);
         if (rt === 'COMPLETA' && invoiceData) {
             const init: Record<string, number> = {};
-            invoiceData.items.forEach(it => { init[it.article_id] = it.expected_qty; });
+            // COMPLETA: pre-llenar con lo que RESTA por devolver (remaining_qty)
+            invoiceData.items.forEach(it => { init[it.article_id] = it.remaining_qty; });
             setScannedQtys(init);
         } else if (rt === 'PARCIAL') {
             const init: Record<string, number> = {};
@@ -195,11 +203,20 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
             it.article_id.toUpperCase() === sku.toUpperCase() ||
             it.barcode.toUpperCase() === sku.toUpperCase()
         ) ?? invoiceData.items.find(it =>
-            // retry con ' ↔ -
             it.sku.toUpperCase() === sku.replaceAll("'", '-').toUpperCase() ||
             it.sku.toUpperCase() === sku.replaceAll('-', "'").toUpperCase()
         );
         if (!item) { showToast(`SKU no encontrado: ${sku}`, false); return; }
+
+        const max = item.remaining_qty;  // máximo = lo que falta por devolver
+        const current = scannedQtys[item.article_id] ?? 0;
+
+        // Ya llegó al máximo — no se puede agregar más
+        if (current >= max) {
+            showToast(`⚠ ${item.article_name}: límite máximo alcanzado (${max} ${item.unit})`, false);
+            setLastScanned(item.article_id);
+            return;
+        }
 
         const embeddedQty = extractQtyFromBarcode(raw);
         const mode = pickingModes[item.article_id] ?? 'UND';
@@ -207,29 +224,56 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         if (mode === 'CAJA') qty = (item.factor_inter || 1) * embeddedQty;
         else if (mode === 'STD') qty = (item.factor_std || 1) * embeddedQty;
 
-        const max = item.expected_qty;
-        const current = scannedQtys[item.article_id] ?? 0;
-        const next = Math.min(current + qty, max);
+        const desired = current + qty;
+        const next = Math.min(desired, max);
 
         setScannedQtys(prev => ({ ...prev, [item.article_id]: next }));
         setLastScanned(item.article_id);
-        showToast(`${item.article_name}: ${next}/${max} ${item.unit}`);
+
+        if (desired > max) {
+            // Superó el límite — se ajustó al máximo
+            showToast(`⚠ ${item.article_name}: ajustado a ${next}/${max} ${item.unit} (excedía el límite)`, false);
+        } else if (next >= max) {
+            // Completado exacto
+            showToast(`✓ ${item.article_name}: COMPLETO ${next}/${max} ${item.unit}`);
+        } else {
+            // Adición normal
+            showToast(`${item.article_name}: ${next}/${max} ${item.unit}`);
+        }
     };
 
     const handleManualAdd = (articleId: string, qty: number) => {
         if (!invoiceData) return;
         const item = invoiceData.items.find(it => it.article_id === articleId);
         if (!item) return;
-        const max = item.expected_qty;
-        setScannedQtys(prev => ({ ...prev, [articleId]: Math.min((prev[articleId] ?? 0) + qty, max) }));
+        const max = item.remaining_qty;
+        const current = scannedQtys[articleId] ?? 0;
+
+        if (current >= max) {
+            showToast(`⚠ ${item.article_name}: límite máximo alcanzado (${max})`, false);
+            setLastScanned(articleId);
+            return;
+        }
+
+        const desired = current + qty;
+        const next = Math.min(desired, max);
+        setScannedQtys(prev => ({ ...prev, [articleId]: next }));
         setLastScanned(articleId);
+
+        if (desired > max) {
+            showToast(`⚠ ${item.article_name}: ajustado a ${next}/${max} (excedía el límite)`, false);
+        } else if (next >= max) {
+            showToast(`✓ ${item.article_name}: COMPLETO ${next}/${max}`);
+        }
     };
 
     const handleManualSet = (articleId: string, val: string) => {
         const n = parseInt(val) || 0;
         const item = invoiceData?.items.find(it => it.article_id === articleId);
-        const max = item?.expected_qty ?? 9999;
-        setScannedQtys(prev => ({ ...prev, [articleId]: Math.max(0, Math.min(n, max)) }));
+        const max = item?.remaining_qty ?? 9999;
+        const clamped = Math.max(0, Math.min(n, max));
+        setScannedQtys(prev => ({ ...prev, [articleId]: clamped }));
+        if (n > max) showToast(`⚠ Cantidad ajustada al máximo permitido: ${max}`, false);
     };
 
     // ── Guardar devolución ────────────────────────────────────────────────────
@@ -342,7 +386,7 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         { header: 'FECHA',            key: 'fecha' },
         { header: 'CLIENTE',          key: 'customer_name' },
         { header: 'CODIGO CLIENTE',   key: 'codigo_cliente' },
-        { header: 'VENDEDOR',         key: 'vendedor' },
+        { header: 'COD. VENDEDOR',    key: 'vendedor' },
         { header: 'FECHA Y PLACA',    key: 'fecha_placa', render: (r: any) => r.fecha_placa ? `${r.fecha_placa?.split('T')[0] ?? ''} ${r.placa ?? ''}`.trim() : (r.placa ?? '') },
         { header: 'NUMERO PLANILLA',  key: 'numero_planilla' },
         { header: 'REMISION',         key: 'remision' },
@@ -463,18 +507,48 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                         </div>
                                     </div>
 
+                                    {/* Banner de devoluciones previas */}
+                                    {invoiceData.returnStatus === 'complete' && (
+                                        <div className="bg-rose-50 border-2 border-rose-300 rounded-2xl p-4 flex items-start gap-3">
+                                            <span className="text-2xl">🚫</span>
+                                            <div>
+                                                <p className="text-[11px] font-black text-rose-700 uppercase tracking-widest">Devolución completa ya registrada</p>
+                                                <p className="text-xs text-rose-500 mt-0.5">Esta factura ya fue devuelta en su totalidad. No se puede registrar otra devolución.</p>
+                                                {invoiceData.previousReturns.map(pr => (
+                                                    <p key={pr.return_id} className="text-[10px] text-rose-400 mt-1 font-mono">
+                                                        #{pr.return_id} · {new Date(pr.created_at).toLocaleDateString('es-CO')} · {pr.return_reason}
+                                                    </p>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {invoiceData.returnStatus === 'partial' && (
+                                        <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex items-start gap-3">
+                                            <span className="text-2xl">⚠️</span>
+                                            <div>
+                                                <p className="text-[11px] font-black text-amber-700 uppercase tracking-widest">Devolución parcial previa</p>
+                                                <p className="text-xs text-amber-600 mt-0.5">Ya se registró una devolución parcial. Solo puedes devolver las cantidades restantes.</p>
+                                                {invoiceData.previousReturns.map(pr => (
+                                                    <p key={pr.return_id} className="text-[10px] text-amber-500 mt-1 font-mono">
+                                                        #{pr.return_id} · {new Date(pr.created_at).toLocaleDateString('es-CO')} · {pr.return_reason} · Cód: {pr.vendedor || '—'}
+                                                    </p>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Campos: vendedor, tipo, motivo, notas */}
-                                    <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-                                        {/* VENDEDOR — obligatorio */}
+                                    <div className={`bg-white rounded-2xl border border-slate-200 p-5 space-y-4 ${invoiceData.returnStatus === 'complete' ? 'opacity-40 pointer-events-none' : ''}`}>
+                                        {/* CÓDIGO VENDEDOR — obligatorio */}
                                         <div>
                                             <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
-                                                Vendedor <span className="text-rose-500">*</span>
+                                                Código Vendedor <span className="text-rose-500">*</span>
                                             </label>
                                             <input
                                                 value={vendedor}
-                                                onChange={e => setVendedor(e.target.value)}
-                                                placeholder="Nombre del vendedor"
-                                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rose-400"
+                                                onChange={e => setVendedor(e.target.value.toUpperCase())}
+                                                placeholder="Ej: R204"
+                                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-rose-400"
                                             />
                                         </div>
 
@@ -548,21 +622,29 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                     {/* Artículos */}
                                     <div className="space-y-2">
                                         {invoiceData.items.map(item => {
-                                            const qty    = scannedQtys[item.article_id] ?? 0;
-                                            const max    = item.expected_qty;
-                                            const done   = qty >= max;
-                                            const mode   = pickingModes[item.article_id] ?? 'UND';
-                                            const isLast = lastScanned === item.article_id;
+                                            const qty        = scannedQtys[item.article_id] ?? 0;
+                                            const max        = item.remaining_qty;
+                                            const alreadyRet = item.qty_returned;
+                                            const done       = qty >= max && max > 0;
+                                            const fullyDone  = alreadyRet >= item.expected_qty;
+                                            const mode       = pickingModes[item.article_id] ?? 'UND';
+                                            const isLast     = lastScanned === item.article_id;
 
                                             return (
                                                 <div key={item.article_id}
-                                                    className={`bg-white rounded-2xl border-2 p-4 transition-all ${done ? 'border-emerald-300' : isLast ? 'border-amber-300' : 'border-slate-100'}`}>
-                                                    {isLast && (
-                                                        <div className="flex items-center gap-1 mb-1.5">
+                                                    className={`bg-white rounded-2xl border-2 p-4 transition-all
+                                                        ${fullyDone ? 'border-slate-200 opacity-60' : done ? 'border-emerald-300' : isLast ? 'border-amber-300' : 'border-slate-100'}`}>
+                                                    <div className="flex items-center gap-2 mb-1.5">
+                                                        {isLast && <>
                                                             <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                                                             <span className="text-[8px] font-black text-amber-600 uppercase tracking-widest">Último escaneado</span>
-                                                        </div>
-                                                    )}
+                                                        </>}
+                                                        {alreadyRet > 0 && (
+                                                            <span className={`ml-auto text-[8px] font-black px-2 py-0.5 rounded-full ${fullyDone ? 'bg-slate-100 text-slate-500' : 'bg-amber-100 text-amber-700'}`}>
+                                                                Ya devuelto: {alreadyRet} {item.unit}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <div className="flex justify-between items-start gap-3">
                                                         <div className="flex-1 min-w-0">
                                                             <p className="text-[13px] font-black text-slate-900 leading-tight truncate">{item.article_name}</p>
@@ -572,10 +654,15 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                                             </div>
                                                         </div>
                                                         <div className="text-right shrink-0">
-                                                            <p className={`text-xl font-black tabular-nums ${done ? 'text-emerald-600' : 'text-slate-700'}`}>
+                                                            <p className={`text-xl font-black tabular-nums ${fullyDone ? 'text-slate-400' : done ? 'text-emerald-600' : 'text-slate-700'}`}>
                                                                 {qty} <span className="text-[11px] text-slate-300">/</span> {max}
                                                             </p>
                                                             <p className="text-[9px] font-black text-slate-400 uppercase">{item.unit}</p>
+                                                            {alreadyRet > 0 && (
+                                                                <p className="text-[8px] text-slate-400 mt-0.5">
+                                                                    Total: {item.expected_qty}
+                                                                </p>
+                                                            )}
                                                         </div>
                                                     </div>
 
@@ -610,7 +697,7 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                                         {returnType === 'PARCIAL' && (
                                                             <>
                                                                 <input
-                                                                    type="number" min={0} max={item.expected_qty}
+                                                                    type="number" min={0} max={item.remaining_qty}
                                                                     value={qty}
                                                                     onChange={e => handleManualSet(item.article_id, e.target.value)}
                                                                     className="w-14 text-center border border-slate-200 rounded-xl text-sm font-black focus:outline-none focus:ring-2 focus:ring-indigo-400"
@@ -638,13 +725,19 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                         })}
                                     </div>
 
-                                    {/* Botón confirmar */}
-                                    <button onClick={handleSaveReturn} disabled={savingReturn}
-                                        className="w-full py-4 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2">
-                                        {savingReturn
-                                            ? <><Icons.Loader className="w-4 h-4 animate-spin" /> Guardando…</>
-                                            : <><Icons.Package className="w-4 h-4" /> Confirmar Recepción de Devolución</>}
-                                    </button>
+                                    {/* Botón confirmar — bloqueado si ya fue devuelta completamente */}
+                                    {invoiceData.returnStatus === 'complete' ? (
+                                        <div className="w-full py-4 bg-slate-100 text-slate-400 font-black text-sm uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed">
+                                            🚫 Devolución ya completa — no se puede registrar otra
+                                        </div>
+                                    ) : (
+                                        <button onClick={handleSaveReturn} disabled={savingReturn}
+                                            className="w-full py-4 bg-gradient-to-r from-rose-600 to-rose-700 hover:from-rose-700 hover:to-rose-800 disabled:opacity-50 text-white font-black text-sm uppercase tracking-widest rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2">
+                                            {savingReturn
+                                                ? <><Icons.Loader className="w-4 h-4 animate-spin" /> Guardando…</>
+                                                : <><Icons.Package className="w-4 h-4" /> {invoiceData.returnStatus === 'partial' ? 'Confirmar Devolución Adicional' : 'Confirmar Recepción de Devolución'}</>}
+                                        </button>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -667,9 +760,16 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                     {bodegaReturns
                                         .filter(r => !searchLegalizacion || r.invoiceNumber.toLowerCase().includes(searchLegalizacion.toLowerCase()))
                                         .map(ret => (
-                                            <ReturnCard key={ret.invoiceNumber} ret={ret}
-                                                processing={processingId === `b-${ret.invoiceNumber}`}
-                                                onConfirm={(obs, reason) => handleConfirmBodega(ret, obs, reason)} />
+                                            <ReturnCard key={ret.invoiceNumber}
+                                                invoiceId={ret.invoiceNumber}
+                                                conductorName={ret.conductorName}
+                                                vehiclePlate={ret.vehiclePlate}
+                                                createdAt={ret.legalizadoAt}
+                                                externalDocId={ret.externalDocId}
+                                                items={ret.items}
+                                                isProcessing={processingId === `b-${ret.invoiceNumber}`}
+                                                onConfirm={(obs, reason) => handleConfirmBodega(ret, obs, reason)}
+                                                type="legalizacion" />
                                         ))}
                                 </>
                             )}

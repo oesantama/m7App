@@ -1759,6 +1759,7 @@ export const restoreSystem = async () => {
       ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS conciliacion_confirmada_by TEXT;
       ALTER TABLE delivery_return_items ADD COLUMN IF NOT EXISTS article_id TEXT;
       ALTER TABLE delivery_return_items ADD COLUMN IF NOT EXISTS un_code TEXT;
+      ALTER TABLE alertas_whatsapp ADD COLUMN IF NOT EXISTS client_id TEXT;
     `);
 
     await client.query('COMMIT');

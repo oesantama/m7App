@@ -17,6 +17,7 @@ interface AlertaWA {
   tipo_evento: string;
   adjunto_tipo: string;
   status_id: string;
+  client_id: string | null;
   last_run: string | null;
   next_run: string | null;
   created_at: string;
@@ -59,7 +60,10 @@ const EMPTY_FORM: Omit<AlertaWA, 'created_at' | 'updated_at' | 'last_run' | 'nex
   tipo_evento: 'MANUAL',
   adjunto_tipo: 'ninguno',
   status_id: 'EST-01',
+  client_id: null,
 };
+
+const TIPOS_CON_CLIENTE = ['CIERRE_FACT', 'SOBRECOSTO'];
 
 function fmtDate(iso: string | null) {
   if (!iso) return '—';
@@ -85,12 +89,19 @@ export default function AlertasWhatsapp() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [cronMode, setCronMode]     = useState<'preset' | 'custom'>('preset');
+  const [clients, setClients]       = useState<{ id: string; name: string }[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.getAlertasWhatsapp();
-      setAlertas(res.success ? res.data : []);
+      const [alertasRes, clientsRes] = await Promise.all([
+        api.getAlertasWhatsapp(),
+        api.getClients().catch(() => []),
+      ]);
+      setAlertas(alertasRes.success ? alertasRes.data : []);
+      if (Array.isArray(clientsRes)) {
+        setClients(clientsRes.map((c: any) => ({ id: c.id, name: c.name })));
+      }
     } catch {
       toast.error('Error al cargar alertas WhatsApp');
     } finally {
@@ -116,11 +127,28 @@ export default function AlertasWhatsapp() {
       tipo_evento: a.tipo_evento,
       adjunto_tipo: a.adjunto_tipo || 'ninguno',
       status_id: a.status_id,
+      client_id: a.client_id || null,
     });
     const preset = CRON_PRESETS.find(p => p.value === a.cron_expression && p.value !== '__custom__');
     setCronMode(preset ? 'preset' : 'custom');
     setPhoneInput('');
     setShowForm(true);
+  }
+
+  const selectedClientIds = form.client_id
+    ? form.client_id.split(',').map((id: string) => id.trim()).filter(Boolean)
+    : [];
+
+  function handleAddClient(clientId: string) {
+    if (!clientId) return;
+    if (selectedClientIds.includes(clientId)) return;
+    const newIds = [...selectedClientIds, clientId];
+    setForm(f => ({ ...f, client_id: newIds.join(',') }));
+  }
+
+  function handleRemoveClient(clientId: string) {
+    const newIds = selectedClientIds.filter((id: string) => id !== clientId);
+    setForm(f => ({ ...f, client_id: newIds.length > 0 ? newIds.join(',') : null }));
   }
 
   function addPhone() {
@@ -153,6 +181,7 @@ export default function AlertasWhatsapp() {
         tipoEvento: form.tipo_evento,
         adjuntoTipo: form.adjunto_tipo,
         statusId: form.status_id,
+        clientId: form.client_id || null,
         updatedBy: 'System',
         createdBy: 'System',
       });
@@ -250,19 +279,92 @@ export default function AlertasWhatsapp() {
               </select>
             </div>
 
+            {/* Selector de cliente — solo para CIERRE_FACT y SOBRECOSTO */}
+            {TIPOS_CON_CLIENTE.includes(form.tipo_evento) && (
+              <div className="space-y-2 col-span-1 md:col-span-2">
+                <label className="text-[10px] font-black uppercase text-slate-500">
+                  Bodegas / Clientes
+                </label>
+                <div className="flex gap-2">
+                  <select
+                    value=""
+                    onChange={e => {
+                      handleAddClient(e.target.value);
+                      e.target.value = ""; // Reset select
+                    }}
+                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-green-400">
+                    <option value="">— Seleccionar cliente para agregar —</option>
+                    {clients
+                      .filter(c => !selectedClientIds.includes(c.id))
+                      .map(c => (
+                        <option key={c.id} value={c.id}>{c.name} ({c.id})</option>
+                      ))
+                    }
+                  </select>
+                  {selectedClientIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, client_id: null }))}
+                      className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-black transition-all">
+                      Limpiar todos
+                    </button>
+                  )}
+                </div>
+
+                {/* Selected clients badges */}
+                {selectedClientIds.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border border-slate-100 rounded-lg">
+                    {selectedClientIds.map(id => {
+                      const clientObj = clients.find(c => c.id === id);
+                      return (
+                        <span key={id} className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 px-2 py-1 rounded-full text-[10px] font-bold">
+                          <span>{clientObj ? clientObj.name : id} ({id})</span>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveClient(id)}
+                            className="text-blue-400 hover:text-red-500 font-bold ml-1">
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-slate-400 italic bg-slate-50/50 border border-dashed border-slate-200 rounded-lg p-2.5 text-center">
+                    — Sin filtro de cliente (Se incluirán todos los clientes/bodegas en el informe) —
+                  </div>
+                )}
+                
+                <p className="text-[9px] text-slate-400 mt-1">
+                  {form.tipo_evento === 'CIERRE_FACT'
+                    ? '📋 El PDF incluirá solo los documentos L pendientes de las bodegas seleccionadas. Si no se selecciona ninguna, se incluirán todos.'
+                    : '💰 El PDF mostrará solo los sobrecostos pendientes de las bodegas seleccionadas. Si no se selecciona ninguna, se incluirán todos.'}
+                </p>
+              </div>
+            )}
+
             {/* Tipo adjunto */}
             <div className="space-y-1">
               <label className="text-[10px] font-black uppercase text-slate-500">
                 <FileText size={10} className="inline mr-1" />Adjunto automático
               </label>
-              <select value={form.adjunto_tipo} onChange={e => setForm(f => ({ ...f, adjunto_tipo: e.target.value }))}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-green-400">
-                {ADJUNTO_TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-              {form.adjunto_tipo === 'informe_flota' && (
-                <p className="text-[9px] text-emerald-600 font-medium mt-1">
-                  ✅ El sistema generará y enviará el PDF con el Informe Flota del día anterior al ejecutar esta alerta.
-                </p>
+              {TIPOS_CON_CLIENTE.includes(form.tipo_evento) ? (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-[10px] text-blue-700 font-medium">
+                  📎 Se generará automáticamente un PDF con el informe de{' '}
+                  {form.tipo_evento === 'CIERRE_FACT' ? 'cierre de facturación' : 'sobrecostos pendientes'}.
+                </div>
+              ) : (
+                <>
+                  <select value={form.adjunto_tipo} onChange={e => setForm(f => ({ ...f, adjunto_tipo: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-green-400">
+                    {ADJUNTO_TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                  {form.adjunto_tipo === 'informe_flota' && (
+                    <p className="text-[9px] text-emerald-600 font-medium mt-1">
+                      ✅ El sistema generará y enviará el PDF con el Informe Flota del día anterior al ejecutar esta alerta.
+                    </p>
+                  )}
+                </>
               )}
             </div>
 
@@ -475,13 +577,34 @@ export default function AlertasWhatsapp() {
                     {a.description && (
                       <p className="text-[11px] text-slate-500">{a.description}</p>
                     )}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[10px]">
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-[10px]">
                       <div>
                         <p className="font-black text-slate-400 uppercase mb-1">Destinatarios</p>
                         <div className="flex flex-wrap gap-1">
                           {(a.phone_numbers || []).map(p => (
                             <span key={p} className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-mono">{p}</span>
                           ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-400 uppercase mb-1">Clientes / Bodegas</p>
+                        <div className="flex flex-wrap gap-1">
+                          {TIPOS_CON_CLIENTE.includes(a.tipo_evento) ? (
+                            a.client_id ? (
+                              a.client_id.split(',').map((id: string) => {
+                                const c = clients.find(cl => cl.id === id.trim());
+                                return (
+                                  <span key={id} className="bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                    {c ? c.name : id}
+                                  </span>
+                                );
+                              })
+                            ) : (
+                              <span className="text-slate-500 italic">Todos</span>
+                            )
+                          ) : (
+                            <span className="text-slate-400">— N/A —</span>
+                          )}
                         </div>
                       </div>
                       <div>
