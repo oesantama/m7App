@@ -387,6 +387,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ confirmedBy }),
     }),
+  confirmSupplierReceived: (id: number | string, receivedBy: string) =>
+    fetchJson(`${API_URL}/inventory/supplier-returns/${id}/received`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ receivedBy }),
+    }),
 
   getConciliationPlanillaUrl: (routeId: string | number) => {
     return `${API_URL}/conciliation/planilla?routeId=${routeId}`;
@@ -990,7 +996,10 @@ export const api = {
     body: JSON.stringify(data)
   }),
   getConciliationLogs: (docId: string, articleId: string) => fetchJson(`${API_URL}/documents/conciliations/${encodeURIComponent(docId)}/${encodeURIComponent(articleId)}`),
-  getRoutes: () => fetchJson(`${API_URL}/routes`),
+  getRoutes: (params?: { date?: string; clientId?: string }) => {
+    const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString() : '';
+    return fetchJson(`${API_URL}/routes${qs}`);
+  },
   saveRoute: (data: any) => fetchJson(`${API_URL}/routes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

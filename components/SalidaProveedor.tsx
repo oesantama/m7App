@@ -32,11 +32,13 @@ interface SupplierReturn {
     notes?: string;
     total_items: number;
     total_qty: number;
-    status: 'borrador' | 'confirmada';
+    status: 'borrador' | 'confirmada' | 'recibida';
     created_by?: string;
     created_at: string;
     confirmed_at?: string;
     confirmed_by?: string;
+    received_at?: string;
+    received_by?: string;
     items?: any[];
 }
 
@@ -66,6 +68,7 @@ const SalidaProveedor: React.FC<{ user: any }> = ({ user }) => {
 
     // Confirm modal
     const [confirmingId, setConfirmingId] = React.useState<number | null>(null);
+    const [receivingId, setReceivingId]   = React.useState<number | null>(null);
 
     const showToast = (msg: string, ok = true) => {
         setToast({ msg, ok });
@@ -194,11 +197,22 @@ const SalidaProveedor: React.FC<{ user: any }> = ({ user }) => {
         setConfirmingId(id);
         try {
             await api.confirmSupplierReturn(id, user?.name ?? user?.email ?? 'Bodega');
-            showToast('Salida confirmada');
+            showToast('Salida confirmada — enviada al proveedor');
             setReturns(prev => prev.map(r => r.id === id ? { ...r, status: 'confirmada' } : r));
         } catch (e: any) {
             showToast(e?.message ?? 'Error al confirmar', false);
         } finally { setConfirmingId(null); }
+    };
+
+    const handleReceived = async (id: number) => {
+        setReceivingId(id);
+        try {
+            await (api as any).confirmSupplierReceived(id, user?.name ?? user?.email ?? 'Bodega');
+            showToast('Recibido confirmado — proveedor aceptó la devolución');
+            setReturns(prev => prev.map(r => r.id === id ? { ...r, status: 'recibida' } : r));
+        } catch (e: any) {
+            showToast(e?.message ?? 'Error al confirmar recibido', false);
+        } finally { setReceivingId(null); }
     };
 
     const selectedClientName = clients.find(c => c.id === selectedClientId)?.name ?? '';
@@ -286,7 +300,9 @@ const SalidaProveedor: React.FC<{ user: any }> = ({ user }) => {
                     returns={returns}
                     loading={loading}
                     confirmingId={confirmingId}
+                    receivingId={receivingId}
                     onConfirm={handleConfirm}
+                    onReceived={handleReceived}
                     onRefresh={() => loadReturns(selectedClientId)}
                 />
             )}
@@ -505,13 +521,21 @@ const NewReturnForm: React.FC<{
 };
 
 // ── Return List ───────────────────────────────────────────────────────────────
+const STATUS_BADGE: Record<string, { label: string; cls: string; dot: string }> = {
+    borrador:   { label: 'Borrador',  cls: 'bg-amber-50 text-amber-700 border border-amber-200',   dot: 'bg-amber-400'  },
+    confirmada: { label: 'Enviada',   cls: 'bg-blue-50 text-blue-700 border border-blue-200',       dot: 'bg-blue-500'   },
+    recibida:   { label: 'Recibida',  cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200', dot: 'bg-emerald-500' },
+};
+
 const ReturnList: React.FC<{
     returns: SupplierReturn[];
     loading: boolean;
     confirmingId: number | null;
+    receivingId: number | null;
     onConfirm: (id: number) => void;
+    onReceived: (id: number) => void;
     onRefresh: () => void;
-}> = ({ returns, loading, confirmingId, onConfirm, onRefresh }) => {
+}> = ({ returns, loading, confirmingId, receivingId, onConfirm, onReceived, onRefresh }) => {
     const [expandedId, setExpandedId] = React.useState<number | null>(null);
 
     if (loading) return (
@@ -520,8 +544,24 @@ const ReturnList: React.FC<{
         </div>
     );
 
+    // Resumen por estado
+    const counts = { borrador: 0, confirmada: 0, recibida: 0 };
+    returns.forEach(r => { if (r.status in counts) counts[r.status as keyof typeof counts]++; });
+
     return (
         <div className="flex flex-col gap-4">
+            {/* Barra de resumen */}
+            {returns.length > 0 && (
+                <div className="grid grid-cols-3 gap-3 max-w-lg">
+                    {([['borrador', 'Pendientes de envío'], ['confirmada', 'Enviadas'], ['recibida', 'Recibidas por proveedor']] as const).map(([s, lbl]) => (
+                        <div key={s} className={`rounded-xl border px-3 py-2 flex flex-col ${STATUS_BADGE[s].cls}`}>
+                            <span className="text-[18px] font-black leading-none">{counts[s]}</span>
+                            <span className="text-[9px] font-black uppercase tracking-widest mt-0.5">{lbl}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
+
             <div className="flex justify-end">
                 <button onClick={onRefresh}
                     className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
@@ -539,11 +579,13 @@ const ReturnList: React.FC<{
                 </div>
             ) : (
                 <div className="flex flex-col gap-3 max-w-3xl">
-                    {returns.map(r => (
+                    {returns.map(r => {
+                        const badge = STATUS_BADGE[r.status] ?? STATUS_BADGE.borrador;
+                        return (
                         <div key={r.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                             <div className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-2 h-2 rounded-full shrink-0 ${r.status === 'confirmada' ? 'bg-emerald-500' : 'bg-amber-400'}`} />
+                                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${badge.dot}`} />
                                     <div>
                                         <p className="text-[12px] font-black text-slate-800">
                                             {r.reference ? `Ref: ${r.reference}` : `Salida #${r.id}`}
@@ -554,57 +596,81 @@ const ReturnList: React.FC<{
                                         </p>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2 ml-auto">
-                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-lg uppercase tracking-widest
-                                        ${r.status === 'confirmada' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-                                        {r.status === 'confirmada' ? 'Confirmada' : 'Borrador'}
+                                <div className="flex items-center gap-2 ml-auto flex-wrap justify-end">
+                                    <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest ${badge.cls}`}>
+                                        {badge.label}
                                     </span>
-                                    {r.status !== 'confirmada' && (
+
+                                    {/* Borrador → Confirmar envío */}
+                                    {r.status === 'borrador' && (
                                         <button onClick={() => onConfirm(r.id)}
                                             disabled={confirmingId === r.id}
-                                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[9px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center gap-1">
+                                            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-[9px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center gap-1">
                                             {confirmingId === r.id
                                                 ? <Icons.Loader className="w-3 h-3 animate-spin" />
-                                                : '✓'} Confirmar
+                                                : <Icons.Send className="w-3 h-3" />} Confirmar envío
                                         </button>
                                     )}
-                                    {r.items && r.items.length > 0 && (
-                                        <button onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
-                                            className="p-1.5 rounded-lg hover:bg-slate-100 transition-all">
-                                            <Icons.ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${expandedId === r.id ? 'rotate-180' : ''}`} />
+
+                                    {/* Confirmada → Confirmar recibido */}
+                                    {r.status === 'confirmada' && (
+                                        <button onClick={() => onReceived(r.id)}
+                                            disabled={receivingId === r.id}
+                                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[9px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center gap-1">
+                                            {receivingId === r.id
+                                                ? <Icons.Loader className="w-3 h-3 animate-spin" />
+                                                : <Icons.CheckCircle className="w-3 h-3" />} Confirmar recibido
                                         </button>
                                     )}
+
+                                    {/* Expand */}
+                                    <button onClick={() => setExpandedId(expandedId === r.id ? null : r.id)}
+                                        className="p-1.5 rounded-lg hover:bg-slate-100 transition-all">
+                                        <Icons.ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${expandedId === r.id ? 'rotate-180' : ''}`} />
+                                    </button>
                                 </div>
                             </div>
 
-                            {expandedId === r.id && r.items && (
+                            {expandedId === r.id && (
                                 <div className="border-t border-slate-100 px-4 py-3 bg-slate-50/50">
-                                    <table className="w-full text-[10px]">
-                                        <thead>
-                                            <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                                                <th className="text-left pb-2">Artículo</th>
-                                                <th className="text-left pb-2">Lote</th>
-                                                <th className="text-right pb-2">Cant.</th>
-                                                <th className="text-left pb-2 pl-3">Nota</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {r.items.map((item: any, i: number) => (
-                                                <tr key={i}>
-                                                    <td className="py-1.5 font-bold text-slate-700">{item.article_name || item.article_id}</td>
-                                                    <td className="py-1.5 text-slate-500">{item.batch || 'S/L'}</td>
-                                                    <td className="py-1.5 text-right font-black text-slate-800">{item.quantity} {item.unit || 'UND'}</td>
-                                                    <td className="py-1.5 pl-3 text-slate-400 italic">{item.notes || '—'}</td>
+                                    {r.items && r.items.length > 0 && (
+                                        <table className="w-full text-[10px] mb-3">
+                                            <thead>
+                                                <tr className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                                                    <th className="text-left pb-2">Artículo</th>
+                                                    <th className="text-left pb-2">Lote</th>
+                                                    <th className="text-right pb-2">Cant.</th>
+                                                    <th className="text-left pb-2 pl-3">Nota</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                    {r.notes && <p className="mt-2 text-[10px] text-slate-500 italic">Obs: {r.notes}</p>}
-                                    {r.confirmed_at && <p className="mt-1 text-[9px] text-emerald-600 font-black">Confirmada: {fmtDate(r.confirmed_at)} por {r.confirmed_by}</p>}
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {r.items.map((item: any, i: number) => (
+                                                    <tr key={i}>
+                                                        <td className="py-1.5 font-bold text-slate-700">{item.article_name || item.article_id}</td>
+                                                        <td className="py-1.5 text-slate-500">{item.batch || 'S/L'}</td>
+                                                        <td className="py-1.5 text-right font-black text-slate-800">{item.quantity} {item.unit || 'UND'}</td>
+                                                        <td className="py-1.5 pl-3 text-slate-400 italic">{item.notes || '—'}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    )}
+                                    {r.notes && <p className="text-[10px] text-slate-500 italic mb-1">Obs: {r.notes}</p>}
+                                    {r.confirmed_at && (
+                                        <p className="text-[9px] text-blue-600 font-black">
+                                            Enviada: {fmtDate(r.confirmed_at)} por {r.confirmed_by}
+                                        </p>
+                                    )}
+                                    {r.received_at && (
+                                        <p className="text-[9px] text-emerald-600 font-black mt-0.5">
+                                            Recibida: {fmtDate(r.received_at)} por {r.received_by}
+                                        </p>
+                                    )}
                                 </div>
                             )}
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>

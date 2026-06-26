@@ -4,6 +4,7 @@ import { api } from '../../services/api';
 import { toast } from 'sonner';
 import { Truck, ChevronDown, ChevronRight, Search, AlertCircle, AlertTriangle, Plus } from 'lucide-react';
 import AssignmentModal from './AssignmentModal';
+import ConciliacionDevolucionModal from './ConciliacionDevolucionModal';
 
 interface DocNormal {
     id: string;
@@ -30,6 +31,11 @@ interface InvoiceRow {
     forma_pago?: string;
     es_devolucion?: boolean;
     route_vehicle_plate?: string;
+    invoice_value?: number;
+    total_qty?: number;
+    vehicle_plate?: string;
+    conductor_id?: string;
+    conductor_name?: string;
 }
 
 type EstadoEntrega = 'entregado' | 'parcial' | 'devolucion' | '';
@@ -71,6 +77,9 @@ const TabPlanNormal: React.FC<Props> = ({ clientId, user }) => {
     const [vehicles, setVehicles] = useState<any[]>([]);
     const [assignments, setAssignments] = useState<any[]>([]);
     const [assigningInvoice, setAssigningInvoice] = useState<InvoiceRow | null>(null);
+
+    // Modal devolución
+    const [devolucionInvoice, setDevolucionInvoice] = useState<InvoiceRow | null>(null);
 
     const loadDocs = useCallback(async () => {
         if (!clientId) return;
@@ -139,6 +148,14 @@ const TabPlanNormal: React.FC<Props> = ({ clientId, user }) => {
         }
     }, [loadDocs]);
 
+    const handleEstadoClick = useCallback((inv: InvoiceRow, estado: EstadoEntrega) => {
+        if (estado === 'devolucion') {
+            setDevolucionInvoice(inv);
+            return;
+        }
+        saveEstado(inv, estado);
+    }, []);  // eslint-disable-line
+
     const saveEstado = useCallback(async (inv: InvoiceRow, estado: EstadoEntrega) => {
         if (!selectedDoc || !estado) return;
         setSaving(s => ({ ...s, [inv.invoice_number]: true }));
@@ -152,7 +169,6 @@ const TabPlanNormal: React.FC<Props> = ({ clientId, user }) => {
             });
             setEstados(s => ({ ...s, [inv.invoice_number]: estado }));
             toast.success(`Factura ${inv.invoice_number} → ${estado}`);
-            // refresh doc list badge
             loadDocs();
         } catch {
             toast.error('Error guardando estado');
@@ -389,7 +405,7 @@ const TabPlanNormal: React.FC<Props> = ({ clientId, user }) => {
                                                                         const isActive = current === opt.value;
                                                                         return (
                                                                             <button key={opt.value}
-                                                                                onClick={() => saveEstado(inv, opt.value)}
+                                                                                onClick={() => handleEstadoClick(inv, opt.value)}
                                                                                 disabled={isBusy}
                                                                                 className={`px-2.5 py-1.5 rounded-lg border text-[8px] font-black uppercase tracking-wide transition-all disabled:opacity-40
                                                                                     ${isActive
@@ -527,6 +543,23 @@ const TabPlanNormal: React.FC<Props> = ({ clientId, user }) => {
                     }}
                 />
             )}
+
+            {/* Modal de Confirmación de Devolución */}
+            <ConciliacionDevolucionModal
+                isOpen={!!devolucionInvoice}
+                onClose={() => setDevolucionInvoice(null)}
+                invoice={devolucionInvoice}
+                documentId={selectedDoc?.id || ''}
+                currentUserId={user?.id || ''}
+                vehiclePlate={devolucionInvoice?.vehicle_plate || devolucionInvoice?.route_vehicle_plate}
+                conductorId={devolucionInvoice?.conductor_id}
+                conductorName={devolucionInvoice?.conductor_name}
+                onSaved={(invoiceNumber) => {
+                    setEstados(s => ({ ...s, [invoiceNumber]: 'devolucion' }));
+                    setDevolucionInvoice(null);
+                    loadDocs();
+                }}
+            />
         </div>
     );
 };

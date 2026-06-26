@@ -9,6 +9,21 @@ interface LearningPatternData {
 
 export const getRoutes = async (req: Request, res: Response) => {
   try {
+    const { date, clientId } = req.query as { date?: string; clientId?: string };
+
+    const params: any[] = [];
+    // Con fecha explícita: traer ese día exacto sin ventana
+    // Sin fecha: ventana de 7 días para carga inicial del dashboard
+    const dateFilterRoutes = date
+      ? `r.created_at::date = $${params.push(date)}`
+      : `r.created_at >= CURRENT_DATE - INTERVAL '7 days'`;
+    const dateFilterDA = date
+      ? `da.created_at::date = $${params.length > 0 ? params.length : params.push(date)}`
+      : `da.created_at >= CURRENT_DATE - INTERVAL '7 days'`;
+    const clientFilter = clientId
+      ? `AND r.client_id::text = $${params.push(clientId)}`
+      : '';
+
     const result = await pool.query(`
       WITH ri_stats AS (
         SELECT
@@ -26,32 +41,21 @@ export const getRoutes = async (req: Request, res: Response) => {
           OR di.invoice = SPLIT_PART(ri.invoice_id, '_', 2)
         WHERE di.item_status IN ('EST-11','EST-12','EST-13','EST-14','COMPLETED','ENTREGADO','FINALIZADO')
         GROUP BY ri.route_id
-      ),
-      active_routes AS (
-        SELECT DISTINCT route_id
-        FROM route_invoices ri
-        LEFT JOIN document_items di
-          ON di.invoice = ri.invoice_id
-          OR di.invoice = SPLIT_PART(ri.invoice_id, '_', 2)
-        WHERE di.item_status NOT IN ('EST-12','EST-13','EST-14','COMPLETADO','FINALIZADO','ENTREGADO')
-           OR di.item_status IS NULL
       )
       SELECT
         r.id::text, r.vehicle_id::text, r.driver_id::text, r.client_id::text,
         r.created_by::text, r.status_id::text, r.created_at,
         v.plate, d.name AS driver_name, d.document_number AS driver_document,
-        COALESCE(s.invoice_ids, '[]'::json)           AS invoice_ids,
-        COALESCE(s.total_invoices, 0)               AS total_invoices,
-        COALESCE(del.delivered_invoices, 0)         AS delivered_invoices,
-        COALESCE(r.total_volume_m3, 0)::float       AS total_volume_m3
+        COALESCE(s.invoice_ids, '[]'::json)     AS invoice_ids,
+        COALESCE(s.total_invoices, 0)           AS total_invoices,
+        COALESCE(del.delivered_invoices, 0)     AS delivered_invoices,
+        COALESCE(r.total_volume_m3, 0)::float   AS total_volume_m3
       FROM routes r
-      LEFT JOIN vehicles    v   ON v.id::text        = r.vehicle_id::text
-      LEFT JOIN drivers     d   ON d.id::text        = r.driver_id::text
-      LEFT JOIN ri_stats    s   ON s.route_id::text  = r.id::text
+      LEFT JOIN vehicles     v   ON v.id::text       = r.vehicle_id::text
+      LEFT JOIN drivers      d   ON d.id::text       = r.driver_id::text
+      LEFT JOIN ri_stats     s   ON s.route_id::text = r.id::text
       LEFT JOIN ri_delivered del ON del.route_id::text = r.id::text
-      INNER JOIN active_routes ar ON ar.route_id::text = r.id::text
-      WHERE r.created_at >= CURRENT_DATE - INTERVAL '7 days'
-        AND r.status_id NOT IN ('EST-16', 'COMPLETADO', 'FINALIZADO')
+      WHERE ${dateFilterRoutes} ${clientFilter}
 
       UNION ALL
 
@@ -75,18 +79,12 @@ export const getRoutes = async (req: Request, res: Response) => {
       LEFT JOIN assignments a ON a.driver_id::text = da.driver_id::text AND a.is_active = true
       LEFT JOIN vehicles    v ON v.id::text        = a.vehicle_id::text
       LEFT JOIN drivers     d ON d.id::text        = da.driver_id::text
-      WHERE da.status IN ('PENDING_SIGNATURES','EN_RUTA','En repart','PENDING')
-        AND da.created_at >= CURRENT_DATE - INTERVAL '7 days'
+      WHERE ${dateFilterDA}
 
       ORDER BY created_at DESC
-    `);
-    
-    if (result.rows.length > 0) {
-      console.log(`[M7-SUCCESS] getRoutes: Enviando ${result.rows.length} rutas activas (últimos 7 días).`);
-    } else {
-      console.warn('[M7-WARN] getRoutes: No se encontraron rutas activas en los últimos 7 días.');
-    }
+    `, params);
 
+    console.log(`[M7-SUCCESS] getRoutes: ${result.rows.length} rutas (date=${date || 'hoy-7d'}, client=${clientId || 'todos'})`);
     res.json(result.rows);
   } catch (err: any) {
     console.error('[M7-GET-ROUTES-ERR]', err);

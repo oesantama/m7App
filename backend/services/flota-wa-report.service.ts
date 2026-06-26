@@ -182,7 +182,7 @@ function buildHtml(rows: FlotaRow[], tdm: TdmSummary, m7sum: M7Summary, fecha: s
   const tdmIntRealPct = tdmIntTotalPct >= 20
     ? tdmIntTotalPct / 2
     : Math.max(0, tdmIntTotalPct - 10);
-  const fmtPct = (n: number) => `${n.toFixed(1)}%`;
+  const fmtPct = (n: number) => `${Math.round(n)}`;
 
   // Barras comparativas (altura proporcional, mín 4px)
   const totalCli = m7ClientList.length + tdmClientList.length || 1;
@@ -215,9 +215,9 @@ function buildHtml(rows: FlotaRow[], tdm: TdmSummary, m7sum: M7Summary, fecha: s
       <div class="kpi" style="background:linear-gradient(135deg,#92400e,#b45309)"><div class="kv">${tdmClientList.length}</div><div class="kt">TDM Clientes</div></div>
     </div>
     <div style="display:flex;gap:4px;padding-bottom:5px">
-      <div class="kpi" style="background:linear-gradient(135deg,#065f46,#059669)"><div class="kv">${fmtPct(m7IntPct)}</div><div class="kt">M7 Intermediación</div></div>
-      <div class="kpi" style="background:linear-gradient(135deg,#6d28d9,#7c3aed)"><div class="kv">${fmtPct(tdmIntTotalPct)}</div><div class="kt">TDM Intermed. Total</div></div>
-      <div class="kpi" style="background:linear-gradient(135deg,#9f1239,#e11d48)"><div class="kv">${fmtPct(tdmIntRealPct)}</div><div class="kt">TDM Intermed. Real</div></div>
+      <div class="kpi" style="background:linear-gradient(135deg,#065f46,#059669)"><div class="kv">${fmtPct(m7IntPct)}</div><div class="kt">M7 Ruta</div></div>
+      <div class="kpi" style="background:linear-gradient(135deg,#6d28d9,#7c3aed)"><div class="kv">${fmtPct(tdmIntTotalPct)}</div><div class="kt">TDM Ruta Total</div></div>
+      <div class="kpi" style="background:linear-gradient(135deg,#9f1239,#e11d48)"><div class="kv">${fmtPct(tdmIntRealPct)}</div><div class="kt">TDM Ruta Real</div></div>
     </div>
   </div>`;
 

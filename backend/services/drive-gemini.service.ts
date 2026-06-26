@@ -1,19 +1,14 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import pool from '../config/database.js';
 import { exec } from 'child_process';
 import util from 'util';
 import fs from 'fs';
 import path from 'path';
 import { createRequire } from 'module';
+import { AIOrchestrator } from './ai-orchestrator/orchestrator.js';
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
 
 const execAsync = util.promisify(exec);
-
-const getAPIKeysPool = (): string[] => {
-    const rawKeys = process.env.GEMINI_API_KEY || '';
-    return rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
-};
 
 export const syncDriveCumplidos = async () => {
     console.log('[M7-CRON] Iniciando sincronización de Drive vs Planillas para CLI-09...');
@@ -66,13 +61,6 @@ export const syncDriveCumplidos = async () => {
 
         console.log(`[M7-CRON] Se encontraron ${missingDocs.length} cumplidos sin procesar en planillas.`);
 
-        const keys = getAPIKeysPool();
-        if (keys.length === 0) {
-            console.error('[M7-CRON] No hay API keys disponibles para procesar.');
-            return;
-        }
-
-        let keyIndex = 0;
         const tmpDir = path.join(process.cwd(), 'scratch', 'temp_pdfs');
         if (!fs.existsSync(tmpDir)) {
             fs.mkdirSync(tmpDir, { recursive: true });
@@ -115,8 +103,6 @@ export const syncDriveCumplidos = async () => {
                     console.error(`[M7-CRON] Error leyendo PDF localmente:`, e);
                 }
 
-                const base64Data = fs.readFileSync(localPath).toString('base64');
-
                 const systemPrompt = `
 Eres un asistente experto en extracción de datos tabulares a JSON.
 Analiza esta planilla de despacho y extrae TODOS los registros en formato JSON.
@@ -151,54 +137,27 @@ Campos exactos por cada fila:
 - notas (Extraer observaciones)
 `;
 
-                let fileSuccess = false;
-                let attempts = 0;
                 let matches: any[] = [];
-                
-                const fallBackModels = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest"];
-
-                while (!fileSuccess && attempts < keys.length * fallBackModels.length) {
-                    try {
-                        const currentKey = keys[keyIndex % keys.length];
-                        const currentModel = fallBackModels[Math.floor(attempts / keys.length) % fallBackModels.length];
-                        const genAI = new GoogleGenerativeAI(currentKey);
-                        const modelIA = genAI.getGenerativeModel({ model: currentModel });
-
-                        console.log(`[M7-CRON] Analizando ${doc.file_name} IA (Intento ${attempts + 1}). Llave ...${currentKey.slice(-4)} Modelo: ${currentModel}`);
-                        
-                        let promptContent: any[] = [systemPrompt];
-                        if (useTextFallback) {
-                             promptContent.push(`TEXTO EXTRAÍDO DEL DOCUMENTO:\n\n${textContent}`);
-                        } else {
-                             promptContent.push({ inlineData: { data: base64Data, mimeType: "application/pdf" } });
-                        }
-
-                        const result = await modelIA.generateContent(promptContent);
-                        
-                        const responseText = await result.response.text();
-                        const cleanJsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-                        const parsed = JSON.parse(cleanJsonStr);
-                        matches = parsed.matches || (Array.isArray(parsed) ? parsed : []);
-                        fileSuccess = true;
-                    } catch (apiErr: any) {
-                        lastFileError = apiErr.message || 'Error desconocido';
-                        
-                        if (lastFileError.includes('429') || lastFileError.includes('404')) {
-                            console.log(`[M7-CRON] Cuota (429) o Modelo (404) excedido/no-encontrado. Rotando...`);
-                            keyIndex++;
-                            attempts++;
-                            if (attempts < keys.length * fallBackModels.length) {
-                                await new Promise(r => setTimeout(r, 2000));
-                            }
-                        } else {
-                            console.error(`[M7-CRON] Error crítico no-cuota procesando ${doc.file_name}:`, lastFileError);
-                            break;
-                        }
+                try {
+                    let promptText = systemPrompt;
+                    if (useTextFallback) {
+                        promptText += `\n\nTEXTO EXTRAÍDO DEL DOCUMENTO:\n\n${textContent}`;
                     }
-                }
 
-                if (!fileSuccess) {
-                    throw new Error(lastFileError);
+                    console.log(`[M7-CRON] Analizando ${doc.file_name} usando AIOrchestrator...`);
+                    const result = await AIOrchestrator.execute({
+                        prompt: promptText,
+                        imageBuffer: useTextFallback ? undefined : fs.readFileSync(localPath),
+                        imageMimeType: useTextFallback ? undefined : 'application/pdf',
+                        taskType: 'extraction',
+                        temperature: 0.1
+                    });
+
+                    const cleanJsonStr = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
+                    const parsed = JSON.parse(cleanJsonStr);
+                    matches = parsed.matches || (Array.isArray(parsed) ? parsed : []);
+                } catch (apiErr: any) {
+                    throw apiErr;
                 }
 
                 if (Array.isArray(matches) && matches.length > 0) {
@@ -251,9 +210,15 @@ Campos exactos por cada fila:
             }
             
             // Si el último error es de cuota y se agotaron los intentos, abortar todo el cron
-            if (lastFileError && lastFileError.includes('429')) {
-                console.warn('[M7-CRON] Se agotaron todas las API Keys por límite de cuota (429). Abortando lote...');
-                errorMessage = 'Cuota Gemini excedida (429) en todas las llaves. Pausado hasta el próximo ciclo.';
+            const isQuotaError = lastFileError && (
+                lastFileError.includes('429') || 
+                lastFileError.toLowerCase().includes('quota') || 
+                lastFileError.toLowerCase().includes('limit') ||
+                lastFileError.toLowerCase().includes('exhausted')
+            );
+            if (isQuotaError) {
+                console.warn('[M7-CRON] Se agotaron todas las API Keys por límite de cuota. Abortando lote...');
+                errorMessage = 'Cuota excedida en todas las llaves del orquestador. Pausado hasta el próximo ciclo.';
                 break;
             }
 
@@ -264,7 +229,7 @@ Campos exactos por cada fila:
         if (failedCount > 0 && !errorMessage) {
             errorMessage = `Último error de archivo: ${lastFileError}`;
             if (savedCount === 0) status = 'ERROR';
-        } else if (errorMessage && errorMessage.includes('429')) {
+        } else if (errorMessage && (errorMessage.includes('429') || errorMessage.toLowerCase().includes('cuota') || errorMessage.toLowerCase().includes('quota'))) {
             status = 'ERROR';
         }
         console.log('[M7-CRON] Sincronización finalizada.');

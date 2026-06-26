@@ -180,6 +180,24 @@ export const confirmSupplierReturn = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * PATCH /api/inventory/supplier-returns/:id/received
+ * Confirma el recibido físico en proveedor (status: confirmada → recibida)
+ */
+export const receivedSupplierReturn = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { receivedBy } = req.body;
+  try {
+    await pool.query(
+      `UPDATE supplier_returns SET status='recibida', received_by=$1, received_at=CURRENT_TIMESTAMP WHERE id=$2 AND status='confirmada'`,
+      [receivedBy, id]
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // ─── CONCILIACIÓN (CABECERA + TRANSACCIONES) ──────────────────────────────────
 
 /**

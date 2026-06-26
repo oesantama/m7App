@@ -7,6 +7,7 @@ import {
   getSupplierReturns,
   createSupplierReturn,
   confirmSupplierReturn,
+  receivedSupplierReturn,
   getConciliationHeaders,
   saveConciliationHeader,
   approveConciliationHeader,
@@ -50,6 +51,7 @@ router.get('/route-assignments', requireInventoryView, getRouteAssignmentItems);
 router.get('/supplier-returns', requireInventoryView, getSupplierReturns);
 router.post('/supplier-returns', requireInventoryEdit, createSupplierReturn);
 router.patch('/supplier-returns/:id/confirm', requireInventoryEdit, confirmSupplierReturn);
+router.patch('/supplier-returns/:id/received', requireInventoryEdit, receivedSupplierReturn);
 
 // ─── Conciliación (Cabecera + Transacciones) ──────────────────────────────────
 router.get('/conciliation-headers', requireInventoryView, getConciliationHeaders);

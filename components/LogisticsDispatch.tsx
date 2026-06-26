@@ -99,6 +99,21 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
     const [isValidating, setIsValidating] = useState(false);
+
+    // Rutas locales para la fecha+cliente seleccionados — reemplaza el prop cuando hay selección explícita
+    const [localRoutes, setLocalRoutes] = useState<any[] | null>(null);
+    const [isFetchingRoutes, setIsFetchingRoutes] = useState(false);
+
+    useEffect(() => {
+        if (!filterDate) { setLocalRoutes(null); return; }
+        let cancelled = false;
+        setIsFetchingRoutes(true);
+        api.getRoutes({ date: filterDate, ...(internalClientId ? { clientId: internalClientId } : {}) })
+            .then((rows: any[]) => { if (!cancelled) setLocalRoutes(rows || []); })
+            .catch(() => { if (!cancelled) setLocalRoutes([]); })
+            .finally(() => { if (!cancelled) setIsFetchingRoutes(false); });
+        return () => { cancelled = true; };
+    }, [filterDate, internalClientId]);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const [isReassigningPlate, setIsReassigningPlate] = useState(false);
 
@@ -1489,7 +1504,8 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     // FILTRO DE PRIVACIDAD POR ROL DE CONDUCTOR + CLIENTE
     const filteredRoutes = React.useMemo(() => {
         if (!user) return [];
-        let routes = activeRoutes;
+        // localRoutes tiene los datos del servidor para la fecha+cliente — tiene precedencia sobre el prop
+        let routes = localRoutes ?? activeRoutes;
 
         // Filtro por cliente seleccionado
         if (internalClientId) {
@@ -1542,7 +1558,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         }
         // Admin u otros roles ven todo (filtrado por cliente)
         return routes;
-    }, [activeRoutes, user, assignments, drivers, internalClientId, filterDate]);
+    }, [activeRoutes, localRoutes, user, assignments, drivers, internalClientId, filterDate]);
 
     // DIAGNÓSTICO DE DATOS (M7-DEBUG)
     useEffect(() => {
@@ -2102,16 +2118,22 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         <Icons.History className="w-3 h-3 opacity-60 group-hover:opacity-100" />
                         <span>Historial</span>
                     </button>
-                    <button 
+                    <button
                         onClick={() => {
                             fetchLocations();
                             onRefresh();
+                            // Re-fetch rutas con la selección actual
+                            if (filterDate) {
+                                api.getRoutes({ date: filterDate, ...(internalClientId ? { clientId: internalClientId } : {}) })
+                                    .then((rows: any[]) => setLocalRoutes(rows || []))
+                                    .catch(() => {});
+                            }
                             toast.info("Actualizando datos operativos...");
                         }}
-                        disabled={isValidating}
-                        className={`w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-slate-950 hover:bg-emerald-400 transition-all ${isValidating ? 'animate-spin' : ''}`}
+                        disabled={isValidating || isFetchingRoutes}
+                        className={`w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-slate-950 hover:bg-emerald-400 transition-all ${(isValidating || isFetchingRoutes) ? 'animate-spin' : ''}`}
                     >
-                        <Icons.RefreshCw className={`w-3.5 h-3.5 ${isValidating ? 'animate-spin' : ''}`} />
+                        <Icons.RefreshCw className={`w-3.5 h-3.5 ${(isValidating || isFetchingRoutes) ? 'animate-spin' : ''}`} />
                     </button>
                 </div>
             </header>
