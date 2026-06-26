@@ -1735,6 +1735,11 @@ export const restoreSystem = async () => {
       ALTER TABLE noticias ADD COLUMN IF NOT EXISTS asistencia_drive_path TEXT;
     `);
 
+    // Columna Drive en training_sessions para PDF de asistencia
+    await client.query(`
+      ALTER TABLE training_sessions ADD COLUMN IF NOT EXISTS asistencia_drive_path TEXT;
+    `);
+
     await client.query('COMMIT');
 
     // FASE FINAL: SINCRONIZACIÓN NUCLEAR DE MENÚS (REUBICACIÓN LOGÍSTICA)

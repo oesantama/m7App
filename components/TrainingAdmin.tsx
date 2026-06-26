@@ -254,7 +254,7 @@ const TrainingAdmin: React.FC = () => {
                                 <h2 className="text-lg font-black uppercase tracking-tight line-clamp-1">{selectedSession.topic}</h2>
                                 <p className="text-[9px] text-slate-400 mt-0.5">{attendance.length} asistentes registrados</p>
                             </div>
-                            <div className="flex gap-2 flex-wrap">
+                            <div className="flex gap-2 flex-wrap items-center">
                                 <button
                                     onClick={downloadPDF}
                                     disabled={pdfLoading || attendance.length === 0}
@@ -263,14 +263,9 @@ const TrainingAdmin: React.FC = () => {
                                     {pdfLoading ? <Icons.Loader className="w-3 h-3 animate-spin" /> : <Icons.FileText className="w-3 h-3" />}
                                     PDF
                                 </button>
-                                <button
-                                    onClick={uploadDrive}
-                                    disabled={driveLoading || attendance.length === 0}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-blue-500 transition-all disabled:opacity-40 flex items-center gap-2"
-                                >
-                                    {driveLoading ? <Icons.Loader className="w-3 h-3 animate-spin" /> : <Icons.Upload className="w-3 h-3" />}
-                                    Drive
-                                </button>
+                                <span className="text-[8px] font-black text-blue-300 uppercase tracking-widest flex items-center gap-1">
+                                    <Icons.Upload className="w-2.5 h-2.5" /> Drive: automático
+                                </span>
                                 <button onClick={() => setSelectedSession(null)} className="w-9 h-9 flex items-center justify-center bg-white/10 rounded-xl hover:bg-red-500 transition-all">
                                     <Icons.Plus className="w-4 h-4 rotate-45" />
                                 </button>
