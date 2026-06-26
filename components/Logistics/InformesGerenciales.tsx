@@ -1258,6 +1258,7 @@ export const InformesGerenciales: React.FC = () => {
         manRecDaysCount: number;
         receivedValue: number;
         receivedDiffMonth: number;
+        isFromTdmFlota: boolean;
       } 
     } = {};
 
@@ -1277,6 +1278,9 @@ export const InformesGerenciales: React.FC = () => {
             client = String(cli.name).trim().toUpperCase();
           }
         }
+      }
+      if (client.includes('PREBEL')) {
+        client = 'PREBEL';
       }
 
       const cxc = parseValNum(r.total_cxc);
@@ -1306,7 +1310,8 @@ export const InformesGerenciales: React.FC = () => {
           totalManRecDays: 0,
           manRecDaysCount: 0,
           receivedValue: 0,
-          receivedDiffMonth: 0
+          receivedDiffMonth: 0,
+          isFromTdmFlota: false
         };
       }
 
@@ -1398,7 +1403,10 @@ export const InformesGerenciales: React.FC = () => {
           invoicedSameMonth: 0, totalPaymentDays: 0, paymentDaysCount: 0,
           totalRecDays: 0, recDaysCount: 0, totalEgrDays: 0, egrDaysCount: 0,
           totalManRecDays: 0, manRecDaysCount: 0, receivedValue: 0, receivedDiffMonth: 0,
+          isFromTdmFlota: true
         };
+      } else {
+        clientsMap[client].isFromTdmFlota = true;
       }
       clientsMap[client].ventaTotal += cobrar;
       clientsMap[client].ingTerceros += pagar;
@@ -1421,7 +1429,7 @@ export const InformesGerenciales: React.FC = () => {
       const ingTerceros = node.ingTerceros;
       const ingresosPropios = ventaTotal - ingTerceros;
       const rawPct = ventaTotal > 0 ? (ingresosPropios / ventaTotal) * 100 : 0;
-      const int = clientName.toUpperCase().startsWith('TDM') ? calcIntReal(rawPct) : rawPct;
+      const int = node.isFromTdmFlota ? calcIntReal(rawPct) : rawPct;
       const vehiculosCount = node.vehicles.size;
       const workedDaysCount = node.workedDates.size;
       const totalVehicleUtilizations = node.vehicleDays.size;
@@ -1507,6 +1515,7 @@ export const InformesGerenciales: React.FC = () => {
         manRecDaysCount: number;
         receivedValue: number;
         receivedDiffMonth: number;
+        isFromTdmFlota: boolean;
       } 
     } = {};
 
@@ -1519,7 +1528,10 @@ export const InformesGerenciales: React.FC = () => {
       // Join logic using provClientes state
       const doc = r.client_document ? String(r.client_document).trim().toUpperCase() : 'S/I';
       const match = provClientes.find(pc => String(pc.documento).trim().toUpperCase() === doc);
-      const client = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
+      let client = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
+      if (client.includes('PREBEL')) {
+        client = 'PREBEL';
+      }
 
       const cxc = parseValNum(r.total_cxc);
       const cxcFinal = parseValNum(r.total_value_cxc_final);
@@ -1548,7 +1560,8 @@ export const InformesGerenciales: React.FC = () => {
           totalManRecDays: 0,
           manRecDaysCount: 0,
           receivedValue: 0,
-          receivedDiffMonth: 0
+          receivedDiffMonth: 0,
+          isFromTdmFlota: false
         };
       }
 
@@ -1640,7 +1653,10 @@ export const InformesGerenciales: React.FC = () => {
           invoicedSameMonth: 0, totalPaymentDays: 0, paymentDaysCount: 0,
           totalRecDays: 0, recDaysCount: 0, totalEgrDays: 0, egrDaysCount: 0,
           totalManRecDays: 0, manRecDaysCount: 0, receivedValue: 0, receivedDiffMonth: 0,
+          isFromTdmFlota: true
         };
+      } else {
+        clientsMap[client].isFromTdmFlota = true;
       }
       clientsMap[client].ventaTotal += cobrar;
       clientsMap[client].ingTerceros += pagar;
@@ -1664,7 +1680,7 @@ export const InformesGerenciales: React.FC = () => {
       const ingTerceros = node.ingTerceros;
       const ingresosPropios = ventaTotal - ingTerceros;
       const rawPct = ventaTotal > 0 ? (ingresosPropios / ventaTotal) * 100 : 0;
-      const int = clientName.toUpperCase().startsWith('TDM') ? calcIntReal(rawPct) : rawPct;
+      const int = node.isFromTdmFlota ? calcIntReal(rawPct) : rawPct;
       const vehiculosCount = node.vehicles.size;
       const workedDaysCount = node.workedDates.size;
       const totalVehicleUtilizations = node.vehicleDays.size;
@@ -1750,6 +1766,7 @@ export const InformesGerenciales: React.FC = () => {
           ingresosPropios: number;
           int: number;
         }>;
+        isFromTdmFlota: boolean;
       }
     } = {};
 
@@ -1761,7 +1778,10 @@ export const InformesGerenciales: React.FC = () => {
 
       const doc = r.client_document ? String(r.client_document).trim().toUpperCase() : 'S/I';
       const match = provClientes.find(pc => String(pc.documento).trim().toUpperCase() === doc);
-      const providerClient = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
+      let providerClient = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
+      if (providerClient.includes('PREBEL')) {
+        providerClient = 'PREBEL';
+      }
 
       let tdmClient = r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I';
       if (tdmClient === 'LOGISTICA,TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S' || tdmClient === 'LOGISTICA, TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S') {
@@ -1773,6 +1793,9 @@ export const InformesGerenciales: React.FC = () => {
             tdmClient = String(cli.name).trim().toUpperCase();
           }
         }
+      }
+      if (tdmClient.includes('PREBEL')) {
+        tdmClient = 'PREBEL';
       }
 
       if (targetClient !== 'GENERAL' && providerClient !== targetClient && tdmClient !== targetClient) {
@@ -1799,7 +1822,8 @@ export const InformesGerenciales: React.FC = () => {
           ventaTotal: 0,
           ingTerceros: 0,
           manifestCount: 0,
-          manifests: []
+          manifests: [],
+          isFromTdmFlota: false
         };
       }
 
@@ -1831,7 +1855,9 @@ export const InformesGerenciales: React.FC = () => {
       const pagar = Number(r.valor_pagar) || 0;
       const mapKey = targetClient === 'GENERAL' ? `${plate}_${rowClient}` : plate;
       if (!platesMap[mapKey]) {
-        platesMap[mapKey] = { plate, clientName: rowClient, ventaTotal: 0, ingTerceros: 0, manifestCount: 0, manifests: [] };
+        platesMap[mapKey] = { plate, clientName: rowClient, ventaTotal: 0, ingTerceros: 0, manifestCount: 0, manifests: [], isFromTdmFlota: true };
+      } else {
+        platesMap[mapKey].isFromTdmFlota = true;
       }
       platesMap[mapKey].ventaTotal += cobrar;
       platesMap[mapKey].ingTerceros += pagar;
@@ -1848,7 +1874,7 @@ export const InformesGerenciales: React.FC = () => {
     const rawPlates = Object.values(platesMap).map(p => {
       const ingresosPropios = p.ventaTotal - p.ingTerceros;
       const rawPct = p.ventaTotal > 0 ? (ingresosPropios / p.ventaTotal) * 100 : 0;
-      const int = p.clientName.toUpperCase().startsWith('TDM') ? calcIntReal(rawPct) : rawPct;
+      const int = p.isFromTdmFlota ? calcIntReal(rawPct) : rawPct;
       return {
         ...p,
         ingresosPropios,
@@ -1906,7 +1932,10 @@ export const InformesGerenciales: React.FC = () => {
 
       const doc = r.client_document ? String(r.client_document).trim().toUpperCase() : 'S/I';
       const match = provClientes.find(pc => String(pc.documento).trim().toUpperCase() === doc);
-      const providerClient = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
+      let providerClient = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
+      if (providerClient.includes('PREBEL')) {
+        providerClient = 'PREBEL';
+      }
 
       let tdmClient = r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I';
       if (tdmClient === 'LOGISTICA,TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S' || tdmClient === 'LOGISTICA, TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S') {
@@ -1918,6 +1947,9 @@ export const InformesGerenciales: React.FC = () => {
             tdmClient = String(cli.name).trim().toUpperCase();
           }
         }
+      }
+      if (tdmClient.includes('PREBEL')) {
+        tdmClient = 'PREBEL';
       }
 
       if (targetClient !== 'GENERAL' && providerClient !== targetClient && tdmClient !== targetClient) {
@@ -2475,7 +2507,7 @@ export const InformesGerenciales: React.FC = () => {
       const totalIngTerceros = vehiclesData.reduce((sum, item) => sum + item.ingTerceros, 0);
       const totalIngresosPropios = totalVentas - totalIngTerceros;
       const rawIntVal = totalVentas > 0 ? (totalIngresosPropios / totalVentas) * 100 : 0;
-      const isTdmClient = selectedClientForVehiclesInt && selectedClientForVehiclesInt.toUpperCase().startsWith('TDM');
+      const isTdmClient = vehiclesData.some((item: any) => item.isFromTdmFlota);
       const overallInt = (isTdmClient ? calcIntReal(rawIntVal) : rawIntVal) / 100;
       const totalManifests = vehiclesData.reduce((sum, item) => sum + item.manifestCount, 0);
 
@@ -4835,7 +4867,7 @@ export const InformesGerenciales: React.FC = () => {
                       const totalIngTerceros = sortedData.reduce((sum: number, item: any) => sum + item.ingTerceros, 0);
                       const totalIngresosPropios = totalVentas - totalIngTerceros;
                       const rawIntVal = totalVentas > 0 ? (totalIngresosPropios / totalVentas) * 100 : 0;
-                      const isTdmClient = selectedClientForVehiclesInt && selectedClientForVehiclesInt.toUpperCase().startsWith('TDM');
+                      const isTdmClient = sortedData.some((item: any) => item.isFromTdmFlota);
                       const overallInt = (isTdmClient ? calcIntReal(rawIntVal) : rawIntVal) / 100;
                       const totalManifests = sortedData.reduce((sum: number, item: any) => sum + item.manifestCount, 0);
 
