@@ -293,7 +293,7 @@ export const downloadSessionPDF = async (req: Request, res: Response) => {
     const sess = sessRes.rows[0];
 
     // Sincronizar solo si hay firmas pendientes
-    await triggerSessionAsistenciaDrive(id, sess).catch(e =>
+    await triggerSessionAsistenciaDrive(String(id), sess).catch(e =>
       console.warn('[TRAINING-PDF] sync Drive falló:', e.message)
     );
 

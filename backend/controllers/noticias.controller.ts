@@ -475,7 +475,7 @@ export const uploadNoticiaAsistenciaToDrive = async (req: Request, res: Response
     );
 
     const pdf = await generateAsistenciaPDF(attRes.rows, { titulo: n.titulo });
-    const { drive_path, drive_link } = await uploadAsistenciaToDrive(pdf, n.titulo, 'noticias');
+    const { drive_path, drive_link } = await uploadAsistenciaToDrive(pdf, n.titulo);
     res.json({ success: true, drive_path, drive_link, total: attRes.rowCount });
   } catch (e: any) {
     console.error('[NOTICIAS-ASIST-DRIVE]', e.message);
