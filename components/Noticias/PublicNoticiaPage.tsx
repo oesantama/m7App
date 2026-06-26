@@ -388,8 +388,8 @@ function AsistenciaForm({ noticiaId, onOk }: { noticiaId: string; onOk: () => vo
               <label style={labelStyle}>Firma <span style={{color:'#ef4444'}}>*</span></label>
               <button type="button" onClick={clearCanvas} style={{fontSize:9,fontWeight:900,color:'#f87171',background:'none',border:'none',cursor:'pointer',textTransform:'uppercase'}}>Limpiar</button>
             </div>
-            <canvas ref={canvasRef} width={460} height={90}
-              style={{width:'100%',height:70,background:'white',border:'1.5px solid #e2e8f0',borderRadius:10,cursor:'crosshair',touchAction:'none',display:'block',boxSizing:'border-box'}}
+            <canvas ref={canvasRef} width={600} height={180}
+              style={{width:'100%',height:130,background:'white',border:'1.5px solid #e2e8f0',borderRadius:10,cursor:'crosshair',touchAction:'none',display:'block',boxSizing:'border-box'}}
               onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
               onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}/>
           </div>

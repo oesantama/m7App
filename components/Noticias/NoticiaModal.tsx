@@ -636,8 +636,8 @@ export default function NoticiaModal({ noticias, userId, onAllSeen }: Props) {
                             <span style={{fontSize:9,fontWeight:900,color:'#6366f1',textTransform:'uppercase',letterSpacing:1}}>Firma</span>
                             <button onClick={clearCanvas} style={{fontSize:9,fontWeight:900,color:'#f87171',background:'none',border:'none',cursor:'pointer',textTransform:'uppercase'}}>Limpiar</button>
                           </div>
-                          <canvas ref={canvasRef} width={460} height={90}
-                            style={{width:'100%',height:70,background:'white',border:'2px solid #c7d2fe',borderRadius:10,cursor:'crosshair',touchAction:'none',display:'block'}}
+                          <canvas ref={canvasRef} width={600} height={180}
+                            style={{width:'100%',height:130,background:'white',border:'2px solid #c7d2fe',borderRadius:10,cursor:'crosshair',touchAction:'none',display:'block'}}
                             onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
                             onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}/>
                         </div>

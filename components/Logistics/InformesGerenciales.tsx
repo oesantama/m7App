@@ -1239,6 +1239,7 @@ export const InformesGerenciales: React.FC = () => {
   };
 
   const getClientTdmTableData = () => {
+    const toDateOnly = (d: Date | null) => d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
     const clientsMap: { 
       [clientName: string]: { 
         ventaTotal: number; 
@@ -1285,7 +1286,8 @@ export const InformesGerenciales: React.FC = () => {
       const ingTercerosRecord = parseValNum(r.total_value_cxp_final);
 
       const plate = r.plate ? String(r.plate).trim().toUpperCase() : '';
-      const date = r.manifest_date ? String(r.manifest_date).trim() : '';
+      const dManDateParsed = toDateOnly(parseCustomDate(r.manifest_date));
+      const date = dManDateParsed ? `${dManDateParsed.getFullYear()}-${String(dManDateParsed.getMonth() + 1).padStart(2, '0')}-${String(dManDateParsed.getDate()).padStart(2, '0')}` : '';
 
       if (!clientsMap[client]) {
         clientsMap[client] = {
@@ -1312,14 +1314,13 @@ export const InformesGerenciales: React.FC = () => {
       clientsMap[client].ingTerceros += ingTercerosRecord;
 
       // Calcular días usando solo fecha calendario (sin horas) para evitar error ±1 día
-      const toDateOnly = (d: Date | null) => d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
       const calDaysOnly = (a: Date | null, b: Date | null) => {
         const da = toDateOnly(a), db = toDateOnly(b);
         return da && db ? Math.max(0, Math.round((db.getTime() - da.getTime()) / 86400000)) : null;
       };
 
       let invoicedInSameMonth = 0;
-      const dMan = toDateOnly(parseCustomDate(r.manifest_date));
+      const dMan = dManDateParsed;
       const dInv = toDateOnly(parseCustomDate(r.invoice_date));
       const dRec = toDateOnly(parseCustomDate(r.fecha_recibo));
       const dEgr = toDateOnly(parseCustomDate(r.fecha_egreso));
@@ -1419,7 +1420,8 @@ export const InformesGerenciales: React.FC = () => {
       const ventaTotal = node.ventaTotal;
       const ingTerceros = node.ingTerceros;
       const ingresosPropios = ventaTotal - ingTerceros;
-      const int = calcIntReal(ventaTotal > 0 ? (ingresosPropios / ventaTotal) * 100 : 0);
+      const rawPct = ventaTotal > 0 ? (ingresosPropios / ventaTotal) * 100 : 0;
+      const int = clientName.toUpperCase().startsWith('TDM') ? calcIntReal(rawPct) : rawPct;
       const vehiculosCount = node.vehicles.size;
       const workedDaysCount = node.workedDates.size;
       const totalVehicleUtilizations = node.vehicleDays.size;
@@ -1486,6 +1488,7 @@ export const InformesGerenciales: React.FC = () => {
   };
 
   const getGeneralTdmTableData = () => {
+    const toDateOnly = (d: Date | null) => d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
     const clientsMap: { 
       [clientName: string]: { 
         ventaTotal: number; 
@@ -1525,7 +1528,8 @@ export const InformesGerenciales: React.FC = () => {
       const ingTercerosRecord = parseValNum(r.total_value_cxp_final);
 
       const plate = r.plate ? String(r.plate).trim().toUpperCase() : '';
-      const date = r.manifest_date ? String(r.manifest_date).trim() : '';
+      const dManDateParsed = toDateOnly(parseCustomDate(r.manifest_date));
+      const date = dManDateParsed ? `${dManDateParsed.getFullYear()}-${String(dManDateParsed.getMonth() + 1).padStart(2, '0')}-${String(dManDateParsed.getDate()).padStart(2, '0')}` : '';
 
       if (!clientsMap[client]) {
         clientsMap[client] = {
@@ -1552,14 +1556,13 @@ export const InformesGerenciales: React.FC = () => {
       clientsMap[client].ingTerceros += ingTercerosRecord;
 
       // Calcular días usando solo fecha calendario (sin horas) para evitar error ±1 día
-      const toDateOnly = (d: Date | null) => d ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null;
       const calDaysOnly = (a: Date | null, b: Date | null) => {
         const da = toDateOnly(a), db = toDateOnly(b);
         return da && db ? Math.max(0, Math.round((db.getTime() - da.getTime()) / 86400000)) : null;
       };
 
       let invoicedInSameMonth = 0;
-      const dMan = toDateOnly(parseCustomDate(r.manifest_date));
+      const dMan = dManDateParsed;
       const dInv = toDateOnly(parseCustomDate(r.invoice_date));
       const dRec = toDateOnly(parseCustomDate(r.fecha_recibo));
       const dEgr = toDateOnly(parseCustomDate(r.fecha_egreso));
@@ -1660,7 +1663,8 @@ export const InformesGerenciales: React.FC = () => {
       const ventaTotal = node.ventaTotal;
       const ingTerceros = node.ingTerceros;
       const ingresosPropios = ventaTotal - ingTerceros;
-      const int = calcIntReal(ventaTotal > 0 ? (ingresosPropios / ventaTotal) * 100 : 0);
+      const rawPct = ventaTotal > 0 ? (ingresosPropios / ventaTotal) * 100 : 0;
+      const int = clientName.toUpperCase().startsWith('TDM') ? calcIntReal(rawPct) : rawPct;
       const vehiculosCount = node.vehicles.size;
       const workedDaysCount = node.workedDates.size;
       const totalVehicleUtilizations = node.vehicleDays.size;
@@ -1843,7 +1847,8 @@ export const InformesGerenciales: React.FC = () => {
 
     const rawPlates = Object.values(platesMap).map(p => {
       const ingresosPropios = p.ventaTotal - p.ingTerceros;
-      const int = p.ventaTotal > 0 ? (ingresosPropios / p.ventaTotal) * 100 : 0;
+      const rawPct = p.ventaTotal > 0 ? (ingresosPropios / p.ventaTotal) * 100 : 0;
+      const int = p.clientName.toUpperCase().startsWith('TDM') ? calcIntReal(rawPct) : rawPct;
       return {
         ...p,
         ingresosPropios,
@@ -2037,7 +2042,7 @@ export const InformesGerenciales: React.FC = () => {
       const totalVenta = tdmTableData.reduce((sum, item) => sum + item.ventaTotal, 0);
       const totalIngTerceros = tdmTableData.reduce((sum, item) => sum + item.ingTerceros, 0);
       const totalIngresosPropios = tdmTableData.reduce((sum, item) => sum + item.ingresosPropios, 0);
-      const overallInt = calcIntReal(totalVenta > 0 ? (totalIngresosPropios / totalVenta) * 100 : 0);
+      const overallInt = totalVenta > 0 ? (totalIngresosPropios / totalVenta) * 100 : 0;
       
       const totalInvoicedSameMonth = tdmTableData.reduce((sum, item) => sum + item.invoicedSameMonthVal, 0);
       const overallInvoicedSameMonthPct = totalVenta > 0 ? (totalInvoicedSameMonth / totalVenta) * 100 : 0;
@@ -2293,7 +2298,7 @@ export const InformesGerenciales: React.FC = () => {
       const totalVenta = tdmTableData.reduce((sum, item) => sum + item.ventaTotal, 0);
       const totalIngTerceros = tdmTableData.reduce((sum, item) => sum + item.ingTerceros, 0);
       const totalIngresosPropios = tdmTableData.reduce((sum, item) => sum + item.ingresosPropios, 0);
-      const overallInt = calcIntReal(totalVenta > 0 ? (totalIngresosPropios / totalVenta) * 100 : 0);
+      const overallInt = totalVenta > 0 ? (totalIngresosPropios / totalVenta) * 100 : 0;
       
       const totalInvoicedSameMonth = tdmTableData.reduce((sum, item) => sum + item.invoicedSameMonthVal, 0);
       const overallInvoicedSameMonthPct = totalVenta > 0 ? (totalInvoicedSameMonth / totalVenta) * 100 : 0;
@@ -2469,7 +2474,9 @@ export const InformesGerenciales: React.FC = () => {
       const totalVentas = vehiclesData.reduce((sum, item) => sum + item.ventaTotal, 0);
       const totalIngTerceros = vehiclesData.reduce((sum, item) => sum + item.ingTerceros, 0);
       const totalIngresosPropios = totalVentas - totalIngTerceros;
-      const overallInt = calcIntReal(totalVentas > 0 ? (totalIngresosPropios / totalVentas) * 100 : 0) / 100;
+      const rawIntVal = totalVentas > 0 ? (totalIngresosPropios / totalVentas) * 100 : 0;
+      const isTdmClient = selectedClientForVehiclesInt && selectedClientForVehiclesInt.toUpperCase().startsWith('TDM');
+      const overallInt = (isTdmClient ? calcIntReal(rawIntVal) : rawIntVal) / 100;
       const totalManifests = vehiclesData.reduce((sum, item) => sum + item.manifestCount, 0);
 
       const totalRow: any = {
@@ -4827,7 +4834,9 @@ export const InformesGerenciales: React.FC = () => {
                       const totalVentas = sortedData.reduce((sum: number, item: any) => sum + item.ventaTotal, 0);
                       const totalIngTerceros = sortedData.reduce((sum: number, item: any) => sum + item.ingTerceros, 0);
                       const totalIngresosPropios = totalVentas - totalIngTerceros;
-                      const overallInt = calcIntReal(totalVentas > 0 ? (totalIngresosPropios / totalVentas) * 100 : 0) / 100;
+                      const rawIntVal = totalVentas > 0 ? (totalIngresosPropios / totalVentas) * 100 : 0;
+                      const isTdmClient = selectedClientForVehiclesInt && selectedClientForVehiclesInt.toUpperCase().startsWith('TDM');
+                      const overallInt = (isTdmClient ? calcIntReal(rawIntVal) : rawIntVal) / 100;
                       const totalManifests = sortedData.reduce((sum: number, item: any) => sum + item.manifestCount, 0);
 
                       const totalRow: any = {

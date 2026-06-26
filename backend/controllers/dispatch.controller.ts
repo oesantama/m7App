@@ -1206,7 +1206,7 @@ export const getInvoiceReturnData = async (req: Request, res: Response) => {
                 dri.article_id,
                 SUM(dri.quantity_returned::numeric) AS qty_returned
             FROM delivery_returns dr
-            JOIN delivery_return_items dri ON dr.id::text = dri.return_id
+            JOIN delivery_return_items dri ON dr.id::text = dri.return_id::text
             WHERE TRIM(UPPER(dr.invoice_id)) = $1
             GROUP BY dr.id, dr.return_reason, dr.status, dr.created_at, dr.vendedor, dri.article_id
             ORDER BY dr.created_at DESC
