@@ -4,7 +4,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
-        echo "[EVO] Starting. DB: ${DATABASE_URL:0:55}..."
+        echo "[EVO] Starting Evolution API..."
         cd /evolution
         rm -rf ./prisma/migrations 2>/dev/null
         cp -r ./prisma/postgresql-migrations ./prisma/migrations
