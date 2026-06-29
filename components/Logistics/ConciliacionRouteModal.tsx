@@ -289,6 +289,19 @@ const ItemRow: React.FC<{
     );
 };
 
+interface BodegaReturn {
+    id: number;
+    return_reason: string | null;
+    status: string;
+    created_at: string;
+    vehicle_plate: string | null;
+    driver_name: string | null;
+    vendedor: string | null;
+    conciliacion_confirmada_at: string | null;
+    conciliacion_confirmada_by: string | null;
+    items: { sku: string | null; article_name: string | null; quantity_returned: number; unit: string | null }[];
+}
+
 const LegalizationDialog: React.FC<{
     inv: InvoiceRow;
     form: InvoiceFormState;
@@ -298,11 +311,54 @@ const LegalizationDialog: React.FC<{
     onSave: () => void;
     allRoutes?: RouteGroup[];
     onCheckReference?: (ref: string) => void;
-}> = ({ inv, form, onClose, onUpdate, onUpdateItem, onSave, allRoutes, onCheckReference }) => {
+    currentUserId: string;
+    onConfirmReturnAndSave: (returnId: number, returnType: 'COMPLETA' | 'PARCIAL', returnValue: number) => Promise<void>;
+}> = ({ inv, form, onClose, onUpdate, onUpdateItem, onSave, allRoutes, onCheckReference, currentUserId, onConfirmReturnAndSave }) => {
     const isLegalized   = !!inv.forma_pago;
     const isRepice      = (inv.item_status || '').toUpperCase() === 'EST-15' || (inv.item_status || '').toUpperCase() === 'REPICE';
     const invoiceVal    = Number(inv.invoice_value) || 0;
     const isWarehouseReceived = !!inv.bodega_received_at;
+
+    // Devoluciones de bodega para esta factura
+    const [bodegaReturns, setBodegaReturns]   = useState<BodegaReturn[]>([]);
+    const [loadingReturns, setLoadingReturns] = useState(true);
+    const [confirmingReturn, setConfirmingReturn] = useState(false);
+    const [returnValue, setReturnValue]       = useState<string>('0');
+
+    useEffect(() => {
+        let cancelled = false;
+        setLoadingReturns(true);
+        api.getReturnsForInvoice(inv.invoice_number)
+            .then((res: any) => {
+                if (!cancelled) {
+                    const data: BodegaReturn[] = res?.data ?? [];
+                    setBodegaReturns(data);
+                    // Pre-cargar valor: para devolución completa = valor factura; parcial = 0
+                    setReturnValue(String(Number(inv.invoice_value) || 0));
+                }
+            })
+            .catch(() => {})
+            .finally(() => { if (!cancelled) setLoadingReturns(false); });
+        return () => { cancelled = true; };
+    }, [inv.invoice_number]);
+
+    const pendingReturns   = bodegaReturns.filter(r => r.status === 'PENDING' || r.status === 'PROCESSED');
+    const confirmedReturns = bodegaReturns.filter(r => r.status === 'CONFIRMED');
+    // Bloquear el formulario normal cuando hay una devolución bodega pendiente de confirmar
+    const hasPendingBodegaReturn = !loadingReturns && pendingReturns.length > 0 && !isLegalized;
+
+    const handleConfirmReturn = async (ret: BodegaReturn) => {
+        const totalQtyItems = ret.items.reduce((s, i) => s + (Number(i.quantity_returned) || 0), 0);
+        const returnType = (totalQtyItems > 0 && inv.items && inv.items.length > 0
+            && totalQtyItems < inv.items.reduce((s, i) => s + (Number(i.qty) || 0), 0))
+            ? 'PARCIAL' : 'COMPLETA';
+        setConfirmingReturn(true);
+        try {
+            await onConfirmReturnAndSave(ret.id, returnType, Number(returnValue) || 0);
+        } finally {
+            setConfirmingReturn(false);
+        }
+    };
     
     // El REPICE es editable aunque esté legalizado, hasta que se reciba en bodega
     const canEdit       = !isWarehouseReceived && (!isLegalized || isRepice);
@@ -348,7 +404,166 @@ const LegalizationDialog: React.FC<{
                 </div>
 
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-                    
+
+                    {/* ── Verificando devoluciones ── */}
+                    {loadingReturns && (
+                        <div className="flex items-center gap-2 text-[9px] text-slate-400">
+                            <Icons.Loader className="w-3 h-3 animate-spin" />
+                            Verificando devoluciones en bodega…
+                        </div>
+                    )}
+
+                    {/* ── MODO CONFIRMACIÓN DE DEVOLUCIÓN BODEGA ─────────── */}
+                    {/* Cuando hay devolución pendiente: solo mostrar este bloque, nada más */}
+                    {hasPendingBodegaReturn && pendingReturns.map(ret => {
+                        const totalDevuelto = ret.items.reduce((s, i) => s + (Number(i.quantity_returned) || 0), 0);
+                        const totalEsperado = (inv.items || []).reduce((s, i) => s + (Number(i.qty) || 0), 0);
+                        const esCompleta    = totalEsperado === 0 || totalDevuelto >= totalEsperado;
+                        const retValNum     = Number(returnValue) || 0;
+                        return (
+                            <div key={ret.id} className="rounded-2xl border-2 border-amber-300 bg-amber-50/40 overflow-hidden">
+                                {/* Cabecera */}
+                                <div className="px-4 py-3 bg-amber-400/20 border-b border-amber-200 flex items-center gap-2">
+                                    <span className="text-base">⚠️</span>
+                                    <p className="text-[9px] font-black text-amber-800 uppercase tracking-widest">
+                                        Devolución registrada en bodega — confirmar para legalizar
+                                    </p>
+                                </div>
+
+                                <div className="p-4 space-y-4">
+                                    {/* Tipo + fecha */}
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase border
+                                            ${esCompleta ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                                            {esCompleta ? '🔄 Devolución Completa' : '📦 Devolución Parcial'}
+                                        </span>
+                                        <span className="text-[8px] text-slate-500">
+                                            {new Date(ret.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                        </span>
+                                    </div>
+
+                                    {/* Motivo + datos */}
+                                    <div className="bg-white rounded-xl border border-amber-100 px-3 py-2.5 space-y-1.5">
+                                        {ret.return_reason && (
+                                            <div className="flex gap-2">
+                                                <span className="text-[8px] font-black text-slate-400 uppercase w-16 shrink-0">Motivo</span>
+                                                <span className="text-[9px] font-semibold text-slate-800">{ret.return_reason}</span>
+                                            </div>
+                                        )}
+                                        {ret.vehicle_plate && (
+                                            <div className="flex gap-2">
+                                                <span className="text-[8px] font-black text-slate-400 uppercase w-16 shrink-0">Placa</span>
+                                                <span className="text-[9px] font-black text-slate-900">{ret.vehicle_plate}</span>
+                                            </div>
+                                        )}
+                                        {ret.driver_name && (
+                                            <div className="flex gap-2">
+                                                <span className="text-[8px] font-black text-slate-400 uppercase w-16 shrink-0">Conductor</span>
+                                                <span className="text-[9px] text-slate-700 truncate">{ret.driver_name}</span>
+                                            </div>
+                                        )}
+                                        {ret.vendedor && (
+                                            <div className="flex gap-2">
+                                                <span className="text-[8px] font-black text-slate-400 uppercase w-16 shrink-0">Vendedor</span>
+                                                <span className="text-[9px] font-black text-slate-900">{ret.vendedor}</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Artículos devueltos */}
+                                    {ret.items.length > 0 && (
+                                        <div className="rounded-xl overflow-hidden border border-amber-200 bg-white">
+                                            <table className="w-full text-[8px]">
+                                                <thead>
+                                                    <tr className="bg-amber-50 border-b border-amber-100">
+                                                        <th className="px-3 py-1.5 text-left font-black text-amber-700 uppercase tracking-widest">Artículo</th>
+                                                        <th className="px-3 py-1.5 text-right font-black text-amber-700 uppercase tracking-widest">Cant. devuelta</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-amber-50">
+                                                    {ret.items.map((item, idx) => (
+                                                        <tr key={idx}>
+                                                            <td className="px-3 py-1.5 text-slate-700 font-medium truncate max-w-[200px]">
+                                                                {item.article_name || item.sku || '—'}
+                                                            </td>
+                                                            <td className="px-3 py-1.5 text-right font-black text-slate-900">
+                                                                {item.quantity_returned}
+                                                                <span className="font-normal text-slate-400 ml-0.5">{item.unit || ''}</span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+
+                                    {/* Valor editable */}
+                                    <div className="bg-white rounded-xl border border-amber-200 px-4 py-3 space-y-2">
+                                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                            Valor de la factura {esCompleta ? '(devolución total = $0 a cobrar)' : ''}
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <p className="text-[7px] font-black text-slate-400 uppercase mb-1">Valor factura</p>
+                                                <p className="text-lg font-black text-slate-900">
+                                                    ${(Number(inv.invoice_value) || 0).toLocaleString('es-CO')}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <label className="text-[7px] font-black text-amber-600 uppercase mb-1 block">
+                                                    Valor a registrar <span className="text-rose-500">*</span>
+                                                </label>
+                                                <div className="relative">
+                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">$</span>
+                                                    <input
+                                                        type="number" min={0}
+                                                        value={returnValue}
+                                                        onChange={e => setReturnValue(e.target.value)}
+                                                        className="w-full pl-6 pr-2 py-2 border-2 border-amber-300 focus:border-amber-500 rounded-xl text-sm font-black outline-none bg-amber-50"
+                                                    />
+                                                </div>
+                                                {retValNum > 0 && (
+                                                    <p className="text-[7px] text-amber-700 font-bold mt-0.5">
+                                                        Diferencia: ${((Number(inv.invoice_value) || 0) - retValNum).toLocaleString('es-CO')}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Botón confirmar */}
+                                    <button
+                                        onClick={() => handleConfirmReturn(ret)}
+                                        disabled={confirmingReturn || form.saving}
+                                        className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-widest rounded-xl flex items-center justify-center gap-2 transition-all shadow-md">
+                                        {confirmingReturn
+                                            ? <><Icons.Loader className="w-4 h-4 animate-spin" /> Procesando…</>
+                                            : <>✓ Confirmar devolución {esCompleta ? 'completa' : 'parcial'} y legalizar</>
+                                        }
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+
+                    {/* Devolución ya confirmada (banner informativo) */}
+                    {!loadingReturns && confirmedReturns.length > 0 && pendingReturns.length === 0 && (
+                        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-2.5">
+                            <span className="text-sm">✅</span>
+                            <div>
+                                <p className="text-[9px] font-black text-emerald-700 uppercase tracking-widest">Devolución confirmada por facturación</p>
+                                {confirmedReturns[0].conciliacion_confirmada_by && (
+                                    <p className="text-[8px] text-emerald-600 mt-0.5">
+                                        {confirmedReturns[0].conciliacion_confirmada_by} · {new Date(confirmedReturns[0].conciliacion_confirmada_at!).toLocaleDateString('es-CO')}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── FORMULARIO NORMAL (oculto mientras haya devolución bodega pendiente) ── */}
+                    {!hasPendingBodegaReturn && (<>
+
                     {/* Estado de Entrega */}
                     <div>
                         <div className="flex items-center justify-between mb-2.5">
@@ -676,14 +891,17 @@ const LegalizationDialog: React.FC<{
                             <p className="text-[8px] text-blue-500 mt-0.5 font-bold">Esta factura ya fue procesada por almacén y no puede ser editada.</p>
                         </div>
                     )}
+
+                    {/* Cierre bloque formulario normal */}
+                    </>)}
                 </div>
 
-                {/* Footer */}
+                {/* Footer — solo muestra "Confirmar Legalización" cuando NO hay devolución pendiente */}
                 <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
                     <button onClick={onClose} className="px-6 py-3 rounded-2xl border border-slate-200 text-slate-500 font-black text-[10px] uppercase tracking-widest hover:bg-white transition-all">
-                        {!canEdit ? 'Cerrar' : 'Cancelar'}
+                        {!canEdit || hasPendingBodegaReturn ? 'Cerrar' : 'Cancelar'}
                     </button>
-                    {canEdit && (
+                    {canEdit && !hasPendingBodegaReturn && (
                         <button onClick={onSave} disabled={form.saving}
                             className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all
                                 ${form.saving ? 'bg-slate-200 text-slate-400' : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-900/20'}`}>
@@ -1311,6 +1529,46 @@ const ConciliacionRouteModal: React.FC<Props> = ({
         }
     };
 
+    // Confirma la devolución de bodega Y legaliza la factura en un solo paso
+    const handleConfirmReturnAndSave = async (inv: InvoiceRow, returnId: number, returnType: 'COMPLETA' | 'PARCIAL', returnValue: number) => {
+        updateForm(inv.invoice_number, { saving: true });
+        try {
+            // 1. Confirmar devolución por facturación
+            await api.confirmReturnByFacturacion(returnId, currentUserId);
+
+            // 2. Legalizar la factura como devolución
+            const esCompleta = returnType === 'COMPLETA';
+            const estadoEntrega: EstadoEntrega = esCompleta ? 'devolucion' : 'parcial';
+            const invoiceVal = Number(inv.invoice_value) || 0;
+
+            await api.saveConciliation({
+                documentId,
+                invoiceNumber:  inv.invoice_number,
+                valor:          returnValue,
+                banco:          'Bancolombia',
+                comprobante:    `DEV-BOD-${returnId}`,
+                fechaPago:      new Date().toISOString().slice(0, 10),
+                formaPago:      'DEVOLUCION' as any,
+                esDevolucion:   true,
+                conciliadoPor:  currentUserId,
+                vehiclePlate:   inv.vehicle_plate || route.plate,
+                conductorId:    inv.conductor_id,
+                conductorName:  inv.conductor_name || route.driver_name || undefined,
+                estadoEntrega,
+                valorFactura:   invoiceVal || undefined,
+                itemsReturned:  [],
+            });
+
+            toast.success(`✅ ${inv.invoice_number} confirmada y legalizada como devolución`);
+            updateForm(inv.invoice_number, { saving: false });
+            setActiveDialog(null);
+            onSaved();
+        } catch (err: any) {
+            toast.error(err.message || 'Error al confirmar devolución');
+            updateForm(inv.invoice_number, { saving: false });
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -1906,15 +2164,17 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 const form = forms.get(activeDialog);
                 if (!inv || !form) return null;
                 return (
-                    <LegalizationDialog 
-                        inv={inv} 
-                        form={form} 
+                    <LegalizationDialog
+                        inv={inv}
+                        form={form}
                         onClose={() => setActiveDialog(null)}
                         onUpdate={(patch) => updateForm(inv.invoice_number, patch)}
                         onUpdateItem={(itemId, rq, rv) => updateItem(inv.invoice_number, itemId, rq, rv)}
                         onSave={() => handleSave(inv)}
                         allRoutes={allRoutes}
                         onCheckReference={(ref) => handleCheckReference(ref, 'individual', undefined, inv.invoice_number)}
+                        currentUserId={currentUserId}
+                        onConfirmReturnAndSave={(returnId, returnType, val) => handleConfirmReturnAndSave(inv, returnId, returnType, val)}
                     />
                 );
             })()}

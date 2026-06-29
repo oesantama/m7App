@@ -641,7 +641,7 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                 
                 const totalDevolucion = Math.round(plateInvoices.reduce((s, i) => {
                     const upperStatus = (i.item_status || '').toUpperCase();
-                    if (i.es_devolucion || DEVUELTO_STATUS.includes(upperStatus)) return s + (Number(i.invoice_value) || 0);
+                    if (i.es_devolucion || DEVUELTO_STATUS.includes(upperStatus)) return s + (Number(i.invoice_value) || Number(i.valor) || 0);
                     if (PARCIAL_STATUS.includes(upperStatus)) {
                         const totalQty = i.items?.reduce((acc: number, it: any) => acc + (it.qty || 0), 0) || 1;
                         const unitPrice = (i.invoice_value || 0) / (totalQty || 1);
@@ -726,7 +726,7 @@ const TabDocumentosLegalizados: React.FC<{ user?: any }> = () => {
                     let rmaVal = 0;
                     let rmaText = '';
                     if (i.es_devolucion || DEVUELTO_STATUS.includes(upperStatus)) {
-                        rmaVal = Number(i.invoice_value) || 0;
+                        rmaVal = Number(i.invoice_value) || Number(i.valor) || 0;
                         rmaText = 'DEVOLUCION';
                     } else if (PARCIAL_STATUS.includes(upperStatus)) {
                         const totalQty = i.items?.reduce((acc: number, it: any) => acc + (it.qty || 0), 0) || 1;

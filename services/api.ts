@@ -297,7 +297,7 @@ export const api = {
     fetchJson(`${API_URL}/dispatch/route-active-plates${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ''}`),
   getRoutePlateInvoices: (plate: string, clientId?: string) =>
     fetchJson(`${API_URL}/dispatch/route-plate-invoices/${encodeURIComponent(plate)}${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ''}`),
-  registerRouteReturn: (data: { invoiceId: string; vehiclePlate?: string; returnType: 'COMPLETA' | 'PARCIAL'; returnReason?: string; notes?: string; items?: any[]; createdBy?: string; vendedor?: string; numeroPlanilla?: string; fechaPlaca?: string }) =>
+  registerRouteReturn: (data: { invoiceId: string; vehiclePlate?: string; vehicleId?: string; driverId?: string; returnType: 'COMPLETA' | 'PARCIAL'; returnReason?: string; notes?: string; items?: any[]; createdBy?: string; vendedor?: string; numeroPlanilla?: string; fechaPlaca?: string }) =>
     fetchJson(`${API_URL}/dispatch/register-route-return`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -321,6 +321,45 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email_proveedor, nombre_proveedor }),
     }),
+  confirmReturnByFacturacion: (id: number, confirmedBy: string) =>
+    fetchJson(`${API_URL}/dispatch/delivery-returns/${id}/confirm-facturacion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmedBy }),
+    }),
+  confirmDocReceived: (id: string, confirmedBy: string) =>
+    fetchJson(`${API_URL}/dispatch/approval-batches/${id}/confirm-doc-received`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ confirmedBy }),
+    }),
+  getReturnsForInvoice: (invoiceId: string) =>
+    fetchJson(`${API_URL}/dispatch/returns-for-invoice/${encodeURIComponent(invoiceId)}`),
+  getReturnsTracking: (clientId?: string) => {
+    const qs = clientId ? `?clientId=${encodeURIComponent(clientId)}` : '';
+    return fetchJson(`${API_URL}/dispatch/delivery-returns/tracking${qs}`);
+  },
+  getConciliacionPending: (clientId?: string) => {
+    const qs = clientId ? `?clientId=${encodeURIComponent(clientId)}` : '';
+    return fetchJson(`${API_URL}/dispatch/delivery-returns/conciliacion-pending${qs}`);
+  },
+  importFromConciliacion: (invoices: any[], importedBy: string) =>
+    fetchJson(`${API_URL}/dispatch/delivery-returns/import-from-conciliacion`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoices, importedBy }),
+    }),
+  advanceReturnState: (id: number, newStatus: string, confirmedBy: string) =>
+    fetchJson(`${API_URL}/dispatch/delivery-returns/${id}/advance`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newStatus, confirmedBy }),
+    }),
+  markExcelDownloaded: (id: number) =>
+    fetchJson(`${API_URL}/dispatch/delivery-returns/${id}/mark-excel`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+    }),
   getInvoiceReturnData: (invoiceNumber: string) =>
     fetchJson(`${API_URL}/dispatch/invoice-return-data/${encodeURIComponent(invoiceNumber)}`),
   getBodegaReturnsHistory: (params?: { clientId?: string; dateFrom?: string; dateTo?: string }) => {
@@ -335,6 +374,14 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+    }),
+  getReturnReasons: () =>
+    fetchJson(`${API_URL}/dispatch/return-reasons`),
+  createReturnReason: (name: string) =>
+    fetchJson(`${API_URL}/dispatch/return-reasons`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
     }),
 
   // ── Consulta de Inventario / Kardex ───────────────────────────────────────

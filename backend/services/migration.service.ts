@@ -41,8 +41,8 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'dispatch_assignments': ['invoice_id', 'driver_id', 'helper_ids', 'scanned_items', 'is_accompanied', 'helper_count', 'status', 'created_by', 'started_at', 'completed_at', 'updated_at', 'created_at'],
   'dispatch_signatures_pending': ['dispatch_id', 'user_id', 'role_type', 'signed', 'signed_at'],
   'delivery_confirmations': ['dispatch_id', 'invoice_id', 'driver_id', 'vehicle_id', 'delivery_type', 'delivered_items', 'notes', 'delivered_at', 'created_at'],
-  'delivery_returns': ['confirmation_id', 'invoice_id', 'driver_id', 'vehicle_id', 'return_reason', 'notes', 'status', 'created_at'],
-  'delivery_return_items': ['return_id', 'sku', 'article_name', 'quantity_returned', 'quantity_delivered', 'unit', 'notes'],
+  'delivery_returns': ['invoice_id', 'driver_id', 'vehicle_id', 'reason_id', 'notes', 'status', 'created_at', 'vendedor', 'numero_planilla', 'fecha_placa', 'return_type'],
+  'delivery_return_items': ['return_id', 'article_id', 'un_code', 'quantity_returned', 'unit'],
   'routing_patterns': ['city', 'vehicle_id', 'neighborhood', 'strength', 'last_used'],
   'delivery_patterns': ['address_key', 'vehicle_id', 'client_id', 'strength', 'last_used'],
   'deletion_logs': ['table_name', 'record_id', 'record_data', 'deleted_by', 'deleted_at'],
@@ -1760,6 +1760,23 @@ export const restoreSystem = async () => {
       ALTER TABLE delivery_return_items ADD COLUMN IF NOT EXISTS article_id TEXT;
       ALTER TABLE delivery_return_items ADD COLUMN IF NOT EXISTS un_code TEXT;
       ALTER TABLE alertas_whatsapp ADD COLUMN IF NOT EXISTS client_id TEXT;
+
+      -- Nuevos estados del pipeline de devoluciones bodega
+      ALTER TABLE delivery_returns DROP CONSTRAINT IF EXISTS delivery_returns_status_check;
+      ALTER TABLE delivery_returns ADD CONSTRAINT delivery_returns_status_check
+        CHECK (status IN ('PENDING','PROCESSED','CONFIRMED','PRE_APPROVAL','PRE_APPROVED','SUPPLIER_EXIT','COMPLETED','CANCELLED'));
+
+      -- Auditoría de cambios de estado (quién, cuándo, qué)
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS pre_approval_at    TIMESTAMPTZ;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS pre_approval_by    TEXT;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS pre_approved_at    TIMESTAMPTZ;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS pre_approved_by    TEXT;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS supplier_exit_at   TIMESTAMPTZ;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS supplier_exit_by   TEXT;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS completed_at       TIMESTAMPTZ;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS completed_by       TEXT;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS excel_downloaded_at TIMESTAMPTZ;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS return_type TEXT CHECK (return_type IN ('COMPLETA','PARCIAL'));
     `);
 
     await client.query('COMMIT');

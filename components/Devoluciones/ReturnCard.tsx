@@ -11,6 +11,8 @@ export const RETURN_REASONS = [
     'Otro',
 ];
 
+export interface ReturnReasonOption { id: number; name: string; }
+
 interface ReturnItem {
     sku?: string;
     article_id?: string;

@@ -946,9 +946,9 @@ const AdminDBManager: React.FC = () => {
                       <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
                           <h4 className="font-bold text-slate-800">Importación Transportando (General)</h4>
                           <p className="text-xs text-slate-500">Bot automático de web scraping para descargar informes generales de manifiestos desde el portal TMS de Transportando y cargarlos a la BD local.</p>
-                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Diariamente, 03:00 AM</p>
+                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Diariamente, 05:00 AM + 07:00 AM</p>
                           <div className="mt-auto pt-2">
-                              <button 
+                              <button
                                   onClick={() => handleRunCron('transportandoScrape')}
                                   disabled={runningCrons['transportandoScrape']}
                                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
@@ -993,7 +993,16 @@ const AdminDBManager: React.FC = () => {
               <div className="min-h-[300px] flex flex-col border border-slate-200 rounded overflow-hidden mt-4">
                   <div className="bg-slate-800 text-white px-4 py-2 font-mono text-sm flex justify-between items-center">
                       <span>Terminal de Logs (CRON)</span>
-                      <button onClick={() => setCronLogs([])} className="text-xs hover:text-slate-300">Limpiar</button>
+                      <div className="flex gap-3">
+                          <button
+                              onClick={() => {
+                                  navigator.clipboard.writeText(cronLogs.join('\n'));
+                                  toast.success('Logs copiados al portapapeles');
+                              }}
+                              className="text-xs hover:text-slate-300"
+                          >Copiar todo</button>
+                          <button onClick={() => setCronLogs([])} className="text-xs hover:text-slate-300">Limpiar</button>
+                      </div>
                   </div>
                   <div className="flex-1 bg-slate-900 text-green-400 p-4 font-mono text-xs overflow-auto whitespace-pre-wrap flex flex-col gap-1 max-h-[400px]">
                       {cronLogs.length === 0 ? (

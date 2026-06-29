@@ -92,7 +92,7 @@ export const scrapeTransportandoReports = async (
         // 2. IR A LA RUTA DEL INFORME
         let reportUrl = 'https://tms.transportando.com.co/#/informe-transporte?tipo=general-manifiestos';
         if (reportType === 'recaudos' || reportType === 'egresos') {
-            reportUrl = 'https://tms.transportando.com.co/#/informes-contabilidad?tipo=informe-consecutivos';
+            reportUrl = 'https://tms.transportando.com.co/#/informes-contabilidad?tipo=informe-listado-consecutivos-documento';
         }
         log(`Navegando al módulo de informes: ${reportUrl}...`);
         await page.goto(reportUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -103,6 +103,14 @@ export const scrapeTransportandoReports = async (
         const currentDate = new Date();
         const currentYear = currentDate.getFullYear();
         const currentMonth = currentDate.getMonth(); // 0 = Enero, 11 = Diciembre
+
+        // Formatea fecha en hora local Colombia (YYYY-MM-DD) sin desfase UTC
+        const toLocalDateStr = (d: Date): string => {
+            const y = d.getFullYear();
+            const mo = String(d.getMonth() + 1).padStart(2, '0');
+            const dy = String(d.getDate()).padStart(2, '0');
+            return `${y}-${mo}-${dy}`;
+        };
 
         const monthsToQuery: {start: string, end: string}[] = [];
         for (let m = 0; m <= currentMonth; m++) {
@@ -115,8 +123,8 @@ export const scrapeTransportandoReports = async (
             }
 
             monthsToQuery.push({
-                start: firstDay.toISOString().slice(0, 10), // YYYY-MM-DD
-                end: lastDay.toISOString().slice(0, 10),
+                start: toLocalDateStr(firstDay),
+                end: toLocalDateStr(lastDay),
             });
         }
 
@@ -143,11 +151,11 @@ export const scrapeTransportandoReports = async (
             });
         };
 
-        // Simular un Request y Response de Express para usar la función existente del backend
         const mockResponse = () => {
             const res: any = {};
-            res.status = () => res;
-            res.json = (data: any) => data;
+            res._data = null;
+            res.status = (code: number) => { res._statusCode = code; return res; };
+            res.json = (data: any) => { res._data = data; return data; };
             return res;
         };
 
@@ -169,19 +177,21 @@ export const scrapeTransportandoReports = async (
             if (reportType === 'recaudos' || reportType === 'egresos') {
                 const targetOption = reportType === 'recaudos' ? 'Recaudos' : 'Egresos';
                 log(`Esperando a que cargue el selector de secuencia...`);
-                
-                // Esperar a que el selector o input esté listo
-                await page.waitForFunction(() => {
-                    return Array.from(document.querySelectorAll('input')).some(i => i.placeholder?.includes('secuencia')) ||
-                           document.querySelector('.el-select__wrapper') !== null;
-                }, { timeout: 30000 });
+
+                // Esperar máx 20s — si no aparece, continuar de todas formas
+                try {
+                    await page.waitForFunction(() => {
+                        return Array.from(document.querySelectorAll('input')).some(i => i.placeholder?.includes('secuencia')) ||
+                               document.querySelector('.el-select__wrapper') !== null;
+                    }, { timeout: 20000 });
+                } catch {
+                    log(`ADVERTENCIA: Selector de secuencia no detectado en 20s, intentando de todas formas...`);
+                }
 
                 log(`Buscando selector de secuencia para elegir "${targetOption}"...`);
                 const selectEl = await page.evaluateHandle(() => {
-                    // Buscar el input que tiene el placeholder "Buscar por secuencia"
                     const input = Array.from(document.querySelectorAll('input')).find(i => i.placeholder?.includes('secuencia'));
                     if (input) return input;
-                    // Fallback a clase genérica
                     return document.querySelector('.el-select__input') || document.querySelector('.el-select__wrapper');
                 });
 
@@ -198,7 +208,7 @@ export const scrapeTransportandoReports = async (
                     await new Promise(r => setTimeout(r, 1500));
 
                     log(`Buscando opción "${targetOption}" en la lista filtrada...`);
-                    const optionSelected = await page.evaluate((opt) => {
+                    const optionSelected = await page.evaluate((opt: string) => {
                         const items = Array.from(document.querySelectorAll('.el-select-dropdown__item'));
                         const target = items.find(item => item.textContent?.toLowerCase().includes(opt.toLowerCase()));
                         if (target) {
@@ -211,10 +221,9 @@ export const scrapeTransportandoReports = async (
                     if (optionSelected) {
                         log(`Opción "${targetOption}" seleccionada exitosamente.`);
                     } else {
-                        log(`ADVERTENCIA: No se pudo seleccionar la secuencia "${targetOption}" en el dropdown.`);
+                        log(`ADVERTENCIA: No se pudo seleccionar "${targetOption}" en el dropdown.`);
                     }
 
-                    // Cerrar el dropdown usando Escape para evitar que tape otros elementos
                     await page.keyboard.press('Escape');
                     await new Promise(r => setTimeout(r, 1200));
                 } else {
@@ -334,14 +343,17 @@ export const scrapeTransportandoReports = async (
 
             if (reportType === 'manifiestos') {
                 log(`Esperando a que la tabla de resultados cargue...`);
-                
-                // Esperar hasta 40 segundos a que aparezca el botón de Excel o el texto de "no hay datos"
+
+                // Esperar hasta 45 segundos a que aparezca el botón de Excel.
+                // IMPORTANTE: el check de "no hay datos" solo corre después de 8 segundos porque
+                // la UI de Transportando ya tiene ese texto en elementos estáticos antes de que
+                // cargue el resultado real — detectarlo antes es un falso positivo que cancela el mes.
                 let excelButtonFound = false;
                 let noDataFound = false;
-                for (let i = 0; i < 40; i++) {
+                for (let i = 0; i < 45; i++) {
                     await new Promise(r => setTimeout(r, 1000));
-                    
-                    // 1. Verificar si apareció el botón de Excel
+
+                    // 1. Verificar si apareció el botón de Excel (prioridad máxima)
                     excelButtonFound = await page.evaluate(() => {
                         const btns = Array.from(document.querySelectorAll('button, a'));
                         return btns.some(b => {
@@ -351,17 +363,34 @@ export const scrapeTransportandoReports = async (
                     });
                     if (excelButtonFound) break;
 
-                    // 2. Verificar si apareció un texto de "no hay datos"
-                    noDataFound = await page.evaluate(() => {
-                        const pageText = document.body.textContent?.toLowerCase() || '';
-                        return pageText.includes('no hay datos') || 
-                               pageText.includes('sin datos') || 
-                               pageText.includes('no se encontraron') || 
-                               pageText.includes('no data');
-                    });
-                    if (noDataFound) {
-                        log(`Información: No se encontraron datos para el periodo ${start} al ${end} (indicado por la plataforma).`);
-                        break;
+                    // 2. Solo después de 8s verificar "no hay datos" en el área de resultados
+                    // (no en todo el body para evitar falsos positivos de elementos estáticos)
+                    if (i >= 8) {
+                        const checkFull = i >= 20;
+                        noDataFound = await page.evaluate((doFullCheck: boolean) => {
+                            // Buscar específicamente en el área de tabla/resultados
+                            const resultsArea = document.querySelector(
+                                '.el-table__empty-block, .el-empty, [class*="el-table"] .el-table__empty-text, ' +
+                                '.el-result, [class*="empty-state"], [class*="no-data"]'
+                            );
+                            if (resultsArea) {
+                                const txt = resultsArea.textContent?.toLowerCase() || '';
+                                return txt.includes('no hay datos') || txt.includes('sin datos') ||
+                                       txt.includes('no se encontraron') || txt.includes('no data') ||
+                                       txt.includes('sin resultados');
+                            }
+                            // Fallback al body completo solo después de 20s
+                            if (doFullCheck) {
+                                const pageText = document.body.textContent?.toLowerCase() || '';
+                                return pageText.includes('no hay datos') || pageText.includes('sin datos') ||
+                                       pageText.includes('no data');
+                            }
+                            return false;
+                        }, checkFull);
+                        if (noDataFound) {
+                            log(`Información: No se encontraron datos para el periodo ${start} al ${end} (verificado después de ${i}s).`);
+                            break;
+                        }
                     }
                 }
 
@@ -403,14 +432,14 @@ export const scrapeTransportandoReports = async (
                     continue;
                 }
             } else {
-                // Para recaudos y egresos, el archivo se descarga inmediatamente al hacer clic en "Obtener informe"
+                // Recaudos y egresos: "Obtener informe" descarga el archivo directamente (sin botón extra)
                 try {
-                    log(`Esperando a que finalice la descarga del archivo (descarga directa en Obtener informe)...`);
-                    downloadedFilePath = await waitForDownload(downloadPath, 25000);
-                    log(`Descarga finalizada. Archivo temporal guardado en: ${downloadedFilePath}`);
+                    log(`Esperando descarga directa (${reportType}) para ${start}-${end}...`);
+                    downloadedFilePath = await waitForDownload(downloadPath, 30000);
+                    log(`Descarga finalizada. Archivo: ${downloadedFilePath}`);
                 } catch (err: any) {
-                    log(`Información: No se detectó ninguna descarga de archivo para el periodo ${start} al ${end} tras 25 segundos. Es posible que no existan datos o el servidor falló.`);
-                    continue; // Saltar al siguiente mes
+                    log(`Sin descarga para ${reportType} en ${start}-${end} (30s). Sin datos o servidor sin respuesta.`);
+                    continue;
                 }
             }
 
@@ -419,30 +448,77 @@ export const scrapeTransportandoReports = async (
                 log(`Subiendo y parseando los datos a la BD local M7...`);
                 const buf = fs.readFileSync(downloadedFilePath);
                 const workbook = XLSX.read(buf, { type: 'buffer' });
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rawJson = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+                log(`Hojas en el Excel: ${workbook.SheetNames.join(' | ')}`);
+
+                // Para recaudos/egresos buscar la hoja con más filas (puede que no sea la primera)
+                let bestSheetData: any[] = [];
+                for (const sheetName of workbook.SheetNames) {
+                    const sheet = workbook.Sheets[sheetName];
+                    const sheetData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+                    if (sheetData.length > bestSheetData.length) {
+                        bestSheetData = sheetData;
+                    }
+                }
+                const rawJson = reportType === 'manifiestos'
+                    ? XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: '' })
+                    : bestSheetData;
 
                 if (rawJson.length > 0) {
-                    log(`Columnas detectadas en el Excel: ${Object.keys(rawJson[0] as object).join(', ')}`);
+                    const cols = Object.keys(rawJson[0] as object);
+                    log(`Columnas en el Excel (${cols.length}): ${cols.join(', ')}`);
+
+                    // Diagnóstico de columnas clave para recaudos/egresos
+                    if (reportType === 'recaudos') {
+                        const colsLower = cols.map(c => c.trim().toLowerCase());
+                        const keyColCandidates = ['consecutive', 'consecutivo', 'recibo', 'numero', 'nro'];
+                        const dateCandidates = ['date', 'fecha', 'fecha recibo', 'fecha_recibo'];
+                        const foundKey = keyColCandidates.find(k => colsLower.some(c => c === k));
+                        const foundDate = dateCandidates.find(k => colsLower.some(c => c === k));
+                        log(`[RECAUDOS] Columna clave buscada (para match con BD campo "receipt"): ${foundKey ? `"${foundKey}" → ENCONTRADA` : `NINGUNA encontrada. Buscaba: ${keyColCandidates.join(', ')}`}`);
+                        log(`[RECAUDOS] Columna fecha buscada: ${foundDate ? `"${foundDate}" → ENCONTRADA` : `NINGUNA encontrada. Buscaba: ${dateCandidates.join(', ')}`}`);
+                        if (!foundKey || !foundDate) {
+                            log(`[RECAUDOS] ⚠ Sin columnas clave: se omitirán TODAS las filas. Revise el nombre de columnas del Excel.`);
+                        }
+                    } else if (reportType === 'egresos') {
+                        const colsLower = cols.map(c => c.trim().toLowerCase());
+                        const keyColCandidates = ['consecutive', 'consecutivo', 'egreso', 'numero', 'nro'];
+                        const dateCandidates = ['date', 'fecha', 'fecha egreso', 'fecha_egreso'];
+                        const foundKey = keyColCandidates.find(k => colsLower.some(c => c === k));
+                        const foundDate = dateCandidates.find(k => colsLower.some(c => c === k));
+                        log(`[EGRESOS] Columna clave buscada (para match con BD campo "egress"): ${foundKey ? `"${foundKey}" → ENCONTRADA` : `NINGUNA encontrada. Buscaba: ${keyColCandidates.join(', ')}`}`);
+                        log(`[EGRESOS] Columna fecha buscada: ${foundDate ? `"${foundDate}" → ENCONTRADA` : `NINGUNA encontrada. Buscaba: ${dateCandidates.join(', ')}`}`);
+                        if (!foundKey || !foundDate) {
+                            log(`[EGRESOS] ⚠ Sin columnas clave: se omitirán TODAS las filas. Revise el nombre de columnas del Excel.`);
+                        }
+                    }
                 }
 
                 log(`Excel leído con éxito: ${rawJson.length} filas encontradas para el periodo ${start} - ${end}.`);
 
                 if (rawJson.length > 0) {
+                    const mockRes = mockResponse();
                     if (reportType === 'manifiestos') {
                         const { uploadReports } = await import('../controllers/management-report.controller.js');
                         const mockReq = { body: { records: rawJson }, user: { name: 'CRON_BOT_MANIFIESTOS' } } as any;
-                        await uploadReports(mockReq, mockResponse());
+                        await uploadReports(mockReq, mockRes);
                     } else if (reportType === 'recaudos') {
                         const { uploadReceiptDates } = await import('../controllers/management-report.controller.js');
                         const mockReq = { body: { records: rawJson }, user: { name: 'CRON_BOT_RECAUDOS' } } as any;
-                        await uploadReceiptDates(mockReq, mockResponse());
+                        await uploadReceiptDates(mockReq, mockRes);
                     } else if (reportType === 'egresos') {
                         const { uploadEgressDates } = await import('../controllers/management-report.controller.js');
                         const mockReq = { body: { records: rawJson }, user: { name: 'CRON_BOT_EGRESOS' } } as any;
-                        await uploadEgressDates(mockReq, mockResponse());
+                        await uploadEgressDates(mockReq, mockRes);
                     }
-                    log(`Importación completada en la BD M7 para el periodo ${start} al ${end}.`);
+                    const bdResult = mockRes._data;
+                    const processed = bdResult?.count ?? '?';
+                    const skipped = typeof bdResult?.count === 'number' ? rawJson.length - bdResult.count : '?';
+                    if (reportType === 'manifiestos') {
+                        log(`Importación BD: ${processed} de ${rawJson.length} filas insertadas/actualizadas (${skipped} omitidas por Número OC vacío).`);
+                    } else {
+                        log(`Importación BD: ${processed} filas actualizaron su fecha en BD de ${rawJson.length} en el Excel (${skipped} sin match — el número consecutivo no existe en BD o la fecha estaba vacía).`);
+                    }
                 } else {
                     log(`No se encontraron registros para importar en este periodo.`);
                 }

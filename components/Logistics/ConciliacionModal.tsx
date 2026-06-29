@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Icons } from '../../constants';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
+import ReturnApprovalInline from '../Devoluciones/ReturnApprovalInline';
 
 type FormaPago = 'TRANSFERENCIA' | 'CONSIGNACION';
 
@@ -258,6 +259,12 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                                 ${isReadOnly ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
                         />
                     </div>
+
+                    {/* Devoluciones de bodega asociadas a esta factura */}
+                    <ReturnApprovalInline
+                        invoiceNumber={invoice.invoice_number}
+                        currentUserName={currentUserId}
+                    />
                 </div>
 
                 {/* Footer */}

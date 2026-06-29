@@ -1,30 +1,44 @@
 import React from 'react';
+import * as XLSX from 'xlsx';
 import { api } from '../../services/api';
-import { ReturnCard, RETURN_REASONS } from './ReturnCard';
+import { ReturnCard, RETURN_REASONS, ReturnReasonOption } from './ReturnCard';
 import { Icons } from '../../constants';
 import { DataTable } from '../shared/DataTable';
 import { cleanSkuM7, extractQtyFromBarcode } from '../../utils/scanner';
 
 // ─── TIPOS ───────────────────────────────────────────────────────────────────
 interface Client { id: string; name: string; }
-type Tab = 'recibir' | 'legalizacion' | 'aprobacion' | 'historial';
+type Tab = 'recibir' | 'sin_registrar' | 'seguimiento' | 'historial';
 
-interface BodegaReturn {
-    invoiceNumber: string; documentId: string | number;
-    conductorName?: string; vehiclePlate?: string;
-    legalizadoAt: string; externalDocId?: string; items: any[];
+interface ConcilPendingInvoice {
+    invoice_id: string;
+    customer_name?: string;
+    codigo_cliente?: string;
+    fecha_placa?: string;
+    plan_type?: string;
+    client_id?: string;
+    vehicle_plate?: string;
+    vehicle_id?: string;
+    driver_id?: string;
+    driver_name?: string;
+    numero_planilla?: string;
+    items: Array<{ article_id: string; article_name?: string; sku?: string; un_code?: string; unit?: string; quantity_returned: number }>;
 }
-interface PendingReturn {
-    id: number; invoice_id: string; return_reason?: string; notes?: string;
-    status: string; created_at: string; vehicle_plate?: string;
-    driver_name?: string; client_id?: string; items: any[];
-}
-interface ApprovalBatch {
-    id: number; batch_code: string; client_id: string; notes?: string;
-    status: string; created_by?: string; created_at: string;
-    total_items: number; approved_items: number;
-    email_proveedor?: string; email_sent_at?: string;
-    confirmed_at?: string; confirmed_by_name?: string;
+
+interface TrackingReturn {
+    id: number; invoice_id: string; return_type?: 'COMPLETA' | 'PARCIAL';
+    return_reason?: string; notes?: string; status: string;
+    fecha?: string; vehicle_plate?: string; driver_name?: string;
+    client_id?: string; vendedor?: string; customer_name?: string;
+    codigo_cliente?: string; order_number?: string; fecha_placa?: string;
+    items: Array<{ sku?: string; article_id?: string; article_name?: string; quantity_returned: number; un_code?: string; unit?: string }>;
+    conciliacion_confirmada_at?: string; conciliacion_confirmada_by?: string;
+    pre_approval_at?: string; pre_approval_by?: string;
+    pre_approved_at?: string; pre_approved_by?: string;
+    supplier_exit_at?: string; supplier_exit_by?: string;
+    completed_at?: string; completed_by?: string;
+    excel_downloaded_at?: string;
+    plan_type?: string; numero_planilla?: string;
 }
 interface InvoiceItem {
     article_id: string; article_name: string; barcode: string; sku: string;
@@ -34,10 +48,13 @@ interface InvoiceItem {
     uom_inter_name: string; uom_std_name: string;
 }
 interface InvoiceData {
+    fromConciliacion?: boolean;
     invoice: {
         invoice_id: string; order_number: string; customer_name: string;
         client_ref: string; vehicle_plate: string; numero_planilla: string;
         fecha_placa: string; plan_type: string; client_id: string;
+        conductor_name: string | null; assigned_plate: string | null; assigned_at: string | null;
+        vehicle_id: string | null; driver_id: string | null;
     };
     returnStatus: 'none' | 'partial' | 'complete';
     previousReturns: Array<{
@@ -50,31 +67,47 @@ interface InvoiceData {
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
-    const [tab, setTab]         = React.useState<Tab>('recibir');
-    const [loading, setLoading] = React.useState(false);
-    const [toast, setToast]     = React.useState<{ msg: string; ok: boolean } | null>(null);
+    const [tab, setTab]   = React.useState<Tab>('recibir');
+    const [toast, setToast] = React.useState<{ msg: string; ok: boolean } | null>(null);
 
     // Client selector
     const [clients, setClients]                   = React.useState<Client[]>([]);
     const [selectedClientId, setSelectedClientId] = React.useState('');
     const [clientsReady, setClientsReady]         = React.useState(false);
 
-    // ── Tab: Post-Legalización ────────────────────────────────────────────────
-    const [bodegaReturns, setBodegaReturns]     = React.useState<BodegaReturn[]>([]);
-    const [processingId, setProcessingId]       = React.useState<string | null>(null);
-    const [searchLegalizacion, setSearchLegalizacion] = React.useState('');
+    // ── Tab: Seguimiento ──────────────────────────────────────────────────────
+    const [trackingReturns, setTrackingReturns]   = React.useState<TrackingReturn[]>([]);
+    const [trackingLoading, setTrackingLoading]   = React.useState(false);
+    const [selectedExcelIds, setSelectedExcelIds] = React.useState<Set<number>>(new Set());
+    const [advancingId, setAdvancingId]           = React.useState<number | null>(null);
+    const [visibleStatuses, setVisibleStatuses]   = React.useState<Set<string>>(
+        new Set(['PENDING','CONFIRMED','PRE_APPROVAL','PRE_APPROVED','SUPPLIER_EXIT'])
+    );
 
-    // ── Tab: Aprobación ───────────────────────────────────────────────────────
-    const [pendingReturns, setPendingReturns]       = React.useState<PendingReturn[]>([]);
-    const [batches, setBatches]                     = React.useState<ApprovalBatch[]>([]);
-    const [selectedReturnIds, setSelectedReturnIds] = React.useState<Set<number>>(new Set());
-    const [batchNotes, setBatchNotes]               = React.useState('');
-    const [creatingBatch, setCreatingBatch]         = React.useState(false);
-    const [batchTab, setBatchTab]                   = React.useState<'pending' | 'batches'>('pending');
-    const [emailModal, setEmailModal]               = React.useState<{ batch: ApprovalBatch } | null>(null);
-    const [emailInput, setEmailInput]               = React.useState('');
-    const [nombreInput, setNombreInput]             = React.useState('');
-    const [sendingEmail, setSendingEmail]           = React.useState(false);
+    // ── Tab: Sin registrar (desde conciliación) ───────────────────────────────
+    const [concilPending, setConcilPending]       = React.useState<ConcilPendingInvoice[]>([]);
+    const [concilLoading, setConcilLoading]       = React.useState(false);
+    const [selectedConcilIds, setSelectedConcilIds] = React.useState<Set<string>>(new Set());
+    const [importingConcil, setImportingConcil]   = React.useState(false);
+    const [concilExtras, setConcilExtras]         = React.useState<Record<string,{vendedor:string; return_reason:string; return_type:'COMPLETA'|'PARCIAL'}>>({});
+    const [concilOtroMode, setConcilOtroMode]     = React.useState<Set<string>>(new Set());
+    const [concilOtroText, setConcilOtroText]     = React.useState<Record<string,string>>({});
+
+    const setConcilExtra = (invoiceId: string, field: string, value: string) =>
+        setConcilExtras(prev => ({ ...prev, [invoiceId]: { vendedor:'', return_reason:'', return_type:'COMPLETA', ...prev[invoiceId], [field]: value } }));
+
+    const confirmConcilOtro = async (invoiceId: string) => {
+        const text = (concilOtroText[invoiceId] || '').trim();
+        if (!text) return;
+        try {
+            const res = await api.createReturnReason(text);
+            if (res?.data) {
+                setReasonOptions(prev => prev.some(r => r.id === res.data.id) ? prev : [...prev, res.data]);
+            }
+        } catch { /* si falla igual registramos el texto */ }
+        setConcilExtra(invoiceId, 'return_reason', text);
+        setConcilOtroMode(prev => { const n = new Set(prev); n.delete(invoiceId); return n; });
+    };
 
     // ── Tab: Recibir devolución ───────────────────────────────────────────────
     const [invoiceSearch, setInvoiceSearch]         = React.useState('');
@@ -84,6 +117,9 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
     const [returnType, setReturnType]               = React.useState<'COMPLETA' | 'PARCIAL'>('COMPLETA');
     const [returnReason, setReturnReason]           = React.useState('');
     const [returnNotes, setReturnNotes]             = React.useState('');
+    const [reasonOptions, setReasonOptions]         = React.useState<ReturnReasonOption[]>([]);
+    const [showOtroInput, setShowOtroInput]         = React.useState(false);
+    const [otroText, setOtroText]                   = React.useState('');
     const [scannedQtys, setScannedQtys]             = React.useState<Record<string, number>>({});
     const [pickingModes, setPickingModes]           = React.useState<Record<string, 'UND' | 'CAJA' | 'STD'>>({});
     const [lastScanned, setLastScanned]             = React.useState<string | null>(null);
@@ -104,6 +140,12 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
 
     // ── Clientes ──────────────────────────────────────────────────────────────
     React.useEffect(() => {
+        api.getReturnReasons().then((r: any) => {
+            if (r?.data) setReasonOptions(r.data);
+        }).catch(() => {});
+    }, []);
+
+    React.useEffect(() => {
         const allowedIds: string[] = user?.clientIds?.length
             ? user.clientIds : user?.clientId ? [user.clientId] : [];
         api.getClients().then((all: any[]) => {
@@ -119,25 +161,64 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
     // ── Carga inicial al cambiar cliente ──────────────────────────────────────
     const loadAll = React.useCallback(async (clientId: string) => {
         if (!clientId) return;
-        setLoading(true);
+        setTrackingLoading(true);
         try {
-            const [br, ap, bt] = await Promise.all([
-                api.getPendingBodegaReturns(clientId).catch(() => ({ data: [] })),
-                api.getApprovalPendingReturns(clientId).catch(() => ({ data: [] })),
-                api.getApprovalBatches(clientId).catch(() => ({ data: [] })),
-            ]);
-            setBodegaReturns(Array.isArray(br) ? br : (br?.data ?? []));
-            setPendingReturns(ap?.data ?? []);
-            setBatches(bt?.data ?? []);
-        } finally { setLoading(false); }
+            const res = await api.getReturnsTracking(clientId).catch(() => ({ data: [] }));
+            setTrackingReturns(Array.isArray(res) ? res : (res?.data ?? []));
+        } finally { setTrackingLoading(false); }
     }, []);
 
     React.useEffect(() => {
         if (selectedClientId) {
-            setBodegaReturns([]); setPendingReturns([]); setBatches([]);
+            setTrackingReturns([]);
+            setSelectedExcelIds(new Set());
             loadAll(selectedClientId);
         }
     }, [selectedClientId, loadAll]);
+
+    const loadConcilPending = React.useCallback(async (clientId: string) => {
+        if (!clientId) return;
+        setConcilLoading(true);
+        try {
+            const res = await api.getConciliacionPending(clientId).catch(() => ({ data: [] }));
+            setConcilPending(Array.isArray(res) ? res : (res?.data ?? []));
+        } finally { setConcilLoading(false); }
+    }, []);
+
+    React.useEffect(() => {
+        if (tab === 'sin_registrar' && selectedClientId) loadConcilPending(selectedClientId);
+    }, [tab, selectedClientId, loadConcilPending]);
+
+    const handleImportConcil = async () => {
+        if (selectedConcilIds.size === 0) return;
+        const toImport = concilPending.filter(i => selectedConcilIds.has(i.invoice_id));
+        // Validar campos obligatorios
+        const missing = toImport.filter(i => !concilExtras[i.invoice_id]?.vendedor?.trim() || !concilExtras[i.invoice_id]?.return_reason);
+        if (missing.length > 0) {
+            showToast(`Complete Vendedor y Motivo en: ${missing.map(i => i.invoice_id).join(', ')}`, false);
+            return;
+        }
+        setImportingConcil(true);
+        try {
+            const payload = toImport.map(i => ({
+                ...i,
+                vendedor:      concilExtras[i.invoice_id]?.vendedor ?? '',
+                return_reason: concilExtras[i.invoice_id]?.return_reason ?? '',
+                return_type:   concilExtras[i.invoice_id]?.return_type ?? 'COMPLETA',
+            }));
+            const res = await api.importFromConciliacion(payload, user?.name || user?.email || 'BODEGA');
+            if (!res?.success) throw new Error(res?.error ?? 'Error al importar');
+            showToast(`✅ ${res.created} devolucion(es) registradas en seguimiento`);
+            setSelectedConcilIds(new Set());
+            await Promise.all([
+                loadConcilPending(selectedClientId),
+                loadAll(selectedClientId),
+            ]);
+            setTab('seguimiento');
+        } catch (e: any) {
+            showToast(e.message ?? 'Error al importar', false);
+        } finally { setImportingConcil(false); }
+    };
 
     // ── Historial ─────────────────────────────────────────────────────────────
     const loadHistory = React.useCallback(async () => {
@@ -153,9 +234,7 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         finally { setHistLoading(false); }
     }, [selectedClientId, histFrom, histTo]);
 
-    React.useEffect(() => {
-        if (tab === 'historial') loadHistory();
-    }, [tab, loadHistory]);
+    // historial se carga solo cuando el usuario hace clic en "Aplicar" con ambas fechas
 
     // ── Buscar factura para recibir ───────────────────────────────────────────
     const handleSearchInvoice = async () => {
@@ -300,7 +379,9 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         try {
             await api.registerRouteReturn({
                 invoiceId:       invoiceData.invoice.invoice_id,
-                vehiclePlate:    invoiceData.invoice.vehicle_plate || undefined,
+                vehiclePlate:    invoiceData.invoice.assigned_plate || invoiceData.invoice.vehicle_plate || undefined,
+                vehicleId:       invoiceData.invoice.vehicle_id   || undefined,
+                driverId:        invoiceData.invoice.driver_id    || undefined,
                 returnType,
                 returnReason,
                 notes:           returnNotes,
@@ -314,74 +395,168 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
             // Reset
             setInvoiceData(null); setInvoiceSearch(''); setVendedor('');
             setReturnType('COMPLETA'); setReturnReason(''); setReturnNotes('');
+            setShowOtroInput(false); setOtroText('');
             setScannedQtys({}); setPickingModes({}); setLastScanned(null);
             loadAll(selectedClientId);
         } catch (e: any) { showToast(e?.message ?? 'Error al guardar', false); }
         finally { setSavingReturn(false); }
     };
 
-    // ── Post-Legalización ─────────────────────────────────────────────────────
-    const handleConfirmBodega = async (ret: BodegaReturn, obs: string, reason: string) => {
-        setProcessingId(`b-${ret.invoiceNumber}`);
-        try {
-            await api.confirmBodegaReturn({
-                invoiceNumber: ret.invoiceNumber,
-                documentId: String(ret.documentId),
-                receivedBy: user?.name ?? user?.email ?? 'Bodega',
-                observation: `${reason}${obs ? ' — ' + obs : ''}`,
+    // ── Seguimiento: construir filas Excel ───────────────────────────────────
+    const buildExcelRows = (returns: TrackingReturn[]) =>
+        returns.flatMap(r =>
+            r.items.length > 0
+                ? r.items.map(it => ({
+                    FECHA:               r.fecha ?? '',
+                    CLIENTE:             r.customer_name ?? '',
+                    'CODIGO CLIENTE':    r.codigo_cliente ?? '',
+                    VENDEDOR:            r.vendedor ?? '',
+                    'FECHA Y PLACA':     `${r.fecha_placa ?? ''} ${r.vehicle_plate ?? ''}`.trim(),
+                    'NUMERO PLANILLA':   r.numero_planilla ?? '',
+                    REMISION:            r.invoice_id,
+                    PEDIDO:              r.order_number ?? '',
+                    REFERENCIA:          it.article_id ?? it.sku ?? '',
+                    UM:                  it.unit ?? '',
+                    CANTIDAD:            Number(it.quantity_returned ?? 0),
+                    'MOTIVO DEVOLUCION': r.return_reason ?? '',
+                    'UNIDAD NEGOCIO':    it.un_code ?? '',
+                }))
+                : [{
+                    FECHA:               r.fecha ?? '',
+                    CLIENTE:             r.customer_name ?? '',
+                    'CODIGO CLIENTE':    r.codigo_cliente ?? '',
+                    VENDEDOR:            r.vendedor ?? '',
+                    'FECHA Y PLACA':     `${r.fecha_placa ?? ''} ${r.vehicle_plate ?? ''}`.trim(),
+                    'NUMERO PLANILLA':   r.numero_planilla ?? '',
+                    REMISION:            r.invoice_id,
+                    PEDIDO:              r.order_number ?? '',
+                    REFERENCIA:          '', UM: '', CANTIDAD: 0,
+                    'MOTIVO DEVOLUCION': r.return_reason ?? '',
+                    'UNIDAD NEGOCIO':    '',
+                }]
+        );
+
+    const writeExcel = (returns: TrackingReturn[], suffix = '') => {
+        const title = `DEVOLUCIONES PLAN ${returns[0]?.plan_type ?? ''} ${new Date().toLocaleDateString('es-CO', { day:'2-digit', month:'long', year:'numeric' }).toUpperCase()}`;
+        const rows  = buildExcelRows(returns);
+        const wb    = XLSX.utils.book_new();
+        const GREEN = 'FFD9EAD3';
+
+        const styleCell = (ws: XLSX.WorkSheet, addr: string, s: any) => {
+            if (!ws[addr]) ws[addr] = { t: 's', v: ws[addr]?.v ?? '' };
+            ws[addr].s = s;
+        };
+
+        // ── Hoja 1: Codigo General ───────────────────────────────────────────
+        const skuMap = new Map<string, { articulo: string; unidad: string; cantidad: number }>();
+        returns.forEach(r => r.items.forEach(it => {
+            const key = it.article_id ?? it.sku ?? '';
+            if (!key) return;
+            const prev = skuMap.get(key) ?? { articulo: it.article_name ?? '', unidad: it.unit ?? '', cantidad: 0 };
+            skuMap.set(key, { articulo: prev.articulo || (it.article_name ?? ''), unidad: prev.unidad || (it.unit ?? ''), cantidad: prev.cantidad + Number(it.quantity_returned ?? 0) });
+        }));
+        const generalRows = Array.from(skuMap.entries()).map(([ref, v]) => ({
+            REFERENCIA: ref, ARTICULO: v.articulo, UM: v.unidad, 'CANTIDAD TOTAL': v.cantidad,
+        }));
+        const wsGen = XLSX.utils.json_to_sheet(generalRows);
+        wsGen['!cols'] = [{ wch: 20 }, { wch: 40 }, { wch: 8 }, { wch: 14 }];
+        ['A1','B1','C1','D1'].forEach(a => styleCell(wsGen, a, {
+            font: { bold: true }, fill: { patternType: 'solid', fgColor: { rgb: GREEN } }, alignment: { horizontal: 'center' },
+        }));
+        XLSX.utils.book_append_sheet(wb, wsGen, 'Codigo General');
+
+        // ── Hoja 2: Devoluciones ─────────────────────────────────────────────
+        const COLS = ['FECHA','CLIENTE','CODIGO CLIENTE','VENDEDOR','FECHA Y PLACA','NUMERO PLANILLA','REMISION','PEDIDO','REFERENCIA','UM','CANTIDAD','MOTIVO DEVOLUCION','UNIDAD NEGOCIO'];
+        const WIDTHS = [12,32,14,10,16,18,14,14,16,6,10,30,14];
+
+        // Construir hoja: fila 1 = título, fila 2 = cabeceras, fila 3+ = datos
+        const wsDevData = [
+            [title, ...Array(COLS.length - 1).fill('')],
+            COLS,
+            ...rows.map(r => COLS.map(c => (r as any)[c] ?? '')),
+        ];
+        const wsDev = XLSX.utils.aoa_to_sheet(wsDevData);
+        wsDev['!cols'] = WIDTHS.map(w => ({ wch: w }));
+        // Merge título A1:M1
+        wsDev['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: COLS.length - 1 } }];
+        // Estilo título
+        styleCell(wsDev, 'A1', {
+            font: { bold: true, sz: 13 },
+            fill: { patternType: 'solid', fgColor: { rgb: GREEN } },
+            alignment: { horizontal: 'center', vertical: 'center' },
+        });
+        // Estilo cabeceras fila 2
+        COLS.forEach((_, i) => {
+            const addr = XLSX.utils.encode_cell({ r: 1, c: i });
+            styleCell(wsDev, addr, {
+                font: { bold: true },
+                fill: { patternType: 'solid', fgColor: { rgb: GREEN } },
+                alignment: { horizontal: 'center' },
             });
-            showToast(`Devolución de ${ret.invoiceNumber} confirmada`);
-            setBodegaReturns(prev => prev.filter(r => r.invoiceNumber !== ret.invoiceNumber));
-        } catch (e: any) { showToast(e?.message ?? 'Error al confirmar', false); }
-        finally { setProcessingId(null); }
+        });
+        XLSX.utils.book_append_sheet(wb, wsDev, 'Devoluciones');
+
+        XLSX.writeFile(wb, `DEVOLUCIONES_${(returns[0]?.plan_type ?? 'PLAN').replace(/\s+/g,'_')}_${suffix || new Date().toISOString().slice(0, 10)}.xlsx`, { cellStyles: true });
     };
 
-    // ── Lote de aprobación ────────────────────────────────────────────────────
-    const handleCreateBatch = async () => {
-        if (selectedReturnIds.size === 0) { showToast('Seleccione al menos una devolución', false); return; }
-        setCreatingBatch(true);
+    // ── Exportar Excel sin cambio de estado (todos los bloques) ──────────────
+    const handleExportExcel = (returns: TrackingReturn[]) => {
+        writeExcel(returns);
+        showToast(`Excel exportado — ${returns.length} devolución(es)`);
+    };
+
+    // ── Descargar Excel pre-aprobación (sin avanzar estado) ──────────────────
+    const handleDownloadExcel = (returns: TrackingReturn[]) => {
+        writeExcel(returns, `PREAPROBACION_${new Date().toISOString().slice(0, 10)}`);
+        showToast(`Excel descargado — ${returns.length} devolución(es)`);
+    };
+
+    // ── Avanzar CONFIRMED → PRE_APPROVAL y registrar descarga del excel ───────
+    const handleSendPreApproval = async (returns: TrackingReturn[]) => {
+        const userName = user?.name ?? user?.email ?? 'USUARIO';
+        setAdvancingId(-1);
         try {
-            const res = await api.createApprovalBatch({
-                clientId: selectedClientId,
-                returnIds: Array.from(selectedReturnIds),
-                notes: batchNotes,
-                createdBy: user?.name ?? user?.email,
-            });
-            showToast(`Lote ${res.batchCode} creado con ${selectedReturnIds.size} devoluciones`);
-            setSelectedReturnIds(new Set()); setBatchNotes('');
+            for (const r of returns) {
+                await api.markExcelDownloaded(r.id);
+                await api.advanceReturnState(r.id, 'PRE_APPROVAL', userName);
+            }
+            setSelectedExcelIds(new Set());
+            showToast(`${returns.length} devolución(es) enviadas a Pre-Aprobación`);
             loadAll(selectedClientId);
-        } catch (e: any) { showToast(e?.message ?? 'Error al crear lote', false); }
-        finally { setCreatingBatch(false); }
+        } catch (e: any) { showToast(e?.message ?? 'Error al avanzar estado', false); }
+        finally { setAdvancingId(null); }
     };
 
-    const handleSendEmail = async () => {
-        if (!emailModal) return;
-        const email = emailInput.trim();
-        if (!email || !email.includes('@')) { showToast('Ingresa un email válido', false); return; }
-        setSendingEmail(true);
+    // ── Seguimiento: avanzar estados en lote ─────────────────────────────────
+    const handleAdvanceBatch = async (ids: number[], newStatus: string, msg: string) => {
+        const userName = user?.name ?? user?.email ?? 'USUARIO';
+        setAdvancingId(-1);
         try {
-            await api.sendApprovalBatchEmail(emailModal.batch.id, email, nombreInput.trim());
-            showToast(`Email enviado a ${email}`);
-            setBatches(prev => prev.map(b =>
-                b.id === emailModal.batch.id
-                    ? { ...b, status: 'enviado', email_proveedor: email, email_sent_at: new Date().toISOString() }
-                    : b
-            ));
-            setEmailModal(null); setEmailInput(''); setNombreInput('');
-        } catch (e: any) { showToast(e.message || 'Error enviando email', false); }
-        finally { setSendingEmail(false); }
+            await Promise.all(ids.map(id => api.advanceReturnState(id, newStatus, userName)));
+            showToast(`${msg} (${ids.length})`);
+            setTrackingReturns(prev => prev.map(r => ids.includes(r.id) ? { ...r, status: newStatus } : r));
+            setSelectedExcelIds(new Set());
+        } catch (e: any) { showToast(e?.message ?? 'Error al avanzar estado', false); }
+        finally { setAdvancingId(null); }
     };
 
     // ── Totales para badge ─────────────────────────────────────────────────────
     const selectedClientName = clients.find(c => c.id === selectedClientId)?.name ?? '';
     const tabs: { id: Tab; label: string; count?: number }[] = [
-        { id: 'recibir',      label: 'Recibir Devolución' },
-        { id: 'legalizacion', label: 'Post-Legalización', count: bodegaReturns.length },
-        { id: 'aprobacion',   label: 'Por Aprobar',       count: pendingReturns.length },
-        { id: 'historial',    label: 'Historial' },
+        { id: 'recibir',       label: 'Recibir Devolución' },
+        { id: 'sin_registrar', label: 'Sin Registrar', count: concilPending.length },
+        { id: 'seguimiento',   label: 'Seguimiento',   count: trackingReturns.length },
+        { id: 'historial',     label: 'Historial' },
     ];
 
     // ── Columnas Excel historial ───────────────────────────────────────────────
+    const fmtDate = (v: string | null | undefined) => {
+        if (!v) return '—';
+        const d = new Date(v);
+        const p = (n: number) => String(n).padStart(2, '0');
+        return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    };
+
     const historyColumns = [
         { header: 'FECHA',            key: 'fecha' },
         { header: 'CLIENTE',          key: 'customer_name' },
@@ -395,7 +570,19 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         { header: 'UM',               key: 'um' },
         { header: 'CANTIDAD',         key: 'cantidad' },
         { header: 'MOTIVO DEVOLUCION',key: 'motivo_devolucion' },
-        { header: 'UNIDAD NEGOCIO',   key: 'unidad_negocio' },
+        { header: 'UNIDAD NEGOCIO',   key: 'un_code' },
+        { header: 'TIPO PLAN',        key: 'unidad_negocio' },
+        { header: 'ESTADO',           key: 'status' },
+        { header: 'F. CONFIRMACIÓN FACT.', key: 'conciliacion_confirmada_at', render: (r: any) => fmtDate(r.conciliacion_confirmada_at), exportRender: (r: any) => fmtDate(r.conciliacion_confirmada_at) },
+        { header: 'POR (CONFIRMACIÓN)',    key: 'conciliacion_confirmada_by' },
+        { header: 'F. EXCEL ENVIADO',  key: 'pre_approval_at',  render: (r: any) => fmtDate(r.pre_approval_at),  exportRender: (r: any) => fmtDate(r.pre_approval_at) },
+        { header: 'POR (EXCEL)',       key: 'pre_approval_by' },
+        { header: 'F. APROBACIÓN PROV.', key: 'pre_approved_at', render: (r: any) => fmtDate(r.pre_approved_at), exportRender: (r: any) => fmtDate(r.pre_approved_at) },
+        { header: 'POR (APROBACIÓN)', key: 'pre_approved_by' },
+        { header: 'F. SALIDA PROV.',   key: 'supplier_exit_at', render: (r: any) => fmtDate(r.supplier_exit_at), exportRender: (r: any) => fmtDate(r.supplier_exit_at) },
+        { header: 'POR (SALIDA)',      key: 'supplier_exit_by' },
+        { header: 'F. COMPLETADO',     key: 'completed_at',     render: (r: any) => fmtDate(r.completed_at),     exportRender: (r: any) => fmtDate(r.completed_at) },
+        { header: 'POR (COMPLETADO)', key: 'completed_by' },
     ];
 
     return (
@@ -455,7 +642,7 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                         ))}
                         <button onClick={() => loadAll(selectedClientId)}
                             className="ml-auto px-3 py-2 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
-                            <Icons.RefreshCw className={`w-3.5 h-3.5 text-slate-400 ${loading ? 'animate-spin' : ''}`} />
+                            <Icons.RefreshCw className={`w-3.5 h-3.5 text-slate-400 ${trackingLoading ? 'animate-spin' : ''}`} />
                         </button>
                     </div>
 
@@ -499,13 +686,31 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                             <div><span className="text-indigo-400 font-black uppercase tracking-widest text-[9px]">Planilla</span>
                                                 <p className="font-bold text-slate-700 font-mono">{invoiceData.invoice.numero_planilla || '—'}</p></div>
                                             <div><span className="text-indigo-400 font-black uppercase tracking-widest text-[9px]">Placa</span>
-                                                <p className="font-bold text-slate-700">{invoiceData.invoice.vehicle_plate || '—'}</p></div>
+                                                <p className="font-bold text-slate-700">{invoiceData.invoice.assigned_plate || invoiceData.invoice.vehicle_plate || '—'}</p></div>
+                                            <div><span className="text-indigo-400 font-black uppercase tracking-widest text-[9px]">Conductor</span>
+                                                <p className="font-bold text-slate-700">{invoiceData.invoice.conductor_name || '—'}</p></div>
+                                            <div><span className="text-indigo-400 font-black uppercase tracking-widest text-[9px]">Fecha Asignación</span>
+                                                <p className="font-bold text-slate-700">{invoiceData.invoice.assigned_at ? new Date(invoiceData.invoice.assigned_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</p></div>
                                             <div><span className="text-indigo-400 font-black uppercase tracking-widest text-[9px]">Pedido</span>
                                                 <p className="font-bold text-slate-700 font-mono">{invoiceData.invoice.order_number || '—'}</p></div>
-                                            <div><span className="text-indigo-400 font-black uppercase tracking-widest text-[9px]">Plan</span>
-                                                <p className="font-bold text-slate-700">{invoiceData.invoice.plan_type || '—'}</p></div>
                                         </div>
                                     </div>
+
+                                    {/* Banner: factura ya procesada por conciliación */}
+                                    {invoiceData.fromConciliacion && invoiceData.returnStatus !== 'complete' && (
+                                        <div className="bg-amber-50 border-2 border-amber-400 rounded-2xl p-4 flex items-start gap-3">
+                                            <span className="text-2xl">⚠️</span>
+                                            <div className="flex-1">
+                                                <p className="text-[11px] font-black text-amber-800 uppercase tracking-widest">Esta factura ya fue procesada en conciliación</p>
+                                                <p className="text-xs text-amber-700 mt-1">Fue marcada como <strong>DEVUELTA</strong> en el módulo de conciliación. Use el tab <strong>"Sin Registrar"</strong> para confirmar la recepción física — ingresará directamente en estado CONFIRMADO sin requerir aprobación de facturación.</p>
+                                                <button
+                                                    onClick={() => setTab('sin_registrar')}
+                                                    className="mt-2 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-[9px] font-black uppercase tracking-widest rounded-xl">
+                                                    Ir a Sin Registrar →
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {/* Banner de devoluciones previas */}
                                     {invoiceData.returnStatus === 'complete' && (
@@ -538,7 +743,7 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                     )}
 
                                     {/* Campos: vendedor, tipo, motivo, notas */}
-                                    <div className={`bg-white rounded-2xl border border-slate-200 p-5 space-y-4 ${invoiceData.returnStatus === 'complete' ? 'opacity-40 pointer-events-none' : ''}`}>
+                                    <div className={`bg-white rounded-2xl border border-slate-200 p-5 space-y-4 ${invoiceData.returnStatus === 'complete' || invoiceData.fromConciliacion ? 'opacity-40 pointer-events-none' : ''}`}>
                                         {/* CÓDIGO VENDEDOR — obligatorio */}
                                         <div>
                                             <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
@@ -573,13 +778,68 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                             <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
                                                 Motivo de Devolución <span className="text-rose-500">*</span>
                                             </label>
-                                            <select value={returnReason} onChange={e => setReturnReason(e.target.value)}
+                                            <select
+                                                value={showOtroInput ? '__otro__' : returnReason}
+                                                onChange={e => {
+                                                    if (e.target.value === '__otro__') {
+                                                        setShowOtroInput(true);
+                                                        setReturnReason('');
+                                                        setOtroText('');
+                                                    } else {
+                                                        setShowOtroInput(false);
+                                                        setReturnReason(e.target.value);
+                                                    }
+                                                }}
                                                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white">
                                                 <option value="">— Seleccionar motivo —</option>
-                                                {RETURN_REASONS.map((r: string) => (
-                                                    <option key={r} value={r}>{r}</option>
+                                                {reasonOptions.map(r => (
+                                                    <option key={r.id} value={r.name}>{r.name}</option>
                                                 ))}
+                                                <option value="__otro__">➕ Otro (crear nuevo)...</option>
                                             </select>
+                                            {showOtroInput && (
+                                                <div className="mt-2 flex gap-2">
+                                                    <input
+                                                        autoFocus
+                                                        value={otroText}
+                                                        onChange={e => setOtroText(e.target.value)}
+                                                        onKeyDown={async e => {
+                                                            if (e.key === 'Enter' && otroText.trim()) {
+                                                                const val = otroText.trim();
+                                                                try {
+                                                                    const res = await api.createReturnReason(val);
+                                                                    if (res?.data) setReasonOptions(prev => prev.some(r => r.id === res.data.id) ? prev : [...prev, res.data]);
+                                                                } catch { /* continuar igual */ }
+                                                                setReturnReason(val);
+                                                                setShowOtroInput(false);
+                                                                setOtroText('');
+                                                            }
+                                                        }}
+                                                        placeholder="Escribir motivo y presionar Enter..."
+                                                        className="flex-1 border border-indigo-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        disabled={!otroText.trim()}
+                                                        onClick={async () => {
+                                                            const val = otroText.trim();
+                                                            if (!val) return;
+                                                            try {
+                                                                const res = await api.createReturnReason(val);
+                                                                if (res?.data) setReasonOptions(prev => prev.some(r => r.id === res.data.id) ? prev : [...prev, res.data]);
+                                                            } catch { /* continuar igual */ }
+                                                            setReturnReason(val);
+                                                            setShowOtroInput(false);
+                                                            setOtroText('');
+                                                        }}
+                                                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white text-[10px] font-black uppercase rounded-xl">
+                                                        Agregar
+                                                    </button>
+                                                </div>
+                                            )}
+                                            {returnReason && !showOtroInput && !reasonOptions.some(r => r.name === returnReason) && (
+                                                <p className="text-[9px] text-indigo-500 font-bold mt-1">✓ Motivo personalizado: "{returnReason}"</p>
+                                            )}
                                         </div>
 
                                         {/* Observaciones */}
@@ -725,8 +985,13 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                         })}
                                     </div>
 
-                                    {/* Botón confirmar — bloqueado si ya fue devuelta completamente */}
-                                    {invoiceData.returnStatus === 'complete' ? (
+                                    {/* Botón confirmar */}
+                                    {invoiceData.fromConciliacion ? (
+                                        <button onClick={() => setTab('sin_registrar')}
+                                            className="w-full py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-black text-sm uppercase tracking-widest rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2">
+                                            ⚠️ Ir a "Sin Registrar" para confirmar recepción →
+                                        </button>
+                                    ) : invoiceData.returnStatus === 'complete' ? (
                                         <div className="w-full py-4 bg-slate-100 text-slate-400 font-black text-sm uppercase tracking-widest rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed">
                                             🚫 Devolución ya completa — no se puede registrar otra
                                         </div>
@@ -744,181 +1009,442 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                     )}
 
                     {/* ══════════════════════════════════════════════════════════
-                        TAB: POST-LEGALIZACIÓN
+                        TAB: SIN REGISTRAR (desde conciliación)
                     ══════════════════════════════════════════════════════════ */}
-                    {tab === 'legalizacion' && (
-                        <div className="max-w-2xl space-y-3">
-                            {loading ? (
+                    {tab === 'sin_registrar' && (
+                        <div className="space-y-4">
+                            {/* Cabecera informativa */}
+                            <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start gap-3">
+                                <span className="text-lg mt-0.5">⚠️</span>
+                                <div>
+                                    <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Devoluciones aprobadas en conciliación sin recibo físico en bodega</p>
+                                    <p className="text-[9px] text-amber-700 mt-0.5">Estas facturas ya fueron marcadas como DEVUELTO en conciliación. Al registrar la recepción física entran directamente al pipeline en estado <strong>CONFIRMADO</strong>, saltando la espera de facturación.</p>
+                                </div>
+                            </div>
+
+                            {/* Acciones */}
+                            {concilPending.length > 0 && (
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    <button
+                                        onClick={() => setSelectedConcilIds(new Set(concilPending.map(i => i.invoice_id)))}
+                                        className="px-3 py-1.5 border border-slate-200 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50">
+                                        Seleccionar todo
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedConcilIds(new Set())}
+                                        className="px-3 py-1.5 border border-rose-200 rounded-xl text-[9px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50">
+                                        Quitar todo
+                                    </button>
+                                    {selectedConcilIds.size > 0 && (
+                                        <button
+                                            onClick={handleImportConcil}
+                                            disabled={importingConcil}
+                                            className="ml-auto flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest rounded-xl">
+                                            {importingConcil
+                                                ? <><Icons.Loader className="w-3.5 h-3.5 animate-spin" /> Registrando…</>
+                                                : <><Icons.Package className="w-3.5 h-3.5" /> Registrar recepción ({selectedConcilIds.size})</>}
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Tabla */}
+                            {concilLoading ? (
                                 <div className="flex justify-center py-20"><Icons.Loader className="w-6 h-6 text-slate-400 animate-spin" /></div>
-                            ) : bodegaReturns.length === 0 ? (
-                                <EmptyState msg="No hay devoluciones post-legalización pendientes" />
+                            ) : concilPending.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-20 text-center">
+                                    <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mb-3">
+                                        <Icons.CheckCircle className="w-6 h-6 text-emerald-400" />
+                                    </div>
+                                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Todo registrado — sin pendientes de conciliación</p>
+                                </div>
                             ) : (
-                                <>
-                                    <input value={searchLegalizacion} onChange={e => setSearchLegalizacion(e.target.value)}
-                                        placeholder="Buscar factura..."
-                                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] outline-none focus:border-indigo-400 font-bold mb-1" />
-                                    {bodegaReturns
-                                        .filter(r => !searchLegalizacion || r.invoiceNumber.toLowerCase().includes(searchLegalizacion.toLowerCase()))
-                                        .map(ret => (
-                                            <ReturnCard key={ret.invoiceNumber}
-                                                invoiceId={ret.invoiceNumber}
-                                                conductorName={ret.conductorName}
-                                                vehiclePlate={ret.vehiclePlate}
-                                                createdAt={ret.legalizadoAt}
-                                                externalDocId={ret.externalDocId}
-                                                items={ret.items}
-                                                isProcessing={processingId === `b-${ret.invoiceNumber}`}
-                                                onConfirm={(obs, reason) => handleConfirmBodega(ret, obs, reason)}
-                                                type="legalizacion" />
-                                        ))}
-                                </>
+                                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                                    <table className="w-full text-[10px]">
+                                        <thead>
+                                            <tr className="bg-slate-50 border-b border-slate-200">
+                                                <th className="px-3 py-2 w-8">
+                                                    <input type="checkbox"
+                                                        checked={selectedConcilIds.size === concilPending.length}
+                                                        onChange={e => setSelectedConcilIds(e.target.checked ? new Set(concilPending.map(i => i.invoice_id)) : new Set())}
+                                                        className="rounded" />
+                                                </th>
+                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Factura</th>
+                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Cliente</th>
+                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Planilla</th>
+                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Placa</th>
+                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Fecha</th>
+                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Plan</th>
+                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Art.</th>
+                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Tipo</th>
+                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Vendedor <span className="text-rose-500">*</span></th>
+                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Motivo <span className="text-rose-500">*</span></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {concilPending.map(inv => {
+                                                const sel = selectedConcilIds.has(inv.invoice_id);
+                                                return (
+                                                    <tr key={inv.invoice_id}
+                                                        onClick={() => setSelectedConcilIds(prev => {
+                                                            const n = new Set(prev);
+                                                            n.has(inv.invoice_id) ? n.delete(inv.invoice_id) : n.add(inv.invoice_id);
+                                                            return n;
+                                                        })}
+                                                        className={`cursor-pointer transition-colors ${sel ? 'bg-emerald-50' : 'hover:bg-slate-50/70'}`}>
+                                                        <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
+                                                            <input type="checkbox" checked={sel}
+                                                                onChange={() => setSelectedConcilIds(prev => {
+                                                                    const n = new Set(prev);
+                                                                    n.has(inv.invoice_id) ? n.delete(inv.invoice_id) : n.add(inv.invoice_id);
+                                                                    return n;
+                                                                })}
+                                                                className="rounded" />
+                                                        </td>
+                                                        <td className="px-3 py-2 font-black text-slate-800 text-[10px]">{inv.invoice_id}</td>
+                                                        <td className="px-3 py-2 text-slate-600 max-w-[130px] truncate text-[10px]" title={inv.customer_name}>{inv.customer_name ?? '—'}</td>
+                                                        <td className="px-3 py-2 text-slate-500 text-[10px]">{inv.numero_planilla ?? '—'}</td>
+                                                        <td className="px-3 py-2 text-slate-500 text-[10px]">{inv.vehicle_plate ?? '—'}</td>
+                                                        <td className="px-3 py-2 text-slate-500 whitespace-nowrap text-[10px]">{inv.fecha_placa ?? '—'}</td>
+                                                        <td className="px-3 py-2">
+                                                            {inv.plan_type && (
+                                                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-lg uppercase ${inv.plan_type.includes('R') ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                                    {inv.plan_type}
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-center">
+                                                            <span className="bg-indigo-100 text-indigo-700 text-[8px] font-black px-2 py-0.5 rounded-lg">
+                                                                {inv.items.length}
+                                                            </span>
+                                                        </td>
+                                                        {/* Tipo COMPLETA/PARCIAL */}
+                                                        <td className="px-2 py-2" onClick={e => e.stopPropagation()}>
+                                                            <div className="flex gap-1">
+                                                                {(['COMPLETA','PARCIAL'] as const).map(t => (
+                                                                    <button key={t} onClick={() => setConcilExtra(inv.invoice_id, 'return_type', t)}
+                                                                        className={`text-[7px] font-black px-1.5 py-0.5 rounded-lg uppercase transition-all ${(concilExtras[inv.invoice_id]?.return_type ?? 'COMPLETA') === t ? (t === 'COMPLETA' ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white') : 'bg-slate-100 text-slate-500'}`}>
+                                                                        {t === 'COMPLETA' ? 'Comp.' : 'Parc.'}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                        {/* Vendedor */}
+                                                        <td className="px-2 py-2 min-w-[90px]" onClick={e => e.stopPropagation()}>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Cód. vendedor"
+                                                                value={concilExtras[inv.invoice_id]?.vendedor ?? ''}
+                                                                onChange={e => setConcilExtra(inv.invoice_id, 'vendedor', e.target.value)}
+                                                                className="w-full text-[9px] px-2 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                                                            />
+                                                        </td>
+                                                        {/* Motivo */}
+                                                        <td className="px-2 py-2 min-w-[150px]" onClick={e => e.stopPropagation()}>
+                                                            {concilOtroMode.has(inv.invoice_id) ? (
+                                                                <div className="flex gap-1">
+                                                                    <input
+                                                                        autoFocus
+                                                                        type="text"
+                                                                        placeholder="Escribir motivo..."
+                                                                        value={concilOtroText[inv.invoice_id] ?? ''}
+                                                                        onChange={e => setConcilOtroText(prev => ({ ...prev, [inv.invoice_id]: e.target.value }))}
+                                                                        onKeyDown={e => { if (e.key === 'Enter') confirmConcilOtro(inv.invoice_id); if (e.key === 'Escape') setConcilOtroMode(prev => { const n = new Set(prev); n.delete(inv.invoice_id); return n; }); }}
+                                                                        className="flex-1 text-[9px] px-2 py-1 border border-indigo-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
+                                                                    />
+                                                                    <button onClick={() => confirmConcilOtro(inv.invoice_id)}
+                                                                        className="text-[8px] px-1.5 py-1 bg-indigo-600 text-white rounded-lg font-black">✓</button>
+                                                                    <button onClick={() => setConcilOtroMode(prev => { const n = new Set(prev); n.delete(inv.invoice_id); return n; })}
+                                                                        className="text-[8px] px-1.5 py-1 bg-slate-200 text-slate-600 rounded-lg font-black">✕</button>
+                                                                </div>
+                                                            ) : (
+                                                                <select
+                                                                    value={concilExtras[inv.invoice_id]?.return_reason ?? ''}
+                                                                    onChange={e => {
+                                                                        if (e.target.value === '__otro__') {
+                                                                            setConcilOtroMode(prev => new Set([...prev, inv.invoice_id]));
+                                                                            setConcilOtroText(prev => ({ ...prev, [inv.invoice_id]: '' }));
+                                                                        } else {
+                                                                            setConcilExtra(inv.invoice_id, 'return_reason', e.target.value);
+                                                                        }
+                                                                    }}
+                                                                    className="w-full text-[9px] px-2 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white">
+                                                                    <option value="">— Seleccionar —</option>
+                                                                    {reasonOptions.map((r: ReturnReasonOption) => (
+                                                                        <option key={r.id} value={r.name}>{r.name}</option>
+                                                                    ))}
+                                                                    <option value="__otro__">➕ Otro (crear nuevo)...</option>
+                                                                </select>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
                             )}
                         </div>
                     )}
 
                     {/* ══════════════════════════════════════════════════════════
-                        TAB: POR APROBAR
+                        TAB: SEGUIMIENTO
                     ══════════════════════════════════════════════════════════ */}
-                    {tab === 'aprobacion' && (
-                        <div className="max-w-2xl">
-                            {!selectedClientId ? (
-                                <EmptyState msg="Selecciona un cliente" />
-                            ) : (
-                                <>
-                                    {/* Sub-tabs */}
-                                    <div className="flex gap-2 mb-4">
-                                        {(['pending', 'batches'] as const).map(bt => (
-                                            <button key={bt} onClick={() => setBatchTab(bt)}
-                                                className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all
-                                                    ${batchTab === bt ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-500'}`}>
-                                                {bt === 'pending' ? `Pendientes (${pendingReturns.length})` : `Lotes (${batches.length})`}
-                                            </button>
-                                        ))}
+                    {tab === 'seguimiento' && (() => {
+                        type Stage = { status: string; label: string; color: string; nextStatus?: string; actionLabel?: string; isPreApproval?: boolean };
+                        const stages: Stage[] = [
+                            { status: 'PENDING',       label: 'Pendiente confirmación facturación',     color: 'amber' },
+                            { status: 'CONFIRMED',     label: 'Confirmadas — enviar pre-aprobación',    color: 'emerald', nextStatus: 'PRE_APPROVAL', actionLabel: 'Enviar Pre-Aprobación', isPreApproval: true },
+                            { status: 'PRE_APPROVAL',  label: 'Excel enviado — pendiente proveedor',    color: 'indigo',  nextStatus: 'PRE_APPROVED', actionLabel: 'Confirmar aprobación prov.' },
+                            { status: 'PRE_APPROVED',  label: 'Aprobado proveedor — pendiente salida',  color: 'sky',     nextStatus: 'SUPPLIER_EXIT',actionLabel: 'Confirmar salida' },
+                            { status: 'SUPPLIER_EXIT', label: 'Salida realizada — pendiente documento', color: 'violet',  nextStatus: 'COMPLETED',    actionLabel: 'Confirmar doc. recibido' },
+                        ];
+
+                        const hdr: Record<string,string> = {
+                            amber:   'bg-amber-50 border-amber-200 text-amber-800',
+                            emerald: 'bg-emerald-50 border-emerald-200 text-emerald-800',
+                            indigo:  'bg-indigo-50 border-indigo-200 text-indigo-800',
+                            sky:     'bg-sky-50 border-sky-200 text-sky-800',
+                            violet:  'bg-violet-50 border-violet-200 text-violet-800',
+                        };
+                        const btnColor: Record<string,string> = {
+                            emerald: 'bg-emerald-600 hover:bg-emerald-700',
+                            indigo:  'bg-indigo-600 hover:bg-indigo-700',
+                            sky:     'bg-sky-600 hover:bg-sky-700',
+                            violet:  'bg-violet-600 hover:bg-violet-700',
+                        };
+
+                        const selForStage = (st: string) => trackingReturns.filter(r => r.status === st && selectedExcelIds.has(r.id));
+                        const toggleStatus = (st: string) => setVisibleStatuses(prev => {
+                            const n = new Set(prev);
+                            n.has(st) ? n.delete(st) : n.add(st);
+                            return n;
+                        });
+
+                        const stageTimestamp = (r: TrackingReturn): string | undefined => ({
+                            PENDING:       r.fecha,
+                            CONFIRMED:     r.conciliacion_confirmada_at,
+                            PRE_APPROVAL:  r.pre_approval_at,
+                            PRE_APPROVED:  r.pre_approved_at,
+                            SUPPLIER_EXIT: r.supplier_exit_at,
+                        } as Record<string,string|undefined>)[r.status];
+
+                        const daysInStage = (r: TrackingReturn): number => {
+                            const ts = stageTimestamp(r);
+                            if (!ts) return 0;
+                            return Math.floor((Date.now() - new Date(ts).getTime()) / 86400000);
+                        };
+
+                        const kpiColors: Record<string,{ bg: string; text: string; badge: string; warn: string }> = {
+                            amber:   { bg: 'bg-amber-50 border-amber-200',   text: 'text-amber-800',   badge: 'bg-amber-100 text-amber-800',   warn: 'text-rose-600' },
+                            emerald: { bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-800', badge: 'bg-emerald-100 text-emerald-800', warn: 'text-rose-600' },
+                            indigo:  { bg: 'bg-indigo-50 border-indigo-200',  text: 'text-indigo-800',  badge: 'bg-indigo-100 text-indigo-800',  warn: 'text-rose-600' },
+                            sky:     { bg: 'bg-sky-50 border-sky-200',        text: 'text-sky-800',     badge: 'bg-sky-100 text-sky-800',        warn: 'text-rose-600' },
+                            violet:  { bg: 'bg-violet-50 border-violet-200',  text: 'text-violet-800',  badge: 'bg-violet-100 text-violet-800',  warn: 'text-rose-600' },
+                        };
+
+                        return (
+                            <div className="space-y-4">
+
+                                {/* ── KPI Panel ── */}
+                                {trackingReturns.length > 0 && (
+                                    <div>
+                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">KPI — Días en cada etapa</p>
+                                        <div className="grid grid-cols-5 gap-2">
+                                            {stages.map(s => {
+                                                const rows = trackingReturns.filter(r => r.status === s.status);
+                                                const days = rows.map(daysInStage);
+                                                const maxDays = days.length ? Math.max(...days) : 0;
+                                                const avgDays = days.length ? Math.round(days.reduce((a,b) => a+b, 0) / days.length) : 0;
+                                                const c = kpiColors[s.color];
+                                                return (
+                                                    <div key={s.status} className={`border rounded-2xl p-3 flex flex-col gap-1.5 ${c.bg}`}>
+                                                        <span className={`text-[8px] font-black uppercase tracking-widest leading-tight ${c.text}`}>{s.label.split('—')[0].trim()}</span>
+                                                        <div className="flex items-end justify-between gap-1">
+                                                            <span className={`text-2xl font-black leading-none ${c.text}`}>{rows.length}</span>
+                                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-lg ${c.badge}`}>{rows.length === 1 ? '1 ret.' : `${rows.length} ret.`}</span>
+                                                        </div>
+                                                        {rows.length > 0 && (
+                                                            <div className="space-y-0.5">
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-[7px] text-slate-500 uppercase">Promedio</span>
+                                                                    <span className={`text-[8px] font-black ${avgDays > 7 ? c.warn : c.text}`}>{avgDays}d</span>
+                                                                </div>
+                                                                <div className="flex justify-between">
+                                                                    <span className="text-[7px] text-slate-500 uppercase">Máximo</span>
+                                                                    <span className={`text-[8px] font-black ${maxDays > 14 ? c.warn : c.text}`}>{maxDays}d</span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {rows.length === 0 && (
+                                                            <span className="text-[8px] text-slate-400">Sin pendientes</span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
+                                )}
 
-                                    {batchTab === 'pending' && (
-                                        loading ? <div className="flex justify-center py-20"><Icons.Loader className="w-6 h-6 text-slate-400 animate-spin" /></div>
-                                        : pendingReturns.length === 0 ? <EmptyState msg="No hay devoluciones pendientes de aprobación" />
-                                        : (
-                                            <>
-                                                <div className="space-y-2 mb-4">
-                                                    {pendingReturns.map(ret => {
-                                                        const sel = selectedReturnIds.has(ret.id);
-                                                        const isPart = ret.status === 'EST-17' || ret.status === 'PARCIAL';
-                                                        return (
-                                                            <label key={ret.id}
-                                                                className={`block bg-white border-2 rounded-2xl px-4 py-3 cursor-pointer transition-all
-                                                                    ${sel ? 'border-indigo-400 bg-indigo-50/30' : 'border-slate-100 hover:border-slate-200'}`}>
-                                                                <div className="flex items-start gap-3">
-                                                                    <input type="checkbox" checked={sel}
-                                                                        onChange={() => setSelectedReturnIds(prev => {
-                                                                            const n = new Set(prev);
-                                                                            n.has(ret.id) ? n.delete(ret.id) : n.add(ret.id);
-                                                                            return n;
-                                                                        })}
-                                                                        className="mt-0.5 w-4 h-4 accent-indigo-600 cursor-pointer shrink-0" />
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                                            <span className="text-[12px] font-black text-slate-900 font-mono">{ret.invoice_id}</span>
-                                                                            <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase
-                                                                                ${isPart ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
-                                                                                {isPart ? 'Parcial' : 'Completa'}
-                                                                            </span>
-                                                                        </div>
-                                                                        {ret.return_reason && <p className="text-[10px] text-slate-500 mt-0.5">{ret.return_reason}</p>}
-                                                                        <p className="text-[8px] text-slate-400 mt-0.5">
-                                                                            {new Date(ret.created_at).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' })}
-                                                                            {ret.vehicle_plate && ` · ${ret.vehicle_plate}`}
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
-                                                            </label>
-                                                        );
-                                                    })}
-                                                </div>
-                                                {selectedReturnIds.size > 0 && (
-                                                    <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
-                                                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                                            {selectedReturnIds.size} devolución(es) seleccionada(s)
-                                                        </p>
-                                                        <input value={batchNotes} onChange={e => setBatchNotes(e.target.value)}
-                                                            placeholder="Notas del lote (opcional)"
-                                                            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-                                                        <button onClick={handleCreateBatch} disabled={creatingBatch}
-                                                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-widest rounded-xl flex items-center justify-center gap-2">
-                                                            {creatingBatch ? <><Icons.Loader className="w-3.5 h-3.5 animate-spin" /> Creando…</> : <><Icons.Package className="w-3.5 h-3.5" /> Crear Lote</>}
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </>
-                                        )
-                                    )}
+                                {/* ── Filtros de estado ── */}
+                                <div className="bg-white border border-slate-200 rounded-2xl p-3">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">Filtrar por estado</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {stages.map(s => {
+                                            const cnt = trackingReturns.filter(r => r.status === s.status).length;
+                                            const active = visibleStatuses.has(s.status);
+                                            const pillOn: Record<string,string> = {
+                                                amber:   'bg-amber-500 text-white border-amber-500',
+                                                emerald: 'bg-emerald-600 text-white border-emerald-600',
+                                                indigo:  'bg-indigo-600 text-white border-indigo-600',
+                                                sky:     'bg-sky-600 text-white border-sky-600',
+                                                violet:  'bg-violet-600 text-white border-violet-600',
+                                            };
+                                            const pillOff: Record<string,string> = {
+                                                amber:   'bg-white text-amber-600 border-amber-300',
+                                                emerald: 'bg-white text-emerald-700 border-emerald-300',
+                                                indigo:  'bg-white text-indigo-700 border-indigo-300',
+                                                sky:     'bg-white text-sky-700 border-sky-300',
+                                                violet:  'bg-white text-violet-700 border-violet-300',
+                                            };
+                                            return (
+                                                <button key={s.status} onClick={() => toggleStatus(s.status)}
+                                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all ${active ? pillOn[s.color] : pillOff[s.color]}`}>
+                                                    <span>{s.label.split('—')[0].trim()}</span>
+                                                    <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${active ? 'bg-white/25' : 'bg-slate-100'}`}>{cnt}</span>
+                                                </button>
+                                            );
+                                        })}
+                                        <button onClick={() => setVisibleStatuses(new Set(stages.map(s => s.status)))}
+                                            className="px-3 py-1.5 rounded-xl border border-slate-200 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-50">
+                                            Todos
+                                        </button>
+                                        <button onClick={() => setVisibleStatuses(new Set())}
+                                            className="px-3 py-1.5 rounded-xl border border-rose-200 text-[9px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50">
+                                            Quitar todo
+                                        </button>
+                                    </div>
+                                </div>
 
-                                    {batchTab === 'batches' && (
-                                        batches.length === 0
-                                            ? <EmptyState msg="No hay lotes creados aún" />
-                                            : <div className="space-y-2">
-                                                {batches.map(b => (
-                                                    <div key={b.id} className="bg-white border-2 border-slate-100 rounded-2xl px-4 py-3">
-                                                        <div className="flex items-start justify-between gap-3">
-                                                            <div>
-                                                                <div className="flex items-center gap-2 flex-wrap">
-                                                                    <span className="text-[12px] font-black text-slate-900 font-mono">{b.batch_code}</span>
-                                                                    <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase
-                                                                        ${b.status === 'aprobado'         ? 'bg-emerald-100 text-emerald-700'
-                                                                        : b.status === 'aprobado_parcial' ? 'bg-teal-100 text-teal-700'
-                                                                        : b.status === 'enviado'          ? 'bg-indigo-100 text-indigo-700'
-                                                                        : 'bg-amber-100 text-amber-700'}`}>
-                                                                        {b.status}
-                                                                    </span>
-                                                                </div>
-                                                                {b.notes && <p className="text-[9px] text-slate-500 mt-1">📝 {b.notes}</p>}
-                                                                <p className="text-[8px] text-slate-400 mt-1">
-                                                                    👤 {b.created_by || '—'} · {new Date(b.created_at).toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' })}
-                                                                </p>
-                                                                {b.confirmed_at && (
-                                                                    <p className="text-[8px] text-emerald-600 font-bold mt-0.5">
-                                                                        ✅ Confirmado por {b.confirmed_by_name || 'Proveedor'} · {new Date(b.confirmed_at).toLocaleDateString('es-CO')}
-                                                                    </p>
-                                                                )}
-                                                                {b.email_sent_at && !b.confirmed_at && (
-                                                                    <p className="text-[8px] text-indigo-500 font-bold mt-0.5">
-                                                                        📧 Email enviado a {b.email_proveedor}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                            <div className="text-right shrink-0">
-                                                                <p className="text-[10px] font-black text-slate-700">{b.total_items} facturas</p>
-                                                                {b.approved_items > 0 && (
-                                                                    <p className="text-[8px] text-emerald-600 font-bold">{b.approved_items} aprobadas</p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <div className="mt-2 pt-2 border-t border-slate-100 flex items-center gap-2">
-                                                            <span className="text-[8px] text-slate-400 font-mono flex-1">
-                                                                <strong className="text-slate-700">{b.batch_code}</strong>
-                                                            </span>
-                                                            <button onClick={() => navigator.clipboard.writeText(b.batch_code).then(() => showToast('Código copiado'))}
-                                                                className="text-[8px] font-black text-indigo-500 hover:text-indigo-700 uppercase tracking-widest px-2 py-1 bg-indigo-50 rounded-lg">
-                                                                Copiar
+                                {trackingLoading ? (
+                                    <div className="flex justify-center py-20"><Icons.Loader className="w-6 h-6 text-slate-400 animate-spin" /></div>
+                                ) : trackingReturns.length === 0 ? (
+                                    <EmptyState msg="No hay devoluciones activas en seguimiento" />
+                                ) : stages.map(stage => {
+                                    if (!visibleStatuses.has(stage.status)) return null;
+                                    const rows = trackingReturns.filter(r => r.status === stage.status);
+                                    if (rows.length === 0) return null;
+                                    const sel = selForStage(stage.status);
+                                    const allSel = rows.every(r => selectedExcelIds.has(r.id));
+
+                                    return (
+                                        <div key={stage.status} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                                            {/* Cabecera del grupo */}
+                                            <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${hdr[stage.color]}`}>
+                                                <span className="text-[10px] font-black uppercase tracking-widest">{stage.label} ({rows.length})</span>
+                                                <div className="flex items-center gap-2">
+                                                    {/* Excel: genérico para otros estados, dedicado (marca descarga) para CONFIRMED */}
+                                                    {stage.isPreApproval ? (
+                                                        sel.length > 0 && (
+                                                            <button
+                                                                onClick={() => handleDownloadExcel(sel)}
+                                                                className="flex items-center gap-1 px-2.5 py-1.5 bg-white/70 hover:bg-white border border-emerald-400 text-emerald-700 text-[9px] font-black uppercase tracking-widest rounded-xl transition-all">
+                                                                <Icons.Download className="w-3 h-3" />
+                                                                Excel ({sel.length})
                                                             </button>
-                                                            {!b.confirmed_at && (
-                                                                <button
-                                                                    onClick={() => { setEmailModal({ batch: b }); setEmailInput(b.email_proveedor || ''); setNombreInput(''); }}
-                                                                    className="text-[8px] font-black text-emerald-600 hover:text-emerald-800 uppercase tracking-widest px-2 py-1 bg-emerald-50 hover:bg-emerald-100 rounded-lg flex items-center gap-1">
-                                                                    <Icons.Send className="w-3 h-3" />
-                                                                    {b.email_sent_at ? 'Reenviar' : 'Enviar Email'}
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
+                                                        )
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => handleExportExcel(sel.length > 0 ? sel : rows)}
+                                                            className="flex items-center gap-1 px-2.5 py-1.5 bg-white/70 hover:bg-white border border-current text-[9px] font-black uppercase tracking-widest rounded-xl opacity-80 hover:opacity-100 transition-all">
+                                                            <Icons.Download className="w-3 h-3" />
+                                                            Excel{sel.length > 0 ? ` (${sel.length})` : ''}
+                                                        </button>
+                                                    )}
+                                                    {/* Acción de avance de estado — solo cuando hay seleccionados */}
+                                                    {stage.nextStatus && sel.length > 0 && (
+                                                        <button
+                                                            disabled={advancingId === -1}
+                                                            onClick={() => stage.isPreApproval
+                                                                ? handleSendPreApproval(sel)
+                                                                : handleAdvanceBatch(sel.map(r => r.id), stage.nextStatus!, stage.actionLabel!)}
+                                                            className={`flex items-center gap-1.5 px-3 py-1.5 text-white text-[9px] font-black uppercase tracking-widest rounded-xl disabled:opacity-50 ${btnColor[stage.color]}`}>
+                                                            {advancingId === -1 ? <Icons.Loader className="w-3 h-3 animate-spin" /> : <>{stage.actionLabel} ({sel.length})</>}
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    )}
+
+                                            {/* Tabla */}
+                                            <div className="overflow-x-auto">
+                                                <table className="w-full text-[10px]">
+                                                    <thead>
+                                                        <tr className="border-b border-slate-100 bg-slate-50/60">
+                                                            {/* Checkbox en TODOS los bloques */}
+                                                            <th className="px-3 py-2 w-8">
+                                                                <input type="checkbox" checked={allSel}
+                                                                    onChange={e => setSelectedExcelIds(prev => {
+                                                                        const n = new Set(prev);
+                                                                        rows.forEach(r => e.target.checked ? n.add(r.id) : n.delete(r.id));
+                                                                        return n;
+                                                                    })}
+                                                                    className="w-3.5 h-3.5 accent-slate-600 cursor-pointer" />
+                                                            </th>
+                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Fecha</th>
+                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Remisión</th>
+                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Cliente</th>
+                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Vendedor</th>
+                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Planilla</th>
+                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Motivo</th>
+                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Artículos</th>
+                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Historial</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {rows.map((ret, idx) => (
+                                                            <tr key={ret.id} className={`border-b border-slate-50 ${idx % 2 === 0 ? '' : 'bg-slate-50/40'} ${selectedExcelIds.has(ret.id) ? 'bg-indigo-50/50' : ''}`}>
+                                                                <td className="px-3 py-2">
+                                                                    <input type="checkbox" checked={selectedExcelIds.has(ret.id)}
+                                                                        onChange={() => setSelectedExcelIds(prev => {
+                                                                            const n = new Set(prev); n.has(ret.id) ? n.delete(ret.id) : n.add(ret.id); return n;
+                                                                        })}
+                                                                        className="w-3.5 h-3.5 accent-slate-600 cursor-pointer" />
+                                                                </td>
+                                                                <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{ret.fecha ?? '—'}</td>
+                                                                <td className="px-3 py-2 font-black text-slate-900 font-mono whitespace-nowrap">{ret.invoice_id}</td>
+                                                                <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
+                                                                    <div>{ret.customer_name ?? ret.client_id ?? '—'}</div>
+                                                                    {ret.codigo_cliente && <div className="text-[8px] text-slate-400">{ret.codigo_cliente}</div>}
+                                                                </td>
+                                                                <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{ret.vendedor ?? '—'}</td>
+                                                                <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
+                                                                    <div>{ret.numero_planilla ?? '—'}</div>
+                                                                    {ret.vehicle_plate && <div className="text-[8px] text-slate-400">{ret.vehicle_plate}</div>}
+                                                                </td>
+                                                                <td className="px-3 py-2 text-slate-600 max-w-[140px] truncate" title={ret.return_reason}>{ret.return_reason ?? '—'}</td>
+                                                                <td className="px-3 py-2 text-slate-500">
+                                                                    {ret.items.length > 0
+                                                                        ? <span className="bg-slate-100 px-1.5 py-0.5 rounded-lg text-[9px] font-black">{ret.items.length} art.</span>
+                                                                        : '—'}
+                                                                </td>
+                                                                <td className="px-3 py-2 text-[8px] text-slate-400 max-w-[160px]">
+                                                                    {ret.conciliacion_confirmada_at && <div className="text-emerald-600">✅ Fact: {ret.conciliacion_confirmada_by} {ret.conciliacion_confirmada_at?.slice(0,10)}</div>}
+                                                                    {ret.pre_approval_at && <div className="text-indigo-500">📤 Excel: {ret.pre_approval_by} {ret.pre_approval_at?.slice(0,10)}</div>}
+                                                                    {ret.pre_approved_at && <div className="text-sky-500">📋 Aprob: {ret.pre_approved_by} {ret.pre_approved_at?.slice(0,10)}</div>}
+                                                                    {ret.supplier_exit_at && <div className="text-violet-500">🚚 Salida: {ret.supplier_exit_by} {ret.supplier_exit_at?.slice(0,10)}</div>}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()}
+
 
                     {/* ══════════════════════════════════════════════════════════
                         TAB: HISTORIAL
@@ -937,10 +1463,19 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                     <input type="date" value={histTo} onChange={e => setHistTo(e.target.value)}
                                         className="border border-slate-200 rounded-xl px-3 py-2 text-[11px] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
                                 </div>
-                                <button onClick={loadHistory} disabled={histLoading}
-                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-1.5">
+                                <button
+                                    onClick={loadHistory}
+                                    disabled={histLoading || !histFrom || !histTo}
+                                    title={!histFrom || !histTo ? 'Seleccione ambas fechas para consultar' : ''}
+                                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-1.5">
                                     <Icons.RefreshCw className={`w-3.5 h-3.5 ${histLoading ? 'animate-spin' : ''}`} />
-                                    Aplicar
+                                    Consultar
+                                </button>
+                                <button
+                                    onClick={() => { setHistFrom(''); setHistTo(''); setHistory([]); }}
+                                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-[10px] font-black uppercase tracking-widest rounded-xl flex items-center gap-1.5">
+                                    <Icons.X className="w-3.5 h-3.5" />
+                                    Limpiar
                                 </button>
                             </div>
 
@@ -961,52 +1496,6 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
             )}
         </div>
 
-        {/* ── Modal envío email al proveedor ───────────────────────────────────── */}
-        {emailModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                    <div className="bg-gradient-to-r from-slate-900 to-emerald-900 px-6 py-4 flex items-center justify-between">
-                        <div>
-                            <p className="text-[9px] font-black text-emerald-300 uppercase tracking-widest mb-0.5">Enviar al Proveedor</p>
-                            <p className="text-white font-black text-sm font-mono">{emailModal.batch.batch_code}</p>
-                        </div>
-                        <button onClick={() => setEmailModal(null)} className="text-slate-400 hover:text-white">
-                            <Icons.X className="w-5 h-5" />
-                        </button>
-                    </div>
-                    <div className="p-6 space-y-4">
-                        <div>
-                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Nombre del proveedor</label>
-                            <input type="text" value={nombreInput} onChange={e => setNombreInput(e.target.value)}
-                                placeholder="Ej: Distribuidora XYZ"
-                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-                        </div>
-                        <div>
-                            <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Email del proveedor *</label>
-                            <input type="email" value={emailInput} onChange={e => setEmailInput(e.target.value)}
-                                placeholder="proveedor@empresa.com"
-                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                                onKeyDown={e => e.key === 'Enter' && handleSendEmail()} />
-                        </div>
-                        <p className="text-[9px] text-slate-400">
-                            Se enviará un correo con el detalle del lote y un enlace válido por 7 días para confirmar el recibo.
-                        </p>
-                        <div className="flex gap-3 pt-1">
-                            <button onClick={() => setEmailModal(null)}
-                                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-[10px] font-black text-slate-500 hover:bg-slate-50 uppercase tracking-widest">
-                                Cancelar
-                            </button>
-                            <button onClick={handleSendEmail} disabled={sendingEmail}
-                                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
-                                {sendingEmail
-                                    ? <><Icons.Loader className="w-3.5 h-3.5 animate-spin" /> Enviando…</>
-                                    : <><Icons.Send className="w-3.5 h-3.5" /> Enviar Email</>}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        )}
         </>
     );
 };

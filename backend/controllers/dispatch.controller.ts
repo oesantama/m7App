@@ -7,6 +7,22 @@ import { sendEmail } from '../services/notification.service.js';
 import { logMovement } from '../utils/kardex.js';
 import { clearInvoicesCache } from './document.controller.js';
 
+// ─── HELPER: resuelve o crea un motivo de devolución, devuelve su ID ───────────
+async function resolveReasonId(reasonText: string | null | undefined, dbClient: any): Promise<number | null> {
+    if (!reasonText?.trim()) return null;
+    const name = reasonText.trim();
+    const ex = await dbClient.query(
+        `SELECT id FROM return_reasons WHERE TRIM(UPPER(name)) = TRIM(UPPER($1)) LIMIT 1`,
+        [name]
+    );
+    if (ex.rows.length > 0) return ex.rows[0].id;
+    const ins = await dbClient.query(
+        `INSERT INTO return_reasons (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name=EXCLUDED.name RETURNING id`,
+        [name]
+    );
+    return ins.rows[0].id;
+}
+
 export const initDispatch = async (req: Request, res: Response) => {
     const {
         invoiceId,
@@ -435,28 +451,28 @@ export const confirmDelivery = async (req: Request, res: Response) => {
             : deliveredItems.filter((i: any) => Number(i.quantityReturned) > 0);
 
         if ((deliveryType === 'RETURN' || deliveryType === 'PARTIAL' || deliveryType === 'REPICE') && itemsToReturn.length > 0) {
+            const rsnId = await resolveReasonId(returnReason, pool);
             const returnRes = await pool.query(`
                 INSERT INTO delivery_returns
-                    (confirmation_id, invoice_id, driver_id, vehicle_id, return_reason, notes, status)
-                VALUES ($1, $2, $3, $4, $5, $6, 'PENDING')
+                    (invoice_id, driver_id, vehicle_id, reason_id, notes, status)
+                VALUES ($1, $2, $3, $4, $5, 'PENDING')
                 RETURNING id
-            `, [confirmationId, invoiceId, driverId, vehicleId || null, returnReason || null, notes || null]);
+            `, [invoiceId, driverId, vehicleId || null, rsnId, notes || null]);
 
             returnId = returnRes.rows[0].id;
 
             // Batch INSERT: todos los items en un solo statement
             const riParams: any[] = [];
             const riValues = itemsToReturn.map((item: any, i: number) => {
-                const n = i * 7;
-                riParams.push(returnId, item.sku || null, item.articleName || null,
-                    Number(item.quantityReturned), Number(item.quantityDelivered ?? 0),
-                    item.unit || null, item.notes || null);
-                return `($${n+1},$${n+2},$${n+3},$${n+4},$${n+5},$${n+6},$${n+7})`;
+                const n = i * 4;
+                riParams.push(returnId, item.sku || item.article_id || null,
+                    Number(item.quantityReturned), item.unit || null);
+                return `($${n+1},$${n+2},$${n+3},$${n+4})`;
             }).join(',');
 
             await pool.query(`
                 INSERT INTO delivery_return_items
-                    (return_id, sku, article_name, quantity_returned, quantity_delivered, unit, notes)
+                    (return_id, article_id, quantity_returned, unit)
                 VALUES ${riValues}
             `, riParams);
         }
@@ -726,7 +742,7 @@ export const getReturnHistory = async (req: Request, res: Response) => {
                     u.name              AS "driverName",
                     dr.vehicle_id       AS "vehicleId",
                     v.plate             AS "vehiclePlate",
-                    dr.return_reason    AS "returnReason",
+                    rr.name             AS "returnReason",
                     dr.notes,
                     dr.status,
                     dr.created_at       AS "createdAt",
@@ -734,19 +750,19 @@ export const getReturnHistory = async (req: Request, res: Response) => {
                         json_agg(
                             json_build_object(
                                 'id',               dri.id,
-                                'sku',              dri.sku,
-                                'articleName',      dri.article_name,
+                                'articleId',        dri.article_id,
+                                'articleName',      art.name,
                                 'quantityReturned', dri.quantity_returned,
-                                'quantityDelivered',dri.quantity_delivered,
-                                'unit',             dri.unit,
-                                'notes',            dri.notes
+                                'unit',             dri.unit
                             )
                         ) FILTER (WHERE dri.id IS NOT NULL),
                     '[]') AS "items"
                 FROM delivery_returns dr
+                LEFT JOIN return_reasons rr ON rr.id = dr.reason_id
                 LEFT JOIN users u ON u.id = dr.driver_id
                 LEFT JOIN vehicles v ON v.id = dr.vehicle_id
                 LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+                LEFT JOIN articles art ON art.id::text = dri.article_id
                 ${where}
                 GROUP BY dr.id, u.name, v.plate
                 ORDER BY dr.created_at DESC
@@ -854,25 +870,25 @@ export const getPendingReturns = async (req: Request, res: Response) => {
 
         const result = await pool.query(`
             SELECT
-                dr.id, dr.invoice_id, dr.driver_id, dr.return_reason, dr.notes,
+                dr.id, dr.invoice_id, dr.driver_id, rr.name AS return_reason, dr.notes,
                 dr.status, dr.created_at,
                 d.name AS driver_name,
                 dl.client_id,
-                json_agg(json_build_object(
-                    'sku',               dri.sku,
-                    'article_name',      dri.article_name,
+                COALESCE(json_agg(json_build_object(
+                    'article_id',        dri.article_id,
+                    'article_name',      art.name,
                     'quantity_returned', dri.quantity_returned,
-                    'quantity_delivered',dri.quantity_delivered,
-                    'unit',              dri.unit,
-                    'notes',             dri.notes
-                )) AS items
+                    'unit',              dri.unit
+                )) FILTER (WHERE dri.id IS NOT NULL), '[]') AS items
             FROM delivery_returns dr
+            LEFT JOIN return_reasons rr ON rr.id = dr.reason_id
             LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
             LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+            LEFT JOIN articles art ON art.id::text = dri.article_id
             LEFT JOIN document_items di ON di.invoice = dr.invoice_id
             LEFT JOIN documents_l dl ON dl.id = di.document_id
             WHERE dr.status = 'PENDING' ${whereClause}
-            GROUP BY dr.id, d.name, dl.client_id
+            GROUP BY dr.id, rr.name, d.name, dl.client_id
             ORDER BY dr.created_at DESC
         `, params);
         res.json(result.rows);
@@ -903,15 +919,14 @@ export const updateReturnStatus = async (req: Request, res: Response) => {
         if (status === 'PROCESSED') {
             // Obtener datos de la devolución y sus items
             const retRes = await pool.query(`
-                SELECT dr.invoice_id, dr.vehicle_id, dc.delivery_type,
-                       json_agg(json_build_object(
-                           'sku', dri.sku, 'qty', dri.quantity_returned, 'batch', 'S/L'
-                       )) AS items
+                SELECT dr.invoice_id, dr.vehicle_id,
+                       COALESCE(json_agg(json_build_object(
+                           'sku', dri.article_id, 'qty', dri.quantity_returned, 'batch', 'S/L'
+                       )) FILTER (WHERE dri.id IS NOT NULL), '[]') AS items
                 FROM delivery_returns dr
-                LEFT JOIN delivery_confirmations dc ON dc.id = dr.confirmation_id
                 LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
                 WHERE dr.id = $1
-                GROUP BY dr.invoice_id, dr.vehicle_id, dc.delivery_type
+                GROUP BY dr.invoice_id, dr.vehicle_id
             `, [id]);
 
             if (retRes.rows.length > 0) {
@@ -1167,6 +1182,7 @@ export const getInvoiceReturnData = async (req: Request, res: Response) => {
                 di.un_code,
                 di.unit,
                 di.expected_qty,
+                di.item_status,
                 di.article_id,
                 COALESCE(a.name, di.article_id) AS article_name,
                 COALESCE(a.barcode, di.article_id) AS barcode,
@@ -1195,20 +1211,70 @@ export const getInvoiceReturnData = async (req: Request, res: Response) => {
             return res.status(404).json({ error: `Factura "${invoiceNumber}" no encontrada en el sistema` });
         }
 
+        // Conductor, placa e IDs desde route_invoices → routes (histórico)
+        const routeAssignResult = await pool.query(`
+            SELECT
+                d.id::text   AS driver_id,
+                d.name       AS conductor_name,
+                v.id::text   AS vehicle_id,
+                v.plate      AS assigned_plate,
+                r.created_at AS assigned_at
+            FROM route_invoices ri
+            JOIN routes r ON r.id::text = ri.route_id::text
+            LEFT JOIN drivers d ON d.id::text = r.driver_id::text
+            LEFT JOIN vehicles v ON v.id::text = r.vehicle_id::text
+            WHERE ri.invoice_id = $1
+            ORDER BY r.created_at DESC
+            LIMIT 1
+        `, [inv]);
+
+        // Fallback: buscar por placa en documents_l si no hay ruta asignada
+        const firstRow = result.rows[0];
+        let conductorName: string | null = null;
+        let assignedPlate: string | null = null;
+        let assignedAt: string | null = null;
+        let resolvedVehicleId: string | null = null;
+        let resolvedDriverId: string | null = null;
+
+        if (routeAssignResult.rowCount) {
+            const ra = routeAssignResult.rows[0];
+            conductorName     = ra.conductor_name;
+            assignedPlate     = ra.assigned_plate;
+            assignedAt        = ra.assigned_at;
+            resolvedVehicleId = ra.vehicle_id;
+            resolvedDriverId  = ra.driver_id;
+        } else if (firstRow?.vehicle_plate) {
+            // Última asignación conocida para esa placa (cualquier estado)
+            const fallbackRes = await pool.query(`
+                SELECT v.id::text AS vehicle_id, a.driver_id::text
+                FROM vehicles v
+                LEFT JOIN assignments a ON a.vehicle_id::text = v.id::text
+                WHERE TRIM(UPPER(v.plate)) = TRIM(UPPER($1))
+                ORDER BY a.id DESC NULLS LAST
+                LIMIT 1
+            `, [firstRow.vehicle_plate]);
+            if (fallbackRes.rowCount) {
+                resolvedVehicleId = fallbackRes.rows[0].vehicle_id;
+                resolvedDriverId  = fallbackRes.rows[0].driver_id;
+            }
+            assignedPlate = firstRow.vehicle_plate;
+        }
+
         // Devoluciones previas para esta factura (suma de qty devuelta por artículo)
         const prevReturnsResult = await pool.query(`
             SELECT
                 dr.id              AS return_id,
-                dr.return_reason,
+                rr.name            AS return_reason,
                 dr.status          AS return_status,
                 dr.created_at,
                 dr.vendedor,
                 dri.article_id,
                 SUM(dri.quantity_returned::numeric) AS qty_returned
             FROM delivery_returns dr
+            LEFT JOIN return_reasons rr ON rr.id = dr.reason_id
             JOIN delivery_return_items dri ON dr.id::text = dri.return_id::text
             WHERE TRIM(UPPER(dr.invoice_id)) = $1
-            GROUP BY dr.id, dr.return_reason, dr.status, dr.created_at, dr.vendedor, dri.article_id
+            GROUP BY dr.id, rr.name, dr.status, dr.created_at, dr.vendedor, dri.article_id
             ORDER BY dr.created_at DESC
         `, [inv]);
 
@@ -1252,9 +1318,15 @@ export const getInvoiceReturnData = async (req: Request, res: Response) => {
             returnStatus = totalReturned >= totalExpected ? 'complete' : 'partial';
         }
 
+        // Detectar si fue procesada por conciliación sin pasar por bodega (EST-13)
+        const fromConciliacion = result.rows.some(r =>
+            ['EST-13','DEVUELTO','DEVUELT'].includes((r.item_status || '').toUpperCase())
+        );
+
         const first = result.rows[0];
         res.json({
             success: true,
+            fromConciliacion,
             invoice: {
                 invoice_id:      first.invoice_id,
                 order_number:    first.order_number,
@@ -1267,6 +1339,11 @@ export const getInvoiceReturnData = async (req: Request, res: Response) => {
                 fecha_placa:     first.fecha_placa,
                 plan_type:       first.plan_type,
                 client_id:       first.client_id,
+                conductor_name:  conductorName,
+                assigned_plate:  assignedPlate,
+                assigned_at:     assignedAt,
+                vehicle_id:      resolvedVehicleId,
+                driver_id:       resolvedDriverId,
             },
             returnStatus,
             previousReturns,
@@ -1376,7 +1453,8 @@ export const getRoutePlateInvoices = async (req: Request, res: Response) => {
 // Registra devolución iniciada desde bodega. vehiclePlate es opcional (se toma del plan si existe).
 export const registerRouteReturn = async (req: Request, res: Response) => {
     const {
-        invoiceId, vehiclePlate, returnType, returnReason, notes, items, createdBy,
+        invoiceId, vehiclePlate, vehicleId: bodyVehicleId, driverId: bodyDriverId,
+        returnType, returnReason, notes, items, createdBy,
         vendedor, numeroPlanilla, fechaPlaca,
     } = req.body;
     if (!invoiceId || !returnType) {
@@ -1389,30 +1467,35 @@ export const registerRouteReturn = async (req: Request, res: Response) => {
     try {
         await client.query('BEGIN');
 
-        // Buscar vehicle_id / driver_id por placa (si viene)
-        let vehicleId: string | null = null;
-        let driverId:  string | null = null;
+        // Usar IDs que vienen del frontend (ya resueltos desde route_invoices)
+        // Solo hacer lookup por placa si no vienen los IDs directamente
+        let vehicleId: string | null = bodyVehicleId || null;
+        let driverId:  string | null = bodyDriverId  || null;
         const plateToUse = vehiclePlate || null;
-        if (plateToUse) {
+        if ((!vehicleId || !driverId) && plateToUse) {
             const vRes = await client.query(
-                `SELECT v.id AS vehicle_id, a.driver_id
+                `SELECT v.id::text AS vehicle_id, a.driver_id::text
                  FROM vehicles v
-                 LEFT JOIN assignments a ON a.vehicle_id::text = v.id::text AND a.is_active = true
-                 WHERE v.plate = $1 LIMIT 1`,
+                 LEFT JOIN assignments a ON a.vehicle_id::text = v.id::text
+                 WHERE TRIM(UPPER(v.plate)) = TRIM(UPPER($1))
+                 ORDER BY a.id DESC NULLS LAST LIMIT 1`,
                 [plateToUse]
             );
-            vehicleId = vRes.rows[0]?.vehicle_id || null;
-            driverId  = vRes.rows[0]?.driver_id  || null;
+            if (vRes.rowCount) {
+                vehicleId = vehicleId || vRes.rows[0].vehicle_id || null;
+                driverId  = driverId  || vRes.rows[0].driver_id  || null;
+            }
         }
 
         // Cabecera delivery_return
+        const rsnId = await resolveReasonId(returnReason, client);
         const retRes = await client.query(
             `INSERT INTO delivery_returns
-                (invoice_id, vehicle_id, driver_id, return_reason, notes, status,
+                (invoice_id, vehicle_id, driver_id, reason_id, notes, status,
                  vendedor, numero_planilla, fecha_placa, created_at)
              VALUES ($1,$2,$3,$4,$5,'PENDING',$6,$7,$8,CURRENT_TIMESTAMP)
              RETURNING id`,
-            [invoiceId, vehicleId, driverId, returnReason || null, notes || null,
+            [invoiceId, vehicleId, driverId, rsnId, notes || null,
              String(vendedor).trim(), numeroPlanilla || null, fechaPlaca || null]
         );
         const returnId = retRes.rows[0].id;
@@ -1424,19 +1507,14 @@ export const registerRouteReturn = async (req: Request, res: Response) => {
             if (qty <= 0) continue;
             await client.query(
                 `INSERT INTO delivery_return_items
-                    (return_id, sku, article_id, un_code, article_name,
-                     quantity_returned, quantity_delivered, unit, notes)
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+                    (return_id, article_id, un_code, quantity_returned, unit)
+                 VALUES ($1,$2,$3,$4,$5)`,
                 [
                     returnId,
-                    item.sku || item.article_id,
-                    item.article_id || null,
+                    item.article_id || item.sku || null,
                     item.un_code    || null,
-                    item.article_name || null,
                     qty,
-                    Number(item.delivered_qty ?? item.expected_qty ?? 0),
                     item.unit || 'UND',
-                    item.notes || null,
                 ]
             );
         }
@@ -1473,35 +1551,37 @@ export const registerRouteReturn = async (req: Request, res: Response) => {
 export const getApprovalPendingReturns = async (req: Request, res: Response) => {
     try {
         const { clientId } = req.query as Record<string, string>;
-        const params: any[] = ['PENDING', 'PROCESSED'];
+        const params: any[] = ['PENDING', 'PROCESSED', 'CONFIRMED'];
         let clientFilter = '';
         if (clientId) { params.push(clientId); clientFilter = `AND dl.client_id = $${params.length}`; }
 
         const result = await pool.query(`
             SELECT
-                dr.id, dr.invoice_id, dr.return_reason, dr.notes, dr.status, dr.created_at,
+                dr.id, dr.invoice_id, rr.name AS return_reason, dr.notes, dr.status, dr.created_at,
+                dr.conciliacion_confirmada_at, dr.conciliacion_confirmada_by,
                 v.plate AS vehicle_plate,
                 d.name  AS driver_name,
                 dl.client_id,
                 dl.external_doc_id,
                 COALESCE(json_agg(json_build_object(
-                    'sku',               dri.sku,
-                    'article_name',      dri.article_name,
+                    'article_id',        dri.article_id,
+                    'article_name',      art.name,
                     'quantity_returned', dri.quantity_returned,
-                    'quantity_delivered',dri.quantity_delivered,
                     'unit',              dri.unit
                 )) FILTER (WHERE dri.id IS NOT NULL), '[]') AS items
             FROM delivery_returns dr
+            LEFT JOIN return_reasons rr ON rr.id = dr.reason_id
             LEFT JOIN vehicles v ON v.id::text = dr.vehicle_id::text
             LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
             LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+            LEFT JOIN articles art ON art.id::text = dri.article_id
             LEFT JOIN document_items di ON di.invoice = dr.invoice_id
             LEFT JOIN documents_l dl ON dl.id = di.document_id
-            WHERE dr.status IN ($1, $2)
-              AND dr.id NOT IN (SELECT return_id FROM return_approval_batch_items WHERE return_id IS NOT NULL)
+            WHERE dr.status IN ($1, $2, $3)
+              AND dr.id NOT IN (SELECT return_id::int FROM return_approval_batch_items WHERE return_id IS NOT NULL)
               ${clientFilter}
-            GROUP BY dr.id, v.plate, d.name, dl.client_id, dl.external_doc_id
-            ORDER BY dr.created_at DESC
+            GROUP BY dr.id, rr.name, v.plate, d.name, dl.client_id, dl.external_doc_id
+            ORDER BY dr.status DESC, dr.created_at DESC
         `, params);
         res.json({ success: true, data: result.rows });
     } catch (err: any) {
@@ -1543,8 +1623,10 @@ export const createApprovalBatch = async (req: Request, res: Response) => {
         for (const returnId of returnIds) {
             // Obtener datos del return para desnormalizar
             const retInfo = await client.query(
-                `SELECT dr.invoice_id, dr.return_reason
-                 FROM delivery_returns dr WHERE dr.id = $1`, [returnId]
+                `SELECT dr.invoice_id, rr.name AS return_reason
+                 FROM delivery_returns dr
+                 LEFT JOIN return_reasons rr ON rr.id = dr.reason_id
+                 WHERE dr.id = $1`, [returnId]
             );
             const invoiceId   = retInfo.rows[0]?.invoice_id  || null;
             const returnReason= retInfo.rows[0]?.return_reason|| null;
@@ -1567,6 +1649,213 @@ export const createApprovalBatch = async (req: Request, res: Response) => {
     }
 };
 
+// ─── GET /api/dispatch/delivery-returns/tracking ─────────────────────────────
+// Pipeline de seguimiento: todas las devoluciones activas de un cliente
+export const getReturnsTracking = async (req: Request, res: Response) => {
+    try {
+        const { clientId } = req.query as Record<string, string>;
+        const params: any[] = [];
+        let clientFilter = '';
+        if (clientId) { params.push(clientId); clientFilter = `AND doc_info.client_id = $${params.length}`; }
+
+        const result = await pool.query(`
+            SELECT
+                dr.id,
+                dr.invoice_id,
+                dr.return_type,
+                rr.name                      AS return_reason,
+                dr.notes,
+                dr.status,
+                dr.created_at::date          AS fecha,
+                dr.vendedor,
+                dr.numero_planilla,
+                dr.conciliacion_confirmada_at, dr.conciliacion_confirmada_by,
+                dr.pre_approval_at,   dr.pre_approval_by,
+                dr.pre_approved_at,   dr.pre_approved_by,
+                dr.supplier_exit_at,  dr.supplier_exit_by,
+                dr.completed_at,      dr.completed_by,
+                dr.excel_downloaded_at,
+                v.plate                      AS vehicle_plate,
+                d.name                       AS driver_name,
+                doc_info.customer_name,
+                doc_info.client_ref          AS codigo_cliente,
+                doc_info.order_number,
+                doc_info.delivery_date::date AS fecha_placa,
+                doc_info.client_id,
+                doc_info.plan_type,
+                COALESCE(json_agg(json_build_object(
+                    'article_id',        dri.article_id,
+                    'article_name',      art.name,
+                    'quantity_returned', dri.quantity_returned,
+                    'un_code',           dri.un_code,
+                    'unit',              dri.unit
+                )) FILTER (WHERE dri.id IS NOT NULL), '[]') AS items
+            FROM delivery_returns dr
+            LEFT JOIN return_reasons rr ON rr.id = dr.reason_id
+            LEFT JOIN vehicles v ON v.id::text = dr.vehicle_id::text
+            LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
+            LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+            LEFT JOIN articles art ON art.id::text = dri.article_id
+            LEFT JOIN LATERAL (
+                SELECT di.customer_name, di.client_ref, di.order_number,
+                       dl.delivery_date, dl.client_id, dl.plan_type
+                FROM document_items di
+                LEFT JOIN documents_l dl ON dl.id = di.document_id
+                WHERE TRIM(UPPER(COALESCE(di.invoice, di.order_number))) = TRIM(UPPER(dr.invoice_id))
+                LIMIT 1
+            ) doc_info ON true
+            WHERE dr.status NOT IN ('CANCELLED','COMPLETED')
+              ${clientFilter}
+            GROUP BY dr.id, v.plate, d.name,
+                     doc_info.customer_name, doc_info.client_ref, doc_info.order_number,
+                     doc_info.delivery_date, doc_info.client_id, doc_info.plan_type, rr.name
+            ORDER BY dr.created_at DESC
+        `, params);
+        res.json({ success: true, data: result.rows });
+    } catch (err: any) {
+        console.error('[M7-TRACKING] getReturnsTracking:', err.message);
+        if (err.message?.includes('does not exist')) return res.json({ success: true, data: [] });
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ─── PUT /api/dispatch/delivery-returns/:id/advance ──────────────────────────
+// Avanza el estado del pipeline: PRE_APPROVAL → PRE_APPROVED → SUPPLIER_EXIT → COMPLETED
+export const advanceReturnState = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { newStatus, confirmedBy } = req.body;
+
+        const validTransitions: Record<string, string> = {
+            PRE_APPROVAL:  'CONFIRMED',
+            PRE_APPROVED:  'PRE_APPROVAL',
+            SUPPLIER_EXIT: 'PRE_APPROVED',
+            COMPLETED:     'SUPPLIER_EXIT',
+        };
+
+        const fromStatus = validTransitions[newStatus];
+        if (!fromStatus) return res.status(400).json({ error: `Estado '${newStatus}' no válido` });
+
+        const auditFields: Record<string, string> = {
+            PRE_APPROVAL:  `pre_approval_at = NOW(), pre_approval_by = $1`,
+            PRE_APPROVED:  `pre_approved_at = NOW(), pre_approved_by = $1`,
+            SUPPLIER_EXIT: `supplier_exit_at = NOW(), supplier_exit_by = $1`,
+            COMPLETED:     `completed_at = NOW(), completed_by = $1`,
+        };
+
+        const result = await pool.query(`
+            UPDATE delivery_returns
+            SET status = '${newStatus}', ${auditFields[newStatus]}
+            WHERE id::text = $2 AND status = '${fromStatus}'
+            RETURNING id
+        `, [confirmedBy || 'USUARIO', id]);
+
+        if (!result.rowCount) return res.status(404).json({ error: 'Devolución no encontrada o estado incorrecto' });
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error('[M7-TRACKING] advanceReturnState:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ─── PUT /api/dispatch/delivery-returns/:id/mark-excel-downloaded ─────────────
+export const markExcelDownloaded = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        await pool.query(
+            `UPDATE delivery_returns SET excel_downloaded_at = NOW() WHERE id::text = $1`,
+            [id]
+        );
+        res.json({ success: true });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ─── GET /api/dispatch/returns-for-invoice/:invoiceId ────────────────────────
+// Devuelve las devoluciones de una factura (para mostrar en modal de conciliación)
+export const getReturnsForInvoice = async (req: Request, res: Response) => {
+    try {
+        const inv = String(req.params.invoiceId || '').trim().toUpperCase();
+        if (!inv) return res.status(400).json({ error: 'invoiceId requerido' });
+
+        const result = await pool.query(`
+            SELECT
+                dr.id, dr.invoice_id, rr.name AS return_reason, dr.notes, dr.status,
+                dr.created_at, dr.vendedor,
+                dr.conciliacion_confirmada_at, dr.conciliacion_confirmada_by,
+                v.plate  AS vehicle_plate,
+                d.name   AS driver_name,
+                COALESCE(json_agg(json_build_object(
+                    'article_id',        dri.article_id,
+                    'article_name',      art.name,
+                    'quantity_returned', dri.quantity_returned,
+                    'unit',              dri.unit
+                )) FILTER (WHERE dri.id IS NOT NULL), '[]') AS items
+            FROM delivery_returns dr
+            LEFT JOIN return_reasons rr ON rr.id = dr.reason_id
+            LEFT JOIN vehicles v ON v.id::text = dr.vehicle_id::text
+            LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
+            LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+            LEFT JOIN articles art ON art.id::text = dri.article_id
+            WHERE TRIM(UPPER(dr.invoice_id)) = $1
+              AND dr.status IN ('PENDING','PROCESSED','CONFIRMED')
+            GROUP BY dr.id, rr.name, v.plate, d.name
+            ORDER BY dr.created_at DESC
+        `, [inv]);
+
+        res.json({ success: true, data: result.rows });
+    } catch (err: any) {
+        console.error('[M7-RETURNS] getReturnsForInvoice:', err.message);
+        if (err.message?.includes('does not exist')) return res.json({ success: true, data: [] });
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ─── POST /api/dispatch/delivery-returns/:id/confirm-facturacion ─────────────
+// Facturación confirma una devolución → pasa a CONFIRMED
+export const confirmReturnFacturacion = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { confirmedBy } = req.body;
+        const result = await pool.query(`
+            UPDATE delivery_returns
+            SET status = 'CONFIRMED',
+                conciliacion_confirmada_at = NOW(),
+                conciliacion_confirmada_by = $1
+            WHERE id = $2 AND status IN ('PENDING','PROCESSED')
+            RETURNING id
+        `, [confirmedBy || 'FACTURACION', id]);
+        if (!result.rowCount) return res.status(404).json({ error: 'Devolución no encontrada o ya confirmada' });
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error('[M7-RETURNS] confirmReturnFacturacion:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ─── POST /api/dispatch/approval-batches/:id/confirm-doc-received ─────────────
+// Marcar que se recibió el documento físico del proveedor
+export const confirmDocReceived = async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { confirmedBy } = req.body;
+        const result = await pool.query(`
+            UPDATE return_approval_batches
+            SET status = 'doc_recibido',
+                confirmed_at = COALESCE(confirmed_at, NOW()),
+                confirmed_by_name = COALESCE(confirmed_by_name, $1)
+            WHERE id::text = $2 AND status IN ('aprobado','aprobado_parcial','enviado')
+            RETURNING id
+        `, [confirmedBy || 'USUARIO', id]);
+        if (!result.rowCount) return res.status(404).json({ error: 'Lote no encontrado o en estado no válido' });
+        res.json({ success: true });
+    } catch (err: any) {
+        console.error('[M7-BATCH] confirmDocReceived:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
 // ─── GET /api/dispatch/approval-batches ──────────────────────────────────────
 // Lista lotes de aprobación de un cliente
 export const getApprovalBatches = async (req: Request, res: Response) => {
@@ -1580,6 +1869,9 @@ export const getApprovalBatches = async (req: Request, res: Response) => {
             SELECT
                 rab.id, rab.batch_code, rab.client_id, rab.notes, rab.status,
                 rab.created_by, rab.created_at, rab.sent_at,
+                rab.email_proveedor, rab.email_sent_at,
+                rab.confirmed_at, rab.confirmed_by_name,
+                rab.proveedor_confirmed_at, rab.proveedor_confirmed_by,
                 COUNT(rabi.id)::int AS total_items,
                 COUNT(rabi.id) FILTER (WHERE rabi.approved = true)::int AS approved_items
             FROM return_approval_batches rab
@@ -1615,8 +1907,8 @@ export const getApprovalBatchByCode = async (req: Request, res: Response) => {
                 v.plate AS vehicle_plate,
                 d.name  AS driver_name,
                 COALESCE(json_agg(json_build_object(
-                    'sku',               dri.sku,
-                    'article_name',      dri.article_name,
+                    'article_id',        dri.article_id,
+                    'article_name',      art.name,
                     'quantity_returned', dri.quantity_returned,
                     'unit',              dri.unit
                 )) FILTER (WHERE dri.id IS NOT NULL), '[]') AS items
@@ -1625,6 +1917,7 @@ export const getApprovalBatchByCode = async (req: Request, res: Response) => {
             LEFT JOIN vehicles v ON v.id::text = dr.vehicle_id::text
             LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
             LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+            LEFT JOIN articles art ON art.id::text = dri.article_id
             WHERE rabi.batch_id::text = $1
             GROUP BY rabi.id, dr.notes, dr.status, dr.created_at, v.plate, d.name
             ORDER BY rabi.invoice_id
@@ -1759,7 +2052,8 @@ export const getBodegaReturnsHistory = async (req: Request, res: Response) => {
 
         const result = await pool.query(`
             SELECT
-                dr.id,
+                dri.id,
+                dr.id                                  AS return_id,
                 dr.created_at::date                    AS fecha,
                 di.customer_name,
                 di.client_ref                          AS codigo_cliente,
@@ -1773,16 +2067,25 @@ export const getBodegaReturnsHistory = async (req: Request, res: Response) => {
                 dri.un_code,
                 dri.unit                               AS um,
                 dri.quantity_returned                  AS cantidad,
-                dr.return_reason                       AS motivo_devolucion,
+                rr.name                                AS motivo_devolucion,
                 dl.plan_type                           AS unidad_negocio,
                 dr.status,
                 dr.conciliacion_confirmada_at,
                 dr.conciliacion_confirmada_by,
+                dr.pre_approval_at,
+                dr.pre_approval_by,
+                dr.pre_approved_at,
+                dr.pre_approved_by,
+                dr.supplier_exit_at,
+                dr.supplier_exit_by,
+                dr.completed_at,
+                dr.completed_by,
                 batch.batch_code,
                 batch.status                           AS batch_status,
                 batch.confirmed_at                     AS proveedor_confirmed_at
             FROM delivery_returns dr
             JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+            LEFT JOIN return_reasons rr ON rr.id = dr.reason_id
             LEFT JOIN document_items di
                    ON TRIM(UPPER(COALESCE(di.invoice, di.order_number))) = TRIM(UPPER(dr.invoice_id))
                   AND TRIM(UPPER(di.article_id)) = TRIM(UPPER(dri.article_id))
@@ -1850,8 +2153,8 @@ export const sendApprovalBatchEmail = async (req: Request, res: Response) => {
                 v.plate AS vehicle_plate,
                 d.name AS driver_name,
                 COALESCE(json_agg(json_build_object(
-                    'sku', dri.sku,
-                    'article_name', dri.article_name,
+                    'sku', COALESCE(art.sku, dri.article_id),
+                    'article_name', COALESCE(art.name, dri.article_id),
                     'quantity_returned', dri.quantity_returned,
                     'unit', dri.unit
                 )) FILTER (WHERE dri.id IS NOT NULL), '[]') AS items
@@ -1860,6 +2163,7 @@ export const sendApprovalBatchEmail = async (req: Request, res: Response) => {
             LEFT JOIN vehicles v ON v.id::text = dr.vehicle_id::text
             LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
             LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+            LEFT JOIN articles art ON art.id::text = dri.article_id
             WHERE rabi.batch_id::text = $1
             GROUP BY rabi.id, dr.notes, dr.status, dr.created_at, v.plate, d.name
             ORDER BY rabi.invoice_id
@@ -1999,7 +2303,8 @@ export const getPublicReturnApproval = async (req: Request, res: Response) => {
                 v.plate AS vehicle_plate,
                 d.name  AS driver_name,
                 COALESCE(json_agg(json_build_object(
-                    'sku', dri.sku, 'article_name', dri.article_name,
+                    'sku', COALESCE(art.sku, dri.article_id),
+                    'article_name', COALESCE(art.name, dri.article_id),
                     'quantity_returned', dri.quantity_returned, 'unit', dri.unit
                 )) FILTER (WHERE dri.id IS NOT NULL), '[]') AS items
             FROM return_approval_batch_items rabi
@@ -2007,6 +2312,7 @@ export const getPublicReturnApproval = async (req: Request, res: Response) => {
             LEFT JOIN vehicles v ON v.id::text = dr.vehicle_id::text
             LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
             LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+            LEFT JOIN articles art ON art.id::text = dri.article_id
             WHERE rabi.batch_id::text = $1
             GROUP BY rabi.id, dr.notes, dr.status, dr.created_at, v.plate, d.name
             ORDER BY rabi.invoice_id
@@ -2072,6 +2378,169 @@ export const confirmPublicReturnApproval = async (req: Request, res: Response) =
         res.json({ success: true, status: nuevoStatus, total, aprobados });
     } catch (err: any) {
         console.error('[M7-DEVOL-CONFIRM]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ─── GET /api/dispatch/delivery-returns/conciliacion-pending ─────────────────
+// Facturas con DEVUELTO en conciliación que NO tienen delivery_returns registrado
+export const getConciliacionPending = async (req: Request, res: Response) => {
+    try {
+        const { clientId } = req.query as Record<string, string>;
+        const params: any[] = [];
+        let clientFilter = '';
+        if (clientId) { params.push(clientId); clientFilter = `AND dl.client_id = $${params.length}`; }
+
+        const result = await pool.query(`
+            SELECT
+                TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number))) AS invoice_id,
+                MAX(di.customer_name)              AS customer_name,
+                MAX(di.client_ref)                 AS codigo_cliente,
+                MAX(dl.delivery_date::date)        AS fecha_placa,
+                MAX(dl.plan_type)                  AS plan_type,
+                MAX(dl.client_id)                  AS client_id,
+                MAX(dl.vehicle_plate)              AS vehicle_plate,
+                MAX(v.id::text)                    AS vehicle_id,
+                MAX(drv.id::text)                  AS driver_id,
+                MAX(drv.name)                      AS driver_name,
+                MAX(dl.external_doc_id)            AS numero_planilla,
+                COALESCE(json_agg(json_build_object(
+                    'article_id',        di.article_id,
+                    'article_name',      COALESCE(art.name, di.article_id),
+                    'sku',               di.article_id,
+                    'un_code',           di.un_code,
+                    'unit',              COALESCE(NULLIF(di.unit,''), 'UND'),
+                    'quantity_returned', COALESCE(di.expected_qty, 0)
+                )) FILTER (WHERE di.article_id IS NOT NULL), '[]') AS items
+            FROM document_items di
+            JOIN documents_l dl ON dl.id = di.document_id
+            LEFT JOIN articles art ON art.id::text = di.article_id
+            LEFT JOIN vehicles v ON v.plate = dl.vehicle_plate
+            LEFT JOIN assignments asgn ON asgn.vehicle_id::text = v.id::text AND asgn.is_active = true
+            LEFT JOIN drivers drv ON drv.id::text = asgn.driver_id::text
+            WHERE di.item_status IN ('EST-13','DEVUELTO','DEVUELT')
+              AND NOT EXISTS (
+                  SELECT 1 FROM delivery_returns dr
+                  WHERE TRIM(UPPER(dr.invoice_id)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
+              )
+              ${clientFilter}
+            GROUP BY TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
+            ORDER BY MAX(dl.delivery_date) DESC
+        `, params);
+
+        res.json({ success: true, data: result.rows });
+    } catch (err: any) {
+        console.error('[M7-CONCIL-PENDING]', err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ─── POST /api/dispatch/delivery-returns/import-from-conciliacion ────────────
+// Crea delivery_returns en estado CONFIRMED para facturas que ya pasaron por conciliación
+export const importFromConciliacion = async (req: Request, res: Response) => {
+    const client = await pool.connect();
+    try {
+        const { invoices, importedBy } = req.body as {
+            invoices: Array<{
+                invoice_id: string; vehicle_id?: string; driver_id?: string;
+                vendedor?: string; numero_planilla?: string; fecha_placa?: string;
+                return_reason?: string; return_type?: string;
+                items: Array<{ article_id: string; article_name?: string; sku?: string; un_code?: string; unit?: string; quantity_returned: number }>;
+            }>;
+            importedBy: string;
+        };
+
+        if (!Array.isArray(invoices) || invoices.length === 0)
+            return res.status(400).json({ error: 'Se requiere al menos una factura' });
+
+        await client.query('BEGIN');
+        const created: number[] = [];
+
+        for (const inv of invoices) {
+            // Evitar duplicados — verificar que no exista ya
+            const exists = await client.query(
+                `SELECT id FROM delivery_returns WHERE TRIM(UPPER(invoice_id)) = $1 LIMIT 1`,
+                [inv.invoice_id.trim().toUpperCase()]
+            );
+            if (exists.rows.length > 0) continue;
+
+            const rsnId = await resolveReasonId(inv.return_reason || 'DEVOLUCION CONCILIACION', client);
+            const retRes = await client.query(
+                `INSERT INTO delivery_returns
+                    (invoice_id, vehicle_id, driver_id, reason_id, return_type, status,
+                     vendedor, numero_planilla, fecha_placa,
+                     conciliacion_confirmada_at, conciliacion_confirmada_by, created_at)
+                 VALUES ($1,$2,$3,$4,$5,'CONFIRMED',$6,$7,$8,NOW(),$9,NOW())
+                 RETURNING id`,
+                [
+                    inv.invoice_id.trim().toUpperCase(),
+                    inv.vehicle_id || null,
+                    inv.driver_id  || null,
+                    rsnId,
+                    inv.return_type || 'COMPLETA',
+                    inv.vendedor || null,
+                    inv.numero_planilla || null,
+                    inv.fecha_placa || null,
+                    importedBy || 'CONCILIACION',
+                ]
+            );
+            const returnId = retRes.rows[0].id;
+            created.push(returnId);
+
+            for (const item of (inv.items || [])) {
+                const qty = Number(item.quantity_returned ?? 0);
+                if (qty <= 0) continue;
+                await client.query(
+                    `INSERT INTO delivery_return_items
+                        (return_id, article_id, un_code, quantity_returned, unit)
+                     VALUES ($1,$2,$3,$4,$5)`,
+                    [
+                        returnId,
+                        item.article_id || null,
+                        item.un_code || null,
+                        qty,
+                        item.unit || 'UND',
+                    ]
+                );
+            }
+        }
+
+        await client.query('COMMIT');
+        res.json({ success: true, created: created.length, ids: created });
+    } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error('[M7-IMPORT-CONCIL]', err.message);
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
+    }
+};
+
+// ─── GET /api/dispatch/return-reasons ────────────────────────────────────────
+export const getReturnReasons = async (_req: Request, res: Response) => {
+    try {
+        const result = await pool.query(
+            `SELECT id, name FROM return_reasons WHERE is_active = true ORDER BY id`
+        );
+        res.json({ success: true, data: result.rows });
+    } catch (err: any) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// ─── POST /api/dispatch/return-reasons ───────────────────────────────────────
+export const createReturnReason = async (req: Request, res: Response) => {
+    try {
+        const { name } = req.body as { name: string };
+        if (!name?.trim()) return res.status(400).json({ error: 'name es requerido' });
+        const result = await pool.query(
+            `INSERT INTO return_reasons (name) VALUES ($1)
+             ON CONFLICT (name) DO UPDATE SET is_active = true
+             RETURNING id, name`,
+            [name.trim()]
+        );
+        res.json({ success: true, data: result.rows[0] });
+    } catch (err: any) {
         res.status(500).json({ error: err.message });
     }
 };

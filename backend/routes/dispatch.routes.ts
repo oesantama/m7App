@@ -30,6 +30,16 @@ import {
     getInvoiceReturnData,
     getBodegaReturnsHistory,
     confirmReturnConciliation,
+    confirmReturnFacturacion,
+    confirmDocReceived,
+    getReturnsForInvoice,
+    getReturnsTracking,
+    advanceReturnState,
+    markExcelDownloaded,
+    getConciliacionPending,
+    importFromConciliacion,
+    getReturnReasons,
+    createReturnReason,
 } from '../controllers/dispatch.controller.js';
 
 const router = Router();
@@ -66,13 +76,27 @@ router.get('/route-plate-invoices/:plate', getRoutePlateInvoices);
 router.post('/register-route-return',    registerRouteReturn);
 
 // Lotes de aprobación de devoluciones
-router.get('/approval-pending',          getApprovalPendingReturns);
-router.post('/approval-batches',         createApprovalBatch);
-router.get('/approval-batches',          getApprovalBatches);
-router.get('/approval-batch/:batchCode', getApprovalBatchByCode);
-router.post('/approval-batches/:id/send-email', sendApprovalBatchEmail);
+router.get('/approval-pending',                         getApprovalPendingReturns);
+router.post('/approval-batches',                        createApprovalBatch);
+router.get('/approval-batches',                         getApprovalBatches);
+router.get('/approval-batch/:batchCode',                getApprovalBatchByCode);
+router.post('/approval-batches/:id/send-email',         sendApprovalBatchEmail);
+router.post('/delivery-returns/:id/confirm-facturacion', confirmReturnFacturacion);
+router.post('/approval-batches/:id/confirm-doc-received', confirmDocReceived);
+
+// Motivos de devolución (maestra)
+router.get('/return-reasons',  getReturnReasons);
+router.post('/return-reasons', createReturnReason);
+
+// Pipeline tracking de devoluciones bodega (rutas literales primero, luego parametrizadas)
+router.get('/delivery-returns/tracking',                    getReturnsTracking);
+router.get('/delivery-returns/conciliacion-pending',        getConciliacionPending);
+router.post('/delivery-returns/import-from-conciliacion',   importFromConciliacion);
+router.put('/delivery-returns/:id/advance',                 advanceReturnState);
+router.put('/delivery-returns/:id/mark-excel',              markExcelDownloaded);
 
 // Recepcion bodega / historial / conciliacion
+router.get('/returns-for-invoice/:invoiceId',     getReturnsForInvoice);
 router.get('/invoice-return-data/:invoiceNumber', getInvoiceReturnData);
 router.get('/bodega-returns-history',             getBodegaReturnsHistory);
 router.post('/returns/:id/confirm-conciliation',  confirmReturnConciliation);
