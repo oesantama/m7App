@@ -77,7 +77,7 @@ services:
     env_file:
       - .env
     environment:
-      - VITE_API_URL=http://192.168.1.49:8081/api
+      - VITE_API_URL=http://localhost:8081/api
       - NODE_OPTIONS=--max-http-header-size=65536
     volumes:
       - ./components:/app/components:z
