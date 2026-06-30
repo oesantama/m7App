@@ -327,6 +327,7 @@ const LegalizationDialog: React.FC<{
     const [bodegaReturns, setBodegaReturns]   = useState<BodegaReturn[]>([]);
     const [loadingReturns, setLoadingReturns] = useState(true);
     const [confirmingReturn, setConfirmingReturn] = useState(false);
+    const [returnDevuelto,    setReturnDevuelto]    = useState<string>('0');
     const [returnConsignar,   setReturnConsignar]   = useState<string>('0');
     const [returnComprobante, setReturnComprobante] = useState<string>('');
     const [returnMetodo,      setReturnMetodo]      = useState<MetodoPago>('TRANSFERENCIA');
@@ -340,7 +341,14 @@ const LegalizationDialog: React.FC<{
                 if (!cancelled) {
                     const data: BodegaReturn[] = res?.data ?? [];
                     setBodegaReturns(data);
-                    setReturnConsignar('0');
+                    // Para COMPLETA pre-llenamos valor devuelto = factura; para PARCIAL el usuario ingresa
+                    const pending = data.find(r => r.status === 'PENDING' || r.status === 'PROCESSED');
+                    const devQty = pending ? pending.items.reduce((s, i) => s + (Number(i.quantity_returned) || 0), 0) : 0;
+                    const invQty = (inv.items || []).reduce((s, i) => s + (Number(i.qty) || 0), 0);
+                    const isComp = invQty === 0 || devQty >= invQty;
+                    const invVal = String(Number(inv.invoice_value) || 0);
+                    setReturnDevuelto(isComp ? invVal : '0');
+                    setReturnConsignar(isComp ? '0' : invVal);
                     setReturnComprobante('');
                     setReturnMetodo('TRANSFERENCIA');
                     setReturnFecha(getYesterday());
@@ -361,6 +369,11 @@ const LegalizationDialog: React.FC<{
         const returnType = (totalQtyItems > 0 && inv.items && inv.items.length > 0
             && totalQtyItems < inv.items.reduce((s, i) => s + (Number(i.qty) || 0), 0))
             ? 'PARCIAL' : 'COMPLETA';
+        const devueltoVal = Number(returnDevuelto) || 0;
+        if (devueltoVal <= 0) {
+            toast.error('El valor devuelto no puede ser $0. Ingrese el valor de los artículos devueltos.');
+            return;
+        }
         const consignarVal = returnType === 'COMPLETA' ? 0 : (Number(returnConsignar) || 0);
         setConfirmingReturn(true);
         try {
@@ -506,77 +519,97 @@ const LegalizationDialog: React.FC<{
                                         </div>
                                     )}
 
-                                    {/* Valores + Datos de Recaudo */}
+                                    {/* Valores: factura / devuelto / a consignar */}
                                     <div className="bg-white rounded-xl border border-amber-200 px-4 py-3 space-y-3">
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {/* Valor factura (solo lectura) */}
                                             <div>
                                                 <p className="text-[7px] font-black text-slate-400 uppercase mb-1">Valor factura</p>
-                                                <p className="text-lg font-black text-slate-900">
+                                                <p className="text-base font-black text-slate-900">
                                                     ${(Number(inv.invoice_value) || 0).toLocaleString('es-CO')}
                                                 </p>
                                             </div>
-                                            {esCompleta ? (
-                                                <div>
-                                                    <p className="text-[7px] font-black text-slate-400 uppercase mb-1">Total a consignar</p>
-                                                    <p className="text-lg font-black text-rose-600">$0</p>
-                                                    <p className="text-[7px] text-rose-500 mt-0.5">Devolución total — sin cobro</p>
-                                                </div>
-                                            ) : (
-                                                <div>
-                                                    <label className="text-[7px] font-black text-amber-600 uppercase mb-1 block">
-                                                        Total a consignar <span className="text-[6px] font-normal text-slate-400">(puede ser $0)</span>
-                                                    </label>
+                                            {/* Valor devuelto (obligatorio, nunca $0) */}
+                                            <div>
+                                                <label className="text-[7px] font-black text-rose-600 uppercase mb-1 block">
+                                                    Valor devuelto <span className="text-rose-500">*</span>
+                                                </label>
+                                                {esCompleta ? (
+                                                    <p className="text-base font-black text-rose-700">
+                                                        ${(Number(inv.invoice_value) || 0).toLocaleString('es-CO')}
+                                                    </p>
+                                                ) : (
                                                     <div className="relative">
-                                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">$</span>
+                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">$</span>
+                                                        <input
+                                                            type="number" min={1}
+                                                            value={returnDevuelto}
+                                                            onChange={e => {
+                                                                const v = e.target.value;
+                                                                setReturnDevuelto(v);
+                                                                const diff = (Number(inv.invoice_value) || 0) - (Number(v) || 0);
+                                                                setReturnConsignar(String(Math.max(0, diff)));
+                                                            }}
+                                                            className="w-full pl-5 pr-1 py-1.5 border-2 border-rose-300 focus:border-rose-500 rounded-xl text-xs font-black outline-none bg-rose-50"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {/* Total a consignar (puede ser $0) */}
+                                            <div>
+                                                <label className="text-[7px] font-black text-amber-600 uppercase mb-1 block">
+                                                    A consignar <span className="text-[6px] font-normal text-slate-400">(puede $0)</span>
+                                                </label>
+                                                {esCompleta ? (
+                                                    <>
+                                                        <p className="text-base font-black text-slate-400">$0</p>
+                                                        <p className="text-[6px] text-slate-400">sin cobro</p>
+                                                    </>
+                                                ) : (
+                                                    <div className="relative">
+                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">$</span>
                                                         <input
                                                             type="number" min={0}
                                                             value={returnConsignar}
                                                             onChange={e => setReturnConsignar(e.target.value)}
-                                                            className="w-full pl-6 pr-2 py-2 border-2 border-amber-300 focus:border-amber-500 rounded-xl text-sm font-black outline-none bg-amber-50"
+                                                            className="w-full pl-5 pr-1 py-1.5 border-2 border-amber-300 focus:border-amber-500 rounded-xl text-xs font-black outline-none bg-amber-50"
                                                         />
                                                     </div>
-                                                    {Number(returnConsignar) >= 0 && (
-                                                        <p className="text-[7px] text-amber-700 font-bold mt-0.5">
-                                                            Valor devuelto: ${((Number(inv.invoice_value) || 0) - (Number(returnConsignar) || 0)).toLocaleString('es-CO')}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
 
                                         {/* Datos de recaudo — solo para devolución parcial */}
                                         {!esCompleta && (
-                                            <>
-                                                <div className="border-t border-amber-100 pt-2">
-                                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-2">Datos de Recaudo</p>
-                                                    <div className="grid grid-cols-2 gap-2">
-                                                        <div className="space-y-1">
-                                                            <label className="text-[7px] font-black text-slate-400 uppercase">Método de Pago</label>
-                                                            <div className="grid grid-cols-2 gap-0.5 p-0.5 bg-amber-50 border border-amber-200 rounded-xl">
-                                                                <button type="button" onClick={() => setReturnMetodo('TRANSFERENCIA')}
-                                                                    className={`py-1.5 rounded-lg text-[7px] font-black uppercase transition-all ${returnMetodo === 'TRANSFERENCIA' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:bg-amber-100'}`}>
-                                                                    📱 Transfer</button>
-                                                                <button type="button" onClick={() => setReturnMetodo('CONSIGNACION')}
-                                                                    className={`py-1.5 rounded-lg text-[7px] font-black uppercase transition-all ${returnMetodo === 'CONSIGNACION' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:bg-amber-100'}`}>
-                                                                    🏦 Consig</button>
-                                                            </div>
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <label className="text-[7px] font-black text-slate-400 uppercase">Fecha</label>
-                                                            <input type="date" value={returnFecha}
-                                                                onChange={e => setReturnFecha(e.target.value)}
-                                                                className="w-full px-2 py-1.5 border border-amber-200 focus:border-amber-500 rounded-xl text-[9px] font-black outline-none bg-amber-50" />
+                                            <div className="border-t border-amber-100 pt-2 space-y-2">
+                                                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Datos de Recaudo</p>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="space-y-1">
+                                                        <label className="text-[7px] font-black text-slate-400 uppercase">Método de Pago</label>
+                                                        <div className="grid grid-cols-2 gap-0.5 p-0.5 bg-amber-50 border border-amber-200 rounded-xl">
+                                                            <button type="button" onClick={() => setReturnMetodo('TRANSFERENCIA')}
+                                                                className={`py-1.5 rounded-lg text-[7px] font-black uppercase transition-all ${returnMetodo === 'TRANSFERENCIA' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:bg-amber-100'}`}>
+                                                                📱 Transfer</button>
+                                                            <button type="button" onClick={() => setReturnMetodo('CONSIGNACION')}
+                                                                className={`py-1.5 rounded-lg text-[7px] font-black uppercase transition-all ${returnMetodo === 'CONSIGNACION' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:bg-amber-100'}`}>
+                                                                🏦 Consig</button>
                                                         </div>
                                                     </div>
-                                                    <div className="mt-2">
-                                                        <label className="text-[7px] font-black text-slate-400 uppercase">No. Comprobante / Ref.</label>
-                                                        <input type="text" value={returnComprobante}
-                                                            onChange={e => setReturnComprobante(e.target.value)}
-                                                            placeholder="Referencia del pago (opcional si total = $0)"
-                                                            className="w-full mt-1 px-3 py-1.5 border border-amber-200 focus:border-amber-500 rounded-xl text-[9px] font-black outline-none bg-amber-50 placeholder:text-slate-300" />
+                                                    <div className="space-y-1">
+                                                        <label className="text-[7px] font-black text-slate-400 uppercase">Fecha</label>
+                                                        <input type="date" value={returnFecha}
+                                                            onChange={e => setReturnFecha(e.target.value)}
+                                                            className="w-full px-2 py-1.5 border border-amber-200 focus:border-amber-500 rounded-xl text-[9px] font-black outline-none bg-amber-50" />
                                                     </div>
                                                 </div>
-                                            </>
+                                                <div>
+                                                    <label className="text-[7px] font-black text-slate-400 uppercase">No. Comprobante / Ref.</label>
+                                                    <input type="text" value={returnComprobante}
+                                                        onChange={e => setReturnComprobante(e.target.value)}
+                                                        placeholder="Referencia del pago (opcional si total = $0)"
+                                                        className="w-full mt-1 px-3 py-1.5 border border-amber-200 focus:border-amber-500 rounded-xl text-[9px] font-black outline-none bg-amber-50 placeholder:text-slate-300" />
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
 
