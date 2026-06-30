@@ -169,6 +169,7 @@ function initForm(inv: InvoiceRow): InvoiceFormState {
         estadoEntrega,
         valor:            isLegalized ? String(inv.valor ?? '')
                           : estadoEntrega === 'devolucion' ? '0'
+                          : estadoEntrega === 'parcial'    ? '0'
                           : String(inv.invoice_value ?? ''),
         numConsignacion:  inv.comprobante || '',
         metodo:           (inv.forma_pago as MetodoPago) || 'TRANSFERENCIA',
@@ -315,7 +316,7 @@ const LegalizationDialog: React.FC<{
     allRoutes?: RouteGroup[];
     onCheckReference?: (ref: string) => void;
     currentUserId: string;
-    onConfirmReturnAndSave: (returnId: number, returnType: 'COMPLETA' | 'PARCIAL', returnValue: number) => Promise<void>;
+    onConfirmReturnAndSave: (returnId: number, returnType: 'COMPLETA' | 'PARCIAL', consignar: number, comprobante: string, metodo: string, fecha: string) => Promise<void>;
 }> = ({ inv, form, onClose, onUpdate, onUpdateItem, onSave, allRoutes, onCheckReference, currentUserId, onConfirmReturnAndSave }) => {
     const isLegalized   = !!inv.forma_pago;
     const isRepice      = (inv.item_status || '').toUpperCase() === 'EST-15' || (inv.item_status || '').toUpperCase() === 'REPICE';
@@ -326,7 +327,10 @@ const LegalizationDialog: React.FC<{
     const [bodegaReturns, setBodegaReturns]   = useState<BodegaReturn[]>([]);
     const [loadingReturns, setLoadingReturns] = useState(true);
     const [confirmingReturn, setConfirmingReturn] = useState(false);
-    const [returnValue, setReturnValue]       = useState<string>('0');
+    const [returnConsignar,   setReturnConsignar]   = useState<string>('0');
+    const [returnComprobante, setReturnComprobante] = useState<string>('');
+    const [returnMetodo,      setReturnMetodo]      = useState<MetodoPago>('TRANSFERENCIA');
+    const [returnFecha,       setReturnFecha]       = useState<string>(getYesterday());
 
     useEffect(() => {
         let cancelled = false;
@@ -336,8 +340,10 @@ const LegalizationDialog: React.FC<{
                 if (!cancelled) {
                     const data: BodegaReturn[] = res?.data ?? [];
                     setBodegaReturns(data);
-                    // Pre-cargar valor: para devolución completa = valor factura; parcial = 0
-                    setReturnValue(String(Number(inv.invoice_value) || 0));
+                    setReturnConsignar('0');
+                    setReturnComprobante('');
+                    setReturnMetodo('TRANSFERENCIA');
+                    setReturnFecha(getYesterday());
                 }
             })
             .catch(() => {})
@@ -355,9 +361,10 @@ const LegalizationDialog: React.FC<{
         const returnType = (totalQtyItems > 0 && inv.items && inv.items.length > 0
             && totalQtyItems < inv.items.reduce((s, i) => s + (Number(i.qty) || 0), 0))
             ? 'PARCIAL' : 'COMPLETA';
+        const consignarVal = returnType === 'COMPLETA' ? 0 : (Number(returnConsignar) || 0);
         setConfirmingReturn(true);
         try {
-            await onConfirmReturnAndSave(ret.id, returnType, Number(returnValue) || 0);
+            await onConfirmReturnAndSave(ret.id, returnType, consignarVal, returnComprobante, returnMetodo, returnFecha);
         } finally {
             setConfirmingReturn(false);
         }
@@ -422,7 +429,6 @@ const LegalizationDialog: React.FC<{
                         const totalDevuelto = ret.items.reduce((s, i) => s + (Number(i.quantity_returned) || 0), 0);
                         const totalEsperado = (inv.items || []).reduce((s, i) => s + (Number(i.qty) || 0), 0);
                         const esCompleta    = totalEsperado === 0 || totalDevuelto >= totalEsperado;
-                        const retValNum     = Number(returnValue) || 0;
                         return (
                             <div key={ret.id} className="rounded-2xl border-2 border-amber-300 bg-amber-50/40 overflow-hidden">
                                 {/* Cabecera */}
@@ -500,11 +506,8 @@ const LegalizationDialog: React.FC<{
                                         </div>
                                     )}
 
-                                    {/* Valor editable */}
-                                    <div className="bg-white rounded-xl border border-amber-200 px-4 py-3 space-y-2">
-                                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                            Valor de la factura {esCompleta ? '(devolución total = $0 a cobrar)' : ''}
-                                        </p>
+                                    {/* Valores + Datos de Recaudo */}
+                                    <div className="bg-white rounded-xl border border-amber-200 px-4 py-3 space-y-3">
                                         <div className="grid grid-cols-2 gap-3">
                                             <div>
                                                 <p className="text-[7px] font-black text-slate-400 uppercase mb-1">Valor factura</p>
@@ -512,26 +515,69 @@ const LegalizationDialog: React.FC<{
                                                     ${(Number(inv.invoice_value) || 0).toLocaleString('es-CO')}
                                                 </p>
                                             </div>
-                                            <div>
-                                                <label className="text-[7px] font-black text-amber-600 uppercase mb-1 block">
-                                                    Valor a registrar <span className="text-rose-500">*</span>
-                                                </label>
-                                                <div className="relative">
-                                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">$</span>
-                                                    <input
-                                                        type="number" min={0}
-                                                        value={returnValue}
-                                                        onChange={e => setReturnValue(e.target.value)}
-                                                        className="w-full pl-6 pr-2 py-2 border-2 border-amber-300 focus:border-amber-500 rounded-xl text-sm font-black outline-none bg-amber-50"
-                                                    />
+                                            {esCompleta ? (
+                                                <div>
+                                                    <p className="text-[7px] font-black text-slate-400 uppercase mb-1">Total a consignar</p>
+                                                    <p className="text-lg font-black text-rose-600">$0</p>
+                                                    <p className="text-[7px] text-rose-500 mt-0.5">Devolución total — sin cobro</p>
                                                 </div>
-                                                {retValNum > 0 && (
-                                                    <p className="text-[7px] text-amber-700 font-bold mt-0.5">
-                                                        Diferencia: ${((Number(inv.invoice_value) || 0) - retValNum).toLocaleString('es-CO')}
-                                                    </p>
-                                                )}
-                                            </div>
+                                            ) : (
+                                                <div>
+                                                    <label className="text-[7px] font-black text-amber-600 uppercase mb-1 block">
+                                                        Total a consignar <span className="text-[6px] font-normal text-slate-400">(puede ser $0)</span>
+                                                    </label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-black text-sm">$</span>
+                                                        <input
+                                                            type="number" min={0}
+                                                            value={returnConsignar}
+                                                            onChange={e => setReturnConsignar(e.target.value)}
+                                                            className="w-full pl-6 pr-2 py-2 border-2 border-amber-300 focus:border-amber-500 rounded-xl text-sm font-black outline-none bg-amber-50"
+                                                        />
+                                                    </div>
+                                                    {Number(returnConsignar) >= 0 && (
+                                                        <p className="text-[7px] text-amber-700 font-bold mt-0.5">
+                                                            Valor devuelto: ${((Number(inv.invoice_value) || 0) - (Number(returnConsignar) || 0)).toLocaleString('es-CO')}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
+
+                                        {/* Datos de recaudo — solo para devolución parcial */}
+                                        {!esCompleta && (
+                                            <>
+                                                <div className="border-t border-amber-100 pt-2">
+                                                    <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-2">Datos de Recaudo</p>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <div className="space-y-1">
+                                                            <label className="text-[7px] font-black text-slate-400 uppercase">Método de Pago</label>
+                                                            <div className="grid grid-cols-2 gap-0.5 p-0.5 bg-amber-50 border border-amber-200 rounded-xl">
+                                                                <button type="button" onClick={() => setReturnMetodo('TRANSFERENCIA')}
+                                                                    className={`py-1.5 rounded-lg text-[7px] font-black uppercase transition-all ${returnMetodo === 'TRANSFERENCIA' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:bg-amber-100'}`}>
+                                                                    📱 Transfer</button>
+                                                                <button type="button" onClick={() => setReturnMetodo('CONSIGNACION')}
+                                                                    className={`py-1.5 rounded-lg text-[7px] font-black uppercase transition-all ${returnMetodo === 'CONSIGNACION' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-400 hover:bg-amber-100'}`}>
+                                                                    🏦 Consig</button>
+                                                            </div>
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-[7px] font-black text-slate-400 uppercase">Fecha</label>
+                                                            <input type="date" value={returnFecha}
+                                                                onChange={e => setReturnFecha(e.target.value)}
+                                                                className="w-full px-2 py-1.5 border border-amber-200 focus:border-amber-500 rounded-xl text-[9px] font-black outline-none bg-amber-50" />
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-2">
+                                                        <label className="text-[7px] font-black text-slate-400 uppercase">No. Comprobante / Ref.</label>
+                                                        <input type="text" value={returnComprobante}
+                                                            onChange={e => setReturnComprobante(e.target.value)}
+                                                            placeholder="Referencia del pago (opcional si total = $0)"
+                                                            className="w-full mt-1 px-3 py-1.5 border border-amber-200 focus:border-amber-500 rounded-xl text-[9px] font-black outline-none bg-amber-50 placeholder:text-slate-300" />
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
 
                                     {/* Botón confirmar */}
@@ -1536,13 +1582,13 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     };
 
     // Confirma la devolución de bodega Y legaliza la factura en un solo paso
-    const handleConfirmReturnAndSave = async (inv: InvoiceRow, returnId: number, returnType: 'COMPLETA' | 'PARCIAL', returnValue: number) => {
+    const handleConfirmReturnAndSave = async (inv: InvoiceRow, returnId: number, returnType: 'COMPLETA' | 'PARCIAL', consignar: number, comprobante: string, metodo: string, fecha: string) => {
         updateForm(inv.invoice_number, { saving: true });
         try {
             // 1. Confirmar devolución por facturación
             await api.confirmReturnByFacturacion(returnId, currentUserId);
 
-            // 2. Legalizar la factura como devolución
+            // 2. Legalizar la factura
             const esCompleta = returnType === 'COMPLETA';
             const estadoEntrega: EstadoEntrega = esCompleta ? 'devolucion' : 'parcial';
             const invoiceVal = Number(inv.invoice_value) || 0;
@@ -1550,12 +1596,14 @@ const ConciliacionRouteModal: React.FC<Props> = ({
             await api.saveConciliation({
                 documentId,
                 invoiceNumber:  inv.invoice_number,
-                valor:          returnValue,
+                // Para PARCIAL: valor = total_a_consignar; backend calcula valor_devuelto = factura - consignar
+                // Para COMPLETA: valor = 0 (sin cobro)
+                valor:          esCompleta ? 0 : consignar,
                 banco:          'Bancolombia',
-                comprobante:    `DEV-BOD-${returnId}`,
-                fechaPago:      new Date().toISOString().slice(0, 10),
-                formaPago:      'DEVOLUCION' as any,
-                esDevolucion:   true,
+                comprobante:    comprobante || `DEV-BOD-${returnId}`,
+                fechaPago:      fecha || new Date().toISOString().slice(0, 10),
+                formaPago:      (esCompleta ? 'DEVOLUCION' : metodo) as any,
+                esDevolucion:   esCompleta,
                 conciliadoPor:  currentUserId,
                 vehiclePlate:   inv.vehicle_plate || route.plate,
                 conductorId:    inv.conductor_id,
@@ -1565,7 +1613,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 itemsReturned:  [],
             });
 
-            toast.success(`✅ ${inv.invoice_number} confirmada y legalizada como devolución`);
+            toast.success(`✅ ${inv.invoice_number} confirmada y legalizada`);
             updateForm(inv.invoice_number, { saving: false });
             setActiveDialog(null);
             onSaved();
@@ -2180,7 +2228,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                         allRoutes={allRoutes}
                         onCheckReference={(ref) => handleCheckReference(ref, 'individual', undefined, inv.invoice_number)}
                         currentUserId={currentUserId}
-                        onConfirmReturnAndSave={(returnId, returnType, val) => handleConfirmReturnAndSave(inv, returnId, returnType, val)}
+                        onConfirmReturnAndSave={(returnId, returnType, consignar, comprobante, metodo, fecha) => handleConfirmReturnAndSave(inv, returnId, returnType, consignar, comprobante, metodo, fecha)}
                     />
                 );
             })()}
