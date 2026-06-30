@@ -65,6 +65,48 @@ interface InvoiceData {
     items: InvoiceItem[];
 }
 
+// ─── ORDENAMIENTO GENÉRICO PARA TABLAS ────────────────────────────────────────
+function sortByKey<T extends Record<string, any>>(rows: T[], key: string | null, dir: 'asc'|'desc'): T[] {
+    if (!key) return rows;
+    const sorted = [...rows];
+    sorted.sort((a, b) => {
+        let av = a[key]; let bv = b[key];
+        if (av === null || av === undefined) av = '';
+        if (bv === null || bv === undefined) bv = '';
+        if (typeof av === 'number' && typeof bv === 'number') return dir === 'asc' ? av - bv : bv - av;
+        const ad = Date.parse(av); const bd = Date.parse(bv);
+        if (!isNaN(ad) && !isNaN(bd) && isNaN(Number(av)) && isNaN(Number(bv))) {
+            return dir === 'asc' ? ad - bd : bd - ad;
+        }
+        const as = String(av).trim().toLowerCase(); const bs = String(bv).trim().toLowerCase();
+        if (as < bs) return dir === 'asc' ? -1 : 1;
+        if (as > bs) return dir === 'asc' ? 1 : -1;
+        return 0;
+    });
+    return sorted;
+}
+
+interface SortThProps {
+    label: string; sortKey: string;
+    activeKey: string | null; dir: 'asc'|'desc';
+    onSort: (key: string) => void;
+    className?: string;
+}
+const SortTh: React.FC<SortThProps> = ({ label, sortKey, activeKey, dir, onSort, className }) => {
+    const active = activeKey === sortKey;
+    return (
+        <th onClick={() => onSort(sortKey)}
+            className={`px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap cursor-pointer select-none hover:bg-slate-100/70 transition-colors ${className || ''}`}>
+            <span className="inline-flex items-center gap-1">
+                {label}
+                {active
+                    ? (dir === 'asc' ? <Icons.ChevronUp className="w-3 h-3 text-indigo-600" /> : <Icons.ChevronDown className="w-3 h-3 text-indigo-600" />)
+                    : <Icons.ChevronDown className="w-3 h-3 text-slate-300" />}
+            </span>
+        </th>
+    );
+};
+
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
     const [tab, setTab]   = React.useState<Tab>('recibir');
@@ -83,6 +125,10 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
     const [visibleStatuses, setVisibleStatuses]   = React.useState<Set<string>>(
         new Set(['PENDING','CONFIRMED','PRE_APPROVAL','PRE_APPROVED','SUPPLIER_EXIT'])
     );
+    const [seguimientoSearch, setSeguimientoSearch]   = React.useState('');
+    const [seguimientoSortKey, setSeguimientoSortKey] = React.useState<string | null>(null);
+    const [seguimientoSortDir, setSeguimientoSortDir] = React.useState<'asc'|'desc'>('asc');
+    const [expandedTrackingIds, setExpandedTrackingIds] = React.useState<Set<number>>(new Set());
 
     // ── Tab: Sin registrar (desde conciliación) ───────────────────────────────
     const [concilPending, setConcilPending]       = React.useState<ConcilPendingInvoice[]>([]);
@@ -91,6 +137,9 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
     const [importingConcil, setImportingConcil]   = React.useState(false);
     const [concilExtras, setConcilExtras]         = React.useState<Record<string,{vendedor:string; return_reason:string; return_type:'COMPLETA'|'PARCIAL'}>>({});
     const [concilOtroMode, setConcilOtroMode]     = React.useState<Set<string>>(new Set());
+    const [concilSearch, setConcilSearch]         = React.useState('');
+    const [concilSortKey, setConcilSortKey]       = React.useState<string | null>(null);
+    const [concilSortDir, setConcilSortDir]       = React.useState<'asc'|'desc'>('asc');
     const [concilOtroText, setConcilOtroText]     = React.useState<Record<string,string>>({});
 
     const setConcilExtra = (invoiceId: string, field: string, value: string) =>
@@ -585,6 +634,44 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         { header: 'POR (COMPLETADO)', key: 'completed_by' },
     ];
 
+    // ── Sin Registrar: filtrado + ordenamiento ────────────────────────────────
+    const displayedConcilPending = React.useMemo(() => {
+        const term = concilSearch.trim().toLowerCase();
+        const filtered = !term ? concilPending : concilPending.filter(inv =>
+            [inv.invoice_id, inv.customer_name, inv.numero_planilla, inv.vehicle_plate, inv.fecha_placa, inv.plan_type]
+                .some(v => v && String(v).toLowerCase().includes(term))
+        );
+        return sortByKey(filtered, concilSortKey, concilSortDir);
+    }, [concilPending, concilSearch, concilSortKey, concilSortDir]);
+
+    const handleConcilSort = (key: string) => {
+        if (concilSortKey === key) {
+            setConcilSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        } else {
+            setConcilSortKey(key);
+            setConcilSortDir('asc');
+        }
+    };
+
+    // ── Seguimiento: filtrado + ordenamiento (compartido entre todas las etapas) ──
+    const displayedTrackingReturns = React.useMemo(() => {
+        const term = seguimientoSearch.trim().toLowerCase();
+        if (!term) return trackingReturns;
+        return trackingReturns.filter(r =>
+            [r.invoice_id, r.customer_name, r.vendedor, r.numero_planilla, r.return_reason, r.vehicle_plate]
+                .some(v => v && String(v).toLowerCase().includes(term))
+        );
+    }, [trackingReturns, seguimientoSearch]);
+
+    const handleSeguimientoSort = (key: string) => {
+        if (seguimientoSortKey === key) {
+            setSeguimientoSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSeguimientoSortKey(key);
+            setSeguimientoSortDir('asc');
+        }
+    };
+
     return (
         <>
         <div className="min-h-screen bg-slate-50/50 p-4 md:p-6">
@@ -595,32 +682,29 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                 </div>
             )}
 
-            <div className="mb-5">
-                <h1 className="text-xl font-black text-slate-900 tracking-tight">Devoluciones — Bodega</h1>
-                <p className="text-[11px] text-slate-500 mt-0.5">Recepción, seguimiento y aprobación de mercancía devuelta</p>
-            </div>
-
-            {/* Client selector */}
-            <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3 mb-5 flex items-center gap-3">
-                <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">Cliente</span>
-                {!clientsReady ? (
-                    <div className="w-4 h-4 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
-                ) : clients.length === 0 ? (
-                    <span className="text-[10px] text-slate-400">Sin clientes asignados</span>
-                ) : clients.length === 1 ? (
-                    <span className="text-[11px] font-black text-slate-700">{clients[0].name}</span>
-                ) : (
-                    <select value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)}
-                        className="flex-1 px-3 py-1.5 border border-slate-200 rounded-xl text-[10px] text-slate-700 font-bold bg-white outline-none focus:border-rose-400 transition-all">
-                        <option value="">— Seleccionar cliente —</option>
-                        {clients.map(c => <option key={c.id} value={c.id}>{c.name} ({c.id})</option>)}
-                    </select>
-                )}
-                {selectedClientName && (
-                    <span className="text-[9px] bg-rose-50 border border-rose-200 text-rose-700 font-black px-2 py-0.5 rounded-lg uppercase tracking-widest ml-auto shrink-0">
-                        {selectedClientName}
-                    </span>
-                )}
+            {/* Client selector — 3 de 12 columnas */}
+            <div className="grid grid-cols-12 gap-3 mb-5">
+                <div className="col-span-12 md:col-span-3 bg-white border border-slate-200 rounded-2xl px-4 py-3 flex items-center gap-3">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0">Cliente</span>
+                    {!clientsReady ? (
+                        <div className="w-4 h-4 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
+                    ) : clients.length === 0 ? (
+                        <span className="text-[10px] text-slate-400">Sin clientes asignados</span>
+                    ) : clients.length === 1 ? (
+                        <span className="text-[11px] font-black text-slate-700">{clients[0].name}</span>
+                    ) : (
+                        <select value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)}
+                            className="flex-1 px-3 py-1.5 border border-slate-200 rounded-xl text-[10px] text-slate-700 font-bold bg-white outline-none focus:border-rose-400 transition-all">
+                            <option value="">— Seleccionar cliente —</option>
+                            {clients.map(c => <option key={c.id} value={c.id}>{c.name} ({c.id})</option>)}
+                        </select>
+                    )}
+                    {selectedClientName && (
+                        <span className="text-[9px] bg-rose-50 border border-rose-200 text-rose-700 font-black px-2 py-0.5 rounded-lg uppercase tracking-widest ml-auto shrink-0">
+                            {selectedClientName}
+                        </span>
+                    )}
+                </div>
             </div>
 
             {!clientsReady ? null : (
@@ -1022,6 +1106,22 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                 </div>
                             </div>
 
+                            {/* Buscador */}
+                            {concilPending.length > 0 && (
+                                <div className="bg-white border border-slate-200 rounded-2xl p-3">
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">Buscar</p>
+                                    <div className="relative">
+                                        <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                        <input
+                                            value={concilSearch}
+                                            onChange={e => setConcilSearch(e.target.value)}
+                                            placeholder="Buscar por factura, cliente, planilla, placa…"
+                                            className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] outline-none focus:bg-white focus:border-indigo-400 transition-colors"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
                             {/* Acciones */}
                             {concilPending.length > 0 && (
                                 <div className="flex items-center gap-3 flex-wrap">
@@ -1051,12 +1151,14 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                             {/* Tabla */}
                             {concilLoading ? (
                                 <div className="flex justify-center py-20"><Icons.Loader className="w-6 h-6 text-slate-400 animate-spin" /></div>
-                            ) : concilPending.length === 0 ? (
+                            ) : displayedConcilPending.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center py-20 text-center">
                                     <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mb-3">
                                         <Icons.CheckCircle className="w-6 h-6 text-emerald-400" />
                                     </div>
-                                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Todo registrado — sin pendientes de conciliación</p>
+                                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                                        {concilSearch ? 'Sin resultados para la búsqueda' : 'Todo registrado — sin pendientes de conciliación'}
+                                    </p>
                                 </div>
                             ) : (
                                 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
@@ -1065,16 +1167,16 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                             <tr className="bg-slate-50 border-b border-slate-200">
                                                 <th className="px-3 py-2 w-8">
                                                     <input type="checkbox"
-                                                        checked={selectedConcilIds.size === concilPending.length}
-                                                        onChange={e => setSelectedConcilIds(e.target.checked ? new Set(concilPending.map(i => i.invoice_id)) : new Set())}
+                                                        checked={selectedConcilIds.size > 0 && displayedConcilPending.every(i => selectedConcilIds.has(i.invoice_id))}
+                                                        onChange={e => setSelectedConcilIds(e.target.checked ? new Set(displayedConcilPending.map(i => i.invoice_id)) : new Set())}
                                                         className="rounded" />
                                                 </th>
-                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Factura</th>
-                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Cliente</th>
-                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Planilla</th>
-                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Placa</th>
-                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Fecha</th>
-                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Plan</th>
+                                                <SortTh label="Factura" sortKey="invoice_id" activeKey={concilSortKey} dir={concilSortDir} onSort={handleConcilSort} className="text-[8px]" />
+                                                <SortTh label="Cliente" sortKey="customer_name" activeKey={concilSortKey} dir={concilSortDir} onSort={handleConcilSort} className="text-[8px]" />
+                                                <SortTh label="Planilla" sortKey="numero_planilla" activeKey={concilSortKey} dir={concilSortDir} onSort={handleConcilSort} className="text-[8px]" />
+                                                <SortTh label="Placa" sortKey="vehicle_plate" activeKey={concilSortKey} dir={concilSortDir} onSort={handleConcilSort} className="text-[8px]" />
+                                                <SortTh label="Fecha" sortKey="fecha_placa" activeKey={concilSortKey} dir={concilSortDir} onSort={handleConcilSort} className="text-[8px]" />
+                                                <SortTh label="Plan" sortKey="plan_type" activeKey={concilSortKey} dir={concilSortDir} onSort={handleConcilSort} className="text-[8px]" />
                                                 <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Art.</th>
                                                 <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Tipo</th>
                                                 <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Vendedor <span className="text-rose-500">*</span></th>
@@ -1082,7 +1184,7 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                            {concilPending.map(inv => {
+                                            {displayedConcilPending.map(inv => {
                                                 const sel = selectedConcilIds.has(inv.invoice_id);
                                                 return (
                                                     <tr key={inv.invoice_id}
@@ -1326,13 +1428,34 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                     </div>
                                 </div>
 
+                                {/* ── Buscador ── */}
+                                {trackingReturns.length > 0 && (
+                                    <div className="bg-white border border-slate-200 rounded-2xl p-3">
+                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">Buscar</p>
+                                        <div className="relative">
+                                            <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                            <input
+                                                value={seguimientoSearch}
+                                                onChange={e => setSeguimientoSearch(e.target.value)}
+                                                placeholder="Buscar por factura, cliente, vendedor, planilla, motivo…"
+                                                className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] outline-none focus:bg-white focus:border-indigo-400 transition-colors"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
                                 {trackingLoading ? (
                                     <div className="flex justify-center py-20"><Icons.Loader className="w-6 h-6 text-slate-400 animate-spin" /></div>
                                 ) : trackingReturns.length === 0 ? (
                                     <EmptyState msg="No hay devoluciones activas en seguimiento" />
+                                ) : displayedTrackingReturns.length === 0 ? (
+                                    <EmptyState msg="Sin resultados para la búsqueda" />
                                 ) : stages.map(stage => {
                                     if (!visibleStatuses.has(stage.status)) return null;
-                                    const rows = trackingReturns.filter(r => r.status === stage.status);
+                                    const rows = sortByKey(
+                                        displayedTrackingReturns.filter(r => r.status === stage.status),
+                                        seguimientoSortKey, seguimientoSortDir
+                                    );
                                     if (rows.length === 0) return null;
                                     const sel = selForStage(stage.status);
                                     const allSel = rows.every(r => selectedExcelIds.has(r.id));
@@ -1390,19 +1513,22 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                                                     })}
                                                                     className="w-3.5 h-3.5 accent-slate-600 cursor-pointer" />
                                                             </th>
-                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Fecha</th>
-                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Remisión</th>
-                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Cliente</th>
-                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Vendedor</th>
-                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Planilla</th>
-                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Motivo</th>
+                                                            <SortTh label="Fecha" sortKey="fecha" activeKey={seguimientoSortKey} dir={seguimientoSortDir} onSort={handleSeguimientoSort} />
+                                                            <SortTh label="Remisión" sortKey="invoice_id" activeKey={seguimientoSortKey} dir={seguimientoSortDir} onSort={handleSeguimientoSort} />
+                                                            <SortTh label="Cliente" sortKey="customer_name" activeKey={seguimientoSortKey} dir={seguimientoSortDir} onSort={handleSeguimientoSort} />
+                                                            <SortTh label="Vendedor" sortKey="vendedor" activeKey={seguimientoSortKey} dir={seguimientoSortDir} onSort={handleSeguimientoSort} />
+                                                            <SortTh label="Planilla" sortKey="numero_planilla" activeKey={seguimientoSortKey} dir={seguimientoSortDir} onSort={handleSeguimientoSort} />
+                                                            <SortTh label="Motivo" sortKey="return_reason" activeKey={seguimientoSortKey} dir={seguimientoSortDir} onSort={handleSeguimientoSort} />
                                                             <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Artículos</th>
                                                             <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Historial</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
-                                                        {rows.map((ret, idx) => (
-                                                            <tr key={ret.id} className={`border-b border-slate-50 ${idx % 2 === 0 ? '' : 'bg-slate-50/40'} ${selectedExcelIds.has(ret.id) ? 'bg-indigo-50/50' : ''}`}>
+                                                        {rows.map((ret, idx) => {
+                                                            const expanded = expandedTrackingIds.has(ret.id);
+                                                            return (
+                                                            <React.Fragment key={ret.id}>
+                                                            <tr className={`border-b border-slate-50 ${idx % 2 === 0 ? '' : 'bg-slate-50/40'} ${selectedExcelIds.has(ret.id) ? 'bg-indigo-50/50' : ''}`}>
                                                                 <td className="px-3 py-2">
                                                                     <input type="checkbox" checked={selectedExcelIds.has(ret.id)}
                                                                         onChange={() => setSelectedExcelIds(prev => {
@@ -1424,7 +1550,16 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                                                 <td className="px-3 py-2 text-slate-600 max-w-[140px] truncate" title={ret.return_reason}>{ret.return_reason ?? '—'}</td>
                                                                 <td className="px-3 py-2 text-slate-500">
                                                                     {ret.items.length > 0
-                                                                        ? <span className="bg-slate-100 px-1.5 py-0.5 rounded-lg text-[9px] font-black">{ret.items.length} art.</span>
+                                                                        ? (
+                                                                            <button
+                                                                                onClick={() => setExpandedTrackingIds(prev => {
+                                                                                    const n = new Set(prev); n.has(ret.id) ? n.delete(ret.id) : n.add(ret.id); return n;
+                                                                                })}
+                                                                                className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded-lg text-[9px] font-black transition-colors">
+                                                                                {ret.items.length} art.
+                                                                                <Icons.ChevronDown className={`w-2.5 h-2.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+                                                                            </button>
+                                                                        )
                                                                         : '—'}
                                                                 </td>
                                                                 <td className="px-3 py-2 text-[8px] text-slate-400 max-w-[160px]">
@@ -1434,7 +1569,37 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                                                     {ret.supplier_exit_at && <div className="text-violet-500">🚚 Salida: {ret.supplier_exit_by} {ret.supplier_exit_at?.slice(0,10)}</div>}
                                                                 </td>
                                                             </tr>
-                                                        ))}
+                                                            {expanded && (
+                                                                <tr className="bg-indigo-50/60">
+                                                                    <td colSpan={8} className="px-4 py-2.5 border-l-4 border-indigo-400">
+                                                                        <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest mb-1.5">Artículos devueltos</p>
+                                                                        <table className="w-full text-[9px]">
+                                                                            <thead>
+                                                                                <tr className="text-indigo-400 font-black uppercase">
+                                                                                    <th className="text-left pb-1">Artículo</th>
+                                                                                    <th className="text-right pb-1">Cantidad devuelta</th>
+                                                                                    <th className="text-right pb-1">Unidad</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody className="divide-y divide-indigo-100">
+                                                                                {ret.items.map((it, i) => (
+                                                                                    <tr key={i}>
+                                                                                        <td className="py-1 font-bold text-slate-700">
+                                                                                            {it.article_id || it.sku}
+                                                                                            {it.article_name && <span className="block text-[8px] text-slate-400 font-normal">{it.article_name}</span>}
+                                                                                        </td>
+                                                                                        <td className="py-1 text-right font-black text-rose-600">{it.quantity_returned}</td>
+                                                                                        <td className="py-1 text-right text-slate-500">{it.unit || 'und'}</td>
+                                                                                    </tr>
+                                                                                ))}
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </td>
+                                                                </tr>
+                                                            )}
+                                                            </React.Fragment>
+                                                            );
+                                                        })}
                                                     </tbody>
                                                 </table>
                                             </div>
