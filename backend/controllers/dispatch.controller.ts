@@ -341,11 +341,9 @@ export const initDeliveryTables = async () => {
 
             CREATE TABLE IF NOT EXISTS delivery_returns (
                 id          SERIAL PRIMARY KEY,
-                confirmation_id INTEGER REFERENCES delivery_confirmations(id) ON DELETE SET NULL,
                 invoice_id  TEXT NOT NULL,
-                driver_id   TEXT NOT NULL,
+                driver_id   TEXT,
                 vehicle_id  TEXT,
-                return_reason TEXT,
                 notes       TEXT,
                 status      TEXT DEFAULT 'PENDING' CHECK (status IN ('PENDING','PROCESSED','CANCELLED')),
                 created_at  TIMESTAMPTZ DEFAULT NOW()
@@ -353,13 +351,11 @@ export const initDeliveryTables = async () => {
 
             CREATE TABLE IF NOT EXISTS delivery_return_items (
                 id                  SERIAL PRIMARY KEY,
-                return_id           INTEGER NOT NULL REFERENCES delivery_returns(id) ON DELETE CASCADE,
-                sku                 TEXT,
-                article_name        TEXT,
-                quantity_returned   INTEGER NOT NULL DEFAULT 0,
-                quantity_delivered  INTEGER NOT NULL DEFAULT 0,
-                unit                TEXT,
-                notes               TEXT
+                return_id           TEXT NOT NULL,
+                article_id          TEXT,
+                un_code             TEXT,
+                quantity_returned   TEXT,
+                unit                TEXT
             );
 
             CREATE TABLE IF NOT EXISTS inventory_news (
@@ -682,11 +678,10 @@ export const getDeliveryHistory = async (req: Request, res: Response) => {
                     dc.notes,
                     dc.delivered_at AS "deliveredAt",
                     dc.created_at   AS "createdAt",
-                    COALESCE(dr.id::text, null) AS "returnId"
+                    null::text AS "returnId"
                 FROM delivery_confirmations dc
                 LEFT JOIN users u ON u.id = dc.driver_id
                 LEFT JOIN vehicles v ON v.id = dc.vehicle_id
-                LEFT JOIN delivery_returns dr ON dr.confirmation_id = dc.id
                 ${where}
                 ORDER BY dc.delivered_at DESC
                 LIMIT $${idx} OFFSET $${idx + 1}

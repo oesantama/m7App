@@ -328,7 +328,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                             FROM delivery_return_items dri
                             JOIN delivery_returns dr ON dr.id::text = dri.return_id::text
                             WHERE TRIM(UPPER(dr.invoice_id)) = TRIM(UPPER(di2.invoice))
-                              AND dri.sku = di2.article_id
+                              AND dri.article_id = di2.article_id
                               AND dr.status <> 'CANCELLED'
                         ),
                         0
