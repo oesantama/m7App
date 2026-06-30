@@ -300,7 +300,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 ic.conductor_name,
                 ic.vehicle_plate,
                 ic.bodega_received_at,
-                COALESCE(ic.sobrecosto::numeric, 0)         AS sobrecosto,
+                COALESCE(ic.sobrecosto, 0)                       AS sobrecosto,
                 ic.created_at                               AS conciliado_at,
                 u.name                                      AS conciliado_por_nombre,
                 MAX(p.vmetodo)                              AS invoice_value,
@@ -324,7 +324,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                             LIMIT 1
                         ),
                         (
-                            SELECT SUM(dri.quantity_returned::numeric)
+                            SELECT SUM(NULLIF(TRIM(dri.quantity_returned), '')::numeric)
                             FROM delivery_return_items dri
                             JOIN delivery_returns dr ON dr.id::text = dri.return_id::text
                             WHERE TRIM(UPPER(dr.invoice_id)) = TRIM(UPPER(di2.invoice))
@@ -415,10 +415,10 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                     -- Conciliación (a lo sumo una fila por factura por doc)
                     MAX(ic.forma_pago)                                      AS forma_pago,
                     MAX(ic.es_devolucion::int)::boolean                     AS es_devolucion,
-                    COALESCE(MAX(ic.valor::numeric), 0)                     AS valor_conc,
-                    COALESCE(MAX(ic.sobrecosto::numeric), 0)                AS sobrecosto,
+                    COALESCE(MAX(NULLIF(ic.valor, '')::numeric), 0)          AS valor_conc,
+                    COALESCE(MAX(ic.sobrecosto), 0)                         AS sobrecosto,
                     -- Pago original (tomar el MAYOR vmetodo por factura para evitar doble conteo)
-                    COALESCE(MAX(p.vmetodo::numeric), 0)                    AS invoice_value,
+                    COALESCE(MAX(NULLIF(p.vmetodo, '')::numeric), 0)        AS invoice_value,
                     MAX(p.metodo_pago)                                      AS metodo_pago
                 FROM document_items di
                 LEFT JOIN invoice_conciliations ic

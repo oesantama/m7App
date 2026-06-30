@@ -146,7 +146,8 @@ app.use('/api', (req, res, next) => {
     '/gh-visitas/public',
     '/cap/public',
     '/noticias/public',
-    '/dispatch/public'
+    '/dispatch/public',
+    '/dogama/email-config/callback'
   ];
   
   if (publicPaths.some(p => p === '/' ? req.path === '/' : req.path.startsWith(p))) {
