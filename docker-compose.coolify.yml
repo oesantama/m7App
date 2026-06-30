@@ -116,8 +116,14 @@ services:
     depends_on:
       m7app-backend:
         condition: service_started
-    mem_limit: 128m
-    memswap_limit: 128m
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:80/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    mem_limit: 256m
+    memswap_limit: 256m
 
   postgres:
     image: 'postgres:15-alpine'
