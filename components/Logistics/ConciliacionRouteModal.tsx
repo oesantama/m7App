@@ -128,8 +128,11 @@ const getYesterday = () => {
 };
 
 const ENTREGADO_STATUS = ['EST-12', 'ENTREGADO', 'COMPLETED', 'FINALIZADO'];
-const DEVUELTO_STATUS  = ['EST-13', 'DEVUELTO', 'DEVUELT'];
-const PARCIAL_STATUS   = ['EST-14', 'ENTREGA PARCIAL', 'PARCIAL'];
+// EST-16/EST-17 = devolución completa/parcial registrada por BODEGA (registerRouteReturn),
+// distinta de EST-13/EST-14 que registra facturación en este mismo modal. Ambos vocabularios
+// deben reconocerse aquí o el modal y el botón "Reversar Cambio" quedan ciegos a lo que bodega ya registró.
+const DEVUELTO_STATUS  = ['EST-13', 'EST-16', 'DEVUELTO', 'DEVUELT'];
+const PARCIAL_STATUS   = ['EST-14', 'EST-17', 'ENTREGA PARCIAL', 'PARCIAL'];
 
 // Determina qué opciones están disponibles según MasterSuite
 function getMsConstraint(inv: InvoiceRow): { allowed: Set<EstadoEntrega>; hint: string | null } {
