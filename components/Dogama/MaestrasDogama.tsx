@@ -1670,7 +1670,7 @@ function VinculacionCorreoTab({ user }: { user: User }) {
                   {provider === 'gmail' ? (
                     <>
                       <li>Ir a <a href={PROVIDER_META.gmail.setupUrl} target="_blank" rel="noreferrer" className="text-indigo-600 underline">Google Cloud Console</a> → Crear credencial OAuth 2.0 → Web Application</li>
-                      <li>Agregar URI de redirección: <code className="bg-slate-200 px-1 rounded">{`${window.location.origin.replace('5173', '8081')}/api/dogama/email-config/callback`}</code></li>
+                      <li>Agregar URI de redirección: <code className="bg-slate-200 px-1 rounded">{`${window.location.origin.replace(/:\d+$/, ':8081')}/api/dogama/email-config/callback`}</code></li>
                       <li>Copiar el <strong>Client ID</strong> y <strong>Client Secret</strong></li>
                       <li>Agregar en el <code className="bg-slate-200 px-1 rounded">.env</code> del backend: <code className="bg-slate-200 px-1 rounded">GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=...</code></li>
                       <li>Habilitar la API <strong>Gmail API</strong> en Google Cloud</li>
@@ -1678,7 +1678,7 @@ function VinculacionCorreoTab({ user }: { user: User }) {
                   ) : (
                     <>
                       <li>Ir a <a href={PROVIDER_META.outlook.setupUrl} target="_blank" rel="noreferrer" className="text-indigo-600 underline">Azure Portal</a> → Registros de aplicaciones → Nuevo registro</li>
-                      <li>URI de redirección: <code className="bg-slate-200 px-1 rounded">{`${window.location.origin.replace('5173', '8081')}/api/dogama/email-config/callback`}</code></li>
+                      <li>URI de redirección: <code className="bg-slate-200 px-1 rounded">{`${window.location.origin.replace(/:\d+$/, ':8081')}/api/dogama/email-config/callback`}</code></li>
                       <li>En <strong>Permisos de API</strong> agregar: <code className="bg-slate-200 px-1 rounded">Mail.Send</code></li>
                       <li>Agregar en el <code className="bg-slate-200 px-1 rounded">.env</code>: <code className="bg-slate-200 px-1 rounded">MICROSOFT_CLIENT_ID=... MICROSOFT_CLIENT_SECRET=...</code></li>
                     </>
