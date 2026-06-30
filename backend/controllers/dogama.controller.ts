@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import pool from '../config/database.js';
 import nodemailer from 'nodemailer';
 import axios from 'axios';
+import { sendEmail } from '../services/notification.service.js';
 
 // ── CONFECCIONISTAS ───────────────────────────────────────────────────────────
 
@@ -1748,75 +1749,77 @@ const buildConfeccionistaEmailHtml = (data: {
 </body></html>`;
 };
 
-export const sendNotifCorreo = async (req: Request, res: Response): Promise<void> => {
-  const { id } = req.params;
-  try {
-    const nr = await pool.query(
-      `SELECT nc.*, enc.remesa, enc.manifiesto, enc.fecha AS enc_fecha,
-              dc.ciudad AS conf_ciudad, v.plate AS placa_actual,
-              d.name AS conductor_name_actual, d.document_number AS cedula, d.phone AS celular,
-              (SELECT string_agg(DISTINCT COALESCE(dd.lote, cr.lote), ', ' ORDER BY COALESCE(dd.lote, cr.lote))
-               FROM dogama_planillas_historial ph
-               LEFT JOIN dogama_despachos dd       ON dd.id = ph.despacho_id AND ph.tipo='despacho'
-               LEFT JOIN dogama_citas_recogidas cr  ON cr.id = ph.cita_id    AND ph.tipo='cita'
-               WHERE ph.enc_id = nc.enc_id
-                 AND COALESCE(ph.confeccionista_id_directo, dd.confeccionista_id, cr.proveedor_id) = nc.confeccionista_id
-                 AND COALESCE(dd.lote, cr.lote) IS NOT NULL
-              ) AS lotes
-       FROM dogama_notif_correos nc
-       LEFT JOIN dogama_enc_planillas_historial enc ON enc.id = nc.enc_id
-       LEFT JOIN dogama_confeccionistas dc ON dc.id = nc.confeccionista_id
-       LEFT JOIN vehicles v ON v.id = enc.vehicle_id
-       LEFT JOIN drivers d ON d.id = enc.conductor_id
-       WHERE nc.id=$1`, [id]
-    );
-    if (nr.rowCount === 0) { res.status(404).json({ error: 'Notificación no encontrada' }); return; }
-    const notif = nr.rows[0];
+export const sendSingleNotifCorreo = async (id: number): Promise<{ success: boolean; to?: string; error?: string }> => {
+  const nr = await pool.query(
+    `SELECT nc.*, enc.remesa, enc.manifiesto, enc.fecha AS enc_fecha,
+            dc.ciudad AS conf_ciudad, dc.correo AS conf_email_actual, v.plate AS placa_actual,
+            d.name AS conductor_name_actual, d.document_number AS cedula, d.phone AS celular,
+            (SELECT string_agg(DISTINCT COALESCE(dd.lote, cr.lote), ', ' ORDER BY COALESCE(dd.lote, cr.lote))
+             FROM dogama_planillas_historial ph
+             LEFT JOIN dogama_despachos dd       ON dd.id = ph.despacho_id AND ph.tipo='despacho'
+             LEFT JOIN dogama_citas_recogidas cr  ON cr.id = ph.cita_id    AND ph.tipo='cita'
+             WHERE ph.enc_id = nc.enc_id
+               AND COALESCE(ph.confeccionista_id_directo, dd.confeccionista_id, cr.proveedor_id) = nc.confeccionista_id
+               AND COALESCE(dd.lote, cr.lote) IS NOT NULL
+            ) AS lotes
+     FROM dogama_notif_correos nc
+     LEFT JOIN dogama_enc_planillas_historial enc ON enc.id = nc.enc_id
+     LEFT JOIN dogama_confeccionistas dc ON dc.id = nc.confeccionista_id
+     LEFT JOIN vehicles v ON v.id = enc.vehicle_id
+     LEFT JOIN drivers d ON d.id = enc.conductor_id
+     WHERE nc.id=$1`, [id]
+  );
+  if (nr.rowCount === 0) {
+    return { success: false, error: 'Notificación no encontrada' };
+  }
+  const notif = nr.rows[0];
 
-    const toEmail = notif.confeccionista_email;
-    if (!toEmail) { res.status(400).json({ error: 'El confeccionista no tiene correo registrado' }); return; }
+  const toEmail = notif.confeccionista_email || notif.conf_email_actual;
+  if (!toEmail) {
+    return { success: false, error: 'El confeccionista no tiene correo registrado' };
+  }
 
-    const provider = notif.from_provider ?? 'gmail';
-    const cfgR = await pool.query(
-      `SELECT * FROM dogama_email_config WHERE provider=$1 AND is_active=true`, [provider]
-    );
-    if (cfgR.rowCount === 0) { res.status(503).json({ error: 'No hay cuenta de correo vinculada activa' }); return; }
+  const provider = notif.from_provider ?? 'gmail';
+  const cfgR = await pool.query(
+    `SELECT * FROM dogama_email_config WHERE provider=$1 AND is_active=true`, [provider]
+  );
+
+  // Intentar usar plantilla guardada; si no existe, usar HTML clásico
+  const tmplR = await pool.query(`SELECT subject, body FROM dogama_email_template WHERE id=1`);
+  const placa  = notif.placa_actual ?? notif.placa ?? '—';
+  const fechaStr = notif.fecha_cita ?? notif.enc_fecha
+    ? new Date((notif.fecha_cita ?? notif.enc_fecha) + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+    : '—';
+  const vars: Record<string, string> = {
+    confeccionista: notif.confeccionista_nombre ?? '—',
+    ciudad:         notif.conf_ciudad ?? '—',
+    placa,
+    conductor:      notif.conductor_name_actual ?? notif.conductor_nombre ?? '—',
+    cedula:         notif.cedula ?? '—',
+    celular:        notif.celular ?? '—',
+    fecha:          fechaStr,
+    lotes:          notif.lotes ?? '—',
+    remesa:         notif.remesa ?? '—',
+    manifiesto:     notif.manifiesto ?? '—',
+  };
+
+  let htmlBody: string;
+  let subject: string;
+  if (tmplR.rowCount && tmplR.rows[0].body) {
+    subject  = applyTemplate(tmplR.rows[0].subject, vars);
+    htmlBody = wrapEmailHtml(applyTemplate(tmplR.rows[0].body, vars));
+  } else {
+    htmlBody = buildConfeccionistaEmailHtml({
+      confeccionistaNombre: notif.confeccionista_nombre ?? '—',
+      placa, conductorNombre: vars.conductor,
+      fecha: notif.fecha_cita ?? notif.enc_fecha,
+      remesa: notif.remesa, manifiesto: notif.manifiesto, ciudadDestino: notif.conf_ciudad,
+    });
+    subject = `Confirmación de Recogida · ${notif.confeccionista_nombre ?? ''}`;
+  }
+
+  if (cfgR.rowCount > 0) {
     const cfg = cfgR.rows[0];
-
-    // Intentar usar plantilla guardada; si no existe, usar HTML clásico
-    const tmplR = await pool.query(`SELECT subject, body FROM dogama_email_template WHERE id=1`);
-    const placa  = notif.placa_actual ?? notif.placa ?? '—';
-    const fechaStr = notif.fecha_cita ?? notif.enc_fecha
-      ? new Date((notif.fecha_cita ?? notif.enc_fecha) + 'T00:00:00').toLocaleDateString('es-CO', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
-      : '—';
-    const vars: Record<string, string> = {
-      confeccionista: notif.confeccionista_nombre ?? '—',
-      ciudad:         notif.conf_ciudad ?? '—',
-      placa,
-      conductor:      notif.conductor_name_actual ?? notif.conductor_nombre ?? '—',
-      cedula:         notif.cedula ?? '—',
-      celular:        notif.celular ?? '—',
-      fecha:          fechaStr,
-      lotes:          notif.lotes ?? '—',
-      remesa:         notif.remesa ?? '—',
-      manifiesto:     notif.manifiesto ?? '—',
-    };
-
-    let htmlBody: string;
-    let subject: string;
-    if (tmplR.rowCount && tmplR.rows[0].body) {
-      subject  = applyTemplate(tmplR.rows[0].subject, vars);
-      htmlBody = wrapEmailHtml(applyTemplate(tmplR.rows[0].body, vars));
-    } else {
-      htmlBody = buildConfeccionistaEmailHtml({
-        confeccionistaNombre: notif.confeccionista_nombre ?? '—',
-        placa, conductorNombre: vars.conductor,
-        fecha: notif.fecha_cita ?? notif.enc_fecha,
-        remesa: notif.remesa, manifiesto: notif.manifiesto, ciudadDestino: notif.conf_ciudad,
-      });
-      subject = `Confirmación de Recogida · ${notif.confeccionista_nombre ?? ''}`;
-    }
-
     if (provider === 'gmail') {
       const transport = nodemailer.createTransport({
         service: 'gmail',
@@ -1855,11 +1858,48 @@ export const sendNotifCorreo = async (req: Request, res: Response): Promise<void
         },
       }, { headers: { Authorization: `Bearer ${tokenData.access_token}`, 'Content-Type': 'application/json' } });
     }
+  } else {
+    // Fallback a Resend / SMTP configurado globalmente
+    await sendEmail(toEmail, subject, htmlBody);
+  }
 
-    await pool.query(
-      `UPDATE dogama_notif_correos SET estado='enviado', sent_at=NOW() WHERE id=$1`, [id]
-    );
-    res.json({ success: true, to: toEmail });
+  await pool.query(
+    `UPDATE dogama_notif_correos SET estado='enviado', sent_at=NOW() WHERE id=$1`, [id]
+  );
+  return { success: true, to: toEmail };
+};
+
+export const sendNotifCorreo = async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+  try {
+    const result = await sendSingleNotifCorreo(Number(id));
+    if (!result.success) {
+      res.status(400).json({ error: result.error });
+      return;
+    }
+    res.json({ success: true, to: result.to });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+export const bulkSendNotifCorreos = async (req: Request, res: Response): Promise<void> => {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    res.status(400).json({ error: 'Lista de IDs inválida' });
+    return;
+  }
+  try {
+    const results: any[] = [];
+    for (const id of ids) {
+      try {
+        const result = await sendSingleNotifCorreo(Number(id));
+        results.push({ id, ...result });
+      } catch (err: any) {
+        results.push({ id, success: false, error: err.message || 'Error desconocido' });
+      }
+    }
+    res.json({ success: true, results });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }

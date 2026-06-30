@@ -66,6 +66,7 @@ router.put('/fletes/:id', requirePermission('MAESTRAS_DOGAMA', 'edit'),   dogama
 router.get('/notif-correos',           requirePermission('CITAS_DESPACHO_CARGA', 'view'),   dogama.getNotifCorreos);
 router.post('/notif-correos',          requirePermission('CITAS_DESPACHO_CARGA', 'create'), dogama.createNotifCorreos);
 router.patch('/notif-correos/:id',     requirePermission('CITAS_DESPACHO_CARGA', 'edit'),   dogama.updateNotifCorreo);
+router.post('/notif-correos/bulk-send', requirePermission('CITAS_DESPACHO_CARGA', 'edit'), dogama.bulkSendNotifCorreos);
 router.post('/notif-correos/:id/send', requirePermission('CITAS_DESPACHO_CARGA', 'edit'),   dogama.sendNotifCorreo);
 
 // ── Plantilla global de correo ────────────────────────────────────────────────

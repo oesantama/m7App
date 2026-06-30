@@ -1552,7 +1552,12 @@ function VinculacionCorreoTab({ user }: { user: User }) {
   }, []);
 
   const handleConnect = (provider: 'gmail' | 'outlook') => {
-    const url = api.dogamaEmailInitUrl(provider);
+    const token = (user as any)?.token ||
+                  localStorage.getItem('token') ||
+                  localStorage.getItem('m7_token') ||
+                  localStorage.getItem('m7_auth_token') ||
+                  localStorage.getItem('m7_client_token');
+    const url = `${api.dogamaEmailInitUrl(provider)}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
     window.open(url, `oauth_${provider}`, 'width=520,height=640,scrollbars=yes,popup=yes');
   };
 

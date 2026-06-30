@@ -327,7 +327,7 @@ const LegalizationDialog: React.FC<{
     const [bodegaReturns, setBodegaReturns]   = useState<BodegaReturn[]>([]);
     const [loadingReturns, setLoadingReturns] = useState(true);
     const [confirmingReturn, setConfirmingReturn] = useState(false);
-    const [returnDevuelto,    setReturnDevuelto]    = useState<string>('0');
+    const [returnRecaudado,   setReturnRecaudado]   = useState<string>('0');
     const [returnComprobante, setReturnComprobante] = useState<string>('');
     const [returnMetodo,      setReturnMetodo]      = useState<MetodoPago>('TRANSFERENCIA');
     const [returnFecha,       setReturnFecha]       = useState<string>(getYesterday());
@@ -340,13 +340,8 @@ const LegalizationDialog: React.FC<{
                 if (!cancelled) {
                     const data: BodegaReturn[] = res?.data ?? [];
                     setBodegaReturns(data);
-                    // Para COMPLETA pre-llenamos valor devuelto = factura; para PARCIAL el usuario ingresa
-                    const pending = data.find(r => r.status === 'PENDING' || r.status === 'PROCESSED');
-                    const devQty = pending ? pending.items.reduce((s, i) => s + (Number(i.quantity_returned) || 0), 0) : 0;
-                    const invQty = (inv.items || []).reduce((s, i) => s + (Number(i.qty) || 0), 0);
-                    const isComp = invQty === 0 || devQty >= invQty;
-                    const invVal = String(Number(inv.invoice_value) || 0);
-                    setReturnDevuelto(isComp ? invVal : '0');
+                    // Recaudado siempre inicia en 0 — facturación indica si cobró algo
+                    setReturnRecaudado('0');
                     setReturnComprobante('');
                     setReturnMetodo('TRANSFERENCIA');
                     setReturnFecha(getYesterday());
@@ -367,17 +362,11 @@ const LegalizationDialog: React.FC<{
         const returnType = (totalQtyItems > 0 && inv.items && inv.items.length > 0
             && totalQtyItems < inv.items.reduce((s, i) => s + (Number(i.qty) || 0), 0))
             ? 'PARCIAL' : 'COMPLETA';
-        const devueltoVal = Number(returnDevuelto) || 0;
-        if (devueltoVal <= 0) {
-            toast.error('El valor devuelto no puede ser $0. Ingrese el valor de los artículos devueltos.');
-            return;
-        }
-        const invoiceValNum = Number(inv.invoice_value) || 0;
-        // A consignar = Factura - Devuelto (lo que el cliente debe pagar por lo entregado)
-        const consignarVal = returnType === 'COMPLETA' ? 0 : Math.max(0, invoiceValNum - devueltoVal);
+        // recaudado = lo que realmente cobró facturación al cliente (puede ser $0)
+        const recaudadoVal = returnType === 'COMPLETA' ? 0 : (Number(returnRecaudado) || 0);
         setConfirmingReturn(true);
         try {
-            await onConfirmReturnAndSave(ret.id, returnType, consignarVal, returnComprobante, returnMetodo, returnFecha);
+            await onConfirmReturnAndSave(ret.id, returnType, recaudadoVal, returnComprobante, returnMetodo, returnFecha);
         } finally {
             setConfirmingReturn(false);
         }
@@ -519,12 +508,17 @@ const LegalizationDialog: React.FC<{
                                         </div>
                                     )}
 
-                                    {/* Valores: factura / devuelto (editable) / a consignar (calculado) */}
+                                    {/* Valores: factura / devuelto (lectura) / recaudado (editable) */}
                                     <div className="bg-white rounded-xl border border-amber-200 px-4 py-3 space-y-3">
                                         {(() => {
-                                            const invVal   = Number(inv.invoice_value) || 0;
-                                            const devNum   = esCompleta ? invVal : (Number(returnDevuelto) || 0);
-                                            const consNum  = Math.max(0, invVal - devNum);
+                                            const invVal      = Number(inv.invoice_value) || 0;
+                                            // devuelto se calcula proporcional desde los artículos del retorno
+                                            const totalEspQty = (inv.items || []).reduce((s: number, i: any) => s + (Number(i.qty) || 0), 0) || 1;
+                                            const unitPr      = invVal / totalEspQty;
+                                            const devNum      = esCompleta
+                                                ? invVal
+                                                : ret.items.reduce((s, i) => s + (Number(i.quantity_returned) || 0) * unitPr, 0);
+                                            const recNum      = esCompleta ? 0 : (Number(returnRecaudado) || 0);
                                             return (
                                             <div className="grid grid-cols-3 gap-2">
                                                 {/* Valor factura (solo lectura) */}
@@ -534,36 +528,39 @@ const LegalizationDialog: React.FC<{
                                                         ${invVal.toLocaleString('es-CO')}
                                                     </p>
                                                 </div>
-                                                {/* Valor devuelto — único campo editable */}
+                                                {/* Valor devuelto — solo lectura, desde artículos bodega */}
                                                 <div>
-                                                    <label className="text-[7px] font-black text-rose-600 uppercase mb-1 block">
-                                                        Valor devuelto <span className="text-rose-500">*</span>
+                                                    <p className="text-[7px] font-black text-rose-600 uppercase mb-1">Valor devuelto</p>
+                                                    <p className="text-base font-black text-rose-700">
+                                                        ${Math.round(devNum).toLocaleString('es-CO')}
+                                                    </p>
+                                                    <p className="text-[6px] text-slate-400">desde artículos</p>
+                                                </div>
+                                                {/* Valor recaudado — editable (puede ser $0) */}
+                                                <div>
+                                                    <label className="text-[7px] font-black text-emerald-600 uppercase mb-1 block">
+                                                        Recaudado
                                                     </label>
                                                     {esCompleta ? (
-                                                        <p className="text-base font-black text-rose-700">
-                                                            ${invVal.toLocaleString('es-CO')}
-                                                        </p>
+                                                        <>
+                                                            <p className="text-base font-black text-slate-400">$0</p>
+                                                            <p className="text-[6px] text-slate-400">sin cobro</p>
+                                                        </>
                                                     ) : (
                                                         <div className="relative">
                                                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">$</span>
                                                             <input
-                                                                type="number" min={1} max={invVal}
-                                                                value={returnDevuelto}
-                                                                onChange={e => setReturnDevuelto(e.target.value)}
-                                                                className="w-full pl-5 pr-1 py-1.5 border-2 border-rose-300 focus:border-rose-500 rounded-xl text-xs font-black outline-none bg-rose-50"
+                                                                type="number" min={0} max={invVal}
+                                                                value={returnRecaudado}
+                                                                onChange={e => setReturnRecaudado(e.target.value)}
+                                                                className="w-full pl-5 pr-1 py-1.5 border-2 border-emerald-300 focus:border-emerald-500 rounded-xl text-xs font-black outline-none bg-emerald-50"
+                                                                placeholder="0"
                                                             />
                                                         </div>
                                                     )}
-                                                </div>
-                                                {/* A consignar — calculado = factura - devuelto (solo lectura) */}
-                                                <div>
-                                                    <p className="text-[7px] font-black text-emerald-600 uppercase mb-1">
-                                                        A consignar <span className="text-[6px] font-normal text-slate-400">(factura − devuelto)</span>
-                                                    </p>
-                                                    <p className={`text-base font-black ${consNum > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
-                                                        ${consNum.toLocaleString('es-CO')}
-                                                    </p>
-                                                    {esCompleta && <p className="text-[6px] text-slate-400">sin cobro</p>}
+                                                    {!esCompleta && recNum === 0 && (
+                                                        <p className="text-[6px] text-slate-400 mt-0.5">sin cobro</p>
+                                                    )}
                                                 </div>
                                             </div>
                                             );
@@ -1430,19 +1427,19 @@ const ConciliacionRouteModal: React.FC<Props> = ({
             
             // Si es parcial, la parte devuelta es el valor de los ítems retornados
             if (isPar) {
-                // Intentar calcular basado en los ítems si están presentes
+                // Calcular desde ítems si están disponibles (returned_qty viene de delivery_return_items)
                 const totalQtyItems = i.items?.reduce((acc: number, it: any) => acc + (Number(it.qty) || 0), 0) || 1;
                 const unitPrice     = (Number(i.invoice_value) || 0) / (totalQtyItems || 1);
                 const itemsDevVal   = i.items?.reduce((acc: number, it: any) => {
-                    const val = it.returned_value !== undefined 
-                        ? Number(it.returned_value) 
+                    const val = it.returned_value !== undefined
+                        ? Number(it.returned_value)
                         : (Number(it.returned_qty || 0) * unitPrice);
                     return acc + val;
                 }, 0) || 0;
-                
+
                 if (itemsDevVal > 0) return s + itemsDevVal;
 
-                // Si no hay ítems detallados pero ya se legalizó, usamos la diferencia (Total - Recaudado)
+                // 3. Fallback: si ya se legalizó, diferencia entre factura y recaudado
                 if (i.forma_pago) {
                     return s + (Math.max(0, (Number(i.invoice_value) || 0) - (Number(i.valor) || 0)));
                 }

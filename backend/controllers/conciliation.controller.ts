@@ -536,7 +536,7 @@ export const saveConciliation = async (req: Request, res: Response) => {
             usuarioNombre,
             sobrecosto,
             itemsReturned,
-            targetRouteId, // ID de la ruta destino para reasignación en REPICE
+            targetRouteId,
         } = req.body;
 
         if (!documentId || !invoiceNumber) {
@@ -660,23 +660,24 @@ export const saveConciliation = async (req: Request, res: Response) => {
                 INSERT INTO invoice_conciliations
                     (document_id, invoice_number, banco, valor, comprobante, fecha_pago,
                      forma_pago, numero_cheque, es_devolucion, conciliado_por,
-                     vehicle_plate, conductor_id, conductor_name, sobrecosto, items_returned, created_at, updated_at)
+                     vehicle_plate, conductor_id, conductor_name, sobrecosto, items_returned,
+                     created_at, updated_at)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
                 ON CONFLICT (document_id, invoice_number) DO UPDATE SET
-                    banco           = EXCLUDED.banco,
-                    valor           = EXCLUDED.valor,
-                    comprobante     = EXCLUDED.comprobante,
-                    fecha_pago      = EXCLUDED.fecha_pago,
-                    forma_pago      = EXCLUDED.forma_pago,
-                    numero_cheque   = EXCLUDED.numero_cheque,
-                    es_devolucion   = EXCLUDED.es_devolucion,
-                    conciliado_por  = EXCLUDED.conciliado_por,
-                    vehicle_plate   = EXCLUDED.vehicle_plate,
-                    conductor_id    = EXCLUDED.conductor_id,
-                    conductor_name  = EXCLUDED.conductor_name,
-                    sobrecosto      = EXCLUDED.sobrecosto,
-                    items_returned  = EXCLUDED.items_returned,
-                    updated_at      = NOW()
+                    banco                  = EXCLUDED.banco,
+                    valor                  = EXCLUDED.valor,
+                    comprobante            = EXCLUDED.comprobante,
+                    fecha_pago             = EXCLUDED.fecha_pago,
+                    forma_pago             = EXCLUDED.forma_pago,
+                    numero_cheque          = EXCLUDED.numero_cheque,
+                    es_devolucion          = EXCLUDED.es_devolucion,
+                    conciliado_por         = EXCLUDED.conciliado_por,
+                    vehicle_plate          = EXCLUDED.vehicle_plate,
+                    conductor_id           = EXCLUDED.conductor_id,
+                    conductor_name         = EXCLUDED.conductor_name,
+                    sobrecosto             = EXCLUDED.sobrecosto,
+                    items_returned         = EXCLUDED.items_returned,
+                    updated_at             = NOW()
                 RETURNING *
             `, [
                 documentId, invoiceNumber,

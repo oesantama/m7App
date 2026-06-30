@@ -5029,9 +5029,12 @@ function CorreosTab({ user }: { user: User }) {
   const [fechaHasta, setFechaHasta] = useState('');
   const [sending, setSending] = useState<number | null>(null);
   const [updating, setUpdating] = useState<number | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkSending, setBulkSending] = useState(false);
 
   const load = async () => {
     setLoading(true);
+    setSelectedIds(new Set());
     try {
       const data = await api.dogamaGetNotifCorreos({
         estado: filtroEstado === 'todos' ? undefined : filtroEstado,
@@ -5070,7 +5073,106 @@ function CorreosTab({ user }: { user: User }) {
     setUpdating(null);
   };
 
+  const toggleSelectRow = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSelectAllVisible = () => {
+    const selectable = rows.filter(r => (r.conf_email_actual || r.confeccionista_email) && r.estado === 'pendiente');
+    if (selectable.length === 0) {
+      toast.info('No hay notificaciones pendientes con correo registrado para seleccionar');
+      return;
+    }
+    setSelectedIds(new Set(selectable.map(r => r.id)));
+  };
+
+  const handleBulkSend = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkSending(true);
+    try {
+      const idsArray = Array.from(selectedIds);
+      const res = await api.dogamaBulkSendNotifCorreos(idsArray);
+      
+      const successful = res.results ? res.results.filter((r: any) => r.success).length : 0;
+      const failed = res.results ? res.results.filter((r: any) => !r.success) : [];
+      
+      if (failed.length > 0) {
+        toast.warning(`Envío masivo: ${successful} enviados correctamente, ${failed.length} fallidos. Ej de error: ${failed[0].error}`);
+      } else {
+        toast.success(`Envío masivo de ${successful} correos completado correctamente.`);
+      }
+      load();
+    } catch (e: any) {
+      toast.error('Error en envío masivo: ' + (e?.message ?? 'Error desconocido'));
+    } finally {
+      setBulkSending(false);
+    }
+  };
+
   const correosColumns: ColumnDef<NotifCorreo>[] = [
+    {
+      header: '✓',
+      key: '_selection',
+      sortable: false,
+      render: r => {
+        const correo = r.conf_email_actual ?? r.confeccionista_email;
+        const isSelectable = !!correo && r.estado === 'pendiente';
+        return (
+          <input
+            type="checkbox"
+            disabled={!isSelectable}
+            checked={selectedIds.has(r.id)}
+            onChange={() => toggleSelectRow(r.id)}
+            title={!isSelectable ? 'Solo se pueden seleccionar pendientes con correo registrado' : ''}
+            className={`w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 ${isSelectable ? 'cursor-pointer' : 'cursor-not-allowed opacity-30'}`}
+          />
+        );
+      }
+    },
+    {
+      header: 'Acciones', key: 'id',
+      render: r => {
+        const correo = r.conf_email_actual ?? r.confeccionista_email;
+        const isSending  = sending  === r.id;
+        const isUpdating = updating === r.id;
+        return (
+          <div className="flex gap-1.5 flex-wrap">
+            {r.estado === 'pendiente' && (
+              <>
+                <button onClick={() => handleSend(r)} disabled={isSending || !correo}
+                  title={!correo ? 'Sin correo registrado' : 'Enviar correo'}
+                  className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold hover:bg-indigo-700 disabled:opacity-40 transition flex items-center gap-1">
+                  {isSending
+                    ? <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    : <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                      </svg>}
+                  Enviar
+                </button>
+                <button onClick={() => handleUpdateEstado(r, 'cancelado')} disabled={isUpdating}
+                  className="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-[11px] font-bold hover:bg-red-100 disabled:opacity-40 transition">
+                  Cancelar
+                </button>
+              </>
+            )}
+            {r.estado === 'cancelado' && (
+              <button onClick={() => handleUpdateEstado(r, 'pendiente')} disabled={isUpdating}
+                className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-[11px] font-bold hover:bg-amber-100 disabled:opacity-40 transition">
+                Reactivar
+              </button>
+            )}
+            {r.estado === 'enviado' && (
+              <span className="text-[11px] text-emerald-600 font-bold">✓ Entregado</span>
+            )}
+          </div>
+        );
+      },
+    },
     {
       header: 'Confeccionista', key: 'confeccionista_nombre', sortable: true,
       render: r => {
@@ -5138,71 +5240,79 @@ function CorreosTab({ user }: { user: User }) {
         );
       },
     },
-    {
-      header: 'Acciones', key: 'id',
-      render: r => {
-        const correo = r.conf_email_actual ?? r.confeccionista_email;
-        const isSending  = sending  === r.id;
-        const isUpdating = updating === r.id;
-        return (
-          <div className="flex gap-1.5 flex-wrap">
-            {r.estado === 'pendiente' && (
-              <>
-                <button onClick={() => handleSend(r)} disabled={isSending || !correo}
-                  title={!correo ? 'Sin correo registrado' : 'Enviar correo'}
-                  className="px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-bold hover:bg-indigo-700 disabled:opacity-40 transition flex items-center gap-1">
-                  {isSending
-                    ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    : <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                      </svg>}
-                  Enviar
-                </button>
-                <button onClick={() => handleUpdateEstado(r, 'cancelado')} disabled={isUpdating}
-                  className="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-[11px] font-bold hover:bg-red-100 disabled:opacity-40 transition">
-                  Cancelar
-                </button>
-              </>
-            )}
-            {r.estado === 'cancelado' && (
-              <button onClick={() => handleUpdateEstado(r, 'pendiente')} disabled={isUpdating}
-                className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 text-[11px] font-bold hover:bg-amber-100 disabled:opacity-40 transition">
-                Reactivar
-              </button>
-            )}
-            {r.estado === 'enviado' && (
-              <span className="text-[11px] text-emerald-600 font-bold">✓ Entregado</span>
-            )}
-          </div>
-        );
-      },
-    },
   ];
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Filtros */}
-      <div className="flex flex-wrap gap-3 mb-5 items-center">
-        <div className="flex gap-1">
-          {(['pendiente', 'enviado', 'cancelado', 'todos'] as const).map(e => (
-            <button key={e} onClick={() => setFiltroEstado(e)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${filtroEstado === e ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
-              {e === 'todos' ? 'Todos' : ESTADO_CORREO_LABELS[e]?.label}
+      {/* Barra de Selección Masiva */}
+      {selectedIds.size > 0 && (
+        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-4 mb-4 flex items-center justify-between animate-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 bg-indigo-600 rounded-full animate-ping" />
+            <span className="text-xs font-bold text-indigo-800">
+              {selectedIds.size} notificaciones seleccionadas para envío masivo
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleBulkSend}
+              disabled={bulkSending}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition disabled:opacity-40"
+            >
+              {bulkSending ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Enviando…
+                </>
+              ) : (
+                <>
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                  </svg>
+                  Enviar seleccionados
+                </>
+              )}
             </button>
-          ))}
+            <button
+              onClick={() => setSelectedIds(new Set())}
+              disabled={bulkSending}
+              className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition disabled:opacity-40"
+            >
+              Despejar selección
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-3 mb-5 items-center justify-between">
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="flex gap-1">
+            {(['pendiente', 'enviado', 'cancelado', 'todos'] as const).map(e => (
+              <button key={e} onClick={() => setFiltroEstado(e)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${filtroEstado === e ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                {e === 'todos' ? 'Todos' : ESTADO_CORREO_LABELS[e]?.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 items-center">
+            <label className="text-xs font-bold text-slate-500">Desde</label>
+            <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)}
+              className="text-xs border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            <label className="text-xs font-bold text-slate-500">Hasta</label>
+            <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)}
+              className="text-xs border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+          </div>
         </div>
         <div className="flex gap-2 items-center">
-          <label className="text-xs font-bold text-slate-500">Desde</label>
-          <input type="date" value={fechaDesde} onChange={e => setFechaDesde(e.target.value)}
-            className="text-xs border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-          <label className="text-xs font-bold text-slate-500">Hasta</label>
-          <input type="date" value={fechaHasta} onChange={e => setFechaHasta(e.target.value)}
-            className="text-xs border border-slate-200 rounded-xl px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+          <button onClick={handleSelectAllVisible} className="px-3 py-1.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-bold transition">
+            Seleccionar pendientes con correo
+          </button>
+          <button onClick={load} disabled={loading}
+            className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition disabled:opacity-50">
+            {loading ? 'Cargando…' : 'Actualizar'}
+          </button>
         </div>
-        <button onClick={load} disabled={loading}
-          className="ml-auto px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition disabled:opacity-50">
-          {loading ? 'Cargando…' : 'Actualizar'}
-        </button>
       </div>
 
       <DataTable

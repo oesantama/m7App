@@ -2058,6 +2058,13 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
     }),
 
+  dogamaBulkSendNotifCorreos: (ids: number[]) =>
+    fetchJson(`${API_URL}/dogama/notif-correos/bulk-send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids }),
+    }),
+
   dogamaGetEmailTemplate: () =>
     fetchJson(`${API_URL}/dogama/email-template`),
 
