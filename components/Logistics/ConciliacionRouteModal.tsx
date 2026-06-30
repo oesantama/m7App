@@ -544,12 +544,7 @@ const LegalizationDialog: React.FC<{
                                                         <input
                                                             type="number" min={1}
                                                             value={returnDevuelto}
-                                                            onChange={e => {
-                                                                const v = e.target.value;
-                                                                setReturnDevuelto(v);
-                                                                const diff = (Number(inv.invoice_value) || 0) - (Number(v) || 0);
-                                                                setReturnConsignar(String(Math.max(0, diff)));
-                                                            }}
+                                                            onChange={e => setReturnDevuelto(e.target.value)}
                                                             className="w-full pl-5 pr-1 py-1.5 border-2 border-rose-300 focus:border-rose-500 rounded-xl text-xs font-black outline-none bg-rose-50"
                                                         />
                                                     </div>
