@@ -465,13 +465,18 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                     THEN invoice_value ELSE 0 END), 0)                               AS credito,
                 -- Conteos por estado
                 COUNT(*) FILTER (WHERE item_status IN ('EST-12','ENTREGADO','COMPLETED','FINALIZADO')) AS completadas,
-                COUNT(*) FILTER (WHERE es_devolucion = true OR item_status IN ('EST-13','DEVUELTO'))   AS devueltas,
-                COUNT(*) FILTER (WHERE item_status IN ('EST-14','ENTREGA PARCIAL'))                    AS parciales,
+                -- EST-13/EST-16 = devolución total (facturación / bodega respectivamente)
+                COUNT(*) FILTER (WHERE es_devolucion = true OR item_status IN ('EST-13','EST-16','DEVUELTO')) AS devueltas,
+                -- EST-14/EST-17 = entrega parcial (facturación / bodega respectivamente)
+                COUNT(*) FILTER (WHERE item_status IN ('EST-14','EST-17','ENTREGA PARCIAL'))           AS parciales,
                 COUNT(*) FILTER (WHERE forma_pago IS NOT NULL)                                         AS legalizadas,
                 -- Valores financieros correctos (sin multiplicación)
                 COALESCE(SUM(CASE WHEN forma_pago IS NOT NULL THEN valor_conc ELSE 0 END), 0)          AS valor_legalizado,
-                COALESCE(SUM(CASE WHEN es_devolucion = true THEN invoice_value ELSE 0 END), 0)         AS valor_devuelto,
-                COALESCE(SUM(CASE WHEN item_status IN ('EST-14','ENTREGA PARCIAL') THEN valor_conc ELSE 0 END), 0) AS valor_parcial,
+                -- El valor devuelto debe contar tanto es_devolucion=true (legalizado explícito)
+                -- como item_status de devolución (EST-13/EST-16) que puede no tener es_devolucion
+                -- marcado si bodega registró la devolución física sin pasar por conciliación.
+                COALESCE(SUM(CASE WHEN es_devolucion = true OR item_status IN ('EST-13','EST-16','DEVUELTO') THEN invoice_value ELSE 0 END), 0) AS valor_devuelto,
+                COALESCE(SUM(CASE WHEN item_status IN ('EST-14','EST-17','ENTREGA PARCIAL') THEN valor_conc ELSE 0 END), 0) AS valor_parcial,
                 COALESCE(SUM(sobrecosto), 0)                                                           AS total_sobrecosto
             FROM route_inv
             GROUP BY route_id, plate, driver_name
