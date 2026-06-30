@@ -698,10 +698,17 @@ export const saveConciliation = async (req: Request, res: Response) => {
             }
 
             // 5. Actualizar item_status en document_items (si hay cambio)
+            // EST-16/EST-17 = bodega ya registró la devolución física de ese artículo
+            // específico (registerRouteReturn). No los pisamos con un estado a nivel de
+            // factura completa (parcial/entregado) — solo 'devolución total' (EST-13)
+            // puede sobrescribirlos, ya que representa una señal más fuerte (toda la
+            // factura se devolvió).
             if (nuevoItemStatus) {
+                const protegerRegistroBodega = nuevoItemStatus !== 'EST-13';
                 await client.query(
                     `UPDATE document_items SET item_status = $1
-                     WHERE document_id = $2 AND invoice = $3`,
+                     WHERE document_id = $2 AND invoice = $3
+                     ${protegerRegistroBodega ? `AND item_status NOT IN ('EST-16','EST-17')` : ''}`,
                     [nuevoItemStatus, documentId, invoiceNumber]
                 );
             }

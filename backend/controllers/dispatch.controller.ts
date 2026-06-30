@@ -1515,12 +1515,27 @@ export const registerRouteReturn = async (req: Request, res: Response) => {
         }
 
         // Marcar item_status en document_items
-        const newStatus = returnType === 'COMPLETA' ? 'EST-16' : 'EST-17';
-        await client.query(
-            `UPDATE document_items SET item_status = $1
-             WHERE TRIM(UPPER(COALESCE(NULLIF(invoice,''), order_number))) = $2`,
-            [newStatus, invoiceId.trim().toUpperCase()]
-        );
+        if (returnType === 'COMPLETA') {
+            // Devolución completa: toda la factura se devolvió
+            await client.query(
+                `UPDATE document_items SET item_status = 'EST-16'
+                 WHERE TRIM(UPPER(COALESCE(NULLIF(invoice,''), order_number))) = $1`,
+                [invoiceId.trim().toUpperCase()]
+            );
+        } else {
+            // Devolución parcial: marcar SOLO los artículos que realmente se devolvieron
+            const returnedArticleIds = itemsArr
+                .map((item: any) => String(item.article_id || item.sku || '').trim().toUpperCase())
+                .filter(Boolean);
+            if (returnedArticleIds.length > 0) {
+                await client.query(
+                    `UPDATE document_items SET item_status = 'EST-17'
+                     WHERE TRIM(UPPER(COALESCE(NULLIF(invoice,''), order_number))) = $1
+                       AND TRIM(UPPER(article_id)) = ANY($2::text[])`,
+                    [invoiceId.trim().toUpperCase(), returnedArticleIds]
+                );
+            }
+        }
 
         // Log
         await client.query(
