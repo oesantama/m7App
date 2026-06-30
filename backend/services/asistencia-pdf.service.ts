@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
+import { PDFDocument } from 'pdf-lib';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOGO_PATH  = path.resolve(__dirname, '../../public/logo-encuesta.png');
@@ -37,10 +38,10 @@ function fmtFecha(d: string | Date): string {
   } catch { return String(d); }
 }
 
-function buildHtml(rows: AsistenciaRow[], cfg: AsistenciaConfig, logoSrc: string): string {
+function buildHtml(rows: AsistenciaRow[], cfg: AsistenciaConfig, logoSrc: string, continuation = false, startIndex = 0): string {
   const filas = rows.map((r, i) => `
     <tr>
-      <td class="num">${i + 1}</td>
+      <td class="num">${startIndex + i + 1}</td>
       <td class="nombre">${r.nombre_completo.toUpperCase()}</td>
       <td class="cedula">${r.cedula}</td>
       <td class="cargo">${(r.cargo || '—').toUpperCase()}</td>
@@ -99,7 +100,7 @@ function buildHtml(rows: AsistenciaRow[], cfg: AsistenciaConfig, logoSrc: string
     <div class="header-left">
       ${logoSrc ? `<img class="logo" src="${logoSrc}" alt="Milla Siete" />` : ''}
       <div class="header-title">
-        <h1>Lista de Asistencia</h1>
+        <h1>Lista de Asistencia${continuation ? ' (Continuación)' : ''}</h1>
         <p>Milla 7 S.A.S. — OrbitM7 Gestión Logística</p>
       </div>
     </div>
@@ -114,7 +115,7 @@ function buildHtml(rows: AsistenciaRow[], cfg: AsistenciaConfig, logoSrc: string
     ${cfg.instructor ? `<div class="meta-item"><span>Instructor</span><strong>${cfg.instructor}</strong></div>` : ''}
     ${cfg.tipo       ? `<div class="meta-item"><span>Tipo</span><strong>${cfg.tipo}</strong></div>` : ''}
     ${cfg.fecha_sesion ? `<div class="meta-item"><span>Fecha Sesión</span><strong>${cfg.fecha_sesion}</strong></div>` : ''}
-    <div class="meta-item"><span>Total Asistentes</span><strong>${rows.length}</strong></div>
+    <div class="meta-item"><span>${continuation ? 'Nuevos Asistentes' : 'Total Asistentes'}</span><strong>${rows.length}</strong></div>
   </div>
 
   <table>
@@ -141,9 +142,14 @@ function buildHtml(rows: AsistenciaRow[], cfg: AsistenciaConfig, logoSrc: string
 </html>`;
 }
 
-export async function generateAsistenciaPDF(rows: AsistenciaRow[], cfg: AsistenciaConfig): Promise<Buffer> {
+export async function generateAsistenciaPDF(
+  rows: AsistenciaRow[],
+  cfg: AsistenciaConfig,
+  continuation = false,
+  startIndex = 0,
+): Promise<Buffer> {
   const logoSrc = getLogoBase64();
-  const html = buildHtml(rows, cfg, logoSrc);
+  const html = buildHtml(rows, cfg, logoSrc, continuation, startIndex);
 
   const browser = await puppeteer.launch({
     headless: true,
@@ -161,6 +167,26 @@ export async function generateAsistenciaPDF(rows: AsistenciaRow[], cfg: Asistenc
   } finally {
     await browser.close();
   }
+}
+
+// Genera solo la(s) página(s) con las filas nuevas y las fusiona al final del PDF que
+// ya existe en Drive — el contenido previo (filas/firmas ya incrustadas) nunca se vuelve
+// a renderizar ni se toca, solo se le agregan páginas nuevas.
+export async function appendRowsToExistingPdf(
+  existingPdfBytes: Buffer,
+  newRows: AsistenciaRow[],
+  cfg: AsistenciaConfig,
+  startIndex: number,
+): Promise<Buffer> {
+  const newPageBytes = await generateAsistenciaPDF(newRows, cfg, true, startIndex);
+
+  const existingDoc = await PDFDocument.load(existingPdfBytes);
+  const newDoc = await PDFDocument.load(newPageBytes);
+  const copiedPages = await existingDoc.copyPages(newDoc, newDoc.getPageIndices());
+  copiedPages.forEach(p => existingDoc.addPage(p));
+
+  const merged = await existingDoc.save();
+  return Buffer.from(merged);
 }
 
 function sanitizeDrive(name: string): string {

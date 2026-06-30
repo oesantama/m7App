@@ -1451,7 +1451,10 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
         // Validación de comprobante y valor obligatorio para Entregado/Parcial
         if (!esDevolucion && form.estadoEntrega !== 'repice') {
-            if (!form.numConsignacion || form.numConsignacion.trim() === '') {
+            // Comprobante solo es obligatorio si realmente hay un valor a consignar.
+            // Si es Parcial con $0 (ej: solo se devolvieron artículos, sin recaudo), no hay
+            // pago que referenciar.
+            if (valorNum > 0 && (!form.numConsignacion || form.numConsignacion.trim() === '')) {
                 toast.error('El número de comprobante / referencia es obligatorio.');
                 return;
             }

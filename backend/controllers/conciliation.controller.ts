@@ -1001,6 +1001,16 @@ export const reverseConciliation = async (req: Request, res: Response) => {
             [documentId, invoiceNumber]
         );
 
+        // 3.5. Si bodega ya tenía esta devolución CONFIRMADA por facturación
+        // (delivery_returns.status = 'CONFIRMED'), reversar también esa confirmación.
+        // Si no estaba confirmada (PENDING/PROCESSED u otro), no se toca nada.
+        await client.query(
+            `UPDATE delivery_returns
+             SET status = 'PENDING', conciliacion_confirmada_at = NULL, conciliacion_confirmada_by = NULL
+             WHERE TRIM(UPPER(invoice_id)) = TRIM(UPPER($1)) AND status = 'CONFIRMED'`,
+            [invoiceNumber]
+        );
+
         // 4. Actualizar estado de document_items a 'EST-10' (Asignado)
         await client.query(
             `UPDATE document_items SET item_status = 'EST-10' WHERE document_id = $1 AND invoice = $2`,

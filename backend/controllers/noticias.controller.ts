@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { fileURLToPath } from 'url';
-import { generateAsistenciaPDF, uploadAsistenciaToDrive, autoUploadNoticiaAsistencia } from '../services/asistencia-pdf.service.js';
+import { generateAsistenciaPDF, uploadAsistenciaToDrive, autoUploadNoticiaAsistencia, appendRowsToExistingPdf } from '../services/asistencia-pdf.service.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DRIVE_BASE    = 'NOTICIAS MILLA 7';
@@ -65,6 +65,15 @@ async function rcloneLink(remotePath: string): Promise<string> {
 async function rcloneDeleteFile(remotePath: string): Promise<void> {
   await new Promise<void>((resolve) => {
     exec(`rclone deletefile "${RCLONE_REMOTE}:${remotePath}"`, () => resolve());
+  });
+}
+
+async function rcloneCopyFrom(remotePath: string, localPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    exec(`rclone copyto "${RCLONE_REMOTE}:${remotePath}" "${localPath}"`, (err, _stdout, stderr) => {
+      if (err) { console.error('[NOTICIAS-DRIVE] copyfrom error:', stderr); reject(err); }
+      else resolve();
+    });
   });
 }
 
@@ -333,6 +342,7 @@ export const registerNoticiaAsistencia = async (req: Request, res: Response) => 
   const { id } = req.params;
   const { nombre_completo, cedula, cargo, firma_b64 } = req.body;
   if (!nombre_completo || !cedula) return res.status(400).json({ error: 'Nombre y cédula son requeridos' });
+  if (!firma_b64) return res.status(400).json({ error: 'La firma es obligatoria' });
   try {
     // Verificar si ya está registrado
     const exists = await pool.query(
@@ -369,40 +379,61 @@ async function triggerNoticiaAsistenciaDrive(noticiaId: number): Promise<void> {
     return;
   }
   const noticia = await pool.query(
-    'SELECT titulo, permite_asistencia FROM noticias WHERE id=$1',
+    'SELECT titulo, permite_asistencia, asistencia_drive_path FROM noticias WHERE id=$1',
     [noticiaId]
   );
   if (!noticia.rowCount || !noticia.rows[0].permite_asistencia) return;
   const n = noticia.rows[0];
 
-  // Solo subir si hay firmas nuevas pendientes (firma_b64 != NULL)
+  // Filas firmadas que aún no se han incorporado al PDF de Drive
   const pendingRes = await pool.query(
-    'SELECT COUNT(*) FROM noticia_asistencia WHERE noticia_id=$1 AND firma_b64 IS NOT NULL',
+    'SELECT id, nombre_completo, cedula, cargo, firma_b64, fecha_registro FROM noticia_asistencia WHERE noticia_id=$1 AND firma_b64 IS NOT NULL ORDER BY fecha_registro ASC',
     [noticiaId]
   );
-  if (parseInt(pendingRes.rows[0].count) === 0) {
+  if (!pendingRes.rowCount) {
     console.log(`[NOTICIAS-ASIST] Sin firmas pendientes para noticia ${noticiaId}, omitiendo upload`);
     return;
   }
+  const pendingRows = pendingRes.rows;
+  const pendingIds  = pendingRows.map(r => r.id);
 
-  // Tomar TODOS los registros para el PDF completo (incluye los recién firmados)
-  const attRes = await pool.query(
-    'SELECT id, nombre_completo, cedula, cargo, firma_b64, fecha_registro FROM noticia_asistencia WHERE noticia_id=$1 ORDER BY fecha_registro ASC',
-    [noticiaId]
-  );
-  if (!attRes.rowCount) return;
+  let drivePath: string | null = n.asistencia_drive_path;
+  const cfg = { titulo: n.titulo };
 
-  const { drive_path } = await autoUploadNoticiaAsistencia({
-    titulo: n.titulo,
-    archivoDrivePath: null,
-    rows: attRes.rows,
-    cfg: { titulo: n.titulo },
-  });
+  if (!drivePath) {
+    // Primera vez: generar el PDF completo (con encabezado) con las filas pendientes
+    const result = await autoUploadNoticiaAsistencia({
+      titulo: n.titulo,
+      archivoDrivePath: null,
+      rows: pendingRows,
+      cfg,
+    });
+    drivePath = result.drive_path;
+  } else {
+    // Ya existe un PDF en Drive: descargarlo, generar SOLO la página con las filas
+    // nuevas y fusionarla al final — el contenido ya subido no se vuelve a tocar.
+    const totalRes = await pool.query('SELECT COUNT(*) FROM noticia_asistencia WHERE noticia_id=$1', [noticiaId]);
+    const startIndex = parseInt(totalRes.rows[0].count) - pendingRows.length;
 
-  await pool.query('UPDATE noticias SET asistencia_drive_path=$1 WHERE id=$2', [drive_path, noticiaId]);
-  // Limpiar firma_b64 — preservada en el PDF de Drive
-  await pool.query('UPDATE noticia_asistencia SET firma_b64 = NULL WHERE noticia_id=$1', [noticiaId]);
-  console.log(`[NOTICIAS-ASIST] Drive actualizado para noticia ${noticiaId} (${attRes.rowCount} registros)`);
+    const tmpExisting = path.join(os.tmpdir(), `noticia_asist_existing_${noticiaId}_${Date.now()}.pdf`);
+    const tmpMerged    = path.join(os.tmpdir(), `noticia_asist_merged_${noticiaId}_${Date.now()}.pdf`);
+    try {
+      await rcloneCopyFrom(drivePath, tmpExisting);
+      const existingBytes = fs.readFileSync(tmpExisting);
+      const mergedBytes = await appendRowsToExistingPdf(existingBytes, pendingRows, cfg, startIndex);
+      fs.writeFileSync(tmpMerged, mergedBytes);
+      await rcloneCopyto(tmpMerged, drivePath);
+    } finally {
+      fs.unlink(tmpExisting, () => {});
+      fs.unlink(tmpMerged, () => {});
+    }
+  }
+
+  await pool.query('UPDATE noticias SET asistencia_drive_path=$1 WHERE id=$2', [drivePath, noticiaId]);
+  // Las firmas ya quedaron incrustadas permanentemente en las páginas del PDF de Drive —
+  // ahora sí es seguro limpiarlas, pero SOLO las que se acaban de incorporar en esta corrida.
+  await pool.query('UPDATE noticia_asistencia SET firma_b64 = NULL WHERE id = ANY($1::int[])', [pendingIds]);
+  console.log(`[NOTICIAS-ASIST] Drive actualizado para noticia ${noticiaId} (+${pendingRows.length} registros incorporados)`);
 }
 
 export const deleteNoticiaAsistencia = async (req: Request, res: Response) => {
@@ -422,14 +453,10 @@ export const downloadNoticiaAsistenciaPDF = async (req: Request, res: Response) 
     if (!noticia.rowCount) return res.status(404).json({ error: 'Noticia no encontrada' });
     const n = noticia.rows[0];
 
-    // Sincronizar solo si hay firmas nuevas pendientes (no sobreescribir el Drive con PDF sin firmas)
-    await triggerNoticiaAsistenciaDrive(Number(id)).catch(e =>
-      console.warn('[NOTICIAS-ASIST-PDF] sync Drive falló:', e.message)
-    );
-
-    // Releer la ruta actualizada (puede haber cambiado en el sync)
-    const updated = await pool.query('SELECT asistencia_drive_path FROM noticias WHERE id=$1', [id]);
-    const drivePath: string | null = updated.rows[0]?.asistencia_drive_path || null;
+    // El PDF ya se mantiene actualizado en Drive en cada firma (triggerNoticiaAsistenciaDrive
+    // corre en background al registrar asistencia) — este botón solo sirve el archivo, no
+    // regenera ni sincroniza nada.
+    const drivePath: string | null = n.asistencia_drive_path || null;
 
     const safeName = n.titulo.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 40);
     res.set({
