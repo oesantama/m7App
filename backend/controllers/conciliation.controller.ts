@@ -319,7 +319,11 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                     'returned_qty', COALESCE(
                         (
                             SELECT (elem->>'returned_qty')::numeric
-                            FROM jsonb_array_elements(COALESCE(ic.items_returned, '[]')::jsonb) AS elem
+                            FROM jsonb_array_elements(
+                                CASE WHEN jsonb_typeof(COALESCE(ic.items_returned::jsonb, '[]'::jsonb)) = 'array'
+                                     THEN COALESCE(ic.items_returned::jsonb, '[]'::jsonb)
+                                     ELSE '[]'::jsonb END
+                            ) AS elem
                             WHERE elem->>'id' = di2.id::text
                             LIMIT 1
                         ),
@@ -335,7 +339,11 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                     ),
                     'returned_value', (
                         SELECT (elem->>'returned_value')::numeric
-                        FROM jsonb_array_elements(COALESCE(ic.items_returned, '[]')::jsonb) AS elem
+                        FROM jsonb_array_elements(
+                            CASE WHEN jsonb_typeof(COALESCE(ic.items_returned::jsonb, '[]'::jsonb)) = 'array'
+                                 THEN COALESCE(ic.items_returned::jsonb, '[]'::jsonb)
+                                 ELSE '[]'::jsonb END
+                        ) AS elem
                         WHERE elem->>'id' = di2.id::text
                         LIMIT 1
                     )
