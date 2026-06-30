@@ -328,7 +328,6 @@ const LegalizationDialog: React.FC<{
     const [loadingReturns, setLoadingReturns] = useState(true);
     const [confirmingReturn, setConfirmingReturn] = useState(false);
     const [returnDevuelto,    setReturnDevuelto]    = useState<string>('0');
-    const [returnConsignar,   setReturnConsignar]   = useState<string>('0');
     const [returnComprobante, setReturnComprobante] = useState<string>('');
     const [returnMetodo,      setReturnMetodo]      = useState<MetodoPago>('TRANSFERENCIA');
     const [returnFecha,       setReturnFecha]       = useState<string>(getYesterday());
@@ -348,7 +347,6 @@ const LegalizationDialog: React.FC<{
                     const isComp = invQty === 0 || devQty >= invQty;
                     const invVal = String(Number(inv.invoice_value) || 0);
                     setReturnDevuelto(isComp ? invVal : '0');
-                    setReturnConsignar(isComp ? '0' : invVal);
                     setReturnComprobante('');
                     setReturnMetodo('TRANSFERENCIA');
                     setReturnFecha(getYesterday());
@@ -374,7 +372,9 @@ const LegalizationDialog: React.FC<{
             toast.error('El valor devuelto no puede ser $0. Ingrese el valor de los artículos devueltos.');
             return;
         }
-        const consignarVal = returnType === 'COMPLETA' ? 0 : (Number(returnConsignar) || 0);
+        const invoiceValNum = Number(inv.invoice_value) || 0;
+        // A consignar = Factura - Devuelto (lo que el cliente debe pagar por lo entregado)
+        const consignarVal = returnType === 'COMPLETA' ? 0 : Math.max(0, invoiceValNum - devueltoVal);
         setConfirmingReturn(true);
         try {
             await onConfirmReturnAndSave(ret.id, returnType, consignarVal, returnComprobante, returnMetodo, returnFecha);
@@ -519,60 +519,55 @@ const LegalizationDialog: React.FC<{
                                         </div>
                                     )}
 
-                                    {/* Valores: factura / devuelto / a consignar */}
+                                    {/* Valores: factura / devuelto (editable) / a consignar (calculado) */}
                                     <div className="bg-white rounded-xl border border-amber-200 px-4 py-3 space-y-3">
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {/* Valor factura (solo lectura) */}
-                                            <div>
-                                                <p className="text-[7px] font-black text-slate-400 uppercase mb-1">Valor factura</p>
-                                                <p className="text-base font-black text-slate-900">
-                                                    ${(Number(inv.invoice_value) || 0).toLocaleString('es-CO')}
-                                                </p>
-                                            </div>
-                                            {/* Valor devuelto (obligatorio, nunca $0) */}
-                                            <div>
-                                                <label className="text-[7px] font-black text-rose-600 uppercase mb-1 block">
-                                                    Valor devuelto <span className="text-rose-500">*</span>
-                                                </label>
-                                                {esCompleta ? (
-                                                    <p className="text-base font-black text-rose-700">
-                                                        ${(Number(inv.invoice_value) || 0).toLocaleString('es-CO')}
+                                        {(() => {
+                                            const invVal   = Number(inv.invoice_value) || 0;
+                                            const devNum   = esCompleta ? invVal : (Number(returnDevuelto) || 0);
+                                            const consNum  = Math.max(0, invVal - devNum);
+                                            return (
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {/* Valor factura (solo lectura) */}
+                                                <div>
+                                                    <p className="text-[7px] font-black text-slate-400 uppercase mb-1">Valor factura</p>
+                                                    <p className="text-base font-black text-slate-900">
+                                                        ${invVal.toLocaleString('es-CO')}
                                                     </p>
-                                                ) : (
-                                                    <div className="relative">
-                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">$</span>
-                                                        <input
-                                                            type="number" min={1}
-                                                            value={returnDevuelto}
-                                                            onChange={e => setReturnDevuelto(e.target.value)}
-                                                            className="w-full pl-5 pr-1 py-1.5 border-2 border-rose-300 focus:border-rose-500 rounded-xl text-xs font-black outline-none bg-rose-50"
-                                                        />
-                                                    </div>
-                                                )}
+                                                </div>
+                                                {/* Valor devuelto — único campo editable */}
+                                                <div>
+                                                    <label className="text-[7px] font-black text-rose-600 uppercase mb-1 block">
+                                                        Valor devuelto <span className="text-rose-500">*</span>
+                                                    </label>
+                                                    {esCompleta ? (
+                                                        <p className="text-base font-black text-rose-700">
+                                                            ${invVal.toLocaleString('es-CO')}
+                                                        </p>
+                                                    ) : (
+                                                        <div className="relative">
+                                                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">$</span>
+                                                            <input
+                                                                type="number" min={1} max={invVal}
+                                                                value={returnDevuelto}
+                                                                onChange={e => setReturnDevuelto(e.target.value)}
+                                                                className="w-full pl-5 pr-1 py-1.5 border-2 border-rose-300 focus:border-rose-500 rounded-xl text-xs font-black outline-none bg-rose-50"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {/* A consignar — calculado = factura - devuelto (solo lectura) */}
+                                                <div>
+                                                    <p className="text-[7px] font-black text-emerald-600 uppercase mb-1">
+                                                        A consignar <span className="text-[6px] font-normal text-slate-400">(factura − devuelto)</span>
+                                                    </p>
+                                                    <p className={`text-base font-black ${consNum > 0 ? 'text-emerald-700' : 'text-slate-400'}`}>
+                                                        ${consNum.toLocaleString('es-CO')}
+                                                    </p>
+                                                    {esCompleta && <p className="text-[6px] text-slate-400">sin cobro</p>}
+                                                </div>
                                             </div>
-                                            {/* Total a consignar (puede ser $0) */}
-                                            <div>
-                                                <label className="text-[7px] font-black text-amber-600 uppercase mb-1 block">
-                                                    A consignar <span className="text-[6px] font-normal text-slate-400">(puede $0)</span>
-                                                </label>
-                                                {esCompleta ? (
-                                                    <>
-                                                        <p className="text-base font-black text-slate-400">$0</p>
-                                                        <p className="text-[6px] text-slate-400">sin cobro</p>
-                                                    </>
-                                                ) : (
-                                                    <div className="relative">
-                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">$</span>
-                                                        <input
-                                                            type="number" min={0}
-                                                            value={returnConsignar}
-                                                            onChange={e => setReturnConsignar(e.target.value)}
-                                                            className="w-full pl-5 pr-1 py-1.5 border-2 border-amber-300 focus:border-amber-500 rounded-xl text-xs font-black outline-none bg-amber-50"
-                                                        />
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
+                                            );
+                                        })()}
 
                                         {/* Datos de recaudo — solo para devolución parcial */}
                                         {!esCompleta && (
