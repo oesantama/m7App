@@ -219,8 +219,19 @@ async function scrapeOFAC(entityId: string, page: any): Promise<{ status: 'found
 // Scraper: Procuraduría General de la Nación
 // ─────────────────────────────────────────────
 async function scrapeProcuraduria(entityId: string, docType: string, page: any): Promise<{ status: 'found' | 'not_found' | 'error'; summary: string; pdfBuffer: Buffer }> {
-    await page.goto('https://www.procuraduria.gov.co/Pages/Consulta-de-Antecedentes.aspx', { waitUntil: 'networkidle2', timeout: 45000 });
-    await new Promise(r => setTimeout(r, 5000));
+    await page.goto('https://www.procuraduria.gov.co/Pages/Consulta-de-Antecedentes.aspx', { waitUntil: 'load', timeout: 45000 });
+    // Esperar a que el formulario esté disponible (no solo tiempo fijo)
+    await page.waitForSelector('select, input[type="text"]', { timeout: 20000 }).catch(() => {});
+    await new Promise(r => setTimeout(r, 2000));
+
+    // Verificar si la página fue bloqueada por WAF
+    const pageBlocked = await page.evaluate(() => {
+        const text = document.body?.innerText || '';
+        return text.includes('Habilite los scripts') || text.includes('No Disponible') || text.includes('noindex');
+    });
+    if (pageBlocked) {
+        throw new Error('La página de la Procuraduría bloqueó el acceso automático. El sitio requiere validación manual.');
+    }
 
     // 1. Seleccionar tipo de documento
     await page.evaluate((tipoDoc: string) => {
@@ -398,10 +409,32 @@ export const runValidation = async (req: Request, res: Response) => {
         await page.setViewport({ width: 1280, height: 900 });
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36');
         await page.evaluateOnNewDocument(() => {
+            // Ocultar webdriver
             Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-            (window as any).chrome = { runtime: {} };
+            // Chrome runtime completo
+            (window as any).chrome = {
+                runtime: {}, loadTimes: () => {}, csi: () => {}, app: {}
+            };
+            // Plugins reales (headless tiene 0, detectado fácilmente)
+            Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+            // Idiomas colombianos
+            Object.defineProperty(navigator, 'languages', { get: () => ['es-CO', 'es', 'en-US', 'en'] });
+            // Permissions override (Notification check es un fingerprint común)
+            const origPerms = window.navigator.permissions.query.bind(window.navigator.permissions);
+            (window.navigator.permissions as any).query = (p: any) =>
+                p.name === 'notifications'
+                    ? Promise.resolve({ state: Notification.permission } as PermissionStatus)
+                    : origPerms(p);
         });
-        await page.setExtraHTTPHeaders({ 'Accept-Language': 'es-CO,es;q=0.9,en-US;q=0.8,en;q=0.7' });
+        await page.setExtraHTTPHeaders({
+            'Accept-Language': 'es-CO,es;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+        });
 
         // Carpeta Drive según tipo de entidad
         const folderName = entity_type === 'tercero'
