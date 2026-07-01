@@ -1598,64 +1598,72 @@ function VinculacionCorreoTab({ user }: { user: User }) {
         <div className="flex justify-center py-16"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
       ) : (
         <div className="space-y-4">
-          {(['gmail', 'outlook'] as const).map(provider => {
-            const meta = PROVIDER_META[provider];
-            const account = getAccount(provider);
-            return (
-              <div key={provider} className={`rounded-3xl border-2 p-5 transition ${account ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-white'}`}>
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center text-2xl ${meta.color}`}>
-                      {meta.icon}
-                    </div>
-                    <div>
-                      <p className="font-black text-slate-800 text-base">{meta.label}</p>
-                      {account ? (
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
-                          <span className="text-sm text-slate-600">{account.display_name}</span>
-                          <span className="text-xs text-slate-400">({account.email})</span>
-                        </div>
-                      ) : (
-                        <p className="text-sm text-slate-400 mt-0.5">No vinculado</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-2 flex-wrap">
-                    {account ? (
-                      <>
-                        <button
-                          onClick={() => handleTest(provider)}
-                          disabled={testing === provider}
-                          className="px-4 py-2 rounded-2xl text-xs font-bold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 disabled:opacity-50 transition">
-                          {testing === provider ? 'Enviando…' : '📨 Enviar prueba'}
-                        </button>
-                        {canEdit && (
-                          <button
-                            onClick={() => handleUnlink(provider)}
-                            disabled={unlinking === provider}
-                            className="px-4 py-2 rounded-2xl text-xs font-bold bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50 transition">
-                            {unlinking === provider ? 'Desvinculando…' : '🔗 Desvincular'}
-                          </button>
+          {(() => {
+            const hasAnyAccountLinked = accounts.some(a => a.is_active);
+            return (['gmail', 'outlook'] as const).map(provider => {
+              const meta = PROVIDER_META[provider];
+              const account = getAccount(provider);
+              return (
+                <div key={provider} className={`rounded-3xl border-2 p-5 transition ${account ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-white'}`}>
+                  <div className="flex items-center justify-between flex-wrap gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-2xl border flex items-center justify-center text-2xl ${meta.color}`}>
+                        {meta.icon}
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-800 text-base">{meta.label}</p>
+                        {account ? (
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                            <span className="text-sm text-slate-600">{account.display_name}</span>
+                            <span className="text-xs text-slate-400">({account.email})</span>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-slate-400 mt-0.5">No vinculado</p>
                         )}
-                      </>
-                    ) : canEdit ? (
-                      <button
-                        onClick={() => handleConnect(provider)}
-                        className="px-5 py-2 rounded-2xl text-sm font-black bg-slate-900 text-white hover:bg-slate-700 transition shadow-sm">
-                        Vincular con {meta.label}
-                      </button>
-                    ) : null}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      {account ? (
+                        <>
+                          <button
+                            onClick={() => handleTest(provider)}
+                            disabled={testing === provider}
+                            className="px-4 py-2 rounded-2xl text-xs font-bold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 disabled:opacity-50 transition">
+                            {testing === provider ? 'Enviando…' : '📨 Enviar prueba'}
+                          </button>
+                          {canEdit && (
+                            <button
+                              onClick={() => handleUnlink(provider)}
+                              disabled={unlinking === provider}
+                              className="px-4 py-2 rounded-2xl text-xs font-bold bg-red-100 text-red-600 hover:bg-red-200 disabled:opacity-50 transition">
+                              {unlinking === provider ? 'Desvinculando…' : '🔗 Desvincular'}
+                            </button>
+                          )}
+                        </>
+                      ) : canEdit ? (
+                        <button
+                          onClick={() => handleConnect(provider)}
+                          disabled={hasAnyAccountLinked}
+                          className={`px-5 py-2 rounded-2xl text-sm font-black transition shadow-sm ${
+                            hasAnyAccountLinked
+                              ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200 opacity-60'
+                              : 'bg-slate-900 text-white hover:bg-slate-700'
+                          }`}>
+                          Vincular con {meta.label}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
+                  {account && (
+                    <p className="text-xs text-slate-400 mt-3">
+                      Vinculado el {new Date(account.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </p>
+                  )}
                 </div>
-                {account && (
-                  <p className="text-xs text-slate-400 mt-3">
-                    Vinculado el {new Date(account.created_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}
-                  </p>
-                )}
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
         </div>
       )}
 

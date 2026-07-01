@@ -303,7 +303,7 @@ interface BodegaReturn {
     vendedor: string | null;
     conciliacion_confirmada_at: string | null;
     conciliacion_confirmada_by: string | null;
-    items: { sku: string | null; article_name: string | null; quantity_returned: number; unit: string | null }[];
+    items: { sku: string | null; article_id?: string | null; article_name: string | null; quantity_returned: number; unit: string | null }[];
 }
 
 const LegalizationDialog: React.FC<{
@@ -316,7 +316,7 @@ const LegalizationDialog: React.FC<{
     allRoutes?: RouteGroup[];
     onCheckReference?: (ref: string) => void;
     currentUserId: string;
-    onConfirmReturnAndSave: (returnId: number, returnType: 'COMPLETA' | 'PARCIAL', consignar: number, comprobante: string, metodo: string, fecha: string) => Promise<void>;
+    onConfirmReturnAndSave: (returnId: number, returnType: 'COMPLETA' | 'PARCIAL', consignar: number, comprobante: string, metodo: string, fecha: string, devuelto: number, itemsReturned: any[]) => Promise<void>;
 }> = ({ inv, form, onClose, onUpdate, onUpdateItem, onSave, allRoutes, onCheckReference, currentUserId, onConfirmReturnAndSave }) => {
     const isLegalized   = !!inv.forma_pago;
     const isRepice      = (inv.item_status || '').toUpperCase() === 'EST-15' || (inv.item_status || '').toUpperCase() === 'REPICE';
@@ -327,6 +327,7 @@ const LegalizationDialog: React.FC<{
     const [bodegaReturns, setBodegaReturns]   = useState<BodegaReturn[]>([]);
     const [loadingReturns, setLoadingReturns] = useState(true);
     const [confirmingReturn, setConfirmingReturn] = useState(false);
+    const [returnDevuelto,    setReturnDevuelto]    = useState<string>('0');
     const [returnRecaudado,   setReturnRecaudado]   = useState<string>('0');
     const [returnComprobante, setReturnComprobante] = useState<string>('');
     const [returnMetodo,      setReturnMetodo]      = useState<MetodoPago>('TRANSFERENCIA');
@@ -340,7 +341,16 @@ const LegalizationDialog: React.FC<{
                 if (!cancelled) {
                     const data: BodegaReturn[] = res?.data ?? [];
                     setBodegaReturns(data);
-                    // Recaudado siempre inicia en 0 — facturación indica si cobró algo
+                    // Pre-llenar devuelto proporcional desde artículos del retorno
+                    const pending = data.find(r => r.status === 'PENDING' || r.status === 'PROCESSED');
+                    if (pending) {
+                        const invQty  = (inv.items || []).reduce((s: number, i: any) => s + (Number(i.qty) || 0), 0) || 1;
+                        const uPrice  = (Number(inv.invoice_value) || 0) / invQty;
+                        const devCalc = pending.items.reduce((s, i) => s + (Number(i.quantity_returned) || 0) * uPrice, 0);
+                        const devQty  = pending.items.reduce((s, i) => s + (Number(i.quantity_returned) || 0), 0);
+                        const isComp  = devQty >= invQty;
+                        setReturnDevuelto(isComp ? String(Number(inv.invoice_value) || 0) : String(Math.round(devCalc)));
+                    }
                     setReturnRecaudado('0');
                     setReturnComprobante('');
                     setReturnMetodo('TRANSFERENCIA');
@@ -359,14 +369,29 @@ const LegalizationDialog: React.FC<{
 
     const handleConfirmReturn = async (ret: BodegaReturn) => {
         const totalQtyItems = ret.items.reduce((s, i) => s + (Number(i.quantity_returned) || 0), 0);
-        const returnType = (totalQtyItems > 0 && inv.items && inv.items.length > 0
-            && totalQtyItems < inv.items.reduce((s, i) => s + (Number(i.qty) || 0), 0))
+        const invTotalQty   = (inv.items || []).reduce((s: number, i: any) => s + (Number(i.qty) || 0), 0);
+        const returnType    = (totalQtyItems > 0 && inv.items && inv.items.length > 0 && totalQtyItems < invTotalQty)
             ? 'PARCIAL' : 'COMPLETA';
-        // recaudado = lo que realmente cobró facturación al cliente (puede ser $0)
-        const recaudadoVal = returnType === 'COMPLETA' ? 0 : (Number(returnRecaudado) || 0);
+        const invVal        = Number(inv.invoice_value) || 0;
+        const devueltoVal   = returnType === 'COMPLETA' ? invVal : (Number(returnDevuelto) || 0);
+        const recaudadoVal  = returnType === 'COMPLETA' ? 0 : (Number(returnRecaudado) || 0);
+        // Construir items_returned con returned_value real (proporcional al devuelto ingresado)
+        const totalRetQty   = totalQtyItems || 1;
+        const itemsReturnedData = ret.items.map(ri => {
+            const artId   = ri.article_id || ri.sku || '';
+            const invItem = (inv.items || []).find((it: any) => it.article_id === artId || it.article_id === ri.sku);
+            const proportion = (Number(ri.quantity_returned) || 0) / totalRetQty;
+            return {
+                id:             invItem?.id || 0,
+                article_id:     artId,
+                qty:            invItem?.qty || 0,
+                returned_qty:   Number(ri.quantity_returned) || 0,
+                returned_value: Math.round(devueltoVal * proportion),
+            };
+        });
         setConfirmingReturn(true);
         try {
-            await onConfirmReturnAndSave(ret.id, returnType, recaudadoVal, returnComprobante, returnMetodo, returnFecha);
+            await onConfirmReturnAndSave(ret.id, returnType, recaudadoVal, returnComprobante, returnMetodo, returnFecha, devueltoVal, itemsReturnedData);
         } finally {
             setConfirmingReturn(false);
         }
@@ -528,13 +553,24 @@ const LegalizationDialog: React.FC<{
                                                         ${invVal.toLocaleString('es-CO')}
                                                     </p>
                                                 </div>
-                                                {/* Valor devuelto — solo lectura, desde artículos bodega */}
+                                                {/* Valor devuelto — editable */}
                                                 <div>
-                                                    <p className="text-[7px] font-black text-rose-600 uppercase mb-1">Valor devuelto</p>
-                                                    <p className="text-base font-black text-rose-700">
-                                                        ${Math.round(devNum).toLocaleString('es-CO')}
-                                                    </p>
-                                                    <p className="text-[6px] text-slate-400">desde artículos</p>
+                                                    <label className="text-[7px] font-black text-rose-600 uppercase mb-1 block">
+                                                        Valor devuelto <span className="text-rose-500">*</span>
+                                                    </label>
+                                                    {esCompleta ? (
+                                                        <p className="text-base font-black text-rose-700">${invVal.toLocaleString('es-CO')}</p>
+                                                    ) : (
+                                                        <div className="relative">
+                                                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">$</span>
+                                                            <input
+                                                                type="number" min={1} max={invVal}
+                                                                value={returnDevuelto}
+                                                                onChange={e => setReturnDevuelto(e.target.value)}
+                                                                className="w-full pl-5 pr-1 py-1.5 border-2 border-rose-300 focus:border-rose-500 rounded-xl text-xs font-black outline-none bg-rose-50"
+                                                            />
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 {/* Valor recaudado — editable (puede ser $0) */}
                                                 <div>
@@ -1602,7 +1638,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     };
 
     // Confirma la devolución de bodega Y legaliza la factura en un solo paso
-    const handleConfirmReturnAndSave = async (inv: InvoiceRow, returnId: number, returnType: 'COMPLETA' | 'PARCIAL', consignar: number, comprobante: string, metodo: string, fecha: string) => {
+    const handleConfirmReturnAndSave = async (inv: InvoiceRow, returnId: number, returnType: 'COMPLETA' | 'PARCIAL', consignar: number, comprobante: string, metodo: string, fecha: string, _devuelto: number, itemsReturned: any[]) => {
         updateForm(inv.invoice_number, { saving: true });
         try {
             // 1. Confirmar devolución por facturación
@@ -1630,7 +1666,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 conductorName:  inv.conductor_name || route.driver_name || undefined,
                 estadoEntrega,
                 valorFactura:   invoiceVal || undefined,
-                itemsReturned:  [],
+                itemsReturned:  itemsReturned || [],
             });
 
             toast.success(`✅ ${inv.invoice_number} confirmada y legalizada`);
@@ -2248,7 +2284,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                         allRoutes={allRoutes}
                         onCheckReference={(ref) => handleCheckReference(ref, 'individual', undefined, inv.invoice_number)}
                         currentUserId={currentUserId}
-                        onConfirmReturnAndSave={(returnId, returnType, consignar, comprobante, metodo, fecha) => handleConfirmReturnAndSave(inv, returnId, returnType, consignar, comprobante, metodo, fecha)}
+                        onConfirmReturnAndSave={(returnId, returnType, consignar, comprobante, metodo, fecha, devuelto, itemsReturned) => handleConfirmReturnAndSave(inv, returnId, returnType, consignar, comprobante, metodo, fecha, devuelto, itemsReturned)}
                     />
                 );
             })()}
