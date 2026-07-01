@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { hasPermission } from '../../utils/permissions';
 import { DataTable, ColumnDef } from '../shared/DataTable';
 import * as XLSX from 'xlsx';
+import GenericConfirmModal from '../Logistics/GenericConfirmModal';
 
 interface Props { user: User; }
 
@@ -1527,6 +1528,7 @@ function VinculacionCorreoTab({ user }: { user: User }) {
   const [testing, setTesting] = useState<string | null>(null);
   const [unlinking, setUnlinking] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
+  const [confirmUnlinkProvider, setConfirmUnlinkProvider] = useState<string | null>(null);
   const canEdit = hasPermission(user, 'MAESTRAS_DOGAMA', 'edit');
 
   const load = async () => {
@@ -1561,8 +1563,14 @@ function VinculacionCorreoTab({ user }: { user: User }) {
     window.open(url, `oauth_${provider}`, 'width=520,height=640,scrollbars=yes,popup=yes');
   };
 
-  const handleUnlink = async (provider: string) => {
-    if (!confirm(`¿Desvincular ${PROVIDER_META[provider]?.label || provider}?`)) return;
+  const handleUnlink = (provider: string) => {
+    setConfirmUnlinkProvider(provider);
+  };
+
+  const handleConfirmUnlink = async () => {
+    if (!confirmUnlinkProvider) return;
+    const provider = confirmUnlinkProvider;
+    setConfirmUnlinkProvider(null);
     setUnlinking(provider);
     try { await api.dogamaDeleteEmailConfig(provider); toast.success('Cuenta desvinculada'); load(); }
     catch { toast.error('Error al desvincular'); }
@@ -1703,6 +1711,13 @@ function VinculacionCorreoTab({ user }: { user: User }) {
           </div>
         )}
       </div>
+      <GenericConfirmModal
+        isOpen={!!confirmUnlinkProvider}
+        title="¿Desvincular Cuenta?"
+        message={`¿Estás seguro de que deseas desvincular la cuenta de ${confirmUnlinkProvider === 'gmail' ? 'Gmail' : 'Outlook'}? Esta acción evitará que se envíen correos desde esta cuenta.`}
+        onClose={() => setConfirmUnlinkProvider(null)}
+        onConfirm={handleConfirmUnlink}
+      />
     </div>
   );
 }
