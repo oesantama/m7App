@@ -319,8 +319,16 @@ export const runCron = async (req: any, res: Response) => {
             case 'facturacionPendienteIndividual':
                 logs = await scheduler.runFacturacionPendienteIndividual();
                 break;
+            case 'transportandoUnificado':
+                scheduler.manualRunTransportandoUnificado().then(() => {
+                    scraper.activeScraperLogs.push("[COMPLETADO] Importación unificada (manifiestos → recaudos → egresos) finalizada.");
+                }).catch(err => {
+                    scraper.activeScraperLogs.push(`[ERROR CRÍTICO] Importación unificada falló: ${err.message}`);
+                });
+                logs = ["Iniciando importación unificada (manifiestos → recaudos → egresos) en segundo plano...", "Los 3 procesos corren en secuencia. Observa la terminal de logs."];
+                return res.json({ success: true, logs, isBackground: true });
             case 'transportandoScrape':
-                scheduler.manualRunTransportandoScrape().then(resLogs => {
+                scheduler.manualRunTransportandoScrape().then(() => {
                     scraper.activeScraperLogs.push("[COMPLETADO] Scraping de manifiestos (General) finalizado.");
                 }).catch(err => {
                     scraper.activeScraperLogs.push(`[ERROR CRÍTICO] Scraping de manifiestos (General) falló: ${err.message}`);
@@ -328,7 +336,7 @@ export const runCron = async (req: any, res: Response) => {
                 logs = ["Iniciando importación general en segundo plano...", "Por favor, mantén esta ventana abierta y observa la terminal de logs."];
                 return res.json({ success: true, logs, isBackground: true });
             case 'transportandoRecaudosScrape':
-                scheduler.manualRunTransportandoRecaudosScrape().then(resLogs => {
+                scheduler.manualRunTransportandoRecaudosScrape().then(() => {
                     scraper.activeScraperLogs.push("[COMPLETADO] Scraping de recaudos finalizado.");
                 }).catch(err => {
                     scraper.activeScraperLogs.push(`[ERROR CRÍTICO] Scraping de recaudos falló: ${err.message}`);
@@ -336,7 +344,7 @@ export const runCron = async (req: any, res: Response) => {
                 logs = ["Iniciando importación de recaudos en segundo plano...", "Por favor, mantén esta ventana abierta y observa la terminal de logs."];
                 return res.json({ success: true, logs, isBackground: true });
             case 'transportandoEgresosScrape':
-                scheduler.manualRunTransportandoEgresosScrape().then(resLogs => {
+                scheduler.manualRunTransportandoEgresosScrape().then(() => {
                     scraper.activeScraperLogs.push("[COMPLETADO] Scraping de egresos finalizado.");
                 }).catch(err => {
                     scraper.activeScraperLogs.push(`[ERROR CRÍTICO] Scraping de egresos falló: ${err.message}`);

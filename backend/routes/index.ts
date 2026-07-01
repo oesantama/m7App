@@ -67,6 +67,7 @@ import dogamaRoutes from './dogama.routes.js';
 import helpdeskRoutes from './helpdesk.routes.js';
 import geoRoutes from './geo.routes.js';
 import alertasWhatsappRoutes from './alertas-whatsapp.routes.js';
+import validationRoutes from './validation.routes.js';
 
 const router = Router();
 
@@ -137,6 +138,7 @@ router.use('/dogama', dogamaRoutes);
 router.use('/helpdesk', helpdeskRoutes);
 router.use('/geo', geoRoutes);
 router.use('/alertas-whatsapp', alertasWhatsappRoutes);
+router.use('/validation', validationRoutes);
 
 // Endpoint seguro: devuelve la API key de Gemini del backend al frontend autenticado
 router.get('/config/gemini-key', (req: any, res) => {

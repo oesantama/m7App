@@ -95,6 +95,7 @@ const FormatosTransportes = lazyWithRetry(() => import('./components/AdminCenter
 const MaestrasDogama = lazyWithRetry(() => import('./components/Dogama/MaestrasDogama'));
 const CitasDespachosCarga = lazyWithRetry(() => import('./components/Dogama/CitasDespachosCarga'));
 const HelpDesk = lazyWithRetry(() => import('./components/HelpDesk'));
+const ValidadorDocumentos = lazyWithRetry(() => import('./components/RRHH/ValidadorDocumentos'));
 
 // Import Admin Module
 const AdminDBManager = lazyWithRetry(() => import('./pages/AdminDBManager'));
@@ -1114,6 +1115,12 @@ const App: React.FC = () => {
         return (
           <React.Suspense fallback={<div className="p-10">Cargando Mesa de Ayuda...</div>}>
             <HelpDesk />
+          </React.Suspense>
+        );
+      case 'validador-documentos':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Validador de Documentos...</div>}>
+            <ValidadorDocumentos />
           </React.Suspense>
         );
       default:
