@@ -106,7 +106,9 @@ export const deleteSource = async (req: Request, res: Response) => {
 // ─────────────────────────────────────────────
 export const getRecords = async (req: Request, res: Response) => {
     try {
-        const { entity_type, entity_id, limit = 50 } = req.query;
+        const entity_type = req.query.entity_type as string | undefined;
+        const entity_id   = req.query.entity_id   as string | undefined;
+        const limit       = Number(req.query.limit) || 50;
         let query = `SELECT vr.*, vs.name as source_name, vs.file_name
                      FROM validation_records vr
                      LEFT JOIN validation_sources vs ON vs.id = vr.source_id
@@ -114,7 +116,7 @@ export const getRecords = async (req: Request, res: Response) => {
         const params: any[] = [];
         if (entity_type) { params.push(entity_type); query += ` AND vr.entity_type=$${params.length}`; }
         if (entity_id)   { params.push(entity_id);   query += ` AND vr.entity_id=$${params.length}`; }
-        params.push(Number(limit));
+        params.push(limit);
         query += ` ORDER BY vr.validated_at DESC LIMIT $${params.length}`;
         const result = await pool.query(query, params);
         res.json(result.rows);
@@ -509,7 +511,8 @@ export const runValidation = async (req: Request, res: Response) => {
 // Servir PDF local (entorno sin rclone)
 // ─────────────────────────────────────────────
 export const getLocalPdf = (req: Request, res: Response) => {
-    const { folder, filename } = req.params;
+    const folder   = String(req.params.folder);
+    const filename = String(req.params.filename);
     const filePath = path.join(LOCAL_PDF_DIR, decodeURIComponent(folder), decodeURIComponent(filename));
     if (!fs.existsSync(filePath)) {
         return res.status(404).json({ error: 'PDF no encontrado' });
