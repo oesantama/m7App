@@ -1,8 +1,14 @@
 import { Request, Response } from 'express';
-import puppeteer from 'puppeteer';
+import { createRequire } from 'module';
+const _require = createRequire(import.meta.url);
+const puppeteerExtra = _require('puppeteer-extra');
+const StealthPlugin = _require('puppeteer-extra-plugin-stealth');
+puppeteerExtra.use(StealthPlugin());
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import https from 'https';
+import { URL } from 'url';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import pool from '../config/database.js';
@@ -216,152 +222,132 @@ async function scrapeOFAC(entityId: string, page: any): Promise<{ status: 'found
 }
 
 // ─────────────────────────────────────────────
-// Scraper: Procuraduría General de la Nación
+// Scraper: Procuraduría — HTTP directo (bypass WAF que bloquea Chrome headless)
+// El formulario real está en un iframe: apps.procuraduria.gov.co/webcert/inicio.aspx
 // ─────────────────────────────────────────────
-async function scrapeProcuraduria(entityId: string, docType: string, page: any): Promise<{ status: 'found' | 'not_found' | 'error'; summary: string; pdfBuffer: Buffer }> {
-    await page.goto('https://www.procuraduria.gov.co/Pages/Consulta-de-Antecedentes.aspx', { waitUntil: 'load', timeout: 45000 });
-    // Esperar a que el formulario esté disponible (no solo tiempo fijo)
-    await page.waitForSelector('select, input[type="text"]', { timeout: 20000 }).catch(() => {});
-    await new Promise(r => setTimeout(r, 2000));
+const PROC_AGENT = new https.Agent({ rejectUnauthorized: false });
+const PROC_BASE = 'https://apps.procuraduria.gov.co/webcert';
+const PROC_HEADERS: Record<string, string> = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'es-CO,es;q=0.9',
+    'Referer': 'https://www.procuraduria.gov.co/Pages/Consulta-de-Antecedentes.aspx',
+};
+const PROC_DOC_TYPES: Record<string, string> = {
+    'Cédula de ciudadanía': '1',
+    'PEP': '0',
+    'Nit': '2',
+    'Cédula extranjería': '5',
+    'PPT': '10',
+};
 
-    // Verificar si la página fue bloqueada por WAF
-    const pageBlocked = await page.evaluate(() => {
-        const text = document.body?.innerText || '';
-        return text.includes('Habilite los scripts') || text.includes('No Disponible') || text.includes('noindex');
-    });
-    if (pageBlocked) {
-        throw new Error('La página de la Procuraduría bloqueó el acceso automático. El sitio requiere validación manual.');
-    }
-
-    // 1. Seleccionar tipo de documento
-    await page.evaluate((tipoDoc: string) => {
-        const selects = Array.from(document.querySelectorAll('select')) as HTMLSelectElement[];
-        const sel = selects.find(s => {
-            const opts = Array.from(s.options).map(o => o.text.trim());
-            return opts.some(o => o.includes('ciudadan') || o.includes('Cédula'));
+function procHttp(method: 'GET' | 'POST', url: string, body?: string, extra: Record<string,string> = {}, redirectCount = 0): Promise<{html: string; cookies: string; finalUrl: string}> {
+    return new Promise((resolve, reject) => {
+        const u = new URL(url);
+        const buf = body ? Buffer.from(body, 'utf-8') : null;
+        const req = https.request({
+            hostname: u.hostname,
+            path: u.pathname + u.search,
+            method,
+            headers: {
+                ...PROC_HEADERS,
+                ...(buf ? { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': String(buf.length) } : {}),
+                ...extra
+            },
+            agent: PROC_AGENT,
+        }, (res) => {
+            const cookies = ((res.headers['set-cookie'] as string[]) || []).map((c: string) => c.split(';')[0]).join('; ');
+            // Seguir redirects automáticamente (máx 5)
+            if ((res.statusCode === 301 || res.statusCode === 302) && res.headers.location && redirectCount < 5) {
+                const location = res.headers.location as string;
+                const nextUrl = location.startsWith('http') ? location : `https://apps.procuraduria.gov.co${location.startsWith('/') ? '' : '/'}${location}`;
+                res.resume(); // descartar body
+                procHttp('GET', nextUrl, undefined, { ...extra, 'Cookie': cookies }, redirectCount + 1)
+                    .then(r => resolve({ ...r, cookies: r.cookies || cookies }))
+                    .catch(reject);
+                return;
+            }
+            const chunks: Buffer[] = [];
+            res.on('data', (c: Buffer) => chunks.push(c));
+            res.on('end', () => resolve({ html: Buffer.concat(chunks).toString('utf-8'), cookies, finalUrl: url }));
         });
-        if (!sel) return false;
-        const opt = Array.from(sel.options).find(o => o.text.trim() === tipoDoc || o.text.includes(tipoDoc));
-        if (opt) {
-            sel.value = opt.value;
-            sel.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-        return true;
-    }, docType);
-    await new Promise(r => setTimeout(r, 800));
-
-    // 2. Ingresar número de identificación
-    await page.evaluate((idVal: string) => {
-        const inputs = Array.from(document.querySelectorAll('input[type="text"]')) as HTMLInputElement[];
-        // Buscar por label o por posición — el input de número es el primero visible
-        let target: HTMLInputElement | null = null;
-        const labels = Array.from(document.querySelectorAll('label, span, td'));
-        for (const lbl of labels) {
-            if (lbl.textContent?.includes('Número Identificación') || lbl.textContent?.includes('Numero')) {
-                const row = (lbl as HTMLElement).closest('tr') || (lbl as HTMLElement).parentElement;
-                if (row) { target = row.querySelector('input[type="text"]'); if (target) break; }
-            }
-        }
-        if (!target) target = inputs[0];
-        if (!target) return false;
-        target.value = idVal;
-        target.dispatchEvent(new Event('input', { bubbles: true }));
-        target.dispatchEvent(new Event('change', { bubbles: true }));
-        return true;
-    }, entityId);
-    await new Promise(r => setTimeout(r, 500));
-
-    // 3. Resolver captcha matemático "¿ Cuánto es X OP Y ?"
-    const captchaResult = await page.evaluate(() => {
-        // Buscar en todos los nodos de texto del documento
-        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
-        const texts: string[] = [];
-        let node;
-        while ((node = walker.nextNode())) {
-            const t = node.textContent?.trim() || '';
-            if (t.length > 0) texts.push(t);
-        }
-        const allText = texts.join(' ');
-
-        // Regex amplio: acepta X, x, ×, *, +, -, con espacios variables
-        const match = allText.match(/[Cc]u[aá]nto\s+es\s+(\d+)\s*([xX×\*\+\-\/÷])\s*(\d+)/);
-        if (!match) return { answer: null, debug: allText.substring(0, 500) };
-
-        const a = parseInt(match[1]);
-        const op = match[2];
-        const b = parseInt(match[3]);
-        let answer: string | null = null;
-        if (op === '+')                          answer = String(a + b);
-        else if (op === '-')                     answer = String(a - b);
-        else if ('xX×*'.includes(op))            answer = String(a * b);
-        else if (op === '/' || op === '÷')       answer = String(Math.round(a / b));
-        return { answer, debug: `${a} ${op} ${b} = ${answer}` };
+        req.on('error', reject);
+        if (buf) req.write(buf);
+        req.end();
     });
+}
 
-    console.log('[PROCURADURIA-CAPTCHA]', captchaResult?.debug);
-    if (!captchaResult?.answer) {
-        throw new Error(`No se pudo leer el captcha matemático de la Procuraduría. Texto encontrado: ${captchaResult?.debug?.substring(0, 200)}`);
-    }
-    const captchaAnswer = captchaResult.answer;
+async function scrapeProcuraduria(entityId: string, entityName: string, docType: string, page: any): Promise<{ status: 'found' | 'not_found' | 'error'; summary: string; pdfBuffer: Buffer }> {
+    // 1. GET form page (iframe real)
+    const { html: formHtml, cookies } = await procHttp('GET', `${PROC_BASE}/inicio.aspx`);
 
-    // Ingresar respuesta del captcha (segundo input de texto visible)
-    await page.evaluate((answer: string) => {
-        const inputs = Array.from(document.querySelectorAll('input[type="text"]')) as HTMLInputElement[];
-        // El captcha suele ser el último input antes del botón
-        let target: HTMLInputElement | null = null;
-        const labels = Array.from(document.querySelectorAll('label, span, td'));
-        for (const lbl of labels) {
-            if (lbl.textContent?.includes('Cuanto') || lbl.textContent?.includes('cuanto')) {
-                const row = (lbl as HTMLElement).closest('tr') || (lbl as HTMLElement).parentElement;
-                if (row) { target = row.querySelector('input[type="text"]'); if (target) break; }
-            }
-        }
-        if (!target && inputs.length >= 2) target = inputs[inputs.length - 1];
-        if (!target) return false;
-        target.value = answer;
-        target.dispatchEvent(new Event('input', { bubbles: true }));
-        target.dispatchEvent(new Event('change', { bubbles: true }));
-        return true;
-    }, captchaAnswer);
-    await new Promise(r => setTimeout(r, 500));
-
-    // 4. Click en "Consultar"
-    const clicked = await page.evaluate(() => {
-        const btns = Array.from(document.querySelectorAll('input[type="submit"], button[type="submit"], button, input[type="button"]'));
-        const btn = btns.find((b: any) =>
-            b.value?.includes('Consultar') || b.textContent?.trim()?.includes('Consultar')
-        );
-        if (btn) { (btn as any).click(); return true; }
-        return false;
-    });
-    if (!clicked) throw new Error('No se encontró el botón Consultar en Procuraduría');
-
-    // 5. Esperar resultado
-    await new Promise(r => setTimeout(r, 4000));
-    await page.waitForFunction(() => {
-        const body = document.body.textContent || '';
-        return body.includes('no presenta antecedentes') || body.includes('presenta antecedentes') ||
-               body.includes('ciudadano') || body.includes('Error') || body.includes('captcha');
-    }, { timeout: 20000 }).catch(() => {});
-
-    // 6. Extraer resumen
-    const summary = await page.evaluate(() => {
-        const body = document.body.textContent || '';
-        if (body.includes('no presenta antecedentes')) return 'El ciudadano no presenta antecedentes';
-        if (body.includes('presenta antecedentes'))    return 'ATENCIÓN: El ciudadano presenta antecedentes';
-        if (body.includes('captcha') || body.includes('incorrecta') || body.includes('inválido')) return 'Captcha incorrecto — reintente';
-        return 'Resultado no determinado';
-    });
-
-    if (summary.includes('Captcha') || summary.includes('captcha')) {
-        throw new Error('Captcha rechazado por Procuraduría — el valor calculado no coincidió');
+    // Detectar bloqueo
+    if (formHtml.includes('No Disponible') && !formHtml.includes('lblPregunta')) {
+        throw new Error('La Procuraduría bloqueó el acceso. Intente más tarde.');
     }
 
-    const status: 'found' | 'not_found' = summary.includes('no presenta') ? 'not_found' : 'found';
+    // 2. Extraer campos del formulario ASP.NET
+    const viewstate   = formHtml.match(/name="__VIEWSTATE"\s+id="__VIEWSTATE"\s+value="([^"]+)"/)?.[1];
+    const vsgen       = formHtml.match(/name="__VIEWSTATEGENERATOR"[^>]+value="([^"]+)"/)?.[1] || '';
+    const evval       = formHtml.match(/name="__EVENTVALIDATION"[^>]+value="([^"]+)"/)?.[1] || '';
+    const formAction  = formHtml.match(/<form[^>]+action="([^"]+)"/)?.[1]?.replace(/&amp;/g, '&');
+    const captchaText = formHtml.match(/<span[^>]+id="lblPregunta"[^>]*>([^<]+)<\/span>/)?.[1];
 
+    if (!viewstate || !formAction) throw new Error('No se encontró el formulario de la Procuraduría');
+
+    // 3. Resolver captcha (matemático o pregunta de nombre)
+    let answer = '';
+    const captchaLower = captchaText?.toLowerCase() || '';
+    if (captchaLower.includes('cuanto') || captchaLower.includes('cuánto')) {
+        // Captcha matemático: "¿ Cuanto es 2 X 3 ?"
+        const mathMatch = captchaText?.match(/[Cc]u[aá]nto\s+es\s+(\d+)\s*([xX×*+\-\/÷])\s*(\d+)/);
+        if (!mathMatch) throw new Error(`Captcha matemático no reconocido: "${captchaText}"`);
+        const ai = parseInt(mathMatch[1]), op = mathMatch[2], bi = parseInt(mathMatch[3]);
+        if (op === '+') answer = String(ai + bi);
+        else if (op === '-') answer = String(ai - bi);
+        else if ('xX×*'.includes(op)) answer = String(ai * bi);
+        else if (op === '/' || op === '÷') answer = String(Math.round(ai / bi));
+    } else if (captchaLower.includes('primer nombre')) {
+        // Pregunta de texto: "¿Cual es el primer nombre de la persona...?"
+        answer = entityId; // Se responde con el número de cédula que ya ingresamos
+        // En realidad pide el primer nombre de entity_name
+        answer = entityName.trim().split(/\s+/)[0];
+    } else {
+        throw new Error(`Captcha no reconocido: "${captchaText}"`);
+    }
+    console.log(`[PROCURADURIA-CAPTCHA] "${captchaText?.trim()}" → "${answer}"`);
+    if (!answer) throw new Error(`No se pudo resolver captcha: "${captchaText}"`);
+
+    // 4. POST formulario
+    const tipoId = PROC_DOC_TYPES[docType] || '1';
+    const actionUrl = formAction.startsWith('http') ? formAction : `${PROC_BASE}/${formAction.replace('./', '')}`;
+    const formBody = new URLSearchParams({
+        '__EVENTTARGET': '', '__EVENTARGUMENT': '',
+        '__VIEWSTATE': viewstate, '__VIEWSTATEGENERATOR': vsgen, '__EVENTVALIDATION': evval,
+        'ddlTipoID': tipoId, 'txtNumID': entityId,
+        'txtRespuestaPregunta': answer, 'txtEmail': '', 'btnConsultar': 'Consultar',
+    }).toString();
+
+    const { html: resultHtml } = await procHttp('POST', actionUrl, formBody, {
+        'Cookie': cookies, 'Referer': `${PROC_BASE}/inicio.aspx`,
+    });
+
+    // 5. Interpretar resultado
+    const lower = resultHtml.toLowerCase();
+    const noAntecedentes = lower.includes('no presenta antecedentes') || lower.includes('no registra antecedentes');
+    const tieneAntecedentes = lower.includes('presenta antecedentes') && !noAntecedentes;
+    const status: 'found' | 'not_found' = tieneAntecedentes ? 'found' : 'not_found';
+    const summary = tieneAntecedentes
+        ? 'ATENCIÓN: El ciudadano presenta antecedentes'
+        : noAntecedentes
+        ? 'El ciudadano no presenta antecedentes'
+        : 'Consulta completada en Procuraduría';
+
+    // 6. Generar PDF renderizando el HTML localmente (sin navegar al sitio)
+    const fullHtml = resultHtml.includes('<html') ? resultHtml : `<html><head><meta charset="utf-8"></head><body>${resultHtml}</body></html>`;
+    await page.setContent(fullHtml, { waitUntil: 'domcontentloaded', timeout: 15000 });
     const pdfBuffer = await page.pdf({
-        format: 'Letter',
-        printBackground: true,
+        format: 'Letter', printBackground: true,
         margin: { top: '15mm', bottom: '15mm', left: '10mm', right: '10mm' }
     });
 
@@ -392,7 +378,7 @@ export const runValidation = async (req: Request, res: Response) => {
     let browser: any;
 
     try {
-        browser = await puppeteer.launch({
+        browser = await puppeteerExtra.launch({
             headless: true,
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
             args: [
@@ -465,7 +451,7 @@ export const runValidation = async (req: Request, res: Response) => {
                     pdfBuffer = result.pdfBuffer;
                 } else if (source.id === 'procuraduria') {
                     const tipoDoc = doc_type || 'Cédula de ciudadanía';
-                    const result = await scrapeProcuraduria(entity_id, tipoDoc, page);
+                    const result = await scrapeProcuraduria(entity_id, entity_name, tipoDoc, page);
                     status = result.status;
                     summary = result.summary;
                     pdfBuffer = result.pdfBuffer;

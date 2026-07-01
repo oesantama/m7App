@@ -44,6 +44,8 @@
     "pg": "^8.17.2",
     "prop-types": "^15.8.1",
     "puppeteer": "^25.1.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
     "qrcode.react": "^4.2.0",
