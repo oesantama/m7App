@@ -441,7 +441,18 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
            // Paso 2: Búsqueda PARCIAL (insensible a acentos, solo si falla la exacta)
            return headers.findIndex(h => {
              if (!h) return false;
-             return terms.some(t => normStr(h).includes(normStr(t)));
+             const normH = normStr(h);
+             return terms.some(t => {
+               const normT = normStr(t);
+               // Evitar falsos positivos para términos muy cortos como 'um', 'un', 'und'
+               if (normT.length <= 3) {
+                 return normH === normT || 
+                        normH.startsWith(normT + ' ') || 
+                        normH.endsWith(' ' + normT) || 
+                        normH.includes(' ' + normT + ' ');
+               }
+               return normH.includes(normT);
+             });
            });
         };
         
@@ -526,7 +537,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const iVolUnit = isPlanR ? -1 : findIdx(['volumen']);
         const iVolUnidad = findIdx(['volumen unitario']); 
         
-        const iUnd = findIdx(['um', 'und', 'unid', 'unidad']);
+        const iUnd = findIdx(['um', 'und', 'unid', 'unidad', 'medida', 'u medida', 'u.m.', 'uom']);
         const iFactura = findIdx([
           'remision/transferencia', 'remision / transferencia',
           'no. factura', 'nro. factura', 'nro factura', 'no factura', 'num factura', 'numero factura', 'número factura',
@@ -658,7 +669,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               articleId: sku,
               expectedQty: qty,
               receivedQty: 0, // Inicia en 0
-              unit: val(iUnd),
+              unit: (val(iUnd) && val(iUnd).trim() !== '0' && val(iUnd).trim() !== '') ? val(iUnd).trim() : 'und',
               volume: String(volVal),
               unitVolume: val(iVolUnidad),
               invoice: val(iFactura),

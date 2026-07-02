@@ -306,6 +306,124 @@ interface BodegaReturn {
     items: { sku: string | null; article_id?: string | null; article_name: string | null; quantity_returned: number; unit: string | null }[];
 }
 
+interface OtroConductorSelectorProps {
+    allRoutes?: RouteGroup[];
+    vehiclePlate?: string;
+    targetRouteId?: string;
+    onUpdate: (patch: Partial<InvoiceFormState>) => void;
+    canEdit: boolean;
+}
+
+const OtroConductorSelector: React.FC<OtroConductorSelectorProps> = ({
+    allRoutes,
+    vehiclePlate,
+    targetRouteId,
+    onUpdate,
+    canEdit
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [search, setSearch] = useState('');
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const filteredRoutes = (allRoutes || []).filter(r => {
+        if (r.plate === vehiclePlate) return false;
+        if (!search) return true;
+        const s = search.toLowerCase();
+        return r.plate.toLowerCase().includes(s) || (r.driver_name || '').toLowerCase().includes(s);
+    });
+
+    const selectedRoute = allRoutes?.find(r => r.route_id === targetRouteId);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    return (
+        <div className="mt-3 animate-in slide-in-from-top-1 duration-200" ref={dropdownRef}>
+            <label className="block text-[8px] font-black text-blue-600 uppercase tracking-widest mb-1.5 ml-1">
+                Conductor / Placa de Destino
+            </label>
+            <p className="text-[7px] text-blue-400 font-bold mb-2 ml-1">
+                El sistema usará la ruta más reciente del conductor seleccionado.
+            </p>
+            <div className="relative">
+                <div
+                    onClick={() => canEdit && setIsOpen(!isOpen)}
+                    className={`w-full px-4 py-3 bg-blue-50 border-2 rounded-xl text-[10px] font-black flex items-center justify-between transition-all cursor-pointer
+                        ${isOpen ? 'border-blue-400 ring-2 ring-blue-100' : 'border-blue-100'}
+                        ${!canEdit ? 'opacity-70 cursor-not-allowed' : 'hover:border-blue-300'}`}
+                >
+                    <div className="flex items-center gap-2">
+                        {selectedRoute ? (
+                            <>
+                                <span className="text-blue-900">🚗 {selectedRoute.plate}</span>
+                                <span className="text-blue-400 text-[8px]">| {selectedRoute.driver_name}</span>
+                            </>
+                        ) : (
+                            <span className="text-blue-300 uppercase tracking-tighter">Buscar por placa o conductor...</span>
+                        )}
+                    </div>
+                    <Icons.ChevronDown className={`w-3 h-3 text-blue-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                </div>
+
+                {isOpen && (
+                    <div className="absolute z-[1000] top-full left-0 right-0 mt-2 bg-white border border-blue-100 shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+                        <div className="p-2 bg-blue-50/50 border-b border-blue-50">
+                            <div className="relative">
+                                <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-blue-400" />
+                                <input
+                                    autoFocus
+                                    type="text"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Filtrar por placa o conductor..."
+                                    className="w-full pl-8 pr-4 py-2 bg-white border border-blue-100 rounded-lg text-[10px] font-bold outline-none focus:border-blue-300 transition-all"
+                                />
+                            </div>
+                        </div>
+                        <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
+                            {filteredRoutes.length > 0 ? (
+                                filteredRoutes.map((r, ridx) => (
+                                    <div
+                                        key={r.route_id}
+                                        onClick={() => {
+                                            onUpdate({ targetRouteId: r.route_id });
+                                            setIsOpen(false);
+                                            setSearch('');
+                                        }}
+                                        className="px-4 py-3 hover:bg-blue-50 cursor-pointer flex items-center justify-between border-b border-blue-50 last:border-0 transition-colors"
+                                    >
+                                        <div className="flex flex-col gap-0.5">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-black text-blue-900">🚗 {r.plate}</span>
+                                                {ridx === 0 && <span className="text-[7px] font-black px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">Más reciente</span>}
+                                            </div>
+                                            <span className="text-[8px] font-bold text-slate-400 uppercase">{r.driver_name || 'Sin conductor'}</span>
+                                        </div>
+                                        {targetRouteId === r.route_id && (
+                                            <Icons.Check className="w-3 h-3 text-emerald-500" />
+                                        )}
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="px-4 py-8 text-center">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase italic">No se encontraron rutas disponibles</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const LegalizationDialog: React.FC<{
     inv: InvoiceRow;
     form: InvoiceFormState;
@@ -733,110 +851,15 @@ const LegalizationDialog: React.FC<{
                                         </p>
                                     )}
 
-                                    {form.numConsignacion === 'OTRO_CONDUCTOR' && (() => {
-                                        const [isOpen, setIsOpen] = useState(false);
-                                        const [search, setSearch] = useState('');
-                                        const dropdownRef = useRef<HTMLDivElement>(null);
-
-                                        const filteredRoutes = (allRoutes || []).filter(r => {
-                                            if (r.plate === inv.vehicle_plate) return false;
-                                            if (!search) return true;
-                                            const s = search.toLowerCase();
-                                            return r.plate.toLowerCase().includes(s) || (r.driver_name || '').toLowerCase().includes(s);
-                                        });
-
-                                        const selectedRoute = allRoutes?.find(r => r.route_id === form.targetRouteId);
-
-                                        // Click outside handler
-                                        useEffect(() => {
-                                            const handleClickOutside = (event: MouseEvent) => {
-                                                if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-                                                    setIsOpen(false);
-                                                }
-                                            };
-                                            document.addEventListener('mousedown', handleClickOutside);
-                                            return () => document.removeEventListener('mousedown', handleClickOutside);
-                                        }, []);
-
-                                        return (
-                                            <div className="mt-3 animate-in slide-in-from-top-1 duration-200" ref={dropdownRef}>
-                                                <label className="block text-[8px] font-black text-blue-600 uppercase tracking-widest mb-1.5 ml-1">
-                                                    Conductor / Placa de Destino
-                                                </label>
-                                                <p className="text-[7px] text-blue-400 font-bold mb-2 ml-1">
-                                                    El sistema usará la ruta más reciente del conductor seleccionado.
-                                                </p>
-                                                <div className="relative">
-                                                    <div
-                                                        onClick={() => canEdit && setIsOpen(!isOpen)}
-                                                        className={`w-full px-4 py-3 bg-blue-50 border-2 rounded-xl text-[10px] font-black flex items-center justify-between transition-all cursor-pointer
-                                                            ${isOpen ? 'border-blue-400 ring-2 ring-blue-100' : 'border-blue-100'}
-                                                            ${!canEdit ? 'opacity-70 cursor-not-allowed' : 'hover:border-blue-300'}`}
-                                                    >
-                                                        <div className="flex items-center gap-2">
-                                                            {selectedRoute ? (
-                                                                <>
-                                                                    <span className="text-blue-900">🚗 {selectedRoute.plate}</span>
-                                                                    <span className="text-blue-400 text-[8px]">| {selectedRoute.driver_name}</span>
-                                                                </>
-                                                            ) : (
-                                                                <span className="text-blue-300 uppercase tracking-tighter">Buscar por placa o conductor...</span>
-                                                            )}
-                                                        </div>
-                                                        <Icons.ChevronDown className={`w-3 h-3 text-blue-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                                                    </div>
-
-                                                    {isOpen && (
-                                                        <div className="absolute z-[1000] top-full left-0 right-0 mt-2 bg-white border border-blue-100 shadow-2xl rounded-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-                                                            <div className="p-2 bg-blue-50/50 border-b border-blue-50">
-                                                                <div className="relative">
-                                                                    <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-blue-400" />
-                                                                    <input
-                                                                        autoFocus
-                                                                        type="text"
-                                                                        value={search}
-                                                                        onChange={(e) => setSearch(e.target.value)}
-                                                                        placeholder="Filtrar por placa o conductor..."
-                                                                        className="w-full pl-8 pr-4 py-2 bg-white border border-blue-100 rounded-lg text-[10px] font-bold outline-none focus:border-blue-300 transition-all"
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                            <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
-                                                                {filteredRoutes.length > 0 ? (
-                                                                    filteredRoutes.map((r, ridx) => (
-                                                                        <div
-                                                                            key={r.route_id}
-                                                                            onClick={() => {
-                                                                                onUpdate({ targetRouteId: r.route_id });
-                                                                                setIsOpen(false);
-                                                                                setSearch('');
-                                                                            }}
-                                                                            className="px-4 py-3 hover:bg-blue-50 cursor-pointer flex items-center justify-between border-b border-blue-50 last:border-0 transition-colors"
-                                                                        >
-                                                                            <div className="flex flex-col gap-0.5">
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span className="text-[10px] font-black text-blue-900">🚗 {r.plate}</span>
-                                                                                    {ridx === 0 && <span className="text-[7px] font-black px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">Más reciente</span>}
-                                                                                </div>
-                                                                                <span className="text-[8px] font-bold text-slate-400 uppercase">{r.driver_name || 'Sin conductor'}</span>
-                                                                            </div>
-                                                                            {form.targetRouteId === r.route_id && (
-                                                                                <Icons.Check className="w-3 h-3 text-emerald-500" />
-                                                                            )}
-                                                                        </div>
-                                                                    ))
-                                                                ) : (
-                                                                    <div className="px-4 py-8 text-center">
-                                                                        <p className="text-[9px] font-black text-slate-400 uppercase italic">No se encontraron rutas disponibles</p>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
+                                    {form.numConsignacion === 'OTRO_CONDUCTOR' && (
+                                        <OtroConductorSelector
+                                            allRoutes={allRoutes}
+                                            vehiclePlate={inv.vehicle_plate}
+                                            targetRouteId={form.targetRouteId}
+                                            onUpdate={onUpdate}
+                                            canEdit={canEdit}
+                                        />
+                                    )}
                                 </div>
                             )}
 

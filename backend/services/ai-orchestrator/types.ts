@@ -7,7 +7,8 @@ export type TaskType =
     | 'extraction'
     | 'translation'
     | 'manual_generation'
-    | 'qa';
+    | 'qa'
+    | 'audio_transcription';
 
 export type ProviderStatus = 'active' | 'inactive' | 'degraded';
 export type KeyStatus = 'active' | 'blocked' | 'exhausted';
@@ -52,6 +53,8 @@ export interface OrchestrationRequest {
     prompt: string;
     imageBuffer?: Buffer;
     imageMimeType?: string;
+    audioBuffer?: Buffer;
+    audioMimeType?: string;
     context?: any;
     taskType?: TaskType; // optional, can be auto-classified
     forceProvider?: string;

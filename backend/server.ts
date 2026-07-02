@@ -148,7 +148,8 @@ app.use('/api', (req, res, next) => {
     '/noticias/public',
     '/dispatch/public',
     '/dogama/email-config/callback',
-    '/validation/pdf'
+    '/validation/pdf',
+    '/public/hv'
   ];
   
   if (publicPaths.some(p => p === '/' ? req.path === '/' : req.path.startsWith(p))) {
@@ -215,6 +216,11 @@ app.listen(PORT, () => {
 
   // Inicializar scheduler SÓLO en el leader worker
   initScheduler();
+
+  // Cron de alertas de vencimiento de documentos HV
+  import('./services/hv-alertas.service.js').then(m => m.startAlertasCron()).catch(e =>
+    console.warn('[ORBIT-BOOT] HV alertas cron no iniciado:', e.message)
+  );
 
   // FLUJO DE ARRANQUE CRÍTICO M7 — solo Worker 1 (o modo standalone en dev)
   console.log('[ORBIT-BOOT] Iniciando secuencia de servicios...');

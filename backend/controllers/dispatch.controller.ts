@@ -1697,8 +1697,8 @@ export const getReturnsTracking = async (req: Request, res: Response) => {
                     'article_id',        dri.article_id,
                     'article_name',      art.name,
                     'quantity_returned', dri.quantity_returned,
-                    'un_code',           dri.un_code,
-                    'unit',              dri.unit
+                    'un_code',           COALESCE(dlp.un_code, di_item.un_code, dri.un_code),
+                    'unit',              COALESCE(di_item.unit, dri.unit)
                 )) FILTER (WHERE dri.id IS NOT NULL), '[]') AS items
             FROM delivery_returns dr
             LEFT JOIN return_reasons rr ON rr.id = dr.reason_id
@@ -1706,6 +1706,11 @@ export const getReturnsTracking = async (req: Request, res: Response) => {
             LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
             LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
             LEFT JOIN articles art ON art.id::text = dri.article_id
+            LEFT JOIN document_items di_item
+                   ON TRIM(UPPER(COALESCE(di_item.invoice, di_item.order_number))) = TRIM(UPPER(dr.invoice_id))
+                  AND TRIM(UPPER(di_item.article_id)) = TRIM(UPPER(dri.article_id))
+            LEFT JOIN document_l_payments dlp
+                   ON TRIM(UPPER(dlp.invoice)) = TRIM(UPPER(dr.invoice_id))
             LEFT JOIN LATERAL (
                 SELECT di.customer_name, di.client_ref, di.order_number,
                        dl.delivery_date, dl.client_id, dl.plan_type
@@ -1718,7 +1723,7 @@ export const getReturnsTracking = async (req: Request, res: Response) => {
               ${clientFilter}
             GROUP BY dr.id, v.plate, d.name,
                      doc_info.customer_name, doc_info.client_ref, doc_info.order_number,
-                     doc_info.delivery_date, doc_info.client_id, doc_info.plan_type, rr.name
+                     doc_info.delivery_date, doc_info.client_id, doc_info.plan_type, rr.name, dlp.un_code
             ORDER BY dr.created_at DESC
         `, params);
         res.json({ success: true, data: result.rows });
@@ -2074,8 +2079,8 @@ export const getBodegaReturnsHistory = async (req: Request, res: Response) => {
                 dr.invoice_id                          AS remision,
                 di.order_number                        AS pedido,
                 dri.article_id                         AS referencia,
-                dri.un_code,
-                dri.unit                               AS um,
+                COALESCE(dlp.un_code, di.un_code, dri.un_code) AS un_code,
+                COALESCE(di.unit, dri.unit)            AS um,
                 dri.quantity_returned                  AS cantidad,
                 rr.name                                AS motivo_devolucion,
                 dl.plan_type                           AS unidad_negocio,
@@ -2099,6 +2104,8 @@ export const getBodegaReturnsHistory = async (req: Request, res: Response) => {
             LEFT JOIN document_items di
                    ON TRIM(UPPER(COALESCE(di.invoice, di.order_number))) = TRIM(UPPER(dr.invoice_id))
                   AND TRIM(UPPER(di.article_id)) = TRIM(UPPER(dri.article_id))
+            LEFT JOIN document_l_payments dlp
+                   ON TRIM(UPPER(dlp.invoice)) = TRIM(UPPER(dr.invoice_id))
             LEFT JOIN documents_l dl ON dl.id = di.document_id
             LEFT JOIN vehicles v ON v.id::text = dr.vehicle_id::text
             LEFT JOIN return_approval_batch_items rabi ON rabi.return_id::text = dr.id::text
@@ -2414,6 +2421,7 @@ export const getConciliacionPending = async (req: Request, res: Response) => {
                 MAX(drv.id::text)                  AS driver_id,
                 MAX(drv.name)                      AS driver_name,
                 MAX(dl.external_doc_id)            AS numero_planilla,
+                (CASE WHEN COUNT(di.id) = MAX(inv_total.total_count) THEN 'COMPLETA' ELSE 'PARCIAL' END) AS return_type,
                 COALESCE(json_agg(json_build_object(
                     'article_id',        di.article_id,
                     'article_name',      COALESCE(art.name, di.article_id),
@@ -2428,6 +2436,11 @@ export const getConciliacionPending = async (req: Request, res: Response) => {
             LEFT JOIN vehicles v ON v.plate = dl.vehicle_plate
             LEFT JOIN assignments asgn ON asgn.vehicle_id::text = v.id::text AND asgn.is_active = true
             LEFT JOIN drivers drv ON drv.id::text = asgn.driver_id::text
+            LEFT JOIN (
+                SELECT TRIM(UPPER(COALESCE(NULLIF(di2.invoice,''), di2.order_number))) AS invoice_id, COUNT(*) AS total_count
+                FROM document_items di2
+                GROUP BY TRIM(UPPER(COALESCE(NULLIF(di2.invoice,''), di2.order_number)))
+            ) inv_total ON inv_total.invoice_id = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
             WHERE di.item_status IN ('EST-13','DEVUELTO','DEVUELT')
               AND NOT EXISTS (
                   SELECT 1 FROM delivery_returns dr

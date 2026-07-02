@@ -38,12 +38,22 @@ export class GeminiAdapter implements ProviderAdapter {
 
         const promptParts: any[] = [request.prompt];
 
-        // If multimodal (PDF / Image)
+        // Multimodal: imagen / PDF
         if (request.imageBuffer && request.imageMimeType) {
             promptParts.push({
                 inlineData: {
                     data: request.imageBuffer.toString('base64'),
                     mimeType: request.imageMimeType
+                }
+            });
+        }
+
+        // Audio (reCAPTCHA, transcripción, etc.)
+        if (request.audioBuffer && request.audioMimeType) {
+            promptParts.push({
+                inlineData: {
+                    data: request.audioBuffer.toString('base64'),
+                    mimeType: request.audioMimeType
                 }
             });
         }

@@ -96,6 +96,8 @@ const MaestrasDogama = lazyWithRetry(() => import('./components/Dogama/MaestrasD
 const CitasDespachosCarga = lazyWithRetry(() => import('./components/Dogama/CitasDespachosCarga'));
 const HelpDesk = lazyWithRetry(() => import('./components/HelpDesk'));
 const ValidadorDocumentos = lazyWithRetry(() => import('./components/RRHH/ValidadorDocumentos'));
+const HojasDeVidaMain = lazyWithRetry(() => import('./components/HojasDeVida/HojasDeVidaMain'));
+const PublicDocForm = lazyWithRetry(() => import('./components/HojasDeVida/PublicDocForm'));
 
 // Import Admin Module
 const AdminDBManager = lazyWithRetry(() => import('./pages/AdminDBManager'));
@@ -1123,6 +1125,27 @@ const App: React.FC = () => {
             <ValidadorDocumentos />
           </React.Suspense>
         );
+      case 'hojas-vida':
+      case 'hv-dashboard':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Hojas de Vida DMS...</div>}>
+            <HojasDeVidaMain defaultTab="dashboard" />
+          </React.Suspense>
+        );
+      case 'hv-solicitudes':
+      case 'hv-vehiculos':
+      case 'hv-conductores':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Hojas de Vida DMS...</div>}>
+            <HojasDeVidaMain defaultTab="solicitudes" />
+          </React.Suspense>
+        );
+      case 'hv-maestras':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Hojas de Vida DMS...</div>}>
+            <HojasDeVidaMain defaultTab="maestras" />
+          </React.Suspense>
+        );
       default:
         return (
           <div className="p-10 border-2 border-dashed border-slate-200 rounded-[3rem] text-center">
@@ -1175,6 +1198,14 @@ const App: React.FC = () => {
           <PublicVisitForm />
         </React.Suspense>
       </>
+    );
+  }
+
+  if (window.location.pathname.startsWith('/documentacion/')) {
+    return (
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-gray-50"><div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>}>
+        <PublicDocForm />
+      </React.Suspense>
     );
   }
 

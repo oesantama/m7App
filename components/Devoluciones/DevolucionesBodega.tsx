@@ -22,6 +22,7 @@ interface ConcilPendingInvoice {
     driver_id?: string;
     driver_name?: string;
     numero_planilla?: string;
+    return_type?: 'COMPLETA' | 'PARCIAL';
     items: Array<{ article_id: string; article_name?: string; sku?: string; un_code?: string; unit?: string; quantity_returned: number }>;
 }
 
@@ -253,7 +254,7 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                 ...i,
                 vendedor:      concilExtras[i.invoice_id]?.vendedor ?? '',
                 return_reason: concilExtras[i.invoice_id]?.return_reason ?? '',
-                return_type:   concilExtras[i.invoice_id]?.return_type ?? 'COMPLETA',
+                return_type:   i.return_type ?? 'COMPLETA',
             }));
             const res = await api.importFromConciliacion(payload, user?.name || user?.email || 'BODEGA');
             if (!res?.success) throw new Error(res?.error ?? 'Error al importar');
@@ -1215,21 +1216,22 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                                                 </span>
                                                             )}
                                                         </td>
-                                                        <td className="px-3 py-2 text-center">
-                                                            <span className="bg-indigo-100 text-indigo-700 text-[8px] font-black px-2 py-0.5 rounded-lg">
-                                                                {inv.items.length}
-                                                            </span>
+                                                        <td className="px-3 py-2">
+                                                            <div className="flex flex-col gap-1 max-w-[150px]">
+                                                                {inv.items.map((it, i) => (
+                                                                    <div key={i} className="flex items-center justify-between gap-2 border-b border-slate-100 last:border-0 pb-0.5 last:pb-0 font-mono text-[9px]">
+                                                                        <span className="text-slate-600 font-bold truncate" title={it.article_name || it.article_id}>{it.article_id}</span>
+                                                                        <span className="text-indigo-600 font-black shrink-0">{it.quantity_returned} <span className="text-slate-400 font-normal text-[8px]">{it.unit || 'und'}</span></span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
                                                         </td>
                                                         {/* Tipo COMPLETA/PARCIAL */}
                                                         <td className="px-2 py-2" onClick={e => e.stopPropagation()}>
-                                                            <div className="flex gap-1">
-                                                                {(['COMPLETA','PARCIAL'] as const).map(t => (
-                                                                    <button key={t} onClick={() => setConcilExtra(inv.invoice_id, 'return_type', t)}
-                                                                        className={`text-[7px] font-black px-1.5 py-0.5 rounded-lg uppercase transition-all ${(concilExtras[inv.invoice_id]?.return_type ?? 'COMPLETA') === t ? (t === 'COMPLETA' ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-white') : 'bg-slate-100 text-slate-500'}`}>
-                                                                        {t === 'COMPLETA' ? 'Comp.' : 'Parc.'}
-                                                                    </button>
-                                                                ))}
-                                                            </div>
+                                                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-lg uppercase whitespace-nowrap
+                                                                ${inv.return_type === 'COMPLETA' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                                {inv.return_type === 'COMPLETA' ? 'Completa' : 'Parcial'}
+                                                            </span>
                                                         </td>
                                                         {/* Vendedor */}
                                                         <td className="px-2 py-2 min-w-[90px]" onClick={e => e.stopPropagation()}>

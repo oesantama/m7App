@@ -1,4 +1,5 @@
 import axios from 'axios';
+import FormData from 'form-data';
 import { ProviderAdapter } from './base.js';
 import { OrchestrationRequest } from '../types.js';
 
@@ -14,6 +15,25 @@ export class GroqAdapter implements ProviderAdapter {
         promptTokens: number;
         completionTokens: number;
     }> {
+        // Audio transcription via Groq Whisper (multipart endpoint)
+        if (request.audioBuffer && request.audioMimeType) {
+            const form = new FormData();
+            const ext = request.audioMimeType.split('/')[1]?.split(';')[0] || 'mp3';
+            form.append('file', request.audioBuffer, { filename: `audio.${ext}`, contentType: request.audioMimeType });
+            form.append('model', 'whisper-large-v3');
+            form.append('response_format', 'text');
+            form.append('language', 'en');
+
+            const res = await axios.post(
+                'https://api.groq.com/openai/v1/audio/transcriptions',
+                form,
+                { headers: { 'Authorization': `Bearer ${apiKey}`, ...form.getHeaders() }, timeout: 30000 }
+            );
+            const raw = typeof res.data === 'string' ? res.data : (res.data?.text || '');
+            const digits = raw.replace(/\D/g, '');
+            return { text: digits, promptTokens: 0, completionTokens: digits.length };
+        }
+
         let apiModelId = modelId;
         // Map common models if necessary, or pass through
         if (modelId === 'llama-3.3-70b-specdec') apiModelId = 'llama-3.3-70b-specdec';

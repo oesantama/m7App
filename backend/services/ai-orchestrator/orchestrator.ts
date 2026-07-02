@@ -237,6 +237,76 @@ export class AIOrchestrator {
     }
 
     /**
+     * Transcripción de audio de reCAPTCHA usando todos los proveedores disponibles.
+     * Estrategia: Gemini 2.0 Flash (7 llaves) → Groq Whisper → error.
+     * Completamente GRATIS usando la cuota diaria de cada proveedor.
+     */
+    static async transcribeAudio(audioBuffer: Buffer, audioMimeType: string): Promise<string> {
+        await this.initialize();
+
+        // Proveedor 1: Gemini (7 llaves rotatorias)
+        try {
+            const geminiKeys = await getKeysForProvider('gemini');
+            const adapter = getProviderAdapter('gemini');
+            for (const key of geminiKeys.filter(k => k.status === 'active')) {
+                try {
+                    const result = await adapter.generateContent(
+                        'gemini-2.0-flash',
+                        key.apiKeyEncrypted,
+                        {
+                            prompt: 'This is a reCAPTCHA audio challenge. Listen carefully and extract ONLY the spoken digits in order. Respond with ONLY the digit sequence, no spaces, no punctuation. Example: "381924"',
+                            audioBuffer,
+                            audioMimeType,
+                            temperature: 0,
+                            maxTokens: 20,
+                            taskType: 'audio_transcription',
+                        }
+                    );
+                    const digits = result.text.replace(/\D/g, '');
+                    if (digits.length >= 4) {
+                        console.log(`[AUDIO-TRANSCRIBE] Gemini (${key.label}): "${digits}"`);
+                        await updateKeyMetrics(key.id, true, 0, result.promptTokens + result.completionTokens);
+                        return digits;
+                    }
+                } catch (e: any) {
+                    const isQuota = e.message?.includes('429') || e.message?.includes('quota') || e.message?.includes('RESOURCE_EXHAUSTED');
+                    await updateKeyMetrics(key.id, false, 0, 0);
+                    if (!isQuota) break; // error estructural → no reintentar con esta llave
+                }
+            }
+        } catch (e) {
+            console.warn('[AUDIO-TRANSCRIBE] Gemini no disponible:', (e as any).message);
+        }
+
+        // Proveedor 2: Groq Whisper (gratis hasta cuota diaria)
+        try {
+            const groqKeys = await getKeysForProvider('groq');
+            const adapter = getProviderAdapter('groq');
+            for (const key of groqKeys.filter(k => k.status === 'active')) {
+                try {
+                    const result = await adapter.generateContent(
+                        'whisper-large-v3',
+                        key.apiKeyEncrypted,
+                        { prompt: '', audioBuffer, audioMimeType, taskType: 'audio_transcription' }
+                    );
+                    const digits = result.text.replace(/\D/g, '');
+                    if (digits.length >= 4) {
+                        console.log(`[AUDIO-TRANSCRIBE] Groq Whisper: "${digits}"`);
+                        await updateKeyMetrics(key.id, true, 0, result.completionTokens);
+                        return digits;
+                    }
+                } catch (e: any) {
+                    await updateKeyMetrics(key.id, false, 0, 0);
+                }
+            }
+        } catch (e) {
+            console.warn('[AUDIO-TRANSCRIBE] Groq no disponible:', (e as any).message);
+        }
+
+        throw new Error('Ningún proveedor de IA pudo transcribir el audio del reCAPTCHA (Gemini + Groq agotados)');
+    }
+
+    /**
      * Calculate cost based on input/output token counts
      */
     private static calculateCost(model: AIModel, promptTokens: number, completionTokens: number): number {

@@ -286,7 +286,29 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         }
 
         const headers = rawData[headerRowIndex].map(h => String(h || '').trim());
-        const findIdx = (terms: string[]) => headers.findIndex(h => terms.some(t => h.toLowerCase().trim().includes(t.toLowerCase().trim())));
+        const normStr = (s: string) => s.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const findIdx = (terms: string[]) => {
+           const exactIdx = headers.findIndex(h => {
+             if (!h) return false;
+             return terms.some(t => normStr(h) === normStr(t));
+           });
+           if (exactIdx !== -1) return exactIdx;
+
+           return headers.findIndex(h => {
+             if (!h) return false;
+             const normH = normStr(h);
+             return terms.some(t => {
+               const normT = normStr(t);
+               if (normT.length <= 3) {
+                 return normH === normT || 
+                        normH.startsWith(normT + ' ') || 
+                        normH.endsWith(' ' + normT) || 
+                        normH.includes(' ' + normT + ' ');
+               }
+               return normH.includes(normT);
+             });
+           });
+        };
 
         // Identificar tipo de plan automáticamente si no se forzó
         const iExactUnOrig = headers.findIndex(h => h.toLowerCase().trim() === 'un orig');
@@ -300,7 +322,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         const iUn = findIdx(['un orig', 'un', 'un code', 'cod plan']);
         const iRef = findIdx(['ref 1', 'referencia', 'client ref', 'ref']);
         const iCant = findIdx(['cant env', 'cantidad', 'qty', 'cantidad esperada']);
-        const iUnd = findIdx(['um', 'und', 'unid', 'unidad']);
+        const iUnd = findIdx(['um', 'und', 'unid', 'unidad', 'medida', 'u medida', 'u.m.', 'uom']);
         const iFactura = findIdx(['remision', 'factura', 'documento', 'invoice']);
         const iCity = findIdx(['destino', 'ciudad', 'city']);
         const iDir = findIdx(['dirección', 'direccion', 'address', 'dir']);
@@ -359,7 +381,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
             receivedQty: 0,
             countedQty: 0,
             status: 'Pending',
-            unit: iUnd !== -1 ? String(row[iUnd]) : 'UND',
+            unit: (iUnd !== -1 && String(row[iUnd] || '').trim() !== '' && String(row[iUnd] || '').trim() !== '0') ? String(row[iUnd]).trim() : 'UND',
             invoice: iFactura !== -1 ? String(row[iFactura]) : '',
             city: iCity !== -1 ? String(row[iCity]) : '',
             address: rawAddr,
