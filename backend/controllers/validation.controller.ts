@@ -871,7 +871,7 @@ async function scrapePoliciaNacional(
 
     // Click radio "Acepto"
     await page.evaluate(() => {
-        const radios = document.querySelectorAll('input[type="radio"]');
+        const radios = Array.from(document.querySelectorAll('input[type="radio"]'));
         for (const r of radios) {
             const val = (r as HTMLInputElement).value?.toLowerCase();
             if (val === 'true' || val === 'acepto' || val === '1') {
@@ -903,7 +903,7 @@ async function scrapePoliciaNacional(
     await page.evaluate((val: string) => {
         const sel = document.querySelector('select') as HTMLSelectElement;
         if (sel) {
-            for (const opt of sel.options) {
+            for (const opt of Array.from(sel.options)) {
                 if (opt.value === val || opt.text.includes(val)) {
                     sel.value = opt.value;
                     sel.dispatchEvent(new Event('change', { bubbles: true }));
