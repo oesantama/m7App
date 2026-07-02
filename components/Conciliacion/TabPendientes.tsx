@@ -112,8 +112,8 @@ const FORMA_COLOR: Record<string, { bg: string; text: string; label: string }> =
 };
 
 const ENTREGADO_STATUS = ['EST-12', 'ENTREGADO', 'COMPLETED', 'FINALIZADO'];
-const DEVUELTO_STATUS  = ['EST-13', 'DEVUELTO', 'DEVUELT'];
-const PARCIAL_STATUS   = ['EST-14', 'ENTREGA PARCIAL', 'PARCIAL'];
+const DEVUELTO_STATUS  = ['EST-13', 'EST-16', 'DEVUELTO', 'DEVUELT'];
+const PARCIAL_STATUS   = ['EST-14', 'EST-17', 'ENTREGA PARCIAL', 'PARCIAL'];
 const REPICE_STATUS    = ['EST-15', 'REPICE'];
 
 // ── Sub-componente: Metric pill ───────────────────────────────────────────────

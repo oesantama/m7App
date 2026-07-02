@@ -25,6 +25,7 @@ import {
     serveLocalFile,
     getAuditoria,
     getPublicSolicitud,
+    getCatalogosPublicos,
     guardarDatosPublico,
     subirDocumentoPublico,
     submitFormularioPublico,
@@ -70,7 +71,7 @@ export default router;
 
 export const hvPublicRouter = Router();
 
-hvPublicRouter.get('/catalogos', getCatalogos);
+hvPublicRouter.get('/catalogos', getCatalogosPublicos);
 hvPublicRouter.get('/:token', getPublicSolicitud);
 hvPublicRouter.patch('/:token/datos', guardarDatosPublico);
 hvPublicRouter.post('/:token/documento', upload.single('archivo'), subirDocumentoPublico);

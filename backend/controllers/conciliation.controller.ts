@@ -725,6 +725,34 @@ export const saveConciliation = async (req: Request, res: Response) => {
                      ${protegerRegistroBodega ? `AND item_status NOT IN ('EST-16','EST-17')` : ''}`,
                     [nuevoItemStatus, documentId, invoiceNumber]
                 );
+
+                // Si Facturación está legalizando una devolución (parcial o total),
+                // verificamos si ya existe una devolución física registrada por Bodega en PENDING/PROCESSED.
+                // En ese caso, la confirmamos automáticamente.
+                if (nuevoItemStatus === 'EST-13' || nuevoItemStatus === 'EST-14') {
+                    const updateRes = await client.query(
+                        `UPDATE delivery_returns
+                         SET status = 'CONFIRMED',
+                             conciliacion_confirmada_at = NOW(),
+                             conciliacion_confirmada_by = $1
+                         WHERE TRIM(UPPER(invoice_id)) = TRIM(UPPER($2))
+                           AND status IN ('PENDING', 'PROCESSED')
+                         RETURNING id`,
+                        [usuarioNombre || conciliadoPor || 'FACTURACION', invoiceNumber]
+                    );
+
+                    // Si ya existía el registro en bodega y lo acabamos de confirmar,
+                    // actualizamos el estado de los ítems a EST-16 (Completa Bodega) o EST-17 (Parcial Bodega)
+                    // para reflejar que el material ya fue físicamente recibido.
+                    if (updateRes.rows.length > 0) {
+                        const finalStatus = nuevoItemStatus === 'EST-13' ? 'EST-16' : 'EST-17';
+                        await client.query(
+                            `UPDATE document_items SET item_status = $1
+                             WHERE document_id = $2 AND invoice = $3`,
+                            [finalStatus, documentId, invoiceNumber]
+                        );
+                    }
+                }
             }
 
         // COMMIT

@@ -5,8 +5,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import { API_URL } from '../../services/api';
 
-const API = '/api/hv';
+const API = `${API_URL}/hv`;
 const BASE_URL = import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin;
 
 interface Solicitud {
@@ -71,7 +72,7 @@ const HVSolicitudes: React.FC<Props> = ({ onRevisar }) => {
     const [estado, setEstado] = useState('');
     const [tipoEntidad, setTipoEntidad] = useState('');
 
-    const token = localStorage.getItem('m7_token');
+    const token = localStorage.getItem('token');
 
     useEffect(() => { cargarCatalogos(); }, []);
     useEffect(() => { cargar(); }, [page, estado, tipoEntidad]);
@@ -314,7 +315,7 @@ const CrearSolicitudModal: React.FC<{
         if (!nombreEntidad.trim()) { toast.error('Ingrese el nombre de la entidad'); return; }
         setSaving(true);
         try {
-            const res = await fetch('/api/hv/solicitudes', {
+            const res = await fetch(`${API}/solicitudes`, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({

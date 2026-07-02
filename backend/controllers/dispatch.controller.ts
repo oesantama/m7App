@@ -1484,15 +1484,46 @@ export const registerRouteReturn = async (req: Request, res: Response) => {
 
         // Cabecera delivery_return
         const rsnId = await resolveReasonId(returnReason, client);
-        const retRes = await client.query(
-            `INSERT INTO delivery_returns
-                (invoice_id, vehicle_id, driver_id, reason_id, notes, status,
-                 vendedor, numero_planilla, fecha_placa, created_at)
-             VALUES ($1,$2,$3,$4,$5,'PENDING',$6,$7,$8,CURRENT_TIMESTAMP)
-             RETURNING id`,
-            [invoiceId, vehicleId, driverId, rsnId, notes || null,
-             String(vendedor).trim(), numeroPlanilla || null, fechaPlaca || null]
+
+        // Verificar si facturación ya legalizó/concilió esta factura
+        const conciliationCheck = await client.query(
+            `SELECT 1 FROM invoice_conciliations 
+             WHERE TRIM(UPPER(invoice_number)) = TRIM(UPPER($1))
+             LIMIT 1`,
+            [invoiceId]
         );
+        const hasConciliation = conciliationCheck.rows.length > 0;
+
+        let queryStr = '';
+        let queryParams: any[] = [];
+        
+        if (hasConciliation) {
+            queryStr = `
+                INSERT INTO delivery_returns
+                    (invoice_id, vehicle_id, driver_id, reason_id, notes, status,
+                     vendedor, numero_planilla, fecha_placa,
+                     conciliacion_confirmada_at, conciliacion_confirmada_by, created_at)
+                 VALUES ($1,$2,$3,$4,$5,'CONFIRMED',$6,$7,$8,CURRENT_TIMESTAMP,$9,CURRENT_TIMESTAMP)
+                 RETURNING id`;
+            queryParams = [
+                invoiceId, vehicleId, driverId, rsnId, notes || null,
+                String(vendedor).trim(), numeroPlanilla || null, fechaPlaca || null,
+                'SISTEMA_AUTO'
+            ];
+        } else {
+            queryStr = `
+                INSERT INTO delivery_returns
+                    (invoice_id, vehicle_id, driver_id, reason_id, notes, status,
+                     vendedor, numero_planilla, fecha_placa, created_at)
+                 VALUES ($1,$2,$3,$4,$5,'PENDING',$6,$7,$8,CURRENT_TIMESTAMP)
+                 RETURNING id`;
+            queryParams = [
+                invoiceId, vehicleId, driverId, rsnId, notes || null,
+                String(vendedor).trim(), numeroPlanilla || null, fechaPlaca || null
+            ];
+        }
+
+        const retRes = await client.query(queryStr, queryParams);
         const returnId = retRes.rows[0].id;
 
         // Ítems con article_id y un_code
@@ -2421,32 +2452,60 @@ export const getConciliacionPending = async (req: Request, res: Response) => {
                 MAX(drv.id::text)                  AS driver_id,
                 MAX(drv.name)                      AS driver_name,
                 MAX(dl.external_doc_id)            AS numero_planilla,
-                (CASE WHEN COUNT(di.id) = MAX(inv_total.total_count) THEN 'COMPLETA' ELSE 'PARCIAL' END) AS return_type,
+                MAX(CASE WHEN di.item_status IN ('EST-14','PARCIAL') THEN 'PARCIAL' ELSE 'COMPLETA' END) AS return_type,
                 COALESCE(json_agg(json_build_object(
                     'article_id',        di.article_id,
                     'article_name',      COALESCE(art.name, di.article_id),
                     'sku',               di.article_id,
                     'un_code',           di.un_code,
                     'unit',              COALESCE(NULLIF(di.unit,''), 'UND'),
-                    'quantity_returned', COALESCE(di.expected_qty, 0)
-                )) FILTER (WHERE di.article_id IS NOT NULL), '[]') AS items
+                    'quantity_returned', COALESCE(
+                        (
+                            SELECT (elem->>'returned_qty')::numeric 
+                            FROM jsonb_array_elements(COALESCE(ic.items_returned::jsonb, '[]'::jsonb)) elem 
+                            WHERE TRIM(UPPER(elem->>'article_id')) = TRIM(UPPER(di.article_id))
+                            LIMIT 1
+                        ), 
+                        di.expected_qty, 
+                        0
+                    )
+                )) FILTER (
+                    WHERE di.article_id IS NOT NULL 
+                      AND (
+                          di.item_status IN ('EST-13','DEVUELTO','DEVUELT')
+                          OR (
+                              di.item_status IN ('EST-14','PARCIAL')
+                              AND COALESCE(
+                                  (
+                                      SELECT (elem->>'returned_qty')::numeric 
+                                      FROM jsonb_array_elements(COALESCE(ic.items_returned::jsonb, '[]'::jsonb)) elem 
+                                      WHERE TRIM(UPPER(elem->>'article_id')) = TRIM(UPPER(di.article_id))
+                                      LIMIT 1
+                                  ), 
+                                  0
+                              ) > 0
+                          )
+                      )
+                ), '[]') AS items
             FROM document_items di
             JOIN documents_l dl ON dl.id = di.document_id
             LEFT JOIN articles art ON art.id::text = di.article_id
             LEFT JOIN vehicles v ON v.plate = dl.vehicle_plate
             LEFT JOIN assignments asgn ON asgn.vehicle_id::text = v.id::text AND asgn.is_active = true
             LEFT JOIN drivers drv ON drv.id::text = asgn.driver_id::text
+            LEFT JOIN invoice_conciliations ic ON ic.document_id = di.document_id 
+              AND TRIM(UPPER(ic.invoice_number)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
             LEFT JOIN (
                 SELECT TRIM(UPPER(COALESCE(NULLIF(di2.invoice,''), di2.order_number))) AS invoice_id, COUNT(*) AS total_count
                 FROM document_items di2
                 GROUP BY TRIM(UPPER(COALESCE(NULLIF(di2.invoice,''), di2.order_number)))
             ) inv_total ON inv_total.invoice_id = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
-            WHERE di.item_status IN ('EST-13','DEVUELTO','DEVUELT')
+            WHERE di.item_status IN ('EST-13','DEVUELTO','DEVUELT','EST-14','PARCIAL')
               AND NOT EXISTS (
                   SELECT 1 FROM delivery_returns dr
                   WHERE TRIM(UPPER(dr.invoice_id)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
               )
-              ${clientFilter}
+              \${clientFilter}
             GROUP BY TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
             ORDER BY MAX(dl.delivery_date) DESC
         `, params);
@@ -2525,6 +2584,27 @@ export const importFromConciliacion = async (req: Request, res: Response) => {
                         item.unit || 'UND',
                     ]
                 );
+            }
+
+            // Actualizar item_status en document_items a EST-16/EST-17 para reflejar que bodega ya recibió físicamente el material.
+            if (inv.return_type === 'COMPLETA') {
+                await client.query(
+                    `UPDATE document_items SET item_status = 'EST-16'
+                     WHERE TRIM(UPPER(COALESCE(NULLIF(invoice,''), order_number))) = $1`,
+                    [inv.invoice_id.trim().toUpperCase()]
+                );
+            } else {
+                const returnedArticleIds = (inv.items || [])
+                    .map((item: any) => String(item.article_id || item.sku || '').trim().toUpperCase())
+                    .filter(Boolean);
+                if (returnedArticleIds.length > 0) {
+                    await client.query(
+                        `UPDATE document_items SET item_status = 'EST-17'
+                         WHERE TRIM(UPPER(COALESCE(NULLIF(invoice,''), order_number))) = $1
+                           AND TRIM(UPPER(article_id)) = ANY($2::text[])`,
+                        [inv.invoice_id.trim().toUpperCase(), returnedArticleIds]
+                    );
+                }
             }
         }
 

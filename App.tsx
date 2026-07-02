@@ -1126,24 +1126,9 @@ const App: React.FC = () => {
           </React.Suspense>
         );
       case 'hojas-vida':
-      case 'hv-dashboard':
         return (
           <React.Suspense fallback={<div className="p-10">Cargando Hojas de Vida DMS...</div>}>
-            <HojasDeVidaMain defaultTab="dashboard" />
-          </React.Suspense>
-        );
-      case 'hv-solicitudes':
-      case 'hv-vehiculos':
-      case 'hv-conductores':
-        return (
-          <React.Suspense fallback={<div className="p-10">Cargando Hojas de Vida DMS...</div>}>
-            <HojasDeVidaMain defaultTab="solicitudes" />
-          </React.Suspense>
-        );
-      case 'hv-maestras':
-        return (
-          <React.Suspense fallback={<div className="p-10">Cargando Hojas de Vida DMS...</div>}>
-            <HojasDeVidaMain defaultTab="maestras" />
+            <HojasDeVidaMain />
           </React.Suspense>
         );
       default:

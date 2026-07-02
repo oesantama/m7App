@@ -586,6 +586,7 @@ export const getPublicSolicitud = async (req: Request, res: Response) => {
                 tipo_tercero: sol.tipo_tercero_nombre,
                 tipo_tercero_codigo: sol.tipo_tercero_codigo,
                 nombre_entidad: sol.nombre_entidad,
+                entidad_id: sol.entidad_id,
                 estado: sol.estado,
                 datos_json: sol.datos_json,
                 token_expira_at: sol.token_expira_at,
@@ -594,6 +595,24 @@ export const getPublicSolicitud = async (req: Request, res: Response) => {
             documentos_requeridos: docsReq.rows,
             documentos_subidos: docsExistentes.rows,
             acceso_id: acceso.rows[0].id,
+        });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
+export const getCatalogosPublicos = async (_req: Request, res: Response) => {
+    try {
+        const [eps, afp, ciudades] = await Promise.all([
+            pool.query(`SELECT nombre FROM gh_eps ORDER BY nombre`),
+            pool.query(`SELECT nombre FROM gh_afp ORDER BY nombre`),
+            pool.query(`SELECT nombre FROM cfg_ciudades WHERE estado='EST-01' ORDER BY nombre`),
+        ]);
+        res.json({
+            eps: eps.rows.map((r: any) => r.nombre),
+            afp: afp.rows.map((r: any) => r.nombre),
+            ciudades: ciudades.rows.map((r: any) => r.nombre),
+            arl: ['AXA Colpatria','Positiva','Sura','Bolívar','Equidad','La Previsora','Colmena','Liberty'],
         });
     } catch (e: any) {
         res.status(500).json({ error: e.message });

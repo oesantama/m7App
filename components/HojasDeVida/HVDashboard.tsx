@@ -5,8 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { API_URL } from '../../services/api';
 
-const API = '/api/hv';
+const API = `${API_URL}/hv`;
 
 interface DashboardData {
     por_estado: { estado: string; total: string }[];
@@ -74,7 +75,7 @@ const HVDashboard: React.FC<Props> = ({ onAbrirSolicitud }) => {
     const [data, setData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const token = localStorage.getItem('m7_token');
+    const token = localStorage.getItem('token');
 
     useEffect(() => { cargar(); }, []);
 

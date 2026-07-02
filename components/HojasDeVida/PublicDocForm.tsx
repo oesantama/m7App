@@ -8,19 +8,20 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 
-const API = '/api/public/hv';
+const API = `${import.meta.env.VITE_API_URL || '/api'}/public/hv`;
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
 
 interface CampoFormulario {
     id: number;
-    clave: string;
-    etiqueta: string;
+    nombre_campo: string;
+    label: string;
     tipo_input: string;
     obligatorio: boolean;
     placeholder?: string;
-    opciones?: string[];
+    opciones?: string[] | null;
     orden: number;
+    seccion?: string;
 }
 
 interface TipoDocumento {
@@ -78,12 +79,17 @@ const PublicDocForm: React.FC = () => {
     const [archivos, setArchivos] = useState<Record<number, { file: File; vencimiento?: string }>>({});
     const [subiendoDoc, setSubiendoDoc] = useState<number | null>(null);
     const [guardandoDatos, setGuardandoDatos] = useState(false);
+    const [catalogos, setCatalogos] = useState<Record<string, string[]>>({});
 
     // Auto-guardado de datos del formulario
     const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         cargarSolicitud();
+        fetch(`${API}/catalogos`)
+            .then(r => r.json())
+            .then(d => setCatalogos(d))
+            .catch(() => {});
     }, [token]);
 
     const cargarSolicitud = async () => {
@@ -101,10 +107,14 @@ const PublicDocForm: React.FC = () => {
             setTiposDocs(data.documentos_requeridos);
             setDocsSubidos(data.documentos_subidos || []);
             setAccesoId(data.acceso_id);
-            // Cargar datos previos si existen
-            if (data.solicitud.datos_json) {
-                setFormData(data.solicitud.datos_json);
-            }
+            // Pre-llenar con datos ya conocidos de la solicitud, luego sobrescribir con guardados
+            const prefill: Record<string, string> = {};
+            if (data.solicitud.nombre_entidad) prefill['nombre_completo'] = data.solicitud.nombre_entidad;
+            if (data.solicitud.entidad_id) prefill['documento_numero'] = data.solicitud.entidad_id;
+            const guardados = (data.solicitud.datos_json && Object.keys(data.solicitud.datos_json).length > 0)
+                ? data.solicitud.datos_json
+                : {};
+            setFormData({ ...prefill, ...guardados });
         } catch {
             setError('Error de conexión. Verifique su internet e intente nuevamente.');
         } finally {
@@ -136,8 +146,8 @@ const PublicDocForm: React.FC = () => {
     const validarPaso1 = () => {
         const obligatorios = campos.filter(c => c.obligatorio);
         for (const c of obligatorios) {
-            if (!formData[c.clave]?.trim()) {
-                toast.error(`El campo "${c.etiqueta}" es obligatorio`);
+            if (!formData[c.nombre_campo]?.trim()) {
+                toast.error(`El campo "${c.label}" es obligatorio`);
                 return false;
             }
         }
@@ -346,8 +356,9 @@ const PublicDocForm: React.FC = () => {
                                     <CampoInput
                                         key={campo.id}
                                         campo={campo}
-                                        valor={formData[campo.clave] || ''}
-                                        onChange={val => handleCampoChange(campo.clave, val)}
+                                        valor={formData[campo.nombre_campo] || ''}
+                                        onChange={val => handleCampoChange(campo.nombre_campo, val)}
+                                        opciones={catalogos[CAMPO_CATALOGO[campo.nombre_campo] || '']}
                                     />
                                 ))}
                             </div>
@@ -397,9 +408,9 @@ const PublicDocForm: React.FC = () => {
                                 <div className="space-y-2">
                                     {campos.map(c => (
                                         <div key={c.id} className="flex justify-between text-sm">
-                                            <span className="text-gray-500">{c.etiqueta}</span>
+                                            <span className="text-gray-500">{c.label}</span>
                                             <span className="font-medium text-gray-800 text-right max-w-[55%] break-words">
-                                                {formData[c.clave] || <span className="text-gray-300 italic">—</span>}
+                                                {formData[c.nombre_campo] || <span className="text-gray-300 italic">—</span>}
                                             </span>
                                         </div>
                                     ))}
@@ -504,19 +515,86 @@ const InfoItem: React.FC<{ icon: string; texto: string }> = ({ icon, texto }) =>
     </div>
 );
 
+const SearchableSelect: React.FC<{
+    opciones: string[];
+    valor: string;
+    onChange: (v: string) => void;
+    placeholder?: string;
+}> = ({ opciones, valor, onChange, placeholder }) => {
+    const [query, setQuery] = useState('');
+    const [abierto, setAbierto] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    const filtradas = query.length > 0
+        ? opciones.filter(o => o.toLowerCase().includes(query.toLowerCase()))
+        : opciones;
+
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false);
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    return (
+        <div ref={ref} className="relative">
+            <input
+                type="text"
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={abierto ? query : valor}
+                placeholder={valor || placeholder || 'Buscar...'}
+                onFocus={() => { setAbierto(true); setQuery(''); }}
+                onChange={e => setQuery(e.target.value)}
+            />
+            {abierto && filtradas.length > 0 && (
+                <ul className="absolute z-50 w-full bg-white border border-gray-200 rounded-xl mt-1 max-h-48 overflow-y-auto shadow-lg">
+                    {filtradas.slice(0, 50).map(op => (
+                        <li
+                            key={op}
+                            className="px-4 py-2.5 text-sm hover:bg-blue-50 cursor-pointer"
+                            onMouseDown={() => { onChange(op); setAbierto(false); setQuery(''); }}
+                        >
+                            {op}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+};
+
+const CAMPO_CATALOGO: Record<string, string> = {
+    eps_nombre: 'eps',
+    arl_nombre: 'arl',
+    ciudad: 'ciudades',
+    ciudad_residencia: 'ciudades',
+    afp_nombre: 'afp',
+    pension_nombre: 'afp',
+};
+
 const CampoInput: React.FC<{
     campo: CampoFormulario;
     valor: string;
     onChange: (v: string) => void;
-}> = ({ campo, valor, onChange }) => {
+    opciones?: string[];
+}> = ({ campo, valor, onChange, opciones }) => {
     const base = "w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+    const tieneCatalogo = opciones && opciones.length > 0;
     return (
         <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-                {campo.etiqueta}
+                {campo.label}
                 {campo.obligatorio && <span className="text-red-500 ml-1">*</span>}
             </label>
-            {campo.tipo_input === 'select' && campo.opciones ? (
+            {tieneCatalogo ? (
+                <SearchableSelect
+                    opciones={opciones!}
+                    valor={valor}
+                    onChange={onChange}
+                    placeholder={campo.placeholder}
+                />
+            ) : campo.tipo_input === 'select' && campo.opciones ? (
                 <select className={base} value={valor} onChange={e => onChange(e.target.value)}>
                     <option value="">Seleccione...</option>
                     {campo.opciones.map(op => (

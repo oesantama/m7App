@@ -5,8 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { API_URL } from '../../services/api';
 
-const API = '/api/hv';
+const API = `${API_URL}/hv`;
 const BASE_URL = window.location.origin;
 
 interface Documento {
@@ -95,7 +96,7 @@ const HVRevision: React.FC<Props> = ({ solicitudId, onVolver }) => {
     const [obsEstado, setObsEstado] = useState('');
     const [showCambioEstado, setShowCambioEstado] = useState(false);
 
-    const token = localStorage.getItem('m7_token');
+    const token = localStorage.getItem('token');
 
     useEffect(() => {
         if (solicitudId) cargar();

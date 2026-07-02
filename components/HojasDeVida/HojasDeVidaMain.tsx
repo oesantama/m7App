@@ -14,10 +14,6 @@ const HVMaestras = lazy(() => import('./HVMaestras.js'));
 
 type Tab = 'dashboard' | 'solicitudes' | 'revision' | 'alertas' | 'maestras';
 
-interface Props {
-    defaultTab?: Tab;
-}
-
 const TABS: { id: Tab; label: string; icon: string }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
     { id: 'solicitudes', label: 'Solicitudes', icon: '📋' },
@@ -32,8 +28,8 @@ const Spinner = () => (
     </div>
 );
 
-const HojasDeVidaMain: React.FC<Props> = ({ defaultTab = 'dashboard' }) => {
-    const [tab, setTab] = useState<Tab>(defaultTab);
+const HojasDeVidaMain: React.FC = () => {
+    const [tab, setTab] = useState<Tab>('dashboard');
     const [solicitudId, setSolicitudId] = useState<string | null>(null);
 
     const abrirRevision = (id: string) => {

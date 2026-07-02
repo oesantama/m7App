@@ -5,8 +5,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { API_URL } from '../../services/api';
 
-const API = '/api/hv';
+const API = `${API_URL}/hv`;
 
 interface TipoDocumento {
     id?: number;
@@ -39,7 +40,7 @@ const HVMaestras: React.FC = () => {
     const [editando, setEditando] = useState<TipoDocumento | null>(null);
     const [saving, setSaving] = useState(false);
     const [filtroTipo, setFiltroTipo] = useState('');
-    const token = localStorage.getItem('m7_token');
+    const token = localStorage.getItem('token');
 
     useEffect(() => { cargar(); }, []);
 
