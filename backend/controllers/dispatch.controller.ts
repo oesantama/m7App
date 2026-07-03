@@ -2148,6 +2148,53 @@ export const getBodegaReturnsHistory = async (req: Request, res: Response) => {
         res.json({ success: true, data: result.rows });
     } catch (err: any) {
         console.error('[M7-DEVOL-HIST]', err.message);
+        // Si falla por tablas de lotes que aún no existen en producción, reintentar sin ellas
+        if (err.message?.includes('return_approval_batch') || err.message?.includes('does not exist')) {
+            try {
+                const { clientId, dateFrom, dateTo } = req.query as Record<string, string>;
+                const params2: any[] = [];
+                const filters2: string[] = [];
+                if (clientId) { params2.push(clientId); filters2.push(`dl.client_id = $${params2.length}`); }
+                if (dateFrom)  { params2.push(dateFrom);  filters2.push(`dr.created_at::date >= $${params2.length}`); }
+                if (dateTo)    { params2.push(dateTo);    filters2.push(`dr.created_at::date <= $${params2.length}`); }
+                const where2 = filters2.length ? `WHERE ${filters2.join(' AND ')}` : '';
+                const r2 = await pool.query(`
+                    SELECT
+                        dri.id, dr.id AS return_id,
+                        dr.created_at::date AS fecha,
+                        di.customer_name, di.client_ref AS codigo_cliente,
+                        dr.vendedor, dl.delivery_date::date AS fecha_placa,
+                        v.plate AS placa, dr.numero_planilla,
+                        dr.invoice_id AS remision, di.order_number AS pedido,
+                        dri.article_id AS referencia,
+                        COALESCE(dlp.un_code, di.un_code, dri.un_code) AS un_code,
+                        COALESCE(di.unit, dri.unit) AS um,
+                        dri.quantity_returned AS cantidad,
+                        rr.name AS motivo_devolucion,
+                        dl.plan_type AS unidad_negocio, dr.status,
+                        dr.conciliacion_confirmada_at, dr.conciliacion_confirmada_by,
+                        dr.pre_approval_at, dr.pre_approval_by,
+                        dr.pre_approved_at, dr.pre_approved_by,
+                        dr.supplier_exit_at, dr.supplier_exit_by,
+                        dr.completed_at, dr.completed_by,
+                        NULL AS batch_code, NULL AS batch_status, NULL AS proveedor_confirmed_at
+                    FROM delivery_returns dr
+                    JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
+                    LEFT JOIN return_reasons rr ON rr.id = dr.reason_id
+                    LEFT JOIN document_items di
+                           ON TRIM(UPPER(COALESCE(di.invoice, di.order_number))) = TRIM(UPPER(dr.invoice_id))
+                          AND TRIM(UPPER(di.article_id)) = TRIM(UPPER(dri.article_id))
+                    LEFT JOIN document_l_payments dlp ON TRIM(UPPER(dlp.invoice)) = TRIM(UPPER(dr.invoice_id))
+                    LEFT JOIN documents_l dl ON dl.id = di.document_id
+                    LEFT JOIN vehicles v ON v.id::text = dr.vehicle_id::text
+                    ${where2}
+                    ORDER BY dr.created_at DESC, dri.article_id
+                `, params2);
+                return res.json({ success: true, data: r2.rows });
+            } catch (err2: any) {
+                console.error('[M7-DEVOL-HIST] fallback error:', err2.message);
+            }
+        }
         res.status(500).json({ error: err.message });
     }
 };
