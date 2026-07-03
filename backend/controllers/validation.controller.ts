@@ -57,6 +57,7 @@ function sanitizeFolder(name: string): string {
 // ─────────────────────────────────────────────
 export const getSources = async (_req: Request, res: Response) => {
     try {
+        await ensureDefaultSources();
         const result = await pool.query(
             'SELECT * FROM validation_sources ORDER BY entity_type, name'
         );
@@ -67,15 +68,25 @@ export const getSources = async (_req: Request, res: Response) => {
 };
 
 export const createSource = async (req: Request, res: Response) => {
-    const { id, name, url, entity_type, file_name, description, is_active } = req.body;
+    const { id, name, url, entity_type, file_name, description, is_active, requires_doc_type, doc_type_options } = req.body;
     if (!id || !name || !url || !entity_type || !file_name) {
         return res.status(400).json({ error: 'Campos requeridos: id, name, url, entity_type, file_name' });
     }
     try {
         await pool.query(
-            `INSERT INTO validation_sources (id, name, url, entity_type, file_name, description, is_active, created_at, updated_at)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW())`,
-            [id.toLowerCase().trim(), name, url, entity_type, file_name, description || null, is_active !== false]
+            `INSERT INTO validation_sources (id, name, url, entity_type, file_name, description, is_active, requires_doc_type, doc_type_options, created_at, updated_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),NOW())`,
+            [
+                id.toLowerCase().trim(),
+                name,
+                url,
+                entity_type,
+                file_name,
+                description || null,
+                is_active !== false,
+                requires_doc_type === true,
+                JSON.stringify(doc_type_options || [])
+            ]
         );
         res.json({ success: true });
     } catch (err: any) {
@@ -85,12 +96,22 @@ export const createSource = async (req: Request, res: Response) => {
 
 export const updateSource = async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { name, url, entity_type, file_name, description, is_active } = req.body;
+    const { name, url, entity_type, file_name, description, is_active, requires_doc_type, doc_type_options } = req.body;
     try {
         await pool.query(
             `UPDATE validation_sources SET name=$1, url=$2, entity_type=$3, file_name=$4,
-             description=$5, is_active=$6, updated_at=NOW() WHERE id=$7`,
-            [name, url, entity_type, file_name, description || null, is_active !== false, id]
+             description=$5, is_active=$6, requires_doc_type=$7, doc_type_options=$8, updated_at=NOW() WHERE id=$9`,
+            [
+                name,
+                url,
+                entity_type,
+                file_name,
+                description || null,
+                is_active !== false,
+                requires_doc_type === true,
+                JSON.stringify(doc_type_options || []),
+                id
+            ]
         );
         res.json({ success: true });
     } catch (err: any) {
@@ -131,6 +152,390 @@ export const getRecords = async (req: Request, res: Response) => {
         res.status(500).json({ error: err.message });
     }
 };
+
+// ─────────────────────────────────────────────
+// Seeder de fuentes predeterminadas
+// ─────────────────────────────────────────────
+async function ensureDefaultSources() {
+    const defaults = [
+        {
+            id: 'mintransporte',
+            name: 'MinTransporte Capacitaciones',
+            url: 'https://web.mintransporte.gov.co/sisconmp2/consultascapacitaciones/',
+            entity_type: 'tercero',
+            file_name: 'capacitaciones_mintransporte.pdf',
+            description: 'Sistema de Información de Conductores que Transportan Mercancías Peligrosas',
+            is_active: true,
+            requires_doc_type: true,
+            doc_type_options: ['Cédula de ciudadanía', 'Cédula extranjería', 'PPT']
+        },
+        {
+            id: 'runt',
+            name: 'RUNT Ciudadano',
+            url: 'https://portalpublico.runt.gov.co/#/consulta-ciudadano-documento/consulta/consulta-ciudadano-documento',
+            entity_type: 'tercero',
+            file_name: 'runt_ciudadano.pdf',
+            description: 'Consulta de ciudadano en el Registro Único Nacional de Tránsito',
+            is_active: true,
+            requires_doc_type: true,
+            doc_type_options: ['Cédula de ciudadanía', 'Cédula extranjería', 'Pasaporte', 'PPT']
+        },
+        {
+            id: 'simit_conductor',
+            name: 'SIMIT Conductor',
+            url: 'https://www.fcm.org.co/simit/#/estado-cuenta',
+            entity_type: 'tercero',
+            file_name: 'simit_conductor.pdf',
+            description: 'Estado de cuenta, multas e infracciones para conductores en SIMIT',
+            is_active: true,
+            requires_doc_type: true,
+            doc_type_options: ['Cédula de ciudadanía', 'Cédula extranjería', 'Pasaporte', 'PPT']
+        },
+        {
+            id: 'simit_vehiculo',
+            name: 'SIMIT Vehículo',
+            url: 'https://www.fcm.org.co/simit/#/estado-cuenta',
+            entity_type: 'placa',
+            file_name: 'simit_vehiculo.pdf',
+            description: 'Estado de cuenta, multas e infracciones por placa de vehículo en SIMIT',
+            is_active: true,
+            requires_doc_type: false,
+            doc_type_options: []
+        }
+    ];
+
+    for (const d of defaults) {
+        try {
+            await pool.query(
+                `INSERT INTO validation_sources (id, name, url, entity_type, file_name, description, is_active, requires_doc_type, doc_type_options, created_at, updated_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+                 ON CONFLICT (id) DO UPDATE SET 
+                    name = EXCLUDED.name, 
+                    url = EXCLUDED.url, 
+                    entity_type = EXCLUDED.entity_type, 
+                    file_name = EXCLUDED.file_name, 
+                    description = EXCLUDED.description, 
+                    requires_doc_type = EXCLUDED.requires_doc_type, 
+                    doc_type_options = EXCLUDED.doc_type_options`,
+                [d.id, d.name, d.url, d.entity_type, d.file_name, d.description, d.is_active, d.requires_doc_type, JSON.stringify(d.doc_type_options)]
+            );
+        } catch (e: any) {
+            console.error('[VALIDATION-SEED] Error seeding source:', d.id, e.message);
+        }
+    }
+}
+
+// Helper: Resolver captchas visuales con IA
+async function solveVisualCaptcha(imageBuffer: Buffer, mimeType: string): Promise<string> {
+    const res = await AIOrchestrator.execute({
+        prompt: 'Identify the characters shown in the image. Return ONLY the alphanumeric characters with no spaces, no extra explanation. Keep uppercase and lowercase as shown.',
+        imageBuffer,
+        imageMimeType: mimeType,
+        temperature: 0,
+        maxTokens: 10,
+        taskType: 'vision',
+        forceProvider: 'gemini'
+    });
+    return res.text.trim().replace(/\s/g, '');
+}
+
+// Scraper: MinTransporte (SISCONMP)
+const MTRANSPORTE_DOC_TYPES: Record<string, string> = {
+    'Cédula de ciudadanía': '1',
+    'Cédula extranjería': '2',
+    'PPT': '3',
+};
+
+async function scrapeSISCONMP(
+    entityId: string, docType: string, page: any
+): Promise<{ status: 'found' | 'not_found' | 'error'; summary: string; pdfBuffer: Buffer }> {
+    await page.goto('https://web.mintransporte.gov.co/sisconmp2/consultascapacitaciones/', { waitUntil: 'networkidle2', timeout: 45000 });
+    await new Promise(r => setTimeout(r, 1500));
+
+    // Seleccionar tipo de documento
+    const tipoVal = MTRANSPORTE_DOC_TYPES[docType] || '1';
+    await page.select('select#cboTDI', tipoVal).catch(() => {});
+    await page.evaluate(() => {
+        const el = document.getElementById('cboTDI');
+        if (el) el.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    // Escribir número de documento
+    await page.waitForSelector('input#txtNDI', { timeout: 15000 });
+    await page.type('input#txtNDI', entityId, { delay: 50 });
+
+    // Click Consultar
+    await page.click('#btnConsultarMD');
+    
+    // Esperar a que desaparezca el overlay de cargando "Cargando, por favor espere..."
+    await page.waitForFunction(() => {
+        const elements = Array.from(document.querySelectorAll('div, span, p, h1, h2, h3, h4, h5, td'));
+        const hasVisibleLoader = elements.some(el => {
+            const txt = el.textContent || '';
+            const isLoaderText = txt.includes('Cargando, por favor espere') || txt.includes('procesando la solicitud');
+            return isLoaderText && (el as HTMLElement).offsetParent !== null;
+        });
+        return !hasVisibleLoader;
+    }, { timeout: 25000 }).catch(() => {});
+    
+    // Esperar a que se actualice la página con el resultado o el mensaje de no encontrado
+    await page.waitForFunction(() => {
+        const text = document.body.textContent || '';
+        return text.includes('No se encontraron') || 
+               text.includes('registros') || 
+               text.includes('coincidencias') || 
+               text.includes('Ministerio de Transporte');
+    }, { timeout: 15000 }).catch(() => {});
+    await new Promise(r => setTimeout(r, 2500));
+
+    const resultHtml = await page.content();
+    const lower = resultHtml.toLowerCase();
+    
+    const noRecords = lower.includes('no se encontrar') || lower.includes('no se registraron') || lower.includes('no posee registros') || lower.includes('no se encontraron registros');
+    const status: 'found' | 'not_found' = noRecords ? 'not_found' : 'found';
+    const summary = noRecords
+        ? 'No se encontraron registros de capacitación de mercancías peligrosas (SISCONMP)'
+        : 'Se encontraron registros de capacitación de mercancías peligrosas (SISCONMP)';
+
+    // Emular pantalla para conservar estilos visuales exactos, logos y colores
+    await page.emulateMediaType('screen');
+    const pdfBuffer = Buffer.from(await page.pdf({
+        format: 'Letter', printBackground: true,
+        margin: { top: '15mm', bottom: '15mm', left: '10mm', right: '10mm' }
+    }));
+
+    return { status, summary, pdfBuffer };
+}
+
+// Scraper: RUNT Ciudadano
+const RUNT_DOC_TYPES: Record<string, string> = {
+    'Cédula de ciudadanía': 'Cédula Ciudadanía',
+    'Cédula extranjería': 'Cédula de Extranjería',
+    'Pasaporte': 'Pasaporte',
+    'PPT': 'Permiso por Protección Temporal',
+};
+
+async function scrapeRUNT(
+    entityId: string, docType: string, page: any
+): Promise<{ status: 'found' | 'not_found' | 'error'; summary: string; pdfBuffer: Buffer }> {
+    const MAX_CAPTCHA_RETRIES = 3;
+
+    for (let attempt = 1; attempt <= MAX_CAPTCHA_RETRIES; attempt++) {
+        try {
+            // Usar domcontentloaded para evitar timeouts causados por scripts de analíticas que mantienen conexiones abiertas
+            await page.goto('https://portalpublico.runt.gov.co/#/consulta-ciudadano-documento/consulta/consulta-ciudadano-documento', { waitUntil: 'domcontentloaded', timeout: 45000 });
+            await new Promise(r => setTimeout(r, 3000)); // Esperar a que la SPA de Angular inicie y monte el DOM
+
+            // Selectores alternativos y flexibles para mayor resistencia a cambios
+            const docInputSelector = 'input[formcontrolname="numeroDocumento"], input.mat-input-element[placeholder*="documento"], input#mat-input-0';
+            const typeSelectSelector = 'mat-select[formcontrolname="tipoDocumento"], mat-select';
+
+            // Esperar que los elementos estén cargados en el DOM (hasta 25 segundos)
+            await page.waitForSelector(docInputSelector, { timeout: 25000 });
+            await page.waitForSelector(typeSelectSelector, { timeout: 25000 });
+
+            const targetLabel = RUNT_DOC_TYPES[docType] || 'Cédula Ciudadanía';
+
+            // Verificar si el tipo de documento deseado ya está seleccionado por defecto
+            const currentSelected = await page.evaluate((sel: string) => {
+                const el = document.querySelector(`${sel} .mat-select-value-text`);
+                return el ? el.textContent?.trim() : '';
+            }, typeSelectSelector);
+
+            if (!currentSelected || !currentSelected.toLowerCase().includes(targetLabel.toLowerCase())) {
+                // Solo si es diferente a lo seleccionado por defecto, hacemos click y elegimos
+                await page.click(typeSelectSelector);
+                await page.waitForSelector('.mat-select-panel mat-option', { timeout: 10000 });
+                await page.evaluate((label: string) => {
+                    const opts = Array.from(document.querySelectorAll('.mat-select-panel mat-option'));
+                    const found = opts.find(o => o.textContent?.trim().toLowerCase().includes(label.toLowerCase()));
+                    if (found) {
+                        (found as HTMLElement).click();
+                    }
+                }, targetLabel);
+                await new Promise(r => setTimeout(r, 1000));
+            }
+
+            // Escribir número de documento
+            await page.click(docInputSelector, { clickCount: 3 });
+            await page.type(docInputSelector, entityId, { delay: 50 });
+
+            // Capturar captcha
+            const captchaSrc = await page.evaluate(() => {
+                const img = document.querySelector('img[src^="data:image/png;base64,"], img');
+                return img ? (img as HTMLImageElement).src : null;
+            });
+            if (!captchaSrc || !captchaSrc.startsWith('data:image')) {
+                throw new Error('No se encontró la imagen del captcha en RUNT');
+            }
+
+            const base64Data = captchaSrc.split(',')[1];
+            const imageBuffer = Buffer.from(base64Data, 'base64');
+
+            // Resolver captcha
+            const captchaAnswer = await solveVisualCaptcha(imageBuffer, 'image/png');
+            console.log(`[RUNT-CAPTCHA] Intento ${attempt} — captcha resuelto: "${captchaAnswer}"`);
+
+            // Escribir captcha
+            const captchaInputSelector = 'input[formcontrolname="captcha"], input.mat-input-element[placeholder*="caracteres"], input#mat-input-1';
+            await page.waitForSelector(captchaInputSelector, { timeout: 15000 });
+            await page.click(captchaInputSelector, { clickCount: 3 });
+            await page.type(captchaInputSelector, captchaAnswer, { delay: 50 });
+
+            // Click Consultar
+            const submitBtnSelector = 'button.mat-raised-button.mat-accent, button[type="submit"], button.btn-primary';
+            await page.click(submitBtnSelector);
+            await new Promise(r => setTimeout(r, 5000));
+
+            const resultHtml = await page.content();
+            const lower = resultHtml.toLowerCase();
+
+            // Verificar si el captcha falló
+            if (lower.includes('no coinciden con la imagen') || lower.includes('captcha incorrecto') || lower.includes('caracteres ingresados no coinciden')) {
+                console.warn(`[RUNT] Captcha incorrecto en intento ${attempt}, reintentando...`);
+                continue;
+            }
+
+            const noRegistered = lower.includes('no se encuentra información') || lower.includes('no registrado') || lower.includes('no existe información');
+            const status: 'found' | 'not_found' = noRegistered ? 'not_found' : 'found';
+            const summary = noRegistered
+                ? 'El ciudadano no está registrado como conductor ante el RUNT'
+                : 'Conductor registrado en RUNT';
+
+            // Emular pantalla para conservar estilos visuales exactos, logos y colores
+            await page.emulateMediaType('screen');
+            const pdfBuffer = Buffer.from(await page.pdf({
+                format: 'Letter', printBackground: true,
+                margin: { top: '15mm', bottom: '15mm', left: '10mm', right: '10mm' }
+            }));
+
+            return { status, summary, pdfBuffer };
+        } catch (e: any) {
+            console.error(`[RUNT-ATTEMPT-ERROR] Intento ${attempt} fallido:`, e.message);
+            if (attempt === MAX_CAPTCHA_RETRIES) {
+                throw e;
+            }
+        }
+    }
+
+    throw new Error(`RUNT: captcha fallido ${MAX_CAPTCHA_RETRIES} veces seguidas`);
+}
+
+// Scraper: SIMIT
+async function scrapeSIMIT(
+    entityId: string, entityType: string, docType: string, page: any
+): Promise<{ status: 'found' | 'not_found' | 'error'; summary: string; pdfBuffer: Buffer }> {
+    await page.goto('https://www.fcm.org.co/simit/#/estado-cuenta', { waitUntil: 'networkidle2', timeout: 45000 });
+    await new Promise(r => setTimeout(r, 1500));
+
+    // Escribir ID/placa
+    await page.waitForSelector('#txtBusqueda', { timeout: 15000 });
+    await page.click('#txtBusqueda', { clickCount: 3 });
+    await page.type('#txtBusqueda', entityId, { delay: 50 });
+
+    // Click Buscar
+    await page.click('#btnNumDocPlaca');
+    await new Promise(r => setTimeout(r, 5000));
+
+    const resultHtml = await page.content();
+    const lower = resultHtml.toLowerCase();
+
+    const noAntecedentes = lower.includes('no tienes comparendos') || lower.includes('no posee a la fecha pendientes');
+    const status: 'found' | 'not_found' = noAntecedentes ? 'not_found' : 'found';
+    const summary = noAntecedentes
+        ? 'El ciudadano no presenta comparendos ni multas registradas en SIMIT'
+        : 'ATENCIÓN: Se encontraron comparendos o multas registradas en SIMIT';
+
+    // Para placas (vehículos), o si no hay paz y salvo disponible, simplemente generamos PDF de la pantalla
+    if (entityType === 'placa') {
+        const pdfBuffer = Buffer.from(await page.pdf({
+            format: 'Letter', printBackground: true,
+            margin: { top: '15mm', bottom: '15mm', left: '10mm', right: '10mm' }
+        }));
+        return { status, summary, pdfBuffer };
+    }
+
+    // Para conductores (terceros), intentamos descargar el Paz y Salvo oficial
+    const buttonSelector = 'a[role="button"].btn-outline-primary, a.btn-outline-primary';
+    const hasButton = await page.$(buttonSelector);
+
+    if (hasButton) {
+        try {
+            // Guardar descargas dentro de la carpeta downloads del proyecto para asegurar permisos de escritura del contenedor
+            const tmpDownloadDir = path.join(__dirname, '..', 'downloads', `simit_${entityId}_${Date.now()}`);
+            fs.mkdirSync(tmpDownloadDir, { recursive: true });
+
+            const client = await page.target().createCDPSession();
+            await client.send('Page.setDownloadBehavior', {
+                behavior: 'allow',
+                downloadPath: tmpDownloadDir,
+            });
+
+            // Click Descargar Paz y Salvo
+            await page.click(buttonSelector);
+            await new Promise(r => setTimeout(r, 2000));
+
+            // Select tipo de documento utilizando page.select nativo para enlazar eventos de AngularJS/Angular
+            await page.waitForSelector('select#tipoDoc', { timeout: 15000 });
+            
+            const optionValue = await page.evaluate((label: string) => {
+                const sel = document.getElementById('tipoDoc') as HTMLSelectElement;
+                if (!sel) return null;
+                const opt = Array.from(sel.options).find(o => 
+                    o.textContent?.toLowerCase().includes('cédula') || 
+                    o.textContent?.toLowerCase().includes(label.toLowerCase())
+                );
+                return opt ? opt.value : null;
+            }, docType);
+
+            if (optionValue) {
+                await page.select('select#tipoDoc', optionValue);
+            }
+            await new Promise(r => setTimeout(r, 1000));
+
+            // Click Descargar utilizando click nativo de Puppeteer en el selector específico del modal
+            const downloadBtnSelector = '.modal-content button.btn-primary, .modal-dialog button.btn-primary, button.btn-primary';
+            await page.waitForSelector(downloadBtnSelector, { timeout: 10000 });
+            await page.click(downloadBtnSelector);
+
+            // Esperar por la descarga del archivo PDF (hasta 30 segundos)
+            let downloadedFile: string | null = null;
+            for (let i = 0; i < 30; i++) {
+                await new Promise(r => setTimeout(r, 1000));
+                if (fs.existsSync(tmpDownloadDir)) {
+                    const files = fs.readdirSync(tmpDownloadDir);
+                    // Si se está descargando (.crdownload), seguimos esperando
+                    const isDownloading = files.some(f => f.endsWith('.crdownload'));
+                    if (isDownloading) {
+                        continue;
+                    }
+                    const pdfFile = files.find(f => f.endsWith('.pdf'));
+                    if (pdfFile) {
+                        downloadedFile = path.join(tmpDownloadDir, pdfFile);
+                        break;
+                    }
+                }
+            }
+
+            if (downloadedFile) {
+                const pdfBuffer = fs.readFileSync(downloadedFile);
+                // Limpieza de archivos temporales
+                try { fs.rmSync(tmpDownloadDir, { recursive: true, force: true }); } catch {}
+                return { status, summary, pdfBuffer };
+            }
+        } catch (downloadErr: any) {
+            console.warn('[SIMIT] Falló descarga de paz y salvo, usando captura de pantalla:', downloadErr.message);
+        }
+    }
+
+    // Fallback: Captura de pantalla como PDF
+    const pdfBuffer = Buffer.from(await page.pdf({
+        format: 'Letter', printBackground: true,
+        margin: { top: '15mm', bottom: '15mm', left: '10mm', right: '10mm' }
+    }));
+
+    return { status, summary, pdfBuffer };
+}
 
 // ─────────────────────────────────────────────
 // Scraper genérico por source
@@ -991,6 +1396,9 @@ export const runValidation = async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'entity_type, entity_id, entity_name y source_ids son requeridos' });
     }
 
+    // Asegurar que las fuentes por defecto estén creadas/actualizadas en BD
+    await ensureDefaultSources();
+
     const sourcesResult = await pool.query(
         `SELECT * FROM validation_sources WHERE id = ANY($1) AND is_active = true`,
         [source_ids]
@@ -1012,7 +1420,10 @@ export const runValidation = async (req: Request, res: Response) => {
                 '--disable-gpu',
                 '--disable-blink-features=AutomationControlled',
                 '--window-size=1280,900',
-                '--ignore-certificate-errors'
+                '--ignore-certificate-errors',
+                '--disable-features=TreatInsecureOriginAsSecure,BlockInsecurePrivateNetworkRequests',
+                '--safebrowsing-disable-extension-blacklist',
+                '--safebrowsing-disable-download-protection'
             ]
         });
 
@@ -1044,6 +1455,12 @@ export const runValidation = async (req: Request, res: Response) => {
                         result = await scrapeContraloria(entity_id, tipoDoc, page);
                     } else if (source.id === 'policia') {
                         result = await scrapePoliciaNacional(entity_id, tipoDoc, page);
+                    } else if (source.id === 'mintransporte') {
+                        result = await scrapeSISCONMP(entity_id, tipoDoc, page);
+                    } else if (source.id === 'runt') {
+                        result = await scrapeRUNT(entity_id, tipoDoc, page);
+                    } else if (source.id === 'simit_conductor' || source.id === 'simit_vehiculo') {
+                        result = await scrapeSIMIT(entity_id, entity_type, tipoDoc, page);
                     } else {
                         throw new Error(`Scraper para fuente "${source.id}" no implementado`);
                     }

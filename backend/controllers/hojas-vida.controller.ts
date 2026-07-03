@@ -218,7 +218,13 @@ export const getSolicitud = async (req: Request, res: Response) => {
         if (!rows.length) return res.status(404).json({ error: 'Solicitud no encontrada' });
 
         const [docs, historial, accesos, envios] = await Promise.all([
-            pool.query('SELECT * FROM hv_documentos WHERE solicitud_id=$1 ORDER BY nombre_doc', [id]),
+            pool.query(`
+                SELECT d.*, r.acepta_vencimiento
+                FROM hv_documentos d
+                LEFT JOIN hv_tipos_documento_req r ON r.id = d.tipo_doc_req_id
+                WHERE d.solicitud_id=$1
+                ORDER BY d.nombre_doc
+            `, [id]),
             pool.query('SELECT * FROM hv_estados_historial WHERE solicitud_id=$1 ORDER BY created_at', [id]),
             pool.query('SELECT * FROM hv_accesos_link WHERE solicitud_id=$1 ORDER BY inicio_at DESC LIMIT 20', [id]),
             pool.query('SELECT el.*, u.name as enviado_por_nombre FROM hv_envios_link el LEFT JOIN users u ON u.id=el.enviado_por WHERE el.solicitud_id=$1 ORDER BY el.sent_at DESC', [id]),
@@ -497,6 +503,56 @@ export const upsertTipoDocumento = async (req: Request, res: Response) => {
     }
 };
 
+export const subirFormatoPlantilla = async (req: Request, res: Response) => {
+    const user = (req as any).user;
+    const tipoDocId = req.params['id'] as string;
+    const file = (req as any).file;
+    if (!file) return res.status(400).json({ error: 'No se recibió archivo' });
+
+    try {
+        const { rows } = await pool.query('SELECT * FROM hv_tipos_documento_req WHERE id=$1', [tipoDocId]);
+        if (!rows.length) return res.status(404).json({ error: 'Tipo de documento no encontrado' });
+
+        const ext = path.extname(file.originalname) || '.pdf';
+        const nombreArchivo = `formato_${tipoDocId}_${rows[0].nombre_archivo.replace(/\.[^.]+$/, '')}${ext}`;
+        const drivePath = `Formatos/${nombreArchivo}`;
+
+        const { saveLocalFallback, uploadBufferToDrive, rcloneAvailable } = await import('../services/hv-drive.service.js');
+        const available = await rcloneAvailable();
+        const { drivePath: savedPath } = available
+            ? await uploadBufferToDrive(file.buffer, drivePath)
+            : await saveLocalFallback(file.buffer, drivePath);
+
+        await pool.query(
+            'UPDATE hv_tipos_documento_req SET formato_plantilla_path=$1, formato_nombre_archivo=$2 WHERE id=$3',
+            [savedPath, nombreArchivo, tipoDocId]
+        );
+
+        await registrarAuditoria(null, 'subir_formato_plantilla', 'tipo_documento', tipoDocId,
+            user.id, user.name, getIp(req), null, { drivePath: savedPath });
+
+        res.json({ success: true, formato_nombre_archivo: nombreArchivo });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
+export const eliminarFormatoPlantilla = async (req: Request, res: Response) => {
+    const user = (req as any).user;
+    const tipoDocId = req.params['id'] as string;
+    try {
+        await pool.query(
+            'UPDATE hv_tipos_documento_req SET formato_plantilla_path=NULL, formato_nombre_archivo=NULL WHERE id=$1',
+            [tipoDocId]
+        );
+        await registrarAuditoria(null, 'eliminar_formato_plantilla', 'tipo_documento', tipoDocId,
+            user.id, user.name, getIp(req));
+        res.json({ success: true });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
 // ─── SERVIR ARCHIVOS LOCALES ─────────────────────────────────────────────────
 
 export const serveLocalFile = async (req: Request, res: Response) => {
@@ -505,6 +561,37 @@ export const serveLocalFile = async (req: Request, res: Response) => {
     if (!fs.existsSync(localPath)) return res.status(404).json({ error: 'Archivo no encontrado' });
     res.setHeader('Content-Type', 'application/pdf');
     fs.createReadStream(localPath).pipe(res);
+};
+
+export const serveFormatoPlantilla = async (req: Request, res: Response) => {
+    const tipoDocId = req.params['id'] as string;
+    try {
+        const { rows } = await pool.query(
+            'SELECT formato_plantilla_path, formato_nombre_archivo, nombre FROM hv_tipos_documento_req WHERE id=$1 AND activo=TRUE',
+            [tipoDocId]
+        );
+        if (!rows.length || !rows[0].formato_plantilla_path) {
+            return res.status(404).json({ error: 'Formato no disponible' });
+        }
+
+        const { formato_plantilla_path, formato_nombre_archivo, nombre } = rows[0];
+        const nombreDescarga = formato_nombre_archivo || `formato-${tipoDocId}.pdf`;
+
+        res.setHeader('Content-Disposition', `attachment; filename="${nombreDescarga}"`);
+        res.setHeader('Content-Type', 'application/pdf');
+
+        if (formato_plantilla_path.startsWith('local:')) {
+            const relativePath = formato_plantilla_path.replace('local:', '');
+            const localPath = path.join(LOCAL_BASE, relativePath);
+            if (!fs.existsSync(localPath)) return res.status(404).json({ error: 'Archivo no encontrado' });
+            fs.createReadStream(localPath).pipe(res);
+        } else {
+            const { rcloneCat } = await import('../services/hv-drive.service.js');
+            rcloneCat(formato_plantilla_path).pipe(res);
+        }
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
 };
 
 // ─── HISTORIAL / AUDITORÍA ───────────────────────────────────────────────────
@@ -690,8 +777,10 @@ export const subirDocumentoPublico = async (req: Request, res: Response) => {
             tipoTerceroCodigo = ttRes.rows[0]?.codigo || null;
         }
 
-        // Subir a Drive
-        const identificador = sol.nombre_entidad || sol.id;
+        // Subir a Drive — carpeta incluye cédula/placa + nombre
+        const identificador = sol.entidad_id
+            ? `${sol.entidad_id} ${sol.nombre_entidad || ''}`.trim()
+            : sol.nombre_entidad || sol.id;
         const { drivePath, driveLink } = await uploadDocument(
             converted.buffer,
             sol.tipo_entidad,
@@ -743,6 +832,23 @@ export const subirDocumentoPublico = async (req: Request, res: Response) => {
             null, 'Formulario público', ip, null, { nombre_doc, nombreFinal, drivePath });
 
         res.json({ success: true, documento_id: docId, drive_link: driveLink, nombre_archivo: nombreFinal });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
+export const actualizarFechaVencimiento = async (req: Request, res: Response) => {
+    const token = req.params['token'] as string;
+    const docId = req.params['docId'] as string;
+    const { fecha_vencimiento } = req.body;
+    try {
+        const sol = await pool.query('SELECT id FROM hv_solicitudes WHERE token=$1', [token]);
+        if (!sol.rows.length) return res.status(404).json({ error: 'No encontrado' });
+        await pool.query(
+            'UPDATE hv_documentos SET fecha_vencimiento=$1 WHERE id=$2 AND solicitud_id=$3',
+            [fecha_vencimiento || null, docId, sol.rows[0].id]
+        );
+        res.json({ ok: true });
     } catch (e: any) {
         res.status(500).json({ error: e.message });
     }

@@ -18,6 +18,7 @@ interface Documento {
     obs_rechazo?: string;
     drive_link?: string;
     fecha_vencimiento?: string;
+    acepta_vencimiento?: boolean;
     subido_at: string;
     version: number;
 }
@@ -123,17 +124,26 @@ const HVRevision: React.FC<Props> = ({ solicitudId, onVolver }) => {
             if (!obsRechazo.trim()) { toast.error('Ingrese el motivo de rechazo'); return; }
         }
         setGuardando(true);
+        const obsActual = obsRechazo;
         try {
             const res = await fetch(`${API}/documentos/${docId}/aprobar`, {
                 method: 'PATCH',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ estado, obs_rechazo: obsRechazo || null }),
+                body: JSON.stringify({ estado, obs_rechazo: obsActual || null }),
             });
             if (!res.ok) throw new Error((await res.json()).error);
             toast.success(estado === 'aprobado' ? 'Documento aprobado' : 'Documento rechazado');
             setDocRechazando(null);
             setObsRechazo('');
-            cargar();
+            // Actualizar estado local para no perder posición de scroll
+            setSol(prev => prev ? {
+                ...prev,
+                documentos: prev.documentos.map(d =>
+                    d.id === docId
+                        ? { ...d, estado, obs_rechazo: estado === 'rechazado' ? obsActual : undefined }
+                        : d
+                ),
+            } : null);
         } catch (e: any) {
             toast.error(e.message);
         } finally {
@@ -262,12 +272,27 @@ const HVRevision: React.FC<Props> = ({ solicitudId, onVolver }) => {
                                 <div className="flex justify-between items-start">
                                     <div className="flex-1 min-w-0">
                                         <p className="font-medium text-gray-800 text-sm truncate">{doc.nombre_doc}</p>
-                                        <p className="text-xs text-gray-500">{doc.nombre_archivo} (v{doc.version})</p>
-                                        {doc.fecha_vencimiento && (
-                                            <p className="text-xs text-orange-600">
-                                                Vence: {new Date(doc.fecha_vencimiento).toLocaleDateString('es-CO')}
-                                            </p>
-                                        )}
+                                        <p className="text-xs text-gray-400">{doc.nombre_archivo} (v{doc.version})</p>
+                                        <div className="flex flex-wrap gap-2 mt-1">
+                                            <span className="text-xs text-gray-500">
+                                                📅 Subido: {new Date(doc.subido_at).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                            </span>
+                                            {doc.fecha_vencimiento ? (
+                                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                                                    new Date(doc.fecha_vencimiento) < new Date()
+                                                        ? 'bg-red-100 text-red-700'
+                                                        : new Date(doc.fecha_vencimiento) < new Date(Date.now() + 30 * 864e5)
+                                                        ? 'bg-orange-100 text-orange-700'
+                                                        : 'bg-yellow-50 text-yellow-700'
+                                                }`}>
+                                                    ⏳ Vence: {new Date(doc.fecha_vencimiento).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                </span>
+                                            ) : doc.acepta_vencimiento ? (
+                                                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                                                    ⚠ Sin fecha de vencimiento
+                                                </span>
+                                            ) : null}
+                                        </div>
                                     </div>
                                     <span className={`ml-2 text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
                                         doc.estado === 'aprobado' ? 'bg-green-100 text-green-700'

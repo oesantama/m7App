@@ -3,7 +3,7 @@
  * Parametrización de tipos de documento y catálogos del sistema HV.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { API_URL } from '../../services/api';
 
@@ -25,6 +25,8 @@ interface TipoDocumento {
     dias_alerta_4: number;
     orden: number;
     activo: boolean;
+    formato_plantilla_path?: string | null;
+    formato_nombre_archivo?: string | null;
 }
 
 interface TipoTercero {
@@ -40,6 +42,9 @@ const HVMaestras: React.FC = () => {
     const [editando, setEditando] = useState<TipoDocumento | null>(null);
     const [saving, setSaving] = useState(false);
     const [filtroTipo, setFiltroTipo] = useState('');
+    const [subiendoFormato, setSubiendoFormato] = useState<number | null>(null);
+    const formatoInputRef = useRef<HTMLInputElement>(null);
+    const formatoTipoIdRef = useRef<number | null>(null);
     const token = localStorage.getItem('token');
 
     useEffect(() => { cargar(); }, []);
@@ -51,6 +56,7 @@ const HVMaestras: React.FC = () => {
             const data = await res.json();
             setTipos(data.tipos_documento || []);
             setTiposTercero(data.tipos_tercero || []);
+            return data;
         } catch {
             toast.error('Error al cargar maestras');
         } finally {
@@ -76,6 +82,50 @@ const HVMaestras: React.FC = () => {
             toast.error(e.message);
         } finally {
             setSaving(false);
+        }
+    };
+
+    const subirFormato = async (tipoDocId: number, file: File) => {
+        setSubiendoFormato(tipoDocId);
+        try {
+            const fd = new FormData();
+            fd.append('archivo', file);
+            const res = await fetch(`${API}/maestras/tipos-documento/${tipoDocId}/formato`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: fd,
+            });
+            if (!res.ok) throw new Error((await res.json()).error);
+            const { formato_nombre_archivo } = await res.json();
+            toast.success('Plantilla subida correctamente');
+            const data = await cargar();
+            if (editando?.id === tipoDocId && data) {
+                const updated = (data.tipos_documento || []).find((t: TipoDocumento) => t.id === tipoDocId);
+                if (updated) setEditando(updated);
+            }
+        } catch (e: any) {
+            toast.error(e.message);
+        } finally {
+            setSubiendoFormato(null);
+        }
+    };
+
+    const eliminarFormato = async (tipoDocId: number) => {
+        if (!confirm('¿Eliminar la plantilla de este formato?')) return;
+        try {
+            const res = await fetch(`${API}/maestras/tipos-documento/${tipoDocId}/formato`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) throw new Error((await res.json()).error);
+            toast.success('Plantilla eliminada');
+            const data = await cargar();
+            if (editando?.id === tipoDocId && data) {
+                const updated = (data.tipos_documento || []).find((t: TipoDocumento) => t.id === tipoDocId);
+                if (updated) setEditando(updated);
+            }
+        } catch (e: any) {
+            toast.error(e.message);
         }
     };
 
@@ -153,6 +203,7 @@ const HVMaestras: React.FC = () => {
                                 <th className="text-left px-4 py-3 font-medium text-gray-600 hidden md:table-cell">Alertas (días)</th>
                                 <th className="px-4 py-3 text-center font-medium text-gray-600">Oblig.</th>
                                 <th className="px-4 py-3 text-center font-medium text-gray-600">Activo</th>
+                                <th className="text-left px-4 py-3 font-medium text-gray-600 hidden md:table-cell">Plantilla</th>
                                 <th className="px-4 py-3"></th>
                             </tr>
                         </thead>
@@ -183,6 +234,37 @@ const HVMaestras: React.FC = () => {
                                             {t.activo ? '●' : '○'}
                                         </span>
                                     </td>
+                                    <td className="px-4 py-3 hidden md:table-cell">
+                                        {subiendoFormato === t.id ? (
+                                            <span className="text-xs text-gray-400 flex items-center gap-1">
+                                                <span className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin inline-block" />
+                                                Subiendo...
+                                            </span>
+                                        ) : t.formato_plantilla_path ? (
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs text-green-600 font-medium">📄 {t.formato_nombre_archivo?.substring(0, 20)}...</span>
+                                                <button
+                                                    onClick={() => { formatoTipoIdRef.current = t.id!; formatoInputRef.current?.click(); }}
+                                                    className="text-xs text-blue-600 hover:underline"
+                                                >
+                                                    Cambiar
+                                                </button>
+                                                <button
+                                                    onClick={() => eliminarFormato(t.id!)}
+                                                    className="text-xs text-red-500 hover:underline"
+                                                >
+                                                    ✕
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => { formatoTipoIdRef.current = t.id!; formatoInputRef.current?.click(); }}
+                                                className="text-xs text-blue-600 border border-blue-200 rounded px-2 py-0.5 hover:bg-blue-50"
+                                            >
+                                                + Subir plantilla
+                                            </button>
+                                        )}
+                                    </td>
                                     <td className="px-4 py-3 text-right">
                                         <button
                                             onClick={() => setEditando({ ...t })}
@@ -204,6 +286,19 @@ const HVMaestras: React.FC = () => {
                     </table>
                 </div>
             )}
+
+            {/* Input oculto para subir plantillas */}
+            <input
+                ref={formatoInputRef}
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                onChange={e => {
+                    const file = e.target.files?.[0];
+                    if (file && formatoTipoIdRef.current) subirFormato(formatoTipoIdRef.current, file);
+                    e.target.value = '';
+                }}
+            />
 
             {/* Modal edición */}
             {editando && (
@@ -331,6 +426,57 @@ const HVMaestras: React.FC = () => {
                                         className="mt-1 w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm"
                                     />
                                 </div>
+
+                                {/* Sección plantilla — solo al editar (tiene id) */}
+                                {editando.id && (
+                                    <div className="border-t pt-4">
+                                        <label className="text-xs font-medium text-gray-600 block mb-2">
+                                            Plantilla descargable (formato en blanco para firmar)
+                                        </label>
+                                        {subiendoFormato === editando.id ? (
+                                            <div className="flex items-center gap-2 text-sm text-gray-500">
+                                                <span className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin inline-block" />
+                                                Subiendo plantilla...
+                                            </div>
+                                        ) : editando.formato_plantilla_path ? (
+                                            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start justify-between gap-3">
+                                                <div>
+                                                    <p className="text-xs font-semibold text-amber-800">📄 {editando.formato_nombre_archivo}</p>
+                                                    <a
+                                                        href={`${API_URL}/public/hv/formato/${editando.id}`}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="text-xs text-blue-600 underline"
+                                                    >
+                                                        Ver / descargar
+                                                    </a>
+                                                </div>
+                                                <div className="flex flex-col gap-1 shrink-0">
+                                                    <button
+                                                        onClick={() => { formatoTipoIdRef.current = editando.id!; formatoInputRef.current?.click(); }}
+                                                        className="text-xs text-blue-600 border border-blue-200 rounded px-2 py-0.5 hover:bg-blue-50"
+                                                    >
+                                                        Cambiar PDF
+                                                    </button>
+                                                    <button
+                                                        onClick={() => eliminarFormato(editando.id!)}
+                                                        className="text-xs text-red-500 border border-red-200 rounded px-2 py-0.5 hover:bg-red-50"
+                                                    >
+                                                        Eliminar
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => { formatoTipoIdRef.current = editando.id!; formatoInputRef.current?.click(); }}
+                                                className="w-full border-2 border-dashed border-amber-300 rounded-lg py-3 text-sm text-amber-700 hover:bg-amber-50 transition-colors flex items-center justify-center gap-2"
+                                            >
+                                                <span>⬆️</span>
+                                                <span>Subir formato PDF (para que el tercero descargue, firme y suba)</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex gap-3 mt-6">

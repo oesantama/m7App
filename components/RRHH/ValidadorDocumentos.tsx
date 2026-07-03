@@ -446,6 +446,227 @@ const TabTerceros: React.FC<{ sources: ValidationSource[] }> = ({ sources }) => 
 };
 
 // ─────────────────────────────────────────────
+// Tab: Validar Placas
+// ─────────────────────────────────────────────
+const TabPlacas: React.FC<{ sources: ValidationSource[] }> = ({ sources }) => {
+    const activeSources = sources.filter(s => s.is_active && (s.entity_type === 'placa' || s.entity_type === 'ambos'));
+
+    const [entries, setEntries] = useState<ValidationEntry[]>([{ id: '', name: '' }]);
+    const [selectedSources, setSelectedSources] = useState<string[]>(activeSources.map(s => s.id));
+    const [running, setRunning] = useState(false);
+    const [results, setResults] = useState<{ entry: ValidationEntry; results: RunResult[] }[]>([]);
+    const [history, setHistory] = useState<ValidationRecord[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+
+    const loadHistory = useCallback(async () => {
+        setLoadingHistory(true);
+        try {
+            const data = await api.validationGetRecords({ entity_type: 'placa', limit: 30 });
+            setHistory(data);
+        } catch { /* silent */ } finally {
+            setLoadingHistory(false);
+        }
+    }, []);
+
+    useEffect(() => { loadHistory(); }, [loadHistory]);
+    useEffect(() => {
+        setSelectedSources(activeSources.map(s => s.id));
+    }, [sources]);
+
+    const addEntry = () => setEntries(p => [...p, { id: '', name: '' }]);
+    const removeEntry = (i: number) => setEntries(p => p.filter((_, idx) => idx !== i));
+    const updateEntry = (i: number, field: 'id' | 'name', value: string) =>
+        setEntries(p => p.map((e, idx) => idx === i ? { ...e, [field]: value } : e));
+
+    const handleRun = async () => {
+        const valid = entries.filter(e => e.id.trim() && e.name.trim());
+        if (valid.length === 0) { toast.error('Ingrese al menos una placa con propietario/descripción'); return; }
+        if (selectedSources.length === 0) { toast.error('Seleccione al menos una fuente de validación'); return; }
+
+        setRunning(true);
+        setResults([]);
+        const allResults: { entry: ValidationEntry; results: RunResult[] }[] = [];
+
+        for (const entry of valid) {
+            try {
+                toast.info(`Validando placa ${entry.id}...`);
+                const res = await api.validationRun({
+                    entity_type: 'placa',
+                    entity_id: entry.id.trim().toUpperCase(),
+                    entity_name: entry.name.trim().toLowerCase(),
+                    source_ids: selectedSources,
+                });
+                allResults.push({ entry, results: res.results });
+            } catch (err: any) {
+                allResults.push({ entry, results: [{ source_id: 'error', source_name: 'Error', status: 'error', summary: err.message, drive_link: '' }] });
+            }
+        }
+
+        setResults(allResults);
+        setRunning(false);
+        toast.success('Validación de placas completada');
+        loadHistory();
+    };
+
+    return (
+        <div className="flex flex-col gap-6">
+            {/* Formulario */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                    <Car size={18} className="text-indigo-600" />
+                    <h3 className="font-black text-slate-800">Placas a validar</h3>
+                    <span className="text-xs text-slate-400 ml-1">— ingrese propietario o descripción para el nombre de la carpeta en Drive</span>
+                </div>
+                <div className="flex flex-col gap-3">
+                    {entries.map((entry, i) => (
+                        <div key={i} className="flex gap-3 items-center">
+                            <input
+                                type="text"
+                                value={entry.id}
+                                onChange={e => updateEntry(i, 'id', e.target.value)}
+                                placeholder="Placa (ej: ABC123)"
+                                className="border border-slate-200 rounded-lg px-3 py-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-indigo-400 font-mono uppercase font-bold"
+                            />
+                            <input
+                                type="text"
+                                value={entry.name}
+                                onChange={e => updateEntry(i, 'name', e.target.value)}
+                                placeholder="Propietario / Descripción (para carpeta Drive)"
+                                className="border border-slate-200 rounded-lg px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                            />
+                            {entries.length > 1 && (
+                                <button onClick={() => removeEntry(i)} className="text-red-400 hover:text-red-600 p-1">
+                                    <Trash2 size={16} />
+                                </button>
+                            )}
+                        </div>
+                    ))}
+                    <button onClick={addEntry} className="flex items-center gap-2 text-indigo-600 text-sm font-semibold hover:underline w-fit">
+                        <Plus size={14} /> Agregar otra placa
+                    </button>
+                </div>
+
+                {/* Fuentes */}
+                <div className="mt-5 pt-4 border-t border-slate-100">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Fuentes a consultar</p>
+                    {activeSources.length === 0 ? (
+                        <p className="text-sm text-slate-400 italic">No hay fuentes activas para vehículos (placas). Configure en la pestaña "Fuentes".</p>
+                    ) : (
+                        <div className="flex flex-wrap gap-3">
+                            {activeSources.map(src => (
+                                <label key={src.id} className="flex items-center gap-2 cursor-pointer bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 hover:border-indigo-300">
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedSources.includes(src.id)}
+                                        onChange={e => setSelectedSources(p => e.target.checked ? [...p, src.id] : p.filter(x => x !== src.id))}
+                                        className="accent-indigo-600"
+                                    />
+                                    <span className="text-sm font-semibold text-slate-700">{src.name}</span>
+                                    <a href={src.url} target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-indigo-500">
+                                        <ExternalLink size={12} />
+                                    </a>
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <div className="mt-5 flex justify-end">
+                    <button
+                        onClick={handleRun}
+                        disabled={running || activeSources.length === 0}
+                        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl px-6 py-2.5 font-bold text-sm shadow-sm transition-colors disabled:opacity-50"
+                    >
+                        {running ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+                        {running ? 'Validando...' : 'Validar ahora'}
+                    </button>
+                </div>
+            </div>
+
+            {/* Resultados de la última ejecución */}
+            {results.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                    <h3 className="font-black text-slate-800 mb-4 flex items-center gap-2">
+                        <ShieldCheck size={18} className="text-emerald-600" /> Resultados
+                    </h3>
+                    <div className="flex flex-col gap-5">
+                        {results.map(({ entry, results: res }, i) => (
+                            <div key={i}>
+                                <div className="text-sm font-bold text-slate-700 mb-2">
+                                    {entry.id} — {entry.name}
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {res.map(r => <RunResultCard key={r.source_id} result={r} />)}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Historial */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-black text-slate-800 flex items-center gap-2">
+                        <FileText size={18} className="text-slate-500" /> Historial de validaciones
+                    </h3>
+                    <button onClick={loadHistory} className="text-xs text-indigo-600 font-semibold hover:underline">
+                        Actualizar
+                    </button>
+                </div>
+                {loadingHistory ? (
+                    <div className="flex justify-center py-8"><Loader2 size={24} className="animate-spin text-indigo-400" /></div>
+                ) : history.length === 0 ? (
+                    <p className="text-sm text-slate-400 italic text-center py-6">No hay validaciones registradas aún.</p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                            <thead>
+                                <tr className="border-b border-slate-100">
+                                    {['Placa', 'Propietario / Descripción', 'Fuente', 'Estado', 'Resultado', 'Fecha', 'PDF'].map(h => (
+                                        <th key={h} className="text-left py-2 px-3 font-semibold text-slate-500 uppercase tracking-wide">{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {history.map(r => {
+                                    const cfg = STATUS_CONFIG[r.status];
+                                    const Icon = cfg.icon;
+                                    return (
+                                        <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50">
+                                            <td className="py-2 px-3 font-mono font-bold text-slate-800">{r.entity_id}</td>
+                                            <td className="py-2 px-3 text-slate-600">{r.entity_name}</td>
+                                            <td className="py-2 px-3 text-slate-600">{r.source_name}</td>
+                                            <td className="py-2 px-3">
+                                                <span className={`flex items-center gap-1 font-bold ${cfg.color}`}>
+                                                    <Icon size={12} /> {cfg.label}
+                                                </span>
+                                            </td>
+                                            <td className="py-2 px-3 text-slate-500 max-w-[200px] truncate">{r.result_summary}</td>
+                                            <td className="py-2 px-3 text-slate-500">
+                                                {new Date(r.validated_at).toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                            </td>
+                                            <td className="py-2 px-3">
+                                                {r.drive_link ? (
+                                                    <a href={resolveLink(r.drive_link)} target="_blank" rel="noopener noreferrer"
+                                                        className="flex items-center gap-1 text-indigo-600 font-semibold hover:underline">
+                                                        <FileText size={12} /> PDF <ExternalLink size={10} />
+                                                    </a>
+                                                ) : <span className="text-slate-300">—</span>}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// ─────────────────────────────────────────────
 // Tab: Maestras Fuentes (CRUD)
 // ─────────────────────────────────────────────
 const TabFuentes: React.FC<{ sources: ValidationSource[]; onRefresh: () => void }> = ({ sources, onRefresh }) => {
@@ -613,13 +834,7 @@ const ValidadorDocumentos: React.FC = () => {
 
             {/* Content */}
             {activeTab === 'terceros' && <TabTerceros sources={sources} />}
-            {activeTab === 'placas'   && (
-                <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center shadow-sm">
-                    <Car size={40} className="text-slate-300 mx-auto mb-3" />
-                    <p className="text-slate-500 font-semibold">Validación de placas — próximamente</p>
-                    <p className="text-xs text-slate-400 mt-1">Configure las fuentes para "Vehículos" en la pestaña Fuentes para habilitar esta sección.</p>
-                </div>
-            )}
+            {activeTab === 'placas'   && <TabPlacas sources={sources} />}
             {activeTab === 'fuentes'  && <TabFuentes sources={sources} onRefresh={loadSources} />}
         </div>
     );

@@ -22,12 +22,16 @@ import {
     getAlertas,
     getMaestras,
     upsertTipoDocumento,
+    subirFormatoPlantilla,
+    eliminarFormatoPlantilla,
     serveLocalFile,
+    serveFormatoPlantilla,
     getAuditoria,
     getPublicSolicitud,
     getCatalogosPublicos,
     guardarDatosPublico,
     subirDocumentoPublico,
+    actualizarFechaVencimiento,
     submitFormularioPublico,
 } from '../controllers/hojas-vida.controller.js';
 
@@ -60,6 +64,8 @@ router.get('/auditoria', getAuditoria);
 // Maestras parametrizables
 router.get('/maestras', getMaestras);
 router.put('/maestras/tipos-documento', upsertTipoDocumento);
+router.post('/maestras/tipos-documento/:id/formato', upload.single('archivo'), subirFormatoPlantilla);
+router.delete('/maestras/tipos-documento/:id/formato', eliminarFormatoPlantilla);
 
 // Archivos locales (fallback rclone) — path viene como query ?p=ruta/al/archivo
 router.get('/file', serveLocalFile);
@@ -72,7 +78,9 @@ export default router;
 export const hvPublicRouter = Router();
 
 hvPublicRouter.get('/catalogos', getCatalogosPublicos);
+hvPublicRouter.get('/formato/:id', serveFormatoPlantilla);
 hvPublicRouter.get('/:token', getPublicSolicitud);
 hvPublicRouter.patch('/:token/datos', guardarDatosPublico);
 hvPublicRouter.post('/:token/documento', upload.single('archivo'), subirDocumentoPublico);
+hvPublicRouter.patch('/:token/documento/:docId/vencimiento', actualizarFechaVencimiento);
 hvPublicRouter.post('/:token/submit', submitFormularioPublico);

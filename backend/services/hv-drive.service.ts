@@ -34,9 +34,16 @@ export function buildDrivePath(
     if (tipoEntidad === 'vehiculo') {
         return `Placas/${id}/${nombreArchivo}`;
     }
-    const tipo = tipoTercero
-        ? sanitizeFolderName(tipoTercero.charAt(0).toUpperCase() + tipoTercero.slice(1) + 's')
-        : 'Terceros';
+    const TIPO_CARPETA: Record<string, string> = {
+        conductor: 'Conductores',
+        conductor_propietario: 'Conductores Propietarios',
+        propietario: 'Propietarios',
+        tenedor: 'Tenedores',
+        auxiliar: 'Auxiliares',
+        escolta: 'Escoltas',
+        proveedor: 'Proveedores',
+    };
+    const tipo = tipoTercero ? (TIPO_CARPETA[tipoTercero.toLowerCase()] || sanitizeFolderName(tipoTercero)) : 'General';
     return `Terceros/${tipo}/${id}/${nombreArchivo}`;
 }
 

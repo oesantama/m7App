@@ -32,13 +32,17 @@ interface TipoDocumento {
     obligatorio: boolean;
     acepta_vencimiento: boolean;
     orden: number;
+    formato_plantilla_path?: string | null;
+    formato_nombre_archivo?: string | null;
 }
 
 interface DocumentoSubido {
+    id?: number;
     tipo_doc_req_id: number;
     nombre_archivo: string;
     estado: 'pendiente' | 'aprobado' | 'rechazado' | 'vencido';
     obs_rechazo?: string;
+    fecha_vencimiento?: string;
 }
 
 interface SolicitudPublica {
@@ -80,6 +84,8 @@ const PublicDocForm: React.FC = () => {
     const [subiendoDoc, setSubiendoDoc] = useState<number | null>(null);
     const [guardandoDatos, setGuardandoDatos] = useState(false);
     const [catalogos, setCatalogos] = useState<Record<string, string[]>>({});
+    const [campoErrors, setCampoErrors] = useState<Set<string>>(new Set());
+    const [docErrors, setDocErrors] = useState<Record<number, 'falta_documento' | 'falta_fecha'>>({});
 
     // Auto-guardado de datos del formulario
     const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -141,16 +147,30 @@ const PublicDocForm: React.FC = () => {
         const nuevos = { ...formData, [clave]: valor };
         setFormData(nuevos);
         autoGuardarDatos(nuevos);
+        if (campoErrors.has(clave)) {
+            setCampoErrors(prev => { const s = new Set(prev); s.delete(clave); return s; });
+        }
     };
 
     const validarPaso1 = () => {
-        const obligatorios = campos.filter(c => c.obligatorio);
-        for (const c of obligatorios) {
-            if (!formData[c.nombre_campo]?.trim()) {
-                toast.error(`El campo "${c.label}" es obligatorio`);
-                return false;
-            }
+        const errors = new Set<string>();
+        for (const c of campos.filter(c => c.obligatorio)) {
+            if (!formData[c.nombre_campo]?.trim()) errors.add(c.nombre_campo);
         }
+        if (errors.size > 0) {
+            setCampoErrors(errors);
+            const primero = campos.find(c => errors.has(c.nombre_campo));
+            if (primero) {
+                setTimeout(() => {
+                    const el = document.getElementById(`campo-${primero.nombre_campo}`);
+                    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    (el as HTMLInputElement | null)?.focus();
+                }, 80);
+            }
+            toast.error(`${errors.size} campo${errors.size > 1 ? 's' : ''} obligatorio${errors.size > 1 ? 's' : ''} sin completar`);
+            return false;
+        }
+        setCampoErrors(new Set());
         return true;
     };
 
@@ -173,9 +193,11 @@ const PublicDocForm: React.FC = () => {
             setDocsSubidos(prev => {
                 const filtered = prev.filter(d => d.tipo_doc_req_id !== tipoDocId);
                 return [...filtered, {
+                    id: data.documento_id,
                     tipo_doc_req_id: tipoDocId,
                     nombre_archivo: data.nombre_archivo,
                     estado: 'pendiente',
+                    fecha_vencimiento: vencimiento || undefined,
                 }];
             });
         } catch {
@@ -190,15 +212,35 @@ const PublicDocForm: React.FC = () => {
         await subirArchivo(tipoDocId, file, vencimiento);
     };
 
+    const handleFechaVencimientoChange = async (docId: number, fecha: string) => {
+        try {
+            await fetch(`${API}/${token}/documento/${docId}/vencimiento`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fecha_vencimiento: fecha }),
+            });
+            setDocsSubidos(prev => prev.map(d => d.id === docId ? { ...d, fecha_vencimiento: fecha } : d));
+        } catch { /* silencioso */ }
+    };
+
     const validarPaso2 = () => {
-        const obligatorios = tiposDocs.filter(d => d.obligatorio);
-        for (const d of obligatorios) {
+        const errors: Record<number, 'falta_documento' | 'falta_fecha'> = {};
+        for (const d of tiposDocs.filter(t => t.obligatorio)) {
             const subido = docsSubidos.find(s => s.tipo_doc_req_id === d.id);
-            if (!subido) {
-                toast.error(`El documento "${d.nombre}" es obligatorio`);
-                return false;
-            }
+            if (!subido) errors[d.id] = 'falta_documento';
+            else if (d.acepta_vencimiento && !subido.fecha_vencimiento) errors[d.id] = 'falta_fecha';
         }
+        if (Object.keys(errors).length > 0) {
+            setDocErrors(errors);
+            const primerId = Number(Object.keys(errors)[0]);
+            setTimeout(() => {
+                document.getElementById(`doc-${primerId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 80);
+            const n = Object.keys(errors).length;
+            toast.error(`${n} documento${n > 1 ? 's' : ''} pendiente${n > 1 ? 's' : ''} — revise los marcados en rojo`);
+            return false;
+        }
+        setDocErrors({});
         return true;
     };
 
@@ -333,6 +375,29 @@ const PublicDocForm: React.FC = () => {
                             <InfoItem icon="💡" texto="Puede cerrar y volver a este link cuando quiera. Su información se guarda automáticamente." />
                             <InfoItem icon="⏰" texto={`Este link expira el ${new Date(solicitud?.token_expira_at || '').toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })}.`} />
                         </div>
+                        {tiposDocs.some(d => d.formato_plantilla_path) && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                                <p className="text-sm font-semibold text-amber-800 mb-2">📄 Formatos para diligenciar</p>
+                                <p className="text-xs text-amber-700 mb-3">
+                                    Algunos documentos requieren que descargue un formato, lo imprima, firme, ponga su huella y lo escanée para subir.
+                                </p>
+                                <div className="space-y-2">
+                                    {tiposDocs.filter(d => d.formato_plantilla_path).map(d => (
+                                        <a
+                                            key={d.id}
+                                            href={`${API}/formato/${d.id}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="flex items-center gap-2 text-xs bg-white border border-amber-300 rounded-lg px-3 py-2 text-amber-900 hover:bg-amber-100 transition-colors"
+                                        >
+                                            <span className="text-base">⬇️</span>
+                                            <span className="font-medium">{d.nombre}</span>
+                                            <span className="ml-auto text-amber-600">Descargar</span>
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                         <button
                             onClick={() => setPaso(1)}
                             className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold text-lg"
@@ -359,6 +424,7 @@ const PublicDocForm: React.FC = () => {
                                         valor={formData[campo.nombre_campo] || ''}
                                         onChange={val => handleCampoChange(campo.nombre_campo, val)}
                                         opciones={catalogos[CAMPO_CATALOGO[campo.nombre_campo] || '']}
+                                        error={campoErrors.has(campo.nombre_campo)}
                                     />
                                 ))}
                             </div>
@@ -383,7 +449,15 @@ const PublicDocForm: React.FC = () => {
                                         doc={doc}
                                         subido={subido}
                                         subiendo={subiendo}
-                                        onChange={(file, venc) => handleArchivoChange(doc.id, file, venc)}
+                                        onChange={(file, venc) => {
+                                            setDocErrors(prev => { const e = { ...prev }; delete e[doc.id]; return e; });
+                                            handleArchivoChange(doc.id, file, venc);
+                                        }}
+                                        onFechaChange={(docId, fecha) => {
+                                            setDocErrors(prev => { const e = { ...prev }; delete e[doc.id]; return e; });
+                                            handleFechaVencimientoChange(docId, fecha);
+                                        }}
+                                        error={docErrors[doc.id]}
                                     />
                                 );
                             })}
@@ -463,7 +537,7 @@ const PublicDocForm: React.FC = () => {
             </div>
 
             {/* Footer navegación */}
-            {paso > 0 && paso < 3 && (
+            {paso > 0 && (
                 <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
                     <div className="max-w-lg mx-auto px-4 py-4 flex gap-3">
                         <button
@@ -472,20 +546,21 @@ const PublicDocForm: React.FC = () => {
                         >
                             ← Atrás
                         </button>
-                        <button
-                            onClick={() => {
-                                if (paso === 1 && !validarPaso1()) return;
-                                if (paso === 2 && !validarPaso2()) return;
-                                setPaso(p => p + 1);
-                            }}
-                            className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-semibold"
-                        >
-                            {paso === 2 ? 'Revisar →' : 'Siguiente →'}
-                        </button>
+                        {paso < 3 && (
+                            <button
+                                onClick={() => {
+                                    if (paso === 1 && !validarPaso1()) return;
+                                    if (paso === 2 && !validarPaso2()) return;
+                                    setPaso(p => p + 1);
+                                }}
+                                className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-semibold"
+                            >
+                                {paso === 2 ? 'Revisar →' : 'Siguiente →'}
+                            </button>
+                        )}
                     </div>
                 </div>
             )}
-            {paso === 0 && null}
         </div>
     );
 };
@@ -578,11 +653,14 @@ const CampoInput: React.FC<{
     valor: string;
     onChange: (v: string) => void;
     opciones?: string[];
-}> = ({ campo, valor, onChange, opciones }) => {
-    const base = "w-full border border-gray-300 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+    error?: boolean;
+}> = ({ campo, valor, onChange, opciones, error }) => {
+    const base = `w-full border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 ${
+        error ? 'border-red-400 bg-red-50 focus:ring-red-400' : 'border-gray-300 focus:ring-blue-500'
+    }`;
     const tieneCatalogo = opciones && opciones.length > 0;
     return (
-        <div>
+        <div id={`campo-${campo.nombre_campo}`}>
             <label className="block text-sm font-medium text-gray-700 mb-1">
                 {campo.label}
                 {campo.obligatorio && <span className="text-red-500 ml-1">*</span>}
@@ -618,6 +696,9 @@ const CampoInput: React.FC<{
                     onChange={e => onChange(e.target.value)}
                 />
             )}
+            {error && (
+                <p className="mt-1 text-xs text-red-600 font-medium">⚠ Este campo es obligatorio</p>
+            )}
         </div>
     );
 };
@@ -627,17 +708,40 @@ const DocUploadCard: React.FC<{
     subido?: DocumentoSubido;
     subiendo: boolean;
     onChange: (file: File, vencimiento?: string) => void;
-}> = ({ doc, subido, subiendo, onChange }) => {
-    const [vencimiento, setVencimiento] = useState('');
+    onFechaChange?: (docId: number, fecha: string) => void;
+    error?: 'falta_documento' | 'falta_fecha';
+}> = ({ doc, subido, subiendo, onChange, onFechaChange, error }) => {
+    const [vencimiento, setVencimiento] = useState(
+        subido?.fecha_vencimiento ? subido.fecha_vencimiento.split('T')[0] : ''
+    );
     const inputRef = useRef<HTMLInputElement>(null);
 
-    const estadoColor = !subido ? 'border-gray-300 bg-white'
+    useEffect(() => {
+        if (subido?.fecha_vencimiento) {
+            setVencimiento(subido.fecha_vencimiento.split('T')[0]);
+        }
+    }, [subido?.fecha_vencimiento]);
+
+    const estadoColor = error ? 'border-red-500 bg-red-50'
+        : !subido ? 'border-gray-300 bg-white'
         : subido.estado === 'aprobado' ? 'border-green-400 bg-green-50'
         : subido.estado === 'rechazado' ? 'border-red-400 bg-red-50'
         : 'border-blue-400 bg-blue-50';
 
     return (
-        <div className={`border-2 rounded-xl p-4 transition-colors ${estadoColor}`}>
+        <div id={`doc-${doc.id}`} className={`border-2 rounded-xl p-4 transition-colors ${estadoColor}`}>
+            {doc.formato_plantilla_path && (
+                <a
+                    href={`${API}/formato/${doc.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3 text-xs text-amber-800 hover:bg-amber-100 transition-colors"
+                >
+                    <span>⬇️</span>
+                    <span className="font-medium flex-1">Descargar formato — imprima, firme, ponga huella y escanée</span>
+                    <span className="text-amber-600 font-semibold whitespace-nowrap">Descargar →</span>
+                </a>
+            )}
             <div className="flex justify-between items-start mb-2">
                 <div>
                     <p className="font-medium text-gray-800 text-sm">
@@ -660,6 +764,12 @@ const DocUploadCard: React.FC<{
                 )}
             </div>
 
+            {error && (
+                <div className="bg-red-100 border border-red-300 rounded-lg px-3 py-2 mb-3 text-xs text-red-700 font-medium flex items-center gap-2">
+                    <span>⚠</span>
+                    <span>{error === 'falta_documento' ? 'Debe subir este documento' : 'Ingrese la fecha de vencimiento'}</span>
+                </div>
+            )}
             {subido?.obs_rechazo && (
                 <div className="bg-red-100 rounded-lg px-3 py-2 mb-3 text-xs text-red-700">
                     <strong>Motivo de rechazo:</strong> {subido.obs_rechazo}
@@ -699,14 +809,21 @@ const DocUploadCard: React.FC<{
 
             {doc.acepta_vencimiento && (
                 <div className="mt-3">
-                    <label className="text-xs text-gray-600 font-medium">
-                        Fecha de vencimiento del documento
+                    <label className={`text-xs font-medium ${error === 'falta_fecha' ? 'text-red-600' : 'text-gray-600'}`}>
+                        Fecha de vencimiento del documento{doc.obligatorio ? ' *' : ''}
                     </label>
                     <input
                         type="date"
-                        className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                        className={`mt-1 w-full border rounded-lg px-3 py-2 text-sm ${
+                            error === 'falta_fecha' ? 'border-red-400 bg-red-50 focus:ring-red-400' : 'border-gray-300'
+                        } focus:outline-none focus:ring-2`}
                         value={vencimiento}
-                        onChange={e => setVencimiento(e.target.value)}
+                        onChange={e => {
+                            setVencimiento(e.target.value);
+                            if (subido?.id && e.target.value) {
+                                onFechaChange?.(subido.id, e.target.value);
+                            }
+                        }}
                     />
                 </div>
             )}
