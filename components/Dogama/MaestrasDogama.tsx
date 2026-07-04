@@ -1544,32 +1544,55 @@ function VinculacionCorreoTab({ user }: { user: User }) {
   useEffect(() => {
     load();
 
-    // Escucha postMessage del popup OAuth
-    const handler = (e: MessageEvent) => {
+    // Canal 1: localStorage storage event (más confiable cross-ventana)
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== 'dogama_oauth_result' || !e.newValue) return;
+      try {
+        const data = JSON.parse(e.newValue);
+        localStorage.removeItem('dogama_oauth_result');
+        if (data.type === 'SUCCESS') {
+          toast.success(`✅ ${PROVIDER_META[data.provider]?.label || data.provider} vinculado: ${data.email}`);
+          loadRef.current();
+        } else {
+          toast.error(`Error al vincular: ${data.error}`);
+        }
+      } catch { /* ignore parse errors */ }
+    };
+
+    // Canal 2: postMessage como respaldo
+    const onMessage = (e: MessageEvent) => {
       if (e.data?.type === 'DOGAMA_OAUTH_SUCCESS') {
-        toast.success(`✅ ${PROVIDER_META[e.data.provider]?.label || e.data.provider} vinculado: ${e.data.email}`);
-        // Pequeño delay para asegurar que el backend ya confirmó la escritura
-        setTimeout(() => loadRef.current(), 800);
+        // Solo actuar si localStorage no lo procesó ya
+        const stored = localStorage.getItem('dogama_oauth_result');
+        if (!stored) {
+          toast.success(`✅ ${PROVIDER_META[e.data.provider]?.label || e.data.provider} vinculado: ${e.data.email}`);
+          loadRef.current();
+        }
       } else if (e.data?.type === 'DOGAMA_OAUTH_ERROR') {
         toast.error(`Error al vincular: ${e.data.error}`);
       }
     };
 
-    // Fallback: recarga cuando el popup cierra y la ventana recupera el foco
+    // Canal 3: focus al cerrar el popup como último recurso
     let popupOpen = false;
-    const onFocus = () => { if (popupOpen) { popupOpen = false; setTimeout(() => loadRef.current(), 400); } };
+    const onFocus = () => {
+      if (popupOpen) {
+        popupOpen = false;
+        setTimeout(() => loadRef.current(), 600);
+      }
+    };
+    const onBlur = () => { popupOpen = true; };
 
-    window.addEventListener('message', handler);
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('message', onMessage);
     window.addEventListener('focus', onFocus);
-
-    // Marcar que hay popup abierto cuando el usuario hace clic en "Vincular"
-    const markPopupOpen = () => { popupOpen = true; };
-    window.addEventListener('blur', markPopupOpen);
+    window.addEventListener('blur', onBlur);
 
     return () => {
-      window.removeEventListener('message', handler);
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('message', onMessage);
       window.removeEventListener('focus', onFocus);
-      window.removeEventListener('blur', markPopupOpen);
+      window.removeEventListener('blur', onBlur);
     };
   }, []);
 

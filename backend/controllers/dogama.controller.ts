@@ -474,14 +474,23 @@ export const handleOAuthCallback = async (req: Request, res: Response) => {
 <!DOCTYPE html><html><head><title>Vinculación</title></head><body>
 <script>
   try {
+    // Canal 1: localStorage (más confiable entre ventanas)
+    localStorage.setItem('dogama_oauth_result', JSON.stringify({
+      type: '${success ? 'SUCCESS' : 'ERROR'}',
+      provider: '${provider}', email: '${email}', name: '${name}', error: '${errMsg}',
+      ts: Date.now()
+    }));
+  } catch(e){}
+  try {
+    // Canal 2: postMessage como respaldo
     window.opener && window.opener.postMessage({
       type: 'DOGAMA_OAUTH_${success ? 'SUCCESS' : 'ERROR'}',
       provider: '${provider}', email: '${email}', name: '${name}', error: '${errMsg}'
     }, '*');
   } catch(e){}
-  setTimeout(() => window.close(), 800);
+  setTimeout(() => window.close(), 1200);
 </script>
-<p style="font-family:sans-serif;text-align:center;margin-top:40px">
+<p style="font-family:sans-serif;text-align:center;margin-top:40px;font-size:18px">
   ${success ? '✅ Vinculado correctamente. Cerrando…' : `❌ Error: ${errMsg}`}
 </p></body></html>`;
 
