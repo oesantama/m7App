@@ -165,7 +165,23 @@ async function generateContentWithRetry(modelNameStr: string, promptData: any, s
         } catch (error: any) {
             const errorStr = (error.toString() + (error.message || '')).toLowerCase();
             const isQuotaError = errorStr.includes('429') || error.status === 429 || errorStr.includes('quota');
-            
+            const isNetworkError = errorStr.includes('error fetching') || errorStr.includes('fetch failed') ||
+                errorStr.includes('econnreset') || errorStr.includes('econnrefused') ||
+                errorStr.includes('etimedout') || errorStr.includes('enotfound') ||
+                errorStr.includes('network') || errorStr.includes('socket') ||
+                (error.cause && String(error.cause).toLowerCase().includes('fetch'));
+
+            if (isNetworkError && i < maxRetries - 1) {
+                const waitSec = Math.pow(2, i) * 3; // 3s, 6s, 12s...
+                sendProgress({
+                    type: 'log',
+                    message: `🌐 ${workerLabel} Error de red en pág. Reintentando en ${waitSec}s... (${i + 1}/${maxRetries})`,
+                    isWaiting: true
+                });
+                await sleep(waitSec * 1000);
+                continue;
+            }
+
             if (isQuotaError && i < maxRetries - 1) {
                 // FASE 1: Extraer tiempo de espera sugerido por Google
                 let waitSeconds = 0;
