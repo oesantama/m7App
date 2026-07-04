@@ -503,6 +503,80 @@ export const upsertTipoDocumento = async (req: Request, res: Response) => {
     }
 };
 
+export const upsertTipoTercero = async (req: Request, res: Response) => {
+    const user = (req as any).user;
+    const body = req.body;
+    try {
+        if (body.id) {
+            await pool.query(
+                `UPDATE hv_tipos_tercero SET
+                 codigo=$1,nombre=$2,descripcion=$3,icono=$4,color=$5,activo=$6,orden=$7
+                 WHERE id=$8`,
+                [body.codigo,body.nombre,body.descripcion||null,body.icono||'user',
+                 body.color||'blue',body.activo!==false,body.orden||0,body.id]
+            );
+        } else {
+            await pool.query(
+                `INSERT INTO hv_tipos_tercero (codigo,nombre,descripcion,icono,color,activo,orden)
+                 VALUES($1,$2,$3,$4,$5,$6,$7)`,
+                [body.codigo,body.nombre,body.descripcion||null,body.icono||'user',
+                 body.color||'blue',body.activo!==false,body.orden||0]
+            );
+        }
+        await registrarAuditoria(null,'upsert_tipo_tercero','tipo_tercero',body.id||null,user.id,user.name,getIp(req));
+        res.json({ success: true });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
+export const upsertCampoFormulario = async (req: Request, res: Response) => {
+    const user = (req as any).user;
+    const body = req.body;
+    try {
+        const opciones = body.opciones
+            ? (typeof body.opciones === 'string' ? body.opciones : JSON.stringify(body.opciones))
+            : null;
+        if (body.id) {
+            await pool.query(
+                `UPDATE hv_campos_formulario SET
+                 tipo_entidad=$1,tipo_tercero_id=$2,nombre_campo=$3,label=$4,
+                 placeholder=$5,tipo_input=$6,opciones=$7,obligatorio=$8,
+                 validacion_regex=$9,mensaje_error=$10,orden=$11,seccion=$12,activo=$13
+                 WHERE id=$14`,
+                [body.tipo_entidad,body.tipo_tercero_id||null,body.nombre_campo,body.label,
+                 body.placeholder||null,body.tipo_input||'text',opciones,body.obligatorio!==false,
+                 body.validacion_regex||null,body.mensaje_error||null,body.orden||0,body.seccion||'general',body.activo!==false,body.id]
+            );
+        } else {
+            await pool.query(
+                `INSERT INTO hv_campos_formulario
+                 (tipo_entidad,tipo_tercero_id,nombre_campo,label,placeholder,
+                  tipo_input,opciones,obligatorio,validacion_regex,mensaje_error,orden,seccion)
+                 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+                [body.tipo_entidad,body.tipo_tercero_id||null,body.nombre_campo,body.label,
+                 body.placeholder||null,body.tipo_input||'text',opciones,body.obligatorio!==false,
+                 body.validacion_regex||null,body.mensaje_error||null,body.orden||0,body.seccion||'general']
+            );
+        }
+        await registrarAuditoria(null,'upsert_campo_formulario','campo_formulario',body.id||null,user.id,user.name,getIp(req));
+        res.json({ success: true });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
+export const eliminarCampoFormulario = async (req: Request, res: Response) => {
+    const user = (req as any).user;
+    try {
+        await pool.query('UPDATE hv_campos_formulario SET activo=false WHERE id=$1', [req.params['id']]);
+        await registrarAuditoria(null,'eliminar_campo','campo_formulario',req.params['id'],user.id,user.name,getIp(req));
+        res.json({ success: true });
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
 export const subirFormatoPlantilla = async (req: Request, res: Response) => {
     const user = (req as any).user;
     const tipoDocId = req.params['id'] as string;

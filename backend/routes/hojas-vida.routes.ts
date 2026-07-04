@@ -22,6 +22,9 @@ import {
     getAlertas,
     getMaestras,
     upsertTipoDocumento,
+    upsertTipoTercero,
+    upsertCampoFormulario,
+    eliminarCampoFormulario,
     subirFormatoPlantilla,
     eliminarFormatoPlantilla,
     serveLocalFile,
@@ -66,6 +69,9 @@ router.get('/maestras', getMaestras);
 router.put('/maestras/tipos-documento', upsertTipoDocumento);
 router.post('/maestras/tipos-documento/:id/formato', upload.single('archivo'), subirFormatoPlantilla);
 router.delete('/maestras/tipos-documento/:id/formato', eliminarFormatoPlantilla);
+router.put('/maestras/tipos-tercero', upsertTipoTercero);
+router.put('/maestras/campos-formulario', upsertCampoFormulario);
+router.delete('/maestras/campos-formulario/:id', eliminarCampoFormulario);
 
 // Archivos locales (fallback rclone) — path viene como query ?p=ruta/al/archivo
 router.get('/file', serveLocalFile);

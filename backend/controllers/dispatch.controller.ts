@@ -2552,7 +2552,7 @@ export const getConciliacionPending = async (req: Request, res: Response) => {
                   SELECT 1 FROM delivery_returns dr
                   WHERE TRIM(UPPER(dr.invoice_id)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
               )
-              \${clientFilter}
+              ${clientFilter}
             GROUP BY TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
             ORDER BY MAX(dl.delivery_date) DESC
         `, params);
