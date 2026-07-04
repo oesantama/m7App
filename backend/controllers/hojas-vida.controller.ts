@@ -568,9 +568,10 @@ export const upsertCampoFormulario = async (req: Request, res: Response) => {
 
 export const eliminarCampoFormulario = async (req: Request, res: Response) => {
     const user = (req as any).user;
+    const campoId = String(req.params['id']);
     try {
-        await pool.query('UPDATE hv_campos_formulario SET activo=false WHERE id=$1', [req.params['id']]);
-        await registrarAuditoria(null,'eliminar_campo','campo_formulario',req.params['id'],user.id,user.name,getIp(req));
+        await pool.query('UPDATE hv_campos_formulario SET activo=false WHERE id=$1', [campoId]);
+        await registrarAuditoria(null,'eliminar_campo','campo_formulario',campoId,user.id,user.name,getIp(req));
         res.json({ success: true });
     } catch (e: any) {
         res.status(500).json({ error: e.message });
