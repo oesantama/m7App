@@ -1911,7 +1911,7 @@ export const getAuxiliaresMesa = async (req: Request, res: Response): Promise<vo
   await ensureDonamaTables();
   try {
     const r = await pool.query(`
-      SELECT am.*, e.descripcion AS estado_nombre, u.name AS usuario_nombre
+      SELECT am.*, e.name AS estado_nombre, u.name AS usuario_nombre
       FROM dogama_auxiliares_mesa am
       LEFT JOIN estados e ON e.id = am.estado_id
       LEFT JOIN users u ON u.id::text = am.usuario_creacion::text
