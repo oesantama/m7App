@@ -33,6 +33,7 @@ interface DataTableProps<T> {
   onSearch?: (term: string) => void;
   loading?: boolean;
   hideTopControls?: boolean;
+  naked?: boolean;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -53,6 +54,7 @@ export function DataTable<T extends Record<string, any>>({
   onSearch,
   loading = false,
   hideTopControls = false,
+  naked = false,
 }: DataTableProps<T>) {
   // Búsqueda
   const [searchTerm, setSearchTerm] = useState('');
@@ -228,7 +230,7 @@ export function DataTable<T extends Record<string, any>>({
   };
 
   return (
-    <div className="bg-white rounded-[2.5rem] shadow-xl border border-slate-100 p-6 md:p-8 animate-in fade-in duration-500">
+    <div className={naked ? '' : 'bg-white rounded-[2.5rem] shadow-xl border border-slate-100 p-6 md:p-8 animate-in fade-in duration-500'}>
       {/* Controles de Búsqueda, Acciones y Exportar */}
       {!hideTopControls && (
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">

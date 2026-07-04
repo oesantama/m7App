@@ -1,7 +1,7 @@
 import React from 'react';
 import * as XLSX from 'xlsx';
 import { api } from '../../services/api';
-import { ReturnCard, RETURN_REASONS, ReturnReasonOption } from './ReturnCard';
+import { ReturnReasonOption } from './ReturnCard';
 import { Icons } from '../../constants';
 import { DataTable } from '../shared/DataTable';
 import { cleanSkuM7, extractQtyFromBarcode } from '../../utils/scanner';
@@ -126,10 +126,7 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
     const [visibleStatuses, setVisibleStatuses]   = React.useState<Set<string>>(
         new Set(['PENDING','CONFIRMED','PRE_APPROVAL','PRE_APPROVED','SUPPLIER_EXIT'])
     );
-    const [seguimientoSearch, setSeguimientoSearch]   = React.useState('');
-    const [seguimientoSortKey, setSeguimientoSortKey] = React.useState<string | null>(null);
-    const [seguimientoSortDir, setSeguimientoSortDir] = React.useState<'asc'|'desc'>('asc');
-    const [expandedTrackingIds, setExpandedTrackingIds] = React.useState<Set<number>>(new Set());
+    const [seguimientoSearch, setSeguimientoSearch] = React.useState('');
 
     // ── Tab: Sin registrar (desde conciliación) ───────────────────────────────
     const [concilPending, setConcilPending]       = React.useState<ConcilPendingInvoice[]>([]);
@@ -664,14 +661,6 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         );
     }, [trackingReturns, seguimientoSearch]);
 
-    const handleSeguimientoSort = (key: string) => {
-        if (seguimientoSortKey === key) {
-            setSeguimientoSortDir(d => d === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSeguimientoSortKey(key);
-            setSeguimientoSortDir('asc');
-        }
-    };
 
     return (
         <>
@@ -1454,10 +1443,7 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                     <EmptyState msg="Sin resultados para la búsqueda" />
                                 ) : stages.map(stage => {
                                     if (!visibleStatuses.has(stage.status)) return null;
-                                    const rows = sortByKey(
-                                        displayedTrackingReturns.filter(r => r.status === stage.status),
-                                        seguimientoSortKey, seguimientoSortDir
-                                    );
+                                    const rows = displayedTrackingReturns.filter(r => r.status === stage.status);
                                     if (rows.length === 0) return null;
                                     const sel = selForStage(stage.status);
                                     const allSel = rows.every(r => selectedExcelIds.has(r.id));
@@ -1466,7 +1452,16 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                         <div key={stage.status} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                                             {/* Cabecera del grupo */}
                                             <div className={`flex items-center justify-between gap-2 px-4 py-2.5 border-b ${hdr[stage.color]}`}>
-                                                <span className="text-[10px] font-black uppercase tracking-widest">{stage.label} ({rows.length})</span>
+                                                <div className="flex items-center gap-2">
+                                                    <input type="checkbox" checked={allSel}
+                                                        onChange={e => setSelectedExcelIds(prev => {
+                                                            const n = new Set(prev);
+                                                            rows.forEach(r => e.target.checked ? n.add(r.id) : n.delete(r.id));
+                                                            return n;
+                                                        })}
+                                                        className="w-3.5 h-3.5 accent-slate-600 cursor-pointer" />
+                                                    <span className="text-[10px] font-black uppercase tracking-widest">{stage.label} ({rows.length})</span>
+                                                </div>
                                                 <div className="flex items-center gap-2">
                                                     {/* Excel: genérico para otros estados, dedicado (marca descarga) para CONFIRMED */}
                                                     {stage.isPreApproval ? (
@@ -1500,111 +1495,104 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                                 </div>
                                             </div>
 
-                                            {/* Tabla */}
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full text-[10px]">
-                                                    <thead>
-                                                        <tr className="border-b border-slate-100 bg-slate-50/60">
-                                                            {/* Checkbox en TODOS los bloques */}
-                                                            <th className="px-3 py-2 w-8">
-                                                                <input type="checkbox" checked={allSel}
-                                                                    onChange={e => setSelectedExcelIds(prev => {
-                                                                        const n = new Set(prev);
-                                                                        rows.forEach(r => e.target.checked ? n.add(r.id) : n.delete(r.id));
-                                                                        return n;
-                                                                    })}
-                                                                    className="w-3.5 h-3.5 accent-slate-600 cursor-pointer" />
-                                                            </th>
-                                                            <SortTh label="Fecha" sortKey="fecha" activeKey={seguimientoSortKey} dir={seguimientoSortDir} onSort={handleSeguimientoSort} />
-                                                            <SortTh label="Remisión" sortKey="invoice_id" activeKey={seguimientoSortKey} dir={seguimientoSortDir} onSort={handleSeguimientoSort} />
-                                                            <SortTh label="Cliente" sortKey="customer_name" activeKey={seguimientoSortKey} dir={seguimientoSortDir} onSort={handleSeguimientoSort} />
-                                                            <SortTh label="Vendedor" sortKey="vendedor" activeKey={seguimientoSortKey} dir={seguimientoSortDir} onSort={handleSeguimientoSort} />
-                                                            <SortTh label="Planilla" sortKey="numero_planilla" activeKey={seguimientoSortKey} dir={seguimientoSortDir} onSort={handleSeguimientoSort} />
-                                                            <SortTh label="Motivo" sortKey="return_reason" activeKey={seguimientoSortKey} dir={seguimientoSortDir} onSort={handleSeguimientoSort} />
-                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Artículos</th>
-                                                            <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap">Historial</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {rows.map((ret, idx) => {
-                                                            const expanded = expandedTrackingIds.has(ret.id);
-                                                            return (
-                                                            <React.Fragment key={ret.id}>
-                                                            <tr className={`border-b border-slate-50 ${idx % 2 === 0 ? '' : 'bg-slate-50/40'} ${selectedExcelIds.has(ret.id) ? 'bg-indigo-50/50' : ''}`}>
-                                                                <td className="px-3 py-2">
-                                                                    <input type="checkbox" checked={selectedExcelIds.has(ret.id)}
-                                                                        onChange={() => setSelectedExcelIds(prev => {
-                                                                            const n = new Set(prev); n.has(ret.id) ? n.delete(ret.id) : n.add(ret.id); return n;
-                                                                        })}
-                                                                        className="w-3.5 h-3.5 accent-slate-600 cursor-pointer" />
-                                                                </td>
-                                                                <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{ret.fecha ?? '—'}</td>
-                                                                <td className="px-3 py-2 font-black text-slate-900 font-mono whitespace-nowrap">{ret.invoice_id}</td>
-                                                                <td className="px-3 py-2 text-slate-700 whitespace-nowrap">
-                                                                    <div>{ret.customer_name ?? ret.client_id ?? '—'}</div>
-                                                                    {ret.codigo_cliente && <div className="text-[8px] text-slate-400">{ret.codigo_cliente}</div>}
-                                                                </td>
-                                                                <td className="px-3 py-2 text-slate-600 whitespace-nowrap">{ret.vendedor ?? '—'}</td>
-                                                                <td className="px-3 py-2 text-slate-600 whitespace-nowrap">
-                                                                    <div>{ret.numero_planilla ?? '—'}</div>
-                                                                    {ret.vehicle_plate && <div className="text-[8px] text-slate-400">{ret.vehicle_plate}</div>}
-                                                                </td>
-                                                                <td className="px-3 py-2 text-slate-600 max-w-[140px] truncate" title={ret.return_reason}>{ret.return_reason ?? '—'}</td>
-                                                                <td className="px-3 py-2 text-slate-500">
-                                                                    {ret.items.length > 0
-                                                                        ? (
-                                                                            <button
-                                                                                onClick={() => setExpandedTrackingIds(prev => {
-                                                                                    const n = new Set(prev); n.has(ret.id) ? n.delete(ret.id) : n.add(ret.id); return n;
-                                                                                })}
-                                                                                className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded-lg text-[9px] font-black transition-colors">
-                                                                                {ret.items.length} art.
-                                                                                <Icons.ChevronDown className={`w-2.5 h-2.5 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-                                                                            </button>
-                                                                        )
-                                                                        : '—'}
-                                                                </td>
-                                                                <td className="px-3 py-2 text-[8px] text-slate-400 max-w-[160px]">
-                                                                    {ret.conciliacion_confirmada_at && <div className="text-emerald-600">✅ Fact: {ret.conciliacion_confirmada_by} {ret.conciliacion_confirmada_at?.slice(0,10)}</div>}
-                                                                    {ret.pre_approval_at && <div className="text-indigo-500">📤 Excel: {ret.pre_approval_by} {ret.pre_approval_at?.slice(0,10)}</div>}
-                                                                    {ret.pre_approved_at && <div className="text-sky-500">📋 Aprob: {ret.pre_approved_by} {ret.pre_approved_at?.slice(0,10)}</div>}
-                                                                    {ret.supplier_exit_at && <div className="text-violet-500">🚚 Salida: {ret.supplier_exit_by} {ret.supplier_exit_at?.slice(0,10)}</div>}
-                                                                </td>
-                                                            </tr>
-                                                            {expanded && (
-                                                                <tr className="bg-indigo-50/60">
-                                                                    <td colSpan={8} className="px-4 py-2.5 border-l-4 border-indigo-400">
-                                                                        <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest mb-1.5">Artículos devueltos</p>
-                                                                        <table className="w-full text-[9px]">
-                                                                            <thead>
-                                                                                <tr className="text-indigo-400 font-black uppercase">
-                                                                                    <th className="text-left pb-1">Artículo</th>
-                                                                                    <th className="text-right pb-1">Cantidad devuelta</th>
-                                                                                    <th className="text-right pb-1">Unidad</th>
-                                                                                </tr>
-                                                                            </thead>
-                                                                            <tbody className="divide-y divide-indigo-100">
-                                                                                {ret.items.map((it, i) => (
-                                                                                    <tr key={i}>
-                                                                                        <td className="py-1 font-bold text-slate-700">
-                                                                                            {it.article_id || it.sku}
-                                                                                            {it.article_name && <span className="block text-[8px] text-slate-400 font-normal">{it.article_name}</span>}
-                                                                                        </td>
-                                                                                        <td className="py-1 text-right font-black text-rose-600">{it.quantity_returned}</td>
-                                                                                        <td className="py-1 text-right text-slate-500">{it.unit || 'und'}</td>
-                                                                                    </tr>
-                                                                                ))}
-                                                                            </tbody>
-                                                                        </table>
-                                                                    </td>
+                                            {/* Tabla via DataTable */}
+                                            <DataTable<TrackingReturn>
+                                                data={rows}
+                                                columns={[
+                                                    {
+                                                        header: '',
+                                                        key: 'id',
+                                                        sortable: false,
+                                                        noWrap: true,
+                                                        render: (ret) => (
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedExcelIds.has(ret.id)}
+                                                                onClick={e => e.stopPropagation()}
+                                                                onChange={() => setSelectedExcelIds(prev => {
+                                                                    const n = new Set(prev);
+                                                                    n.has(ret.id) ? n.delete(ret.id) : n.add(ret.id);
+                                                                    return n;
+                                                                })}
+                                                                className="w-3.5 h-3.5 accent-slate-600 cursor-pointer"
+                                                            />
+                                                        ),
+                                                    },
+                                                    { header: 'Fecha', key: 'fecha', sortable: true, noWrap: true },
+                                                    {
+                                                        header: 'Remisión', key: 'invoice_id', sortable: true, noWrap: true,
+                                                        render: (ret) => <span className="font-black text-slate-900 font-mono">{ret.invoice_id}</span>,
+                                                    },
+                                                    {
+                                                        header: 'Cliente', key: 'customer_name', sortable: true,
+                                                        render: (ret) => (
+                                                            <div>
+                                                                <div>{ret.customer_name ?? ret.client_id ?? '—'}</div>
+                                                                {ret.codigo_cliente && <div className="text-[8px] text-slate-400">{ret.codigo_cliente}</div>}
+                                                            </div>
+                                                        ),
+                                                    },
+                                                    { header: 'Vendedor', key: 'vendedor', sortable: true, noWrap: true },
+                                                    {
+                                                        header: 'Planilla', key: 'numero_planilla', sortable: true,
+                                                        render: (ret) => (
+                                                            <div>
+                                                                <div>{ret.numero_planilla ?? '—'}</div>
+                                                                {ret.vehicle_plate && <div className="text-[8px] text-slate-400">{ret.vehicle_plate}</div>}
+                                                            </div>
+                                                        ),
+                                                    },
+                                                    {
+                                                        header: 'Motivo', key: 'return_reason', sortable: true, maxWidth: '160px',
+                                                        render: (ret) => <span title={ret.return_reason ?? ''}>{ret.return_reason ?? '—'}</span>,
+                                                    },
+                                                    {
+                                                        header: 'Artículos', key: 'items' as any, sortable: false,
+                                                        render: (ret) => ret.items.length > 0
+                                                            ? <span className="flex items-center gap-1 bg-slate-100 px-1.5 py-0.5 rounded-lg text-[9px] font-black">{ret.items.length} art. <Icons.ChevronDown className="w-2.5 h-2.5 opacity-60" /></span>
+                                                            : <span className="text-slate-300">—</span>,
+                                                    },
+                                                    {
+                                                        header: 'Historial', key: 'conciliacion_confirmada_at' as any, sortable: false,
+                                                        render: (ret) => (
+                                                            <div className="text-[8px] space-y-0.5 max-w-[160px]">
+                                                                {ret.conciliacion_confirmada_at && <div className="text-emerald-600">✅ Fact: {ret.conciliacion_confirmada_by} {ret.conciliacion_confirmada_at?.slice(0,10)}</div>}
+                                                                {ret.pre_approval_at && <div className="text-indigo-500">📤 Excel: {ret.pre_approval_by} {ret.pre_approval_at?.slice(0,10)}</div>}
+                                                                {ret.pre_approved_at && <div className="text-sky-500">📋 Aprob: {ret.pre_approved_by} {ret.pre_approved_at?.slice(0,10)}</div>}
+                                                                {ret.supplier_exit_at && <div className="text-violet-500">🚚 Salida: {ret.supplier_exit_by} {ret.supplier_exit_at?.slice(0,10)}</div>}
+                                                            </div>
+                                                        ),
+                                                    },
+                                                ]}
+                                                hideTopControls={true}
+                                                naked={true}
+                                                renderExpandedRow={(ret) => ret.items.length > 0 ? (
+                                                    <div className="px-4 py-2.5 border-l-4 border-indigo-400 bg-indigo-50/60">
+                                                        <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest mb-1.5">Artículos devueltos</p>
+                                                        <table className="w-full text-[9px]">
+                                                            <thead>
+                                                                <tr className="text-indigo-400 font-black uppercase">
+                                                                    <th className="text-left pb-1">Artículo</th>
+                                                                    <th className="text-right pb-1">Cant.</th>
+                                                                    <th className="text-right pb-1">Unidad</th>
                                                                 </tr>
-                                                            )}
-                                                            </React.Fragment>
-                                                            );
-                                                        })}
-                                                    </tbody>
-                                                </table>
-                                            </div>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-indigo-100">
+                                                                {ret.items.map((it, i) => (
+                                                                    <tr key={i}>
+                                                                        <td className="py-1 font-bold text-slate-700">
+                                                                            {it.article_id || it.sku}
+                                                                            {it.article_name && <span className="block text-[8px] text-slate-400 font-normal">{it.article_name}</span>}
+                                                                        </td>
+                                                                        <td className="py-1 text-right font-black text-rose-600">{it.quantity_returned}</td>
+                                                                        <td className="py-1 text-right text-slate-500">{it.unit || 'und'}</td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                ) : null}
+                                            />
                                         </div>
                                     );
                                 })}
