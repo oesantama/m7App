@@ -1538,19 +1538,39 @@ function VinculacionCorreoTab({ user }: { user: User }) {
     finally { setLoading(false); }
   };
 
+  const loadRef = React.useRef(load);
+  loadRef.current = load;
+
   useEffect(() => {
     load();
-    // Listen for OAuth popup postMessage
+
+    // Escucha postMessage del popup OAuth
     const handler = (e: MessageEvent) => {
       if (e.data?.type === 'DOGAMA_OAUTH_SUCCESS') {
         toast.success(`✅ ${PROVIDER_META[e.data.provider]?.label || e.data.provider} vinculado: ${e.data.email}`);
-        load();
+        // Pequeño delay para asegurar que el backend ya confirmó la escritura
+        setTimeout(() => loadRef.current(), 800);
       } else if (e.data?.type === 'DOGAMA_OAUTH_ERROR') {
         toast.error(`Error al vincular: ${e.data.error}`);
       }
     };
+
+    // Fallback: recarga cuando el popup cierra y la ventana recupera el foco
+    let popupOpen = false;
+    const onFocus = () => { if (popupOpen) { popupOpen = false; setTimeout(() => loadRef.current(), 400); } };
+
     window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
+    window.addEventListener('focus', onFocus);
+
+    // Marcar que hay popup abierto cuando el usuario hace clic en "Vincular"
+    const markPopupOpen = () => { popupOpen = true; };
+    window.addEventListener('blur', markPopupOpen);
+
+    return () => {
+      window.removeEventListener('message', handler);
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('blur', markPopupOpen);
+    };
   }, []);
 
   const handleConnect = (provider: 'gmail' | 'outlook') => {
@@ -1596,7 +1616,7 @@ function VinculacionCorreoTab({ user }: { user: User }) {
         <div>
           <p className="text-sm font-bold text-amber-800">Envío de correos vía cuenta propia</p>
           <p className="text-xs text-amber-700 mt-1">
-            Al vincular tu Gmail u Outlook, los correos del módulo Dogama se enviarán desde esa cuenta.
+            Al vincular tu Gmail, los correos del módulo Dogama se enviarán desde esa cuenta.
             Si no hay cuenta vinculada, se usa Resend (servicio actual del sistema).
           </p>
         </div>
@@ -1608,7 +1628,7 @@ function VinculacionCorreoTab({ user }: { user: User }) {
         <div className="space-y-4">
           {(() => {
             const hasAnyAccountLinked = accounts.some(a => a.is_active);
-            return (['gmail', 'outlook'] as const).map(provider => {
+            return (['gmail'] as const).map(provider => {
               const meta = PROVIDER_META[provider];
               const account = getAccount(provider);
               return (
@@ -1714,7 +1734,7 @@ function VinculacionCorreoTab({ user }: { user: User }) {
       <GenericConfirmModal
         isOpen={!!confirmUnlinkProvider}
         title="¿Desvincular Cuenta?"
-        message={`¿Estás seguro de que deseas desvincular la cuenta de ${confirmUnlinkProvider === 'gmail' ? 'Gmail' : 'Outlook'}? Esta acción evitará que se envíen correos desde esta cuenta.`}
+        message={`¿Estás seguro de que deseas desvincular la cuenta de Gmail? Esta acción evitará que se envíen correos desde esta cuenta.`}
         onClose={() => setConfirmUnlinkProvider(null)}
         onConfirm={handleConfirmUnlink}
       />
