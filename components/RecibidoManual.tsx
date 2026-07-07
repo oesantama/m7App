@@ -148,6 +148,7 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
           return;
         }
 
+        const headers = rawData[headerRowIndex].map(h => String(h || '').trim());
         const normStr = (s: string) => s.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const findIdx = (terms: string[]) => {
            const exactIdx = headers.findIndex(h => {
@@ -184,7 +185,7 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
         const iUn = findIdx(['un orig', 'un', 'un code', 'cod plan']);
         const iRef = findIdx(['ref 1', 'referencia', 'client ref', 'ref']);
         const iCant = findIdx(['cant env', 'cantidad', 'qty', 'cantidad esperada']);
-        const iUnd = findIdx(['um', 'und', 'unid', 'unidad', 'medida', 'u medida', 'u.m.', 'uom']);
+        const iUnd = findIdx(['um', 'und', 'unid', 'unidad', 'medida', 'u medida', 'u.m.', 'uom', 'u.m', 'umb', 'umv', 'u.med', 'un.med.', 'un.med', 'unidade', 'unidades']);
         const iFactura = findIdx(['remision', 'factura', 'documento', 'invoice']);
         const iCity = findIdx(['destino', 'ciudad', 'city']);
         const iDir = findIdx(['dirección', 'direccion', 'address']);
@@ -223,7 +224,7 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
             receivedQty: 0,
             countedQty: 0,
             status: 'Pending',
-            unit: (iUnd !== -1 && String(row[iUnd] || '').trim() !== '' && String(row[iUnd] || '').trim() !== '0') ? String(row[iUnd]).trim() : 'UND',
+            unit: (iUnd !== -1 && String(row[iUnd] || '').trim() !== '' && String(row[iUnd] || '').trim() !== '0') ? String(row[iUnd]).trim().toUpperCase() : 'UND',
             invoice: iFactura !== -1 ? String(row[iFactura]) : '',
             city: iCity !== -1 ? String(row[iCity]) : '',
             address: iDir !== -1 ? String(row[iDir]) : '',

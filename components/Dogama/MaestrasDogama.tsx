@@ -1769,6 +1769,8 @@ function VinculacionCorreoTab({ user }: { user: User }) {
 
 interface FleteItem {
   id: number;
+  empresa: string | null;
+  precio_unitario: string | null;
   flete_minimo: string | null;
   valor_intermediacion_minimo: string | null;
   flete_maximo: string | null;
@@ -1784,6 +1786,8 @@ interface FleteItem {
 }
 
 const EMPTY_FLETE = {
+  empresa: '',
+  precio_unitario: '',
   flete_minimo: '',
   valor_intermediacion_minimo: '',
   flete_maximo: '',
@@ -1816,6 +1820,8 @@ function FleteTab({ user }: { user: User }) {
   const openCreate = () => { setForm({ ...EMPTY_FLETE }); setEditItem(null); setShowForm(true); };
   const openEdit = (item: FleteItem) => {
     setForm({
+      empresa:                     String(item.empresa ?? ''),
+      precio_unitario:             String(item.precio_unitario ?? ''),
       flete_minimo:                String(item.flete_minimo ?? ''),
       valor_intermediacion_minimo: String(item.valor_intermediacion_minimo ?? ''),
       flete_maximo:                String(item.flete_maximo ?? ''),
@@ -1830,6 +1836,8 @@ function FleteTab({ user }: { user: User }) {
     setSaving(true);
     try {
       const payload = {
+        empresa:                     form.empresa?.trim() || null,
+        precio_unitario:             form.precio_unitario             ? Number(form.precio_unitario)             : null,
         flete_minimo:                form.flete_minimo                ? Number(form.flete_minimo)                : null,
         valor_intermediacion_minimo: form.valor_intermediacion_minimo ? Number(form.valor_intermediacion_minimo) : null,
         flete_maximo:                form.flete_maximo                ? Number(form.flete_maximo)                : null,
@@ -1852,6 +1860,8 @@ function FleteTab({ user }: { user: User }) {
   const toggleEstado = async (item: FleteItem) => {
     try {
       await api.dogamaUpdateFlete(item.id, {
+        empresa:                     item.empresa?.trim() || null,
+        precio_unitario:             item.precio_unitario             ? Number(item.precio_unitario)             : null,
         flete_minimo:                item.flete_minimo                ? Number(item.flete_minimo)                : null,
         valor_intermediacion_minimo: item.valor_intermediacion_minimo ? Number(item.valor_intermediacion_minimo) : null,
         flete_maximo:                item.flete_maximo                ? Number(item.flete_maximo)                : null,
@@ -1872,6 +1882,8 @@ function FleteTab({ user }: { user: User }) {
 
   const columns: ColumnDef<FleteItem>[] = [
     { header: '#', key: 'id', sortable: true, render: r => <span className="text-slate-400 text-xs">{r.id}</span> },
+    { header: 'Empresa',        key: 'empresa',                     sortable: true, render: r => <span className="font-semibold">{r.empresa ?? '—'}</span> },
+    { header: 'Precio Unit.',   key: 'precio_unitario',             sortable: true, render: r => <span className="font-mono">{r.precio_unitario ? `$${formatNum(r.precio_unitario)}` : '—'}</span> },
     { header: 'Flete Mínimo',   key: 'flete_minimo',                sortable: true, render: r => <span className="font-mono">{formatNum(r.flete_minimo)}</span> },
     { header: 'Intermed. Mín.', key: 'valor_intermediacion_minimo', sortable: true, render: r => <span className="font-mono">{formatNum(r.valor_intermediacion_minimo)}%</span> },
     { header: 'Flete Máximo',   key: 'flete_maximo',                sortable: true, render: r => <span className="font-mono">{formatNum(r.flete_maximo)}</span> },
@@ -1911,6 +1923,16 @@ function FleteTab({ user }: { user: User }) {
               </p>
             </div>
             <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Empresa (Comodín)</label>
+                <input type="text" value={form.empresa} onChange={setF('empresa')} placeholder="Nombre de la empresa..."
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Precio Unitario ($ — se carga automático al crear OS)</label>
+                <input type="number" value={form.precio_unitario} onChange={setF('precio_unitario')} placeholder="270"
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+              </div>
               {([
                 { k: 'flete_minimo',                label: 'Flete Mínimo',       type: 'number' },
                 { k: 'valor_intermediacion_minimo', label: 'Intermed. Mínimo (%)', type: 'number' },

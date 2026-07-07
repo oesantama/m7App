@@ -537,7 +537,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const iVolUnit = isPlanR ? -1 : findIdx(['volumen']);
         const iVolUnidad = findIdx(['volumen unitario']); 
         
-        const iUnd = findIdx(['um', 'und', 'unid', 'unidad', 'medida', 'u medida', 'u.m.', 'uom']);
+        const iUnd = findIdx(['um', 'und', 'unid', 'unidad', 'medida', 'u medida', 'u.m.', 'uom', 'u.m', 'umb', 'umv', 'u.med', 'un.med.', 'un.med', 'unidade', 'unidades']);
         const iFactura = findIdx([
           'remision/transferencia', 'remision / transferencia',
           'no. factura', 'nro. factura', 'nro factura', 'no factura', 'num factura', 'numero factura', 'número factura',
@@ -669,7 +669,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               articleId: sku,
               expectedQty: qty,
               receivedQty: 0, // Inicia en 0
-              unit: (val(iUnd) && val(iUnd).trim() !== '0' && val(iUnd).trim() !== '') ? val(iUnd).trim() : 'und',
+              unit: (val(iUnd) && val(iUnd).trim() !== '0' && val(iUnd).trim() !== '') ? val(iUnd).trim().toUpperCase() : 'UND',
               volume: String(volVal),
               unitVolume: val(iVolUnidad),
               invoice: val(iFactura),
@@ -804,11 +804,32 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         }
 
         const headers = rawData[headerRowIndex].map(h => String(h || '').trim());
-        const normStr = (s: string) => s.toLowerCase().trim().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        const normStr = (s: string) =>
+          s.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const findIdx = (terms: string[]) => {
-          const exact = headers.findIndex(h => h && terms.some(t => normStr(h) === normStr(t)));
-          if (exact !== -1) return exact;
-          return headers.findIndex(h => h && terms.some(t => normStr(h).includes(normStr(t))));
+           // Paso 1: Búsqueda EXACTA (insensible a acentos)
+           const exactIdx = headers.findIndex(h => {
+             if (!h) return false;
+             return terms.some(t => normStr(h) === normStr(t));
+           });
+           if (exactIdx !== -1) return exactIdx;
+
+           // Paso 2: Búsqueda PARCIAL (insensible a acentos, solo si falla la exacta)
+           return headers.findIndex(h => {
+             if (!h) return false;
+             const normH = normStr(h);
+             return terms.some(t => {
+               const normT = normStr(t);
+               // Evitar falsos positivos para términos muy cortos como 'um', 'un', 'und'
+               if (normT.length <= 3) {
+                 return normH === normT || 
+                        normH.startsWith(normT + ' ') || 
+                        normH.endsWith(' ' + normT) || 
+                        normH.includes(' ' + normT + ' ');
+               }
+               return normH.includes(normT);
+             });
+           });
         };
 
         const isPlanR = type === 'Plan R';
@@ -824,6 +845,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const iPeso     = findIdx(['peso', 'weight', 'kgs', 'kilogramos']);
         const iLat      = findIdx(['latitud', 'lat', 'latitude', 'coord y', 'coordinada y']);
         const iLng      = findIdx(['longitud', 'lng', 'longitude', 'coord x', 'coordinada x']);
+        const iUnd      = findIdx(['um', 'und', 'unid', 'unidad', 'medida', 'u medida', 'u.m.', 'uom', 'u.m', 'umb', 'umv', 'u.med', 'un.med.', 'un.med', 'unidade', 'unidades']);
 
         if (iPlaca === -1 || iCarga === -1) {
           toast.error('No se detectaron columnas PLACA o CARGA en el archivo.');
@@ -874,6 +896,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
             peso:        iPeso !== -1  ? parseNumberM7(val(iPeso), isPlanR, 'weight') : undefined,
             lat:  iLat !== -1 && val(iLat)  ? (parseFloat(val(iLat).replace(',', '.'))  || null) : null,
             lng:  iLng !== -1 && val(iLng)  ? (parseFloat(val(iLng).replace(',', '.')) || null) : null,
+            unit: (iUnd !== -1 && val(iUnd).trim() !== '' && val(iUnd).trim() !== '0') ? val(iUnd).trim().toUpperCase() : undefined,
           });
         });
 
@@ -2032,7 +2055,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                         const fieldLabels: Record<string, string> = {
                           city: 'Ciudad', address: 'Dirección', volume: 'Volumen',
                           neighborhood: 'Barrio', expected_qty: 'Cant. Esperada', peso: 'Peso',
-                          latitude: 'Latitud', longitude: 'Longitud'
+                          latitude: 'Latitud', longitude: 'Longitud', unit: 'U.M.'
                         };
                         const changes = Object.entries(p.new)
                           .filter(([k, v]) => v !== undefined && String(p.old[k] ?? '') !== String(v))

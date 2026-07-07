@@ -1290,8 +1290,8 @@ const App: React.FC = () => {
           {renderContent()}
         </Layout>
 
-        {/* CHATBOT POSICIÓN ABSOLUTA AL FRENTE - ALINEADO CON HEADER 'RUTAS' */}
-        <AIChat
+        {/* CHATBOT — temporalmente oculto */}
+        {/* <AIChat
           key="global-ai-chat-v8"
           context={{
             user: user.name,
@@ -1302,7 +1302,7 @@ const App: React.FC = () => {
             activeDrivers: drivers.filter(d => d.status === 'Activo').length,
             recentAssignments: assignments.slice(-5)
           }}
-        />
+        /> */}
 
       </React.Suspense>
     </>

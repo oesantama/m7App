@@ -2702,6 +2702,7 @@ export const correctDocumentItems = async (req: Request, res: Response) => {
       lng?: number | null;
       expectedQty?: number;
       peso?: number;
+      unit?: string;
     }>;
     dryRun: boolean;
     changedBy: string;
@@ -2745,7 +2746,7 @@ export const correctDocumentItems = async (req: Request, res: Response) => {
       const docId = item.documentId?.trim();
 
       const existing = await client.query(
-        `SELECT id, city, address, volume, neighborhood, expected_qty, peso, latitude, longitude
+        `SELECT id, city, address, volume, neighborhood, expected_qty, peso, latitude, longitude, unit
          FROM document_items
          WHERE document_id = $1 AND article_id = $2 AND TRIM(invoice) = $3
          LIMIT 1`,
@@ -2765,6 +2766,7 @@ export const correctDocumentItems = async (req: Request, res: Response) => {
       if (item.neighborhood !== undefined) proposed.neighborhood = item.neighborhood;
       if (item.expectedQty !== undefined) proposed.expected_qty = item.expectedQty;
       if (item.peso      !== undefined) proposed.peso         = item.peso;
+      if (item.unit      !== undefined) proposed.unit         = item.unit;
       if (item.lat  != null) proposed.latitude  = item.lat;
       if (item.lng  != null) proposed.longitude = item.lng;
 
@@ -2776,7 +2778,7 @@ export const correctDocumentItems = async (req: Request, res: Response) => {
         old: {
           city: old.city, address: old.address, volume: old.volume,
           neighborhood: old.neighborhood, expected_qty: old.expected_qty, peso: old.peso,
-          latitude: old.latitude, longitude: old.longitude,
+          latitude: old.latitude, longitude: old.longitude, unit: old.unit,
         },
         new: proposed,
       });
@@ -2797,6 +2799,7 @@ export const correctDocumentItems = async (req: Request, res: Response) => {
         if (item.neighborhood !== undefined) addField('neighborhood', item.neighborhood);
         if (item.expectedQty !== undefined) addField('expected_qty', item.expectedQty);
         if (item.peso      !== undefined) addField('peso',         item.peso);
+        if (item.unit      !== undefined) addField('unit',         item.unit);
         if (item.lat  != null) addField('latitude',  item.lat);
         if (item.lng  != null) addField('longitude', item.lng);
 
@@ -2836,6 +2839,7 @@ export const correctDocumentItems = async (req: Request, res: Response) => {
         if (item.neighborhood !== undefined && String(old.neighborhood) !== String(item.neighborhood)) fieldsToLog.push(['neighborhood', old.neighborhood, item.neighborhood]);
         if (item.expectedQty !== undefined && String(old.expected_qty) !== String(item.expectedQty)) fieldsToLog.push(['expected_qty', old.expected_qty, item.expectedQty]);
         if (item.peso      !== undefined && String(old.peso)         !== String(item.peso))      fieldsToLog.push(['peso',         old.peso,         item.peso]);
+        if (item.unit      !== undefined && String(old.unit)         !== String(item.unit))      fieldsToLog.push(['unit',         old.unit,         item.unit]);
         if (item.lat  != null && String(old.latitude  ?? '') !== String(item.lat))  fieldsToLog.push(['latitude',  old.latitude,  item.lat]);
         if (item.lng  != null && String(old.longitude ?? '') !== String(item.lng)) fieldsToLog.push(['longitude', old.longitude, item.lng]);
 

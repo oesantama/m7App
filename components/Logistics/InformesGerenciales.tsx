@@ -3135,25 +3135,28 @@ export const InformesGerenciales: React.FC = () => {
                             </span>
                           </div>
                         </div>
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto overflow-y-auto max-h-[65vh] custom-scrollbar relative">
                           <table className="w-full text-sm">
                             <thead>
-                              <tr className="border-b border-slate-100 bg-slate-50 select-none">
-                                <th onClick={() => handleSort('clientName')} className="text-left cursor-pointer hover:bg-slate-100 transition-colors font-black text-[10px] text-slate-400 uppercase tracking-widest p-4">
+                              <tr className="border-b border-slate-100 bg-slate-50 select-none sticky top-0 z-20 shadow-sm">
+                                <th onClick={() => handleSort('clientName')} className="text-left cursor-pointer hover:bg-slate-100 transition-colors font-black text-[10px] text-slate-400 uppercase tracking-widest p-4 sticky left-0 z-30 bg-slate-50 border-r border-slate-200">
                                   Cliente {pendienteSortField === 'clientName' && <span className="text-indigo-600 text-[8px]">{pendienteSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                 </th>
-                                <th onClick={() => handleSort('cxc')} className="text-right cursor-pointer hover:bg-slate-100 transition-colors font-black text-[10px] text-slate-400 uppercase tracking-widest p-4 border-l border-slate-200">
+                                <th onClick={() => handleSort('cxc')} title="Suma de CxC (valor a cobrar) pendiente de facturar" className="text-right cursor-pointer hover:bg-slate-100 transition-colors font-black text-[10px] text-slate-400 uppercase tracking-widest p-4 border-l border-slate-200">
                                   Valor CXC Final {pendienteSortField === 'cxc' && <span className="text-indigo-600 text-[8px]">{pendienteSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                  <div className="text-[8px] font-normal text-slate-400 normal-case tracking-normal mt-0.5">Σ CxC pendiente</div>
                                 </th>
-                                <th onClick={() => handleSort('cxp')} className="text-right cursor-pointer hover:bg-slate-100 transition-colors font-black text-[10px] text-slate-400 uppercase tracking-widest p-4">
+                                <th onClick={() => handleSort('cxp')} title="Suma de CxP (valor a pagar) pendiente en los manifiestos sin facturar" className="text-right cursor-pointer hover:bg-slate-100 transition-colors font-black text-[10px] text-slate-400 uppercase tracking-widest p-4">
                                   Valor CXP Final {pendienteSortField === 'cxp' && <span className="text-indigo-600 text-[8px]">{pendienteSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                  <div className="text-[8px] font-normal text-slate-400 normal-case tracking-normal mt-0.5">Σ CxP pendiente</div>
                                 </th>
                                 {sortedMonths.map((sm, idx) => {
                                   const pct = totals.cxc > 0 ? ((totals.months[sm] || 0) / totals.cxc) * 100 : 0;
                                   return (
-                                    <th onClick={() => handleSort(`month_${sm}`)} key={sm} className="text-right cursor-pointer hover:bg-slate-100 transition-colors font-black text-[10px] text-slate-400 uppercase tracking-widest p-4 border-l border-slate-200">
+                                    <th onClick={() => handleSort(`month_${sm}`)} key={sm} title={`CxC pendiente del mes ${monthNames[idx]} · % = (CxC mes / CxC total) × 100`} className="text-right cursor-pointer hover:bg-slate-100 transition-colors font-black text-[10px] text-slate-400 uppercase tracking-widest p-4 border-l border-slate-200">
                                       <div className="text-[9px] text-indigo-500 mb-1">{pct.toFixed(2)}%</div>
                                       {monthNames[idx]} {pendienteSortField === `month_${sm}` && <span className="text-indigo-600 text-[8px]">{pendienteSortDirection === 'asc' ? '▲' : '▼'}</span>}
+                                      <div className="text-[8px] font-normal text-slate-400 normal-case tracking-normal mt-0.5">(CxC mes/CxC total)×100</div>
                                     </th>
                                   );
                                 })}
@@ -3162,7 +3165,7 @@ export const InformesGerenciales: React.FC = () => {
                             <tbody className="divide-y divide-slate-100">
                               {filteredTableRows.map((row, i) => (
                                 <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                                  <td className="p-4 text-[11px] font-bold text-slate-700">
+                                  <td className="p-4 text-[11px] font-bold text-slate-700 sticky left-0 z-10 bg-white border-r border-slate-100 shadow-[1px_0_3px_rgba(0,0,0,0.02)]">
                                     <div className="flex items-center justify-between group">
                                       <span>{row.clientName}</span>
                                       <button 
@@ -3976,7 +3979,14 @@ export const InformesGerenciales: React.FC = () => {
                           <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                               <div className="flex items-center gap-2">
-                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">Ventas Clientes General</h3>
+                                <h3 className="text-xs font-black uppercase tracking-wider text-slate-800">
+                                Ventas Clientes General
+                                {(reportFromDate || reportToDate) && (
+                                  <span className="ml-2 text-[10px] font-semibold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                    {reportFromDate || '…'} — {reportToDate || '…'}
+                                  </span>
+                                )}
+                              </h3>
                                 <div className="flex items-center gap-1.5 ml-2">
                                   <button 
                                     onClick={() => setSelectedClientForVehiclesInt('GENERAL')}
@@ -3996,7 +4006,6 @@ export const InformesGerenciales: React.FC = () => {
                                   </button>
                                 </div>
                               </div>
-                              <p className="text-[10px] text-slate-400 mt-1">Agrupado por el nombre del cliente de prov_cliente según su documento. Excluye anulados.</p>
                             </div>
                             
                             <div className="flex flex-wrap items-center gap-2.5">
@@ -4065,107 +4074,124 @@ export const InformesGerenciales: React.FC = () => {
                                         {tdmSortField === 'clientName' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('ventaTotal')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('ventaTotal')} title="Σ CxC de todos los manifiestos del período" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Venta</span>
                                         {tdmSortField === 'ventaTotal' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ CxC</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('ingTerceros')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('ingTerceros')} title="Σ CxP (costo pagado a terceros) de todos los manifiestos del período" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Ing Terceros</span>
                                         {tdmSortField === 'ingTerceros' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ CxP</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('ingresosPropios')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('ingresosPropios')} title="Ingresos Propios = Venta − Ing. Terceros (CxC − CxP)" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Ingresos Propios</span>
                                         {tdmSortField === 'ingresosPropios' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">CxC − CxP</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('int')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('int')} title="Intermediación % = (Ingresos Propios / Venta) × 100" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>INT</span>
                                         {tdmSortField === 'int' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">(Propios/Venta)×100</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('participation')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('participation')} title="Participación en Venta = (Venta cliente / Venta total general) × 100" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Part-vta</span>
                                         {tdmSortField === 'participation' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">(Venta/Venta Total)×100</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('invoicedSameMonthVal')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('invoicedSameMonthVal')} title="Σ CxC de manifiestos en estado FACTURADA dentro del período" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Vl fact mes</span>
                                         {tdmSortField === 'invoicedSameMonthVal' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ CxC (estado=FACTURADA)</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('invoicedSameMonthPct')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('invoicedSameMonthPct')} title="% Facturado del Mes = (Vl Fact Mes / Venta) × 100" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>% Fact. Mes</span>
                                         {tdmSortField === 'invoicedSameMonthPct' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">(Vl Fact/Venta)×100</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averagePaymentDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Factura (Fecha Factura - Fecha Manifiesto)">
+                                    <th onClick={() => handleTdmSort('averagePaymentDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Factura · Fórmula: Σ(Fecha Factura − Fecha Manifiesto) / nº manifiestos con ambas fechas">
                                       <div className="flex flex-col items-end justify-center gap-1">
                                         <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dia fact <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averagePaymentDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ(Fec.Fact−Fec.Man)/n</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averageRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Factura hasta Recibo (Fecha Recibo - Fecha Factura)">
+                                    <th onClick={() => handleTdmSort('averageRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Factura hasta Recibo · Fórmula: Σ(Fecha Recibo − Fecha Factura) / nº manifiestos con ambas fechas">
                                       <div className="flex flex-col items-end justify-center gap-1">
                                         <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dias rec <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averageRecDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ(Fec.Rec−Fec.Fact)/n</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averageEgrDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Egreso (Fecha Egreso - Fecha Manifiesto)">
+                                    <th onClick={() => handleTdmSort('averageEgrDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Egreso · Fórmula: Σ(Fecha Egreso − Fecha Manifiesto) / nº manifiestos con ambas fechas">
                                       <div className="flex flex-col items-end justify-center gap-1">
                                         <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dias egreso <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averageEgrDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ(Fec.Egr−Fec.Man)/n</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averageManRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Recibo (Fecha Recibo - Fecha Manifiesto)">
+                                    <th onClick={() => handleTdmSort('averageManRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Recibo · Fórmula: Σ(Fecha Recibo − Fecha Manifiesto) / nº manifiestos con ambas fechas">
                                       <div className="flex flex-col items-end justify-center gap-1">
                                         <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dia man recibido <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averageManRecDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ(Fec.Rec−Fec.Man)/n</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('receivedValue')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('receivedValue')} title="Σ CxC de manifiestos recibidos (con fecha_recibo) en el mismo mes que la factura" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Vl Rec Mismo Mes</span>
                                         {tdmSortField === 'receivedValue' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ CxC (recibido=mes factura)</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('receivedDiffMonth')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('receivedDiffMonth')} title="Σ CxC de manifiestos recibidos en mes diferente al de la factura, o sin factura" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Vl Rec Dif Mes</span>
                                         {tdmSortField === 'receivedDiffMonth' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ CxC (recibido≠mes factura)</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('receivedPct')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('receivedPct')} title="% Recibido = (Vl Rec Mismo Mes / Venta) × 100" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>% Recibido</span>
                                         {tdmSortField === 'receivedPct' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">(Vl Rec Mismo Mes/Venta)×100</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('workedDaysCount')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('workedDaysCount')} title="Cantidad de fechas distintas en que el cliente tuvo manifiestos activos" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Días Lab.</span>
                                         {tdmSortField === 'workedDaysCount' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Fechas únicas con manifiestos</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('totalVehicleUtilizations')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('totalVehicleUtilizations')} title="Total de combinaciones únicas placa+fecha (vehículo-día utilizados en el período)" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Veh. prom mes</span>
                                         {tdmSortField === 'totalVehicleUtilizations' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ placa×fecha únicos</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averageVehiclesPerDay')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('averageVehiclesPerDay')} title="Promedio de vehículos por día laborado · Fórmula: Total vehículo-días / Días Laborados" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>veh Prom. Día</span>
                                         {tdmSortField === 'averageVehiclesPerDay' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Veh-días / Días Lab.</div>
                                     </th>
                                   </tr>
                                 </thead>
@@ -4396,107 +4422,124 @@ export const InformesGerenciales: React.FC = () => {
                                         {tdmSortField === 'clientName' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('ventaTotal')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('ventaTotal')} title="Σ CxC de todos los manifiestos del período" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Venta</span>
                                         {tdmSortField === 'ventaTotal' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ CxC</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('ingTerceros')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('ingTerceros')} title="Σ CxP (costo pagado a terceros) de todos los manifiestos del período" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Ing Terceros</span>
                                         {tdmSortField === 'ingTerceros' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ CxP</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('ingresosPropios')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('ingresosPropios')} title="Ingresos Propios = Venta − Ing. Terceros (CxC − CxP)" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Ingresos Propios</span>
                                         {tdmSortField === 'ingresosPropios' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">CxC − CxP</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('int')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('int')} title="Intermediación % = (Ingresos Propios / Venta) × 100" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>INT</span>
                                         {tdmSortField === 'int' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">(Propios/Venta)×100</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('participation')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('participation')} title="Participación en Venta = (Venta cliente / Venta total general) × 100" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Part-vta</span>
                                         {tdmSortField === 'participation' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">(Venta/Venta Total)×100</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('invoicedSameMonthVal')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('invoicedSameMonthVal')} title="Σ CxC de manifiestos en estado FACTURADA dentro del período" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Vl fact mes</span>
                                         {tdmSortField === 'invoicedSameMonthVal' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ CxC (estado=FACTURADA)</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('invoicedSameMonthPct')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('invoicedSameMonthPct')} title="% Facturado del Mes = (Vl Fact Mes / Venta) × 100" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>% Fact. Mes</span>
                                         {tdmSortField === 'invoicedSameMonthPct' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">(Vl Fact/Venta)×100</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averagePaymentDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Factura (Fecha Factura - Fecha Manifiesto)">
+                                    <th onClick={() => handleTdmSort('averagePaymentDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Factura · Fórmula: Σ(Fecha Factura − Fecha Manifiesto) / nº manifiestos con ambas fechas">
                                       <div className="flex flex-col items-end justify-center gap-1">
                                         <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dia fact <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averagePaymentDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ(Fec.Fact−Fec.Man)/n</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averageRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Factura hasta Recibo (Fecha Recibo - Fecha Factura)">
+                                    <th onClick={() => handleTdmSort('averageRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Factura hasta Recibo · Fórmula: Σ(Fecha Recibo − Fecha Factura) / nº manifiestos con ambas fechas">
                                       <div className="flex flex-col items-end justify-center gap-1">
                                         <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dias rec <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averageRecDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ(Fec.Rec−Fec.Fact)/n</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averageEgrDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Egreso (Fecha Egreso - Fecha Manifiesto)">
+                                    <th onClick={() => handleTdmSort('averageEgrDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Egreso · Fórmula: Σ(Fecha Egreso − Fecha Manifiesto) / nº manifiestos con ambas fechas">
                                       <div className="flex flex-col items-end justify-center gap-1">
                                         <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dias egreso <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averageEgrDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ(Fec.Egr−Fec.Man)/n</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averageManRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Recibo (Fecha Recibo - Fecha Manifiesto)">
+                                    <th onClick={() => handleTdmSort('averageManRecDays')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors" title="Promedio de días desde Manifiesto hasta Recibo · Fórmula: Σ(Fecha Recibo − Fecha Manifiesto) / nº manifiestos con ambas fechas">
                                       <div className="flex flex-col items-end justify-center gap-1">
                                         <div className="uppercase flex items-center justify-end gap-1 text-center text-xs">prom dia man recibido <HelpCircle size={14} className="text-slate-400" /></div>
                                         {tdmSortField === 'averageManRecDays' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ(Fec.Rec−Fec.Man)/n</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('receivedValue')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('receivedValue')} title="Σ CxC de manifiestos recibidos (con fecha_recibo) en el mismo mes que la factura" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Vl Rec Mismo Mes</span>
                                         {tdmSortField === 'receivedValue' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ CxC (recibido=mes factura)</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('receivedDiffMonth')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('receivedDiffMonth')} title="Σ CxC de manifiestos recibidos en mes diferente al de la factura, o sin factura" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Vl Rec Dif Mes</span>
                                         {tdmSortField === 'receivedDiffMonth' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ CxC (recibido≠mes factura)</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('receivedPct')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('receivedPct')} title="% Recibido = (Vl Rec Mismo Mes / Venta) × 100" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>% Recibido</span>
                                         {tdmSortField === 'receivedPct' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">(Vl Rec Mismo Mes/Venta)×100</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('workedDaysCount')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('workedDaysCount')} title="Cantidad de fechas distintas en que el cliente tuvo manifiestos activos" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Días Lab.</span>
                                         {tdmSortField === 'workedDaysCount' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Fechas únicas con manifiestos</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('totalVehicleUtilizations')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('totalVehicleUtilizations')} title="Total de combinaciones únicas placa+fecha (vehículo-día utilizados en el período)" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>Veh. prom mes</span>
                                         {tdmSortField === 'totalVehicleUtilizations' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Σ placa×fecha únicos</div>
                                     </th>
-                                    <th onClick={() => handleTdmSort('averageVehiclesPerDay')} className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
+                                    <th onClick={() => handleTdmSort('averageVehiclesPerDay')} title="Promedio de vehículos por día laborado · Fórmula: Total vehículo-días / Días Laborados" className="p-3.5 text-right cursor-pointer hover:bg-slate-100 select-none transition-colors">
                                       <div className="flex items-center justify-end gap-1">
                                         <span>veh Prom. Día</span>
                                         {tdmSortField === 'averageVehiclesPerDay' && <span className="text-indigo-600 font-bold text-[8px]">{tdmSortDirection === 'asc' ? '▲' : '▼'}</span>}
                                       </div>
+                                      <div className="text-[8px] font-normal text-blue-500/70 normal-case tracking-normal mt-0.5">Veh-días / Días Lab.</div>
                                     </th>
                                   </tr>
                                 </thead>

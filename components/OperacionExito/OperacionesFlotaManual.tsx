@@ -29,6 +29,10 @@ const fmtDate = (d: string) => {
 
 export default function OperacionesFlotaManual({ user }: Props) {
   const today = new Date().toISOString().slice(0, 10);
+  // Primer y último día del mes en curso
+  const nowD = new Date();
+  const firstOfMonth = new Date(nowD.getFullYear(), nowD.getMonth(), 1).toISOString().slice(0, 10);
+  const lastOfMonth  = new Date(nowD.getFullYear(), nowD.getMonth() + 1, 0).toISOString().slice(0, 10);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [clients, setClients] = useState<any[]>([]);
@@ -41,10 +45,10 @@ export default function OperacionesFlotaManual({ user }: Props) {
   const [dragging, setDragging] = useState(false);
   const [detectedFormat, setDetectedFormat] = useState<1 | 2>(1);
 
-  // Results state
+  // Results state — inicia con el mes en curso
   const [activeTab, setActiveTab] = useState<'resumen' | 'detalle'>('resumen');
-  const [filterFrom, setFilterFrom] = useState('');
-  const [filterTo, setFilterTo] = useState('');
+  const [filterFrom, setFilterFrom] = useState(firstOfMonth);
+  const [filterTo, setFilterTo] = useState(lastOfMonth);
   const [filterClient, setFilterClient] = useState('');
   const [detailRows, setDetailRows] = useState<any[]>([]);
   const [summaryRows, setSummaryRows] = useState<any[]>([]);
@@ -366,8 +370,12 @@ export default function OperacionesFlotaManual({ user }: Props) {
   const summaryColumns: ColumnDef<any>[] = [
     { header: 'Cliente TDM', key: 'client_name', sortable: true, render: r => <span className="font-bold text-amber-700">TDM {r.client_name}</span> },
     { header: 'Manifiestos', key: 'total_manifiestos', sortable: true, render: r => <span className="font-black text-slate-900">{Number(r.total_manifiestos).toLocaleString('es-CO')}</span> },
-    { header: 'Total Cobrar', key: 'total_cobrar', sortable: true, render: r => <span className="font-bold text-emerald-700">{fmt(r.total_cobrar)}</span> },
-    { header: 'Total Pagar', key: 'total_pagar', sortable: true, render: r => <span className="font-bold text-rose-600">{fmt(r.total_pagar)}</span> },
+    { header: 'Total Cobrar', key: 'total_cobrar', sortable: true,
+      render: r => <span className="font-bold text-emerald-700">{fmt(r.total_cobrar)}</span>,
+      exportRender: r => Math.round(Number(r.total_cobrar) || 0) },
+    { header: 'Total Pagar', key: 'total_pagar', sortable: true,
+      render: r => <span className="font-bold text-rose-600">{fmt(r.total_pagar)}</span>,
+      exportRender: r => Math.round(Number(r.total_pagar) || 0) },
     { header: 'Fecha Desde', key: 'fecha_desde', sortable: true, render: r => <span className="text-slate-500 text-xs">{fmtDate(r.fecha_desde)}</span> },
     { header: 'Fecha Hasta', key: 'fecha_hasta', sortable: true, render: r => <span className="text-slate-500 text-xs">{fmtDate(r.fecha_hasta)}</span> },
   ];
@@ -377,8 +385,12 @@ export default function OperacionesFlotaManual({ user }: Props) {
     { header: 'Cliente TDM', key: 'client_name', sortable: true, render: r => <span className="font-bold text-amber-700">TDM {r.client_name}</span> },
     { header: 'Fecha', key: 'fecha_operacion', sortable: true, render: r => <span className="text-slate-600 text-xs">{fmtDate(r.fecha_operacion)}</span> },
     { header: 'Remesa', key: 'remesa', render: r => <span className="text-slate-500 text-xs">{r.remesa || '—'}</span> },
-    { header: 'V. Cobrar', key: 'valor_cobrar', sortable: true, render: r => <span className="font-bold text-emerald-700">{fmt(r.valor_cobrar)}</span> },
-    { header: 'V. Pagar', key: 'valor_pagar', sortable: true, render: r => <span className="font-bold text-rose-600">{fmt(r.valor_pagar)}</span> },
+    { header: 'V. Cobrar', key: 'valor_cobrar', sortable: true,
+      render: r => <span className="font-bold text-emerald-700">{fmt(r.valor_cobrar)}</span>,
+      exportRender: r => Math.round(Number(r.valor_cobrar) || 0) },
+    { header: 'V. Pagar', key: 'valor_pagar', sortable: true,
+      render: r => <span className="font-bold text-rose-600">{fmt(r.valor_pagar)}</span>,
+      exportRender: r => Math.round(Number(r.valor_pagar) || 0) },
     { header: 'Origen', key: 'ciudad_origen', render: r => <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600">{r.ciudad_origen}</span> },
     { header: 'Destino', key: 'ciudad_destino', render: r => <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600">{r.ciudad_destino}</span> },
     { header: 'Placa', key: 'placa', render: r => r.placa

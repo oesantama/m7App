@@ -1,6 +1,9 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { authenticateToken, requirePermission } from '../middleware/auth.middleware.js';
 import * as dogama from '../controllers/dogama.controller.js';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 const router = Router();
 
@@ -86,5 +89,20 @@ router.patch('/planillas/:id/cargue', requirePermission('CITAS_DESPACHO_CARGA', 
 router.get('/auxiliares-externos',        requirePermission('CITAS_DESPACHO_CARGA', 'view'),   dogama.getAuxiliaresExternos);
 router.post('/auxiliares-externos',       requirePermission('CITAS_DESPACHO_CARGA', 'create'), dogama.createAuxiliarExterno);
 router.delete('/auxiliares-externos/:id', requirePermission('CITAS_DESPACHO_CARGA', 'delete'), dogama.deleteAuxiliarExterno);
+
+// ── Órdenes de Servicio ───────────────────────────────────────────────────────
+router.get('/ordenes-servicio',              requirePermission('CITAS_DESPACHO_CARGA', 'view'),   dogama.getOrdenesServicio);
+router.post('/ordenes-servicio',             requirePermission('CITAS_DESPACHO_CARGA', 'create'), dogama.createOrdenServicio);
+router.put('/ordenes-servicio/:id',          requirePermission('CITAS_DESPACHO_CARGA', 'edit'),   dogama.updateOrdenServicio);
+router.patch('/ordenes-servicio/:id/estado', requirePermission('CITAS_DESPACHO_CARGA', 'edit'),   dogama.patchOrdenServicioEstado);
+router.delete('/ordenes-servicio/:id',       requirePermission('CITAS_DESPACHO_CARGA', 'delete'), dogama.deleteOrdenServicio);
+
+// ── Recogidas por OS ──────────────────────────────────────────────────────────
+router.get('/ordenes-servicio/:os_id/recogidas',      requirePermission('CITAS_DESPACHO_CARGA', 'view'),   dogama.getOsRecogidas);
+router.post('/ordenes-servicio/:os_id/recogidas',     requirePermission('CITAS_DESPACHO_CARGA', 'create'), dogama.createOsRecogida);
+router.delete('/ordenes-servicio/:os_id/recogidas/:id', requirePermission('CITAS_DESPACHO_CARGA', 'delete'), dogama.deleteOsRecogida);
+
+// ── Importación masiva CSV ────────────────────────────────────────────────────
+router.post('/ordenes-servicio/import', requirePermission('CITAS_DESPACHO_CARGA', 'create'), upload.single('file'), dogama.importOrdenesServicio);
 
 export default router;

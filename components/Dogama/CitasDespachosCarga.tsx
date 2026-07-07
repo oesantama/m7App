@@ -2944,7 +2944,7 @@ function CargueDialog({ record, user, onSaved, onClose }: {
   onClose: () => void;
 }) {
   const [auxiliares, setAuxiliares] = useState<AuxiliarMesaOpt[]>([]);
-  const [extList,    setExtList]    = useState<{ id: number; nombre: string }[]>([]);
+  const [extList,    setExtList]    = useState<{ id: number; nombre: string; pending?: boolean }[]>([]);
   const [newExtName, setNewExtName] = useState('');
   const [saving,     setSaving]     = useState(false);
   const [addingExt,  setAddingExt]  = useState(false);
@@ -2969,6 +2969,15 @@ function CargueDialog({ record, user, onSaved, onClose }: {
   }, [record.id]);
 
   const handleSave = async () => {
+    // Validaciones de hora
+    if (form.llegada_vh && form.hora_inicio_carge && form.hora_inicio_carge <= form.llegada_vh) {
+      toast.error('La hora de inicio de cargue debe ser mayor que la hora de llegada del vehículo');
+      return;
+    }
+    if (form.hora_inicio_carge && form.hora_final_carge && form.hora_final_carge <= form.hora_inicio_carge) {
+      toast.error('La hora final de cargue debe ser mayor que la hora de inicio');
+      return;
+    }
     setSaving(true);
     try {
       const updated = await api.dogamaPatchPlanillaCargue(record.id, {
@@ -2979,31 +2988,35 @@ function CargueDialog({ record, user, onSaved, onClose }: {
         hora_inicio_carge: form.hora_inicio_carge || null,
         hora_final_carge:  form.hora_final_carge  || null,
         observaciones:     form.observaciones     || null,
-        usuario_cargue_id: user.id || null,
+        usuario_cargue_id: user.id ? Number(user.id) : null,
       }) as PlanillaHistorial;
+      // Guardar auxiliares pendientes en batch
+      const pendientes = extList.filter(x => x.pending);
+      for (const ext of pendientes) {
+        await api.dogamaCreateAuxiliarExterno({
+          nombre: ext.nombre,
+          planilla_historial_id: record.id,
+          usuario_creacion: Number(user.id),
+        });
+      }
       toast.success('Datos de cargue guardados');
       onSaved(updated);
     } catch (e: any) { toast.error(e?.message || 'Error al guardar'); }
     finally { setSaving(false); }
   };
 
-  const handleAddExt = async () => {
+  const handleAddExt = () => {
     if (!newExtName.trim()) return;
-    setAddingExt(true);
-    try {
-      const r = await api.dogamaCreateAuxiliarExterno({
-        nombre: newExtName.trim(),
-        planilla_historial_id: record.id,
-        usuario_creacion: user.id,
-      }) as any;
-      setExtList(l => [...l, r]);
-      setNewExtName('');
-      toast.success('Auxiliar externo agregado');
-    } catch { toast.error('Error al agregar'); }
-    finally { setAddingExt(false); }
+    setExtList(l => [...l, { id: -(Date.now()), nombre: newExtName.trim(), pending: true }]);
+    setNewExtName('');
   };
 
   const handleDeleteExt = async (id: number) => {
+    const item = extList.find(x => x.id === id);
+    if (item?.pending) {
+      setExtList(l => l.filter(x => x.id !== id));
+      return;
+    }
     try {
       await api.dogamaDeleteAuxiliarExterno(id);
       setExtList(l => l.filter(x => x.id !== id));
@@ -3023,7 +3036,7 @@ function CargueDialog({ record, user, onSaved, onClose }: {
   );
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[900] flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 shrink-0">
@@ -3072,7 +3085,7 @@ function CargueDialog({ record, user, onSaved, onClose }: {
               : <ul className="space-y-1 mb-2">
                   {extList.map(x => (
                     <li key={x.id} className="flex items-center justify-between text-sm text-slate-700">
-                      <span>{x.nombre}</span>
+                      <span>{x.nombre}{x.pending && <span className="ml-1.5 text-[10px] text-amber-500 font-semibold italic">(pendiente)</span>}</span>
                       <button onClick={() => handleDeleteExt(x.id)}
                         className="w-5 h-5 flex items-center justify-center text-red-400 hover:text-red-600 transition">
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
@@ -3086,9 +3099,9 @@ function CargueDialog({ record, user, onSaved, onClose }: {
                 onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddExt(); } }}
                 placeholder="Nombre auxiliar externo"
                 className="flex-1 border border-slate-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-              <button onClick={handleAddExt} disabled={addingExt || !newExtName.trim()}
+              <button onClick={handleAddExt} disabled={!newExtName.trim()}
                 className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition disabled:opacity-50">
-                {addingExt ? '…' : 'Agregar'}
+                Agregar
               </button>
             </div>
           </div>
@@ -3283,6 +3296,71 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
       doc.save(`ruta_${group.placa}_${group.fecha}.pdf`);
       toast.success('PDF generado');
     } catch (e: any) { toast.error('Error PDF: ' + e.message); }
+  };
+
+  const exportExcel = () => {
+    try {
+      const wb = XLSX.utils.book_new();
+
+      // Hoja 1: Consolidado de la ruta
+      const activeRecs = innerRecords.filter(r => r.estado_id !== 'EST-16');
+      const consolidado = [{
+        'Placa':          group.placa ?? '—',
+        'Fecha':          group.fecha ?? '—',
+        'Conductor':      group.conductor_nombre ?? '—',
+        'Cliente':        group.client_nombre ?? '—',
+        'Remesa':         innerRecords[0]?.remesa ?? '—',
+        'Manifiesto':     innerRecords[0]?.manifiesto ?? '—',
+        'CxC ($)':        innerRecords[0]?.valor_cxc ?? '—',
+        'Intermediación %': innerRecords[0]?.intermediacion ?? '—',
+        'CxP ($)':        innerRecords[0]?.valor_cxp ?? '—',
+        'Total registros': innerRecords.length,
+        'Activos':        activeRecs.length,
+        'Cancelados':     innerRecords.length - activeRecs.length,
+        'Total Cajas':    activeRecs.reduce((s, r) => s + (Number(r.cajas)    || 0), 0),
+        'Total Tulas':    activeRecs.reduce((s, r) => s + (Number(r.tulas)    || 0), 0),
+        'Total Canastas': activeRecs.reduce((s, r) => s + (Number(r.canastas) || 0), 0),
+        'Total Costales': activeRecs.reduce((s, r) => s + (Number(r.costales) || 0), 0),
+      }];
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(consolidado), 'Consolidado');
+
+      // Hoja 2: Detalle con horas y cargue
+      const detalle = innerRecords.map((r, i) => ({
+        '#':                    i + 1,
+        'Confeccionista':       r.confeccionista_nombre ?? '—',
+        'Dirección':            r.confeccionista_direccion ?? '—',
+        'Ciudad':               r.confeccionista_ciudad ?? '—',
+        'Tipo':                 r.tipo,
+        'Turno':                r.turno ?? '—',
+        'Hora Prog.':           r.hora_inicio ?? '—',
+        'Hora Real':            r.hora_fin ?? '—',
+        'Referencia':           r.referencia ?? '—',
+        'Marca':                r.marca ?? '—',
+        'Lote':                 r.lote ?? '—',
+        'Color':                r.color ?? '—',
+        'Mesa':                 r.mesa ?? '—',
+        'Unidades':             r.unidades ?? 0,
+        'Documento':            r.numero_documento ?? '—',
+        'Cajas':                r.cajas ?? 0,
+        'Tulas':                r.tulas ?? 0,
+        'Canastas':             r.canastas ?? 0,
+        'Costales':             r.costales ?? 0,
+        'ID Cita/Desp.':        r.despacho_id ? `D-${r.despacho_id}` : r.cita_id ? `C-${r.cita_id}` : '—',
+        'Estado':               r.estado_id === 'EST-16' ? 'Cancelado' : 'Activo',
+        'Motivo cancelación':   r.motivo_cancelacion ?? '—',
+        // Datos de cargue
+        'Llegada vehículo':     r.llegada_vh ?? '—',
+        'Hora inicio cargue':   r.hora_inicio_carge ?? '—',
+        'Hora final cargue':    r.hora_final_carge ?? '—',
+        'Unidades cargue':      r.unidades_carge ?? 0,
+        'Cantidad cargada':     r.cantidad_cargada ?? 0,
+        'Observaciones cargue': r.observaciones ?? '—',
+      }));
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(detalle), 'Detalle');
+
+      XLSX.writeFile(wb, `ruta_${group.placa}_${group.fecha}.xlsx`);
+      toast.success('Excel exportado');
+    } catch (e: any) { toast.error('Error Excel: ' + e.message); }
   };
 
   return (
@@ -3495,7 +3573,7 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
                     <th className="text-left px-2 py-2 font-bold">ID</th>
                     {hasBultos && <th className="text-left px-2 py-2 font-bold">Bultos</th>}
                     <th className="text-center px-2 py-2 font-bold">Estado</th>
-                    <th data-no-export="1" className="text-center px-2 py-2 rounded-tr-xl font-bold">Acc.</th>
+                    <th data-no-export="1" className="text-center px-2 py-2 rounded-tr-xl font-bold">Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -3630,12 +3708,16 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
                                 </div>
                               )}
                             </div>
+                            <button onClick={() => onEdit(r)} title="Editar registro"
+                              className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-violet-50 text-violet-500 transition">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            </button>
                             <button onClick={() => setCargueTarget(r)} title="Registrar cargue"
                               className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-indigo-50 text-indigo-500 transition">
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                             </button>
                             {!cancelled && (
-                              <button onClick={() => setCancelTarget(r)} title="Cancelar"
+                              <button onClick={() => setCancelTarget(r)} title="Cancelar registro"
                                 className="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-red-50 text-red-400 transition">
                                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/></svg>
                               </button>
@@ -3676,6 +3758,12 @@ function RouteDetailDialog({ group, user, localRecords, onEdit, onClose, onGroup
               className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
               Historial
+            </button>
+            <button onClick={exportExcel}
+              title="Exportar Excel con consolidado y detalle de cargue"
+              className="flex items-center gap-1 px-4 py-2 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold border border-emerald-200 transition">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+              Excel
             </button>
             <button onClick={exportImage}
               className="flex items-center gap-1 px-4 py-2 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition">
@@ -5327,6 +5415,839 @@ function CorreosTab({ user }: { user: User }) {
   );
 }
 
+// ── Órdenes de Servicio Tab ────────────────────────────────────────────────────
+
+interface OrdenServicio {
+  id: number;
+  numero_oc: string;
+  numero_om: string | null;
+  confeccionista_id: number | null;
+  confeccionista_nombre: string | null;
+  tipo_os: 'ida' | 'recogida';
+  cantidad: number;
+  cantidad_entregada_cedi: number;
+  precio_unitario: string | null;
+  valor_total: string | null;
+  flete: string | null;
+  tarifa: string | null;
+  manifiesto: string | null;
+  remesa: string | null;
+  factura_inicial: string | null;
+  fecha_factura: string | null;
+  estado_id: string;
+  estado_nombre: string | null;
+  fecha_creacion: string;
+}
+
+interface FleteConfig {
+  id: number;
+  empresa: string | null;
+  precio_unitario: string | null;
+  flete_minimo: string | null;
+}
+
+interface OsRecogida {
+  id: number;
+  os_id: number;
+  cantidad: number;
+  remesa: string | null;
+  manifiesto: string | null;
+  codigo_sap: string | null;
+  flete: string | null;
+  fecha_creacion: string;
+}
+
+const EMPTY_OS_FORM = {
+  numero_oc: '',
+  numero_om: '',
+  confeccionista_id: '',
+  tipo_os: 'ida',
+  cantidad: '',
+  cantidad_entregada_cedi: '0',
+  precio_unitario: '',
+  valor_total: '',
+  flete: '',
+  tarifa: '',
+  manifiesto: '',
+  remesa: '',
+  factura_inicial: '',
+  fecha_factura: '',
+  estado_id: 'EST-01',
+};
+
+const OS_ESTADOS: { id: string; label: string; color: string }[] = [
+  { id: 'EST-01', label: 'Activo',     color: 'bg-emerald-100 text-emerald-700' },
+  { id: 'EST-02', label: 'Bloqueado',  color: 'bg-amber-100 text-amber-700' },
+  { id: 'EST-10', label: 'Confirmado', color: 'bg-indigo-100 text-indigo-700' },
+  { id: 'EST-16', label: 'Cancelado',  color: 'bg-red-100 text-red-700' },
+];
+
+function fmtCOP(v: string | number | null | undefined): string {
+  if (v == null || v === '') return '—';
+  const n = Number(v);
+  return isNaN(n) ? '—' : n.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function exportOrdenesExcel(rows: OrdenServicio[], tipo: 'ida' | 'recogida') {
+  const filtered = rows.filter(r => r.tipo_os === tipo);
+  if (!filtered.length) { toast.error(`Sin registros de tipo "${tipo}" para exportar`); return; }
+  const wb = XLSX.utils.book_new();
+  const data = filtered.map(r => ({
+    OC: r.numero_oc,
+    OM: r.numero_om ?? '',
+    Confeccionista: r.confeccionista_nombre ?? '',
+    Cantidad: r.cantidad,
+    'Cant. Entregada CEDI': r.cantidad_entregada_cedi,
+    'Cant. por Entregar': r.cantidad - r.cantidad_entregada_cedi,
+    'Precio Unitario': r.precio_unitario != null ? Math.round(Number(r.precio_unitario)) : '',
+    'Valor Total': r.valor_total != null ? Math.round(Number(r.valor_total)) : '',
+    Flete: r.flete != null ? Math.round(Number(r.flete)) : '',
+    Tarifa: r.tarifa != null ? Math.round(Number(r.tarifa)) : '',
+    Manifiesto: r.manifiesto ?? '',
+    Remesa: r.remesa ?? '',
+    'Factura Inicial': r.factura_inicial ?? '',
+    'Fecha Factura': r.fecha_factura ?? '',
+    Estado: r.estado_nombre ?? r.estado_id,
+    'Fecha Creación': r.fecha_creacion ? new Date(r.fecha_creacion).toLocaleDateString('es-CO') : '',
+  }));
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), `Informe ${tipo === 'ida' ? 'Ida' : 'Recogida'}`);
+  XLSX.writeFile(wb, `informe_os_${tipo}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+function OrdenesServicioTab({ user }: { user: User }) {
+  const [rows,         setRows]         = useState<OrdenServicio[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [filterOc,     setFilterOc]     = useState('');
+  const [filterOm,     setFilterOm]     = useState('');
+  const [showModal,    setShowModal]    = useState(false);
+  const [editItem,     setEditItem]     = useState<OrdenServicio | null>(null);
+  const [confirmDel,   setConfirmDel]   = useState<OrdenServicio | null>(null);
+  const [fleteConfig,  setFleteConfig]  = useState<FleteConfig | null>(null);
+  const [confs,        setConfs]        = useState<ConfItem[]>([]);
+  const [form,         setForm]         = useState({ ...EMPTY_OS_FORM });
+  const [saving,       setSaving]       = useState(false);
+  const [deleting,     setDeleting]     = useState(false);
+
+  // Diálogo de recogidas
+  const [detalleOs,      setDetalleOs]      = useState<OrdenServicio | null>(null);
+  const [recogidas,      setRecogidas]      = useState<OsRecogida[]>([]);
+  const [loadingRec,     setLoadingRec]     = useState(false);
+  const [savingRec,      setSavingRec]      = useState(false);
+  const [newRec,         setNewRec]         = useState({ cantidad: '', remesa: '', manifiesto: '', codigo_sap: '', flete: '' });
+
+  const [showImport,      setShowImport]      = useState(false);
+  const [importTipo,      setImportTipo]      = useState<'ida' | 'recogida'>('ida');
+  const [importFile,      setImportFile]      = useState<File | null>(null);
+  const [importing,       setImporting]       = useState(false);
+  const [importPreview,   setImportPreview]   = useState<{ headers: string[]; rows: string[][]; total: number } | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
+
+  const parseImportPreview = (file: File, tipo: 'ida' | 'recogida') => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      if (lines.length < 2) { setImportPreview(null); return; }
+
+      // Parse CSV with quoted fields
+      const parseCSVLine = (line: string): string[] => {
+        const result: string[] = [];
+        let cur = '', inQuote = false;
+        for (let i = 0; i < line.length; i++) {
+          if (line[i] === '"') { inQuote = !inQuote; continue; }
+          if (line[i] === ';' && !inQuote) { result.push(cur.trim()); cur = ''; continue; }
+          cur += line[i];
+        }
+        result.push(cur.trim());
+        return result;
+      };
+
+      const allHeaders = parseCSVLine(lines[0]);
+      // Show only the columns we'll actually import
+      const colMap: Record<string, string[]> = {
+        recogida: ['04_oc_uribe_oc_text','07_om_uribe_text_text','tipo_confeccion','nombre_confeccionista','total_prendas','total_prendas_recibidas_text','referencia_antigua_text'],
+        ida:      ['n_mero_de_oc_text','n_mero_de_om_text','tipo_de_confeccion_text','nombre_del_confeccionista','total_prendas_text','prendas_recibidas_text','empresa_text'],
+      };
+      const wantedCols = colMap[tipo];
+      const colLabels: Record<string, string> = {
+        '04_oc_uribe_oc_text': 'OC', '07_om_uribe_text_text': 'OM',
+        'tipo_confeccion': 'Tipo', 'nombre_confeccionista': 'Confeccionista',
+        'total_prendas': 'Total Prendas', 'total_prendas_recibidas_text': 'Recibidas',
+        'referencia_antigua_text': 'Ref. Ant.',
+        'n_mero_de_oc_text': 'OC', 'n_mero_de_om_text': 'OM',
+        'tipo_de_confeccion_text': 'Tipo', 'nombre_del_confeccionista': 'Confeccionista',
+        'total_prendas_text': 'Total Prendas', 'prendas_recibidas_text': 'Recibidas',
+        'empresa_text': 'Empresa',
+      };
+      const colIdxs = wantedCols.map(c => allHeaders.findIndex(h => h.toLowerCase() === c.toLowerCase()));
+      const displayHeaders = wantedCols.map(c => colLabels[c] || c);
+      const previewRows = lines.slice(1, 6).map(l => {
+        const cells = parseCSVLine(l);
+        return colIdxs.map(i => (i >= 0 ? cells[i] || '' : '—'));
+      });
+      setImportPreview({ headers: displayHeaders, rows: previewRows, total: lines.length - 1 });
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+
+  const canCreate = hasPermission(user, 'CITAS_DESPACHO_CARGA', 'create');
+  const canEdit   = hasPermission(user, 'CITAS_DESPACHO_CARGA', 'edit');
+  const canDelete = hasPermission(user, 'CITAS_DESPACHO_CARGA', 'delete');
+
+  const loadAll = async () => {
+    setLoading(true);
+    try {
+      const [data, fletes, confData] = await Promise.all([
+        api.dogamaGetOrdenesServicio(),
+        api.dogamaGetFletes(),
+        api.dogamaGetConfeccionistas(),
+      ]);
+      setRows(Array.isArray(data) ? data : []);
+      const activo = Array.isArray(fletes) ? fletes.find((f: any) => f.estado_id === 'EST-01') ?? fletes[0] : null;
+      setFleteConfig(activo ?? null);
+      setConfs(Array.isArray(confData) ? confData : []);
+    } catch { toast.error('Error al cargar órdenes de servicio'); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { loadAll(); }, []);
+
+  const setF = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setForm(prev => {
+      const next = { ...prev, [k]: e.target.value };
+      if ((k === 'cantidad' || k === 'precio_unitario') && next.cantidad && next.precio_unitario) {
+        next.valor_total = String(Number(next.cantidad) * Number(next.precio_unitario));
+      }
+      return next;
+    });
+  };
+
+  const openCreate = () => {
+    setForm({
+      ...EMPTY_OS_FORM,
+      precio_unitario: fleteConfig?.precio_unitario ?? '',
+      flete: fleteConfig?.flete_minimo ?? '',
+    });
+    setEditItem(null);
+    setShowModal(true);
+  };
+
+  const openEdit = (item: OrdenServicio) => {
+    setForm({
+      numero_oc:               item.numero_oc,
+      numero_om:               item.numero_om ?? '',
+      confeccionista_id:       String(item.confeccionista_id ?? ''),
+      tipo_os:                 item.tipo_os,
+      cantidad:                String(item.cantidad),
+      cantidad_entregada_cedi: String(item.cantidad_entregada_cedi),
+      precio_unitario:         String(item.precio_unitario ?? ''),
+      valor_total:             String(item.valor_total ?? ''),
+      flete:                   String(item.flete ?? ''),
+      tarifa:                  String(item.tarifa ?? ''),
+      manifiesto:              item.manifiesto ?? '',
+      remesa:                  item.remesa ?? '',
+      factura_inicial:         item.factura_inicial ?? '',
+      fecha_factura:           item.fecha_factura ? item.fecha_factura.slice(0, 10) : '',
+      estado_id:               item.estado_id,
+    });
+    setEditItem(item);
+    setShowModal(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.numero_oc.trim()) { toast.error('El número de OC es obligatorio'); return; }
+    setSaving(true);
+    try {
+      const payload = {
+        numero_oc:               form.numero_oc.trim(),
+        numero_om:               form.numero_om?.trim() || null,
+        confeccionista_id:       form.confeccionista_id ? Number(form.confeccionista_id) : null,
+        tipo_os:                 form.tipo_os,
+        cantidad:                form.cantidad ? Number(form.cantidad) : 0,
+        cantidad_entregada_cedi: form.cantidad_entregada_cedi ? Number(form.cantidad_entregada_cedi) : 0,
+        precio_unitario:         form.precio_unitario ? Number(form.precio_unitario) : null,
+        valor_total:             form.valor_total ? Number(form.valor_total) : null,
+        flete:                   form.flete ? Number(form.flete) : null,
+        tarifa:                  form.tarifa ? Number(form.tarifa) : null,
+        manifiesto:              form.manifiesto?.trim() || null,
+        remesa:                  form.remesa?.trim() || null,
+        factura_inicial:         form.factura_inicial?.trim() || null,
+        fecha_factura:           form.fecha_factura || null,
+        estado_id:               form.estado_id,
+      };
+      if (editItem) {
+        await api.dogamaUpdateOrdenServicio(editItem.id, { ...payload, usuario_actualizacion: user.id });
+        toast.success('Orden de servicio actualizada');
+      } else {
+        await api.dogamaCreateOrdenServicio({ ...payload, usuario_creacion: user.id });
+        toast.success('Orden de servicio creada');
+      }
+      setShowModal(false);
+      loadAll();
+    } catch (e: any) { toast.error(e?.message || 'Error al guardar'); }
+    finally { setSaving(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDel) return;
+    setDeleting(true);
+    try {
+      await api.dogamaDeleteOrdenServicio(confirmDel.id);
+      toast.success('Orden eliminada');
+      setConfirmDel(null);
+      loadAll();
+    } catch { toast.error('Error al eliminar'); }
+    finally { setDeleting(false); }
+  };
+
+  const handleEstado = async (item: OrdenServicio, estado_id: string) => {
+    try {
+      await api.dogamaPatchOrdenServicioEstado(item.id, estado_id, user.id);
+      toast.success('Estado actualizado');
+      loadAll();
+    } catch { toast.error('Error al cambiar estado'); }
+  };
+
+  const openDetalle = async (item: OrdenServicio) => {
+    setDetalleOs(item);
+    setNewRec({ cantidad: '', remesa: '', manifiesto: '', codigo_sap: '', flete: '' });
+    setLoadingRec(true);
+    try {
+      const data = await api.dogamaGetOsRecogidas(item.id);
+      setRecogidas(Array.isArray(data) ? data : []);
+    } catch { toast.error('Error al cargar recogidas'); }
+    finally { setLoadingRec(false); }
+  };
+
+  const handleAddRecogida = async () => {
+    if (!detalleOs) return;
+    if (!newRec.cantidad || Number(newRec.cantidad) <= 0) { toast.error('La cantidad es obligatoria'); return; }
+    if (!newRec.remesa.trim())     { toast.error('La remesa es obligatoria'); return; }
+    if (!newRec.manifiesto.trim()) { toast.error('El manifiesto es obligatorio'); return; }
+    if (!newRec.codigo_sap.trim()) { toast.error('El código SAP es obligatorio'); return; }
+    if (!newRec.flete || Number(newRec.flete) <= 0) { toast.error('El flete es obligatorio'); return; }
+    setSavingRec(true);
+    try {
+      await api.dogamaCreateOsRecogida(detalleOs.id, {
+        cantidad:    Number(newRec.cantidad),
+        remesa:      newRec.remesa?.trim() || null,
+        manifiesto:  newRec.manifiesto?.trim() || null,
+        codigo_sap:  newRec.codigo_sap?.trim() || null,
+        flete:       newRec.flete ? Number(newRec.flete) : null,
+        usuario_creacion: user.id,
+      });
+      toast.success('Recogida registrada');
+      setNewRec({ cantidad: '', remesa: '', manifiesto: '', codigo_sap: '', flete: '' });
+      const [fresh, freshRows] = await Promise.all([
+        api.dogamaGetOsRecogidas(detalleOs.id),
+        api.dogamaGetOrdenesServicio(),
+      ]);
+      setRecogidas(Array.isArray(fresh) ? fresh : []);
+      setRows(Array.isArray(freshRows) ? freshRows : []);
+      const updated = (Array.isArray(freshRows) ? freshRows : []).find((r: OrdenServicio) => r.id === detalleOs.id);
+      if (updated) setDetalleOs(updated);
+    } catch (e: any) { toast.error(e?.message || 'Error al guardar'); }
+    finally { setSavingRec(false); }
+  };
+
+  const handleDeleteRecogida = async (rec: OsRecogida) => {
+    if (!detalleOs) return;
+    try {
+      await api.dogamaDeleteOsRecogida(detalleOs.id, rec.id);
+      toast.success('Recogida eliminada');
+      const [fresh, freshRows] = await Promise.all([
+        api.dogamaGetOsRecogidas(detalleOs.id),
+        api.dogamaGetOrdenesServicio(),
+      ]);
+      setRecogidas(Array.isArray(fresh) ? fresh : []);
+      setRows(Array.isArray(freshRows) ? freshRows : []);
+      const updated = (Array.isArray(freshRows) ? freshRows : []).find((r: OrdenServicio) => r.id === detalleOs.id);
+      if (updated) setDetalleOs(updated);
+    } catch { toast.error('Error al eliminar recogida'); }
+  };
+
+  const displayedRows = rows.filter(r =>
+    (!filterOc || r.numero_oc.toLowerCase().includes(filterOc.toLowerCase())) &&
+    (!filterOm || (r.numero_om ?? '').toLowerCase().includes(filterOm.toLowerCase()))
+  );
+
+  const estadoBadge = (estado_id: string, estado_nombre: string | null) => {
+    const e = OS_ESTADOS.find(x => x.id === estado_id);
+    return (
+      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${e?.color ?? 'bg-slate-100 text-slate-500'}`}>
+        {estado_nombre ?? e?.label ?? estado_id}
+      </span>
+    );
+  };
+
+  const inputCls = 'w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white';
+  const labelCls = 'block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1';
+
+  const columns: ColumnDef<OrdenServicio>[] = [
+    { header: 'OC',          key: 'numero_oc',              sortable: true, noWrap: true, render: r => <span className="font-black text-slate-800 font-mono text-xs">{r.numero_oc}</span> },
+    { header: 'OM',          key: 'numero_om',              sortable: true, noWrap: true, render: r => <span className="font-mono text-xs">{r.numero_om ?? '—'}</span> },
+    { header: 'Tipo',        key: 'tipo_os',                sortable: true, noWrap: true, render: r => (
+      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${r.tipo_os === 'ida' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+        {r.tipo_os === 'ida' ? 'Ida' : 'Recogida'}
+      </span>
+    )},
+    { header: 'Confeccionista', key: 'confeccionista_nombre', sortable: true, render: r => <span className="text-xs">{r.confeccionista_nombre ?? '—'}</span> },
+    { header: 'Cantidad',    key: 'cantidad',               sortable: true, noWrap: true, render: r => <span className="font-mono text-xs">{r.cantidad.toLocaleString('es-CO')}</span> },
+    { header: 'Ent. CEDI',   key: 'cantidad_entregada_cedi',sortable: true, noWrap: true, render: r => <span className="font-mono text-xs text-emerald-700">{r.cantidad_entregada_cedi.toLocaleString('es-CO')}</span> },
+    { header: 'Por Entregar',key: 'id' as any,              sortable: false, noWrap: true, render: r => {
+      const pend = r.cantidad - r.cantidad_entregada_cedi;
+      return <span className={`font-mono text-xs font-bold ${pend > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{pend.toLocaleString('es-CO')}</span>;
+    }},
+    { header: 'Valor Total', key: 'valor_total',            sortable: true, noWrap: true, render: r => <span className="font-mono text-xs">{r.valor_total ? `$${fmtCOP(r.valor_total)}` : '—'}</span> },
+    { header: 'Manifiesto',  key: 'manifiesto',             sortable: true, noWrap: true, render: r => <span className="text-xs">{r.manifiesto ?? '—'}</span> },
+    { header: 'Remesa',      key: 'remesa',                 sortable: true, noWrap: true, render: r => <span className="text-xs">{r.remesa ?? '—'}</span> },
+    { header: 'Factura',     key: 'factura_inicial',        sortable: true, noWrap: true, render: r => <span className="text-xs">{r.factura_inicial ?? '—'}</span> },
+    { header: 'Estado',      key: 'estado_id',              sortable: true, noWrap: true, render: r => estadoBadge(r.estado_id, r.estado_nombre) },
+    ...(canEdit || canDelete ? [{
+      header: 'Acciones', key: 'fecha_factura' as keyof OrdenServicio, sortable: false, noWrap: true,
+      render: (r: OrdenServicio) => (
+        <div className="flex gap-1 items-center">
+          {/* Ver detalle recogidas */}
+          <button onClick={() => openDetalle(r)} title="Ver recogidas"
+            className="p-1 rounded-lg text-teal-600 hover:bg-teal-50 transition" aria-label="Ver recogidas">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+          </button>
+          {canEdit && (
+            <button onClick={() => openEdit(r)} title="Editar"
+              className="p-1 rounded-lg text-indigo-600 hover:bg-indigo-50 transition" aria-label="Editar">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+            </button>
+          )}
+          {canEdit && r.estado_id !== 'EST-02' && (
+            <button onClick={() => handleEstado(r, 'EST-02')} title="Bloquear"
+              className="p-1 rounded-lg text-amber-600 hover:bg-amber-50 transition" aria-label="Bloquear">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            </button>
+          )}
+          {canEdit && r.estado_id !== 'EST-10' && (
+            <button onClick={() => handleEstado(r, 'EST-10')} title="Confirmar"
+              className="p-1 rounded-lg text-emerald-600 hover:bg-emerald-50 transition" aria-label="Confirmar">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            </button>
+          )}
+          {canDelete && (
+            <button onClick={() => setConfirmDel(r)} title="Eliminar"
+              className="p-1 rounded-lg text-red-500 hover:bg-red-50 transition" aria-label="Eliminar">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
+            </button>
+          )}
+        </div>
+      ),
+    }] : []),
+  ];
+
+  return (
+    <div>
+      {/* Modal Crear / Editar */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-150 my-8 overflow-hidden">
+            {/* Header del modal */}
+            <div className="bg-gradient-to-r from-indigo-600 to-indigo-500 px-6 py-4">
+              <p className="text-xs font-black text-indigo-200 uppercase tracking-widest mb-0.5">
+                {editItem ? 'Editar' : 'Nueva'} Orden de Servicio
+              </p>
+              <div className="flex items-center gap-3">
+                <p className="text-lg font-black text-white">
+                  {editItem ? `OC: ${editItem.numero_oc}` : 'Crear OS'}
+                </p>
+                {fleteConfig?.empresa && (
+                  <span className="text-xs bg-white/20 text-white px-2.5 py-1 rounded-full font-semibold">
+                    {fleteConfig.empresa}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="p-6">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>N° OC <span className="text-red-500">*</span></label>
+                <input type="text" value={form.numero_oc} onChange={setF('numero_oc')} placeholder="Ej: OC-2024-001"
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>N° OM</label>
+                <input type="text" value={form.numero_om} onChange={setF('numero_om')} placeholder="Ej: OM-2024-001"
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Confeccionista</label>
+                <select value={form.confeccionista_id} onChange={setF('confeccionista_id')} className={inputCls}>
+                  <option value="">— Seleccionar —</option>
+                  {confs.map(c => <option key={c.id} value={c.id}>{c.descripcion_conf}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Tipo OS</label>
+                <select value={form.tipo_os} onChange={setF('tipo_os')} className={inputCls}>
+                  <option value="ida">Ida (Despacho)</option>
+                  <option value="recogida">Recogida</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Cantidad</label>
+                <input type="number" value={form.cantidad} onChange={setF('cantidad')} placeholder="0"
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Cant. Entregada CEDI</label>
+                <input type="number" value={form.cantidad_entregada_cedi} onChange={setF('cantidad_entregada_cedi')} placeholder="0"
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Precio Unitario ($)</label>
+                <input type="number" value={form.precio_unitario} onChange={setF('precio_unitario')} placeholder="270"
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Valor Total ($) — auto</label>
+                <input type="number" value={form.valor_total} onChange={setF('valor_total')} placeholder="0"
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Flete ($)</label>
+                <input type="number" value={form.flete} onChange={setF('flete')} placeholder="0"
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Tarifa ($)</label>
+                <input type="number" value={form.tarifa} onChange={setF('tarifa')} placeholder="0"
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Manifiesto</label>
+                <input type="text" value={form.manifiesto} onChange={setF('manifiesto')} placeholder="Número manifiesto"
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Remesa</label>
+                <input type="text" value={form.remesa} onChange={setF('remesa')} placeholder="Número remesa"
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Factura Inicial</label>
+                <input type="text" value={form.factura_inicial} onChange={setF('factura_inicial')} placeholder="N° factura"
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Fecha Factura</label>
+                <input type="date" value={form.fecha_factura} onChange={setF('fecha_factura')}
+                  className={inputCls} />
+              </div>
+              <div className="col-span-2">
+                <label className={labelCls}>Estado</label>
+                <select value={form.estado_id} onChange={setF('estado_id')} className={inputCls}>
+                  {OS_ESTADOS.map(e => <option key={e.id} value={e.id}>{e.label}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setShowModal(false)} disabled={saving}
+                className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition">
+                Cancelar
+              </button>
+              <button onClick={handleSave} disabled={saving}
+                className="flex-1 px-4 py-2.5 rounded-2xl bg-indigo-600 text-white text-sm font-black hover:bg-indigo-700 disabled:opacity-50 transition flex items-center justify-center gap-2">
+                {saving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {saving ? 'Guardando…' : 'Guardar'}
+              </button>
+            </div>
+            </div>{/* /p-6 */}
+          </div>
+        </div>
+      )}
+
+      {/* Modal Detalle Recogidas */}
+      {detalleOs && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl my-8 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-150">
+            {/* Header */}
+            <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-6 py-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs font-black text-teal-200 uppercase tracking-widest mb-0.5">Detalle de Recogidas</p>
+                <div className="flex items-center gap-3">
+                  <span className="text-white font-black text-base">OC: {detalleOs.numero_oc}</span>
+                  {detalleOs.numero_om && <span className="text-teal-200 text-sm">OM: {detalleOs.numero_om}</span>}
+                  {detalleOs.manifiesto && <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Manif: {detalleOs.manifiesto}</span>}
+                  {detalleOs.remesa && <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Remesa: {detalleOs.remesa}</span>}
+                </div>
+              </div>
+              <button onClick={() => setDetalleOs(null)}
+                className="text-white/70 hover:text-white transition p-1">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* Resumen cantidades */}
+            <div className="flex gap-6 px-6 py-3 bg-teal-50 border-b border-teal-100 text-sm">
+              <div><span className="text-slate-500">Total OS:</span> <span className="font-black text-slate-800">{detalleOs.cantidad.toLocaleString('es-CO')}</span></div>
+              <div><span className="text-slate-500">Entregado CEDI:</span> <span className="font-black text-emerald-700">{detalleOs.cantidad_entregada_cedi.toLocaleString('es-CO')}</span></div>
+              <div><span className="text-slate-500">Por entregar:</span> <span className={`font-black ${detalleOs.cantidad - detalleOs.cantidad_entregada_cedi > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{(detalleOs.cantidad - detalleOs.cantidad_entregada_cedi).toLocaleString('es-CO')}</span></div>
+            </div>
+
+            <div className="p-6">
+              {/* Tabla recogidas existentes */}
+              {loadingRec
+                ? <div className="flex justify-center py-8"><div className="w-7 h-7 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
+                : recogidas.length === 0
+                  ? <p className="text-center text-slate-400 text-sm py-6">Sin recogidas registradas aún.</p>
+                  : (
+                    <div className="overflow-x-auto mb-4">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-slate-800 text-white">
+                            {['Ingreso / Cant.', 'Remesa', 'Manifiesto', 'Cód. SAP', 'Flete', 'Fecha', ''].map(h => (
+                              <th key={h} className="px-3 py-2 text-left font-bold uppercase tracking-wide whitespace-nowrap">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {recogidas.map((rec, i) => (
+                            <tr key={rec.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                              <td className="px-3 py-2 font-black text-slate-800">{rec.cantidad.toLocaleString('es-CO')}</td>
+                              <td className="px-3 py-2">{rec.remesa ?? '—'}</td>
+                              <td className="px-3 py-2">{rec.manifiesto ?? '—'}</td>
+                              <td className="px-3 py-2">{rec.codigo_sap ?? '—'}</td>
+                              <td className="px-3 py-2 font-mono">{rec.flete ? `$${fmtCOP(rec.flete)}` : '—'}</td>
+                              <td className="px-3 py-2 text-slate-400 whitespace-nowrap">{new Date(rec.fecha_creacion).toLocaleDateString('es-CO')}</td>
+                              <td className="px-3 py-2">
+                                {canDelete && (
+                                  <button onClick={() => handleDeleteRecogida(rec)} title="Eliminar"
+                                    className="text-red-400 hover:text-red-600 transition p-0.5">
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+              }
+
+              {/* Formulario agregar recogida */}
+              {canCreate && (
+                <div className="border-t border-slate-100 pt-4">
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Agregar Recogida</p>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
+                    {([
+                      { k: 'cantidad',   label: 'Cantidad *',   type: 'number', placeholder: '0' },
+                      { k: 'remesa',     label: 'Remesa *',     type: 'text',   placeholder: 'N° remesa' },
+                      { k: 'manifiesto', label: 'Manifiesto *', type: 'text',   placeholder: 'N° manifiesto' },
+                      { k: 'codigo_sap', label: 'Cód. SAP *',  type: 'text',   placeholder: 'SAP' },
+                      { k: 'flete',      label: 'Flete ($) *',  type: 'number', placeholder: '0' },
+                    ] as const).map(f => (
+                      <div key={f.k}>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">{f.label}</label>
+                        <input
+                          type={f.type}
+                          value={(newRec as any)[f.k]}
+                          onChange={e => setNewRec(p => ({ ...p, [f.k]: e.target.value }))}
+                          placeholder={f.placeholder}
+                          className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-300"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={handleAddRecogida} disabled={savingRec}
+                    className="mt-3 px-5 py-2 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-black disabled:opacity-50 transition flex items-center gap-2">
+                    {savingRec && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                    {savingRec ? 'Guardando…' : '+ Agregar'}
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 pb-5 flex justify-end gap-3">
+              <button onClick={() => { setDetalleOs(null); openEdit(detalleOs); }}
+                className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-black transition">
+                Editar OS
+              </button>
+              <button onClick={() => setDetalleOs(null)}
+                className="px-5 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Confirmar Eliminación */}
+      {confirmDel && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in slide-in-from-bottom-4 duration-150">
+            <p className="text-base font-black text-slate-800 mb-1">Eliminar OS</p>
+            <p className="text-sm text-slate-500 mb-5">
+              ¿Eliminar la orden <span className="font-black text-slate-800">{confirmDel.numero_oc}</span>? Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDel(null)} disabled={deleting}
+                className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold hover:bg-slate-50 disabled:opacity-50 transition">
+                Cancelar
+              </button>
+              <button onClick={handleDelete} disabled={deleting}
+                className="flex-1 px-4 py-2.5 rounded-2xl bg-red-600 text-white text-sm font-black hover:bg-red-700 disabled:opacity-50 transition flex items-center justify-center gap-2">
+                {deleting && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                {deleting ? 'Eliminando…' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header y filtros */}
+      {/* Modal importar CSV */}
+      {showImport && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-150 overflow-hidden">
+            <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-6 py-4">
+              <p className="text-xs font-black text-teal-200 uppercase tracking-widest mb-0.5">Importar desde m7track</p>
+              <p className="text-lg font-black text-white">Carga masiva CSV</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Tipo de informe</label>
+                <div className="flex gap-3">
+                  {(['ida', 'recogida'] as const).map(t => (
+                    <button key={t} onClick={() => {
+                      setImportTipo(t);
+                      setImportPreview(null);
+                      if (importFile) parseImportPreview(importFile, t);
+                    }}
+                      className={`flex-1 py-2.5 rounded-2xl text-sm font-bold border-2 transition ${importTipo === t ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
+                      {t === 'ida' ? '📤 Informe Ida' : '📥 Informe Recogida'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Archivo CSV</label>
+                <input ref={importFileRef} type="file" accept=".csv" className="hidden"
+                  onChange={e => {
+                    const f = e.target.files?.[0] ?? null;
+                    setImportFile(f);
+                    setImportPreview(null);
+                    if (f) parseImportPreview(f, importTipo);
+                  }} />
+                <button onClick={() => importFileRef.current?.click()}
+                  className={`w-full py-3 rounded-2xl border-2 border-dashed text-sm font-semibold transition ${importFile ? 'border-teal-400 bg-teal-50 text-teal-700' : 'border-slate-300 text-slate-500 hover:border-teal-400 hover:text-teal-600'}`}>
+                  {importFile ? `✓ ${importFile.name}` : 'Seleccionar archivo…'}
+                </button>
+                {importFile && <p className="text-xs text-slate-400 mt-1">Tamaño: {(importFile.size / 1024 / 1024).toFixed(2)} MB</p>}
+              </div>
+
+              {/* Vista previa */}
+              {importPreview && (
+                <div className="border border-teal-200 rounded-2xl overflow-hidden">
+                  <div className="bg-teal-50 px-4 py-2.5 flex items-center justify-between">
+                    <span className="text-xs font-black text-teal-700 uppercase tracking-wide">Vista previa</span>
+                    <span className="text-xs font-bold text-teal-600 bg-teal-100 px-2.5 py-1 rounded-full">
+                      {importPreview.total.toLocaleString()} filas a cargar
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto max-h-40">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 sticky top-0">
+                        <tr>
+                          {importPreview.headers.map((h, i) => (
+                            <th key={i} className="px-3 py-2 text-left font-bold text-slate-600 whitespace-nowrap border-b border-slate-200">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importPreview.rows.map((row, ri) => (
+                          <tr key={ri} className="border-b border-slate-100 hover:bg-slate-50">
+                            {row.map((cell, ci) => (
+                              <td key={ci} className="px-3 py-1.5 text-slate-700 whitespace-nowrap max-w-[140px] truncate">{cell || '—'}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="bg-amber-50 px-4 py-2 flex items-center gap-2">
+                    <svg className="w-3.5 h-3.5 text-amber-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
+                    <span className="text-xs text-amber-700">Mostrando primeras 5 filas. Los registros duplicados (misma OC+OM+tipo) serán omitidos.</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button onClick={() => { setShowImport(false); setImportFile(null); setImportPreview(null); }}
+                className="flex-1 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">
+                Cancelar
+              </button>
+              <button
+                disabled={!importFile || importing || !importPreview}
+                onClick={async () => {
+                  if (!importFile) return;
+                  setImporting(true);
+                  try {
+                    const r: any = await api.dogamaImportOrdenesServicio(importFile, importTipo);
+                    toast.success(`Importación completa: ${r.inserted} insertados, ${r.skipped} omitidos${r.confCreated ? `, ${r.confCreated} confeccionistas creados` : ''}`);
+                    setShowImport(false); setImportFile(null); setImportPreview(null);
+                    loadAll();
+                  } catch (e: any) { toast.error(e?.message || 'Error al importar'); }
+                  finally { setImporting(false); }
+                }}
+                className="flex-1 py-2.5 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold transition disabled:opacity-50">
+                {importing ? 'Importando…' : importPreview ? `Importar ${importPreview.total.toLocaleString()} filas` : 'Seleccione un archivo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-3 mb-4 items-end">
+        {canCreate && (
+          <button onClick={openCreate}
+            className="px-5 py-2.5 rounded-2xl text-sm font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition">
+            + Crear OS
+          </button>
+        )}
+        {canCreate && (
+          <button onClick={() => setShowImport(true)}
+            className="px-4 py-2.5 rounded-2xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white flex items-center gap-2 shadow-sm transition">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Importar CSV
+          </button>
+        )}
+        <button onClick={() => exportOrdenesExcel(rows, 'ida')}
+          className="px-4 py-2.5 rounded-2xl text-sm font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition">
+          <Download className="w-4 h-4" /> Informe Ida
+        </button>
+        <button onClick={() => exportOrdenesExcel(rows, 'recogida')}
+          className="px-4 py-2.5 rounded-2xl text-sm font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition">
+          <Download className="w-4 h-4" /> Informe Recogida
+        </button>
+        <div className="flex gap-2 ml-auto flex-wrap">
+          <input value={filterOc} onChange={e => setFilterOc(e.target.value)} placeholder="Filtrar OC…"
+            className="text-sm border border-slate-200 rounded-2xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 w-36" />
+          <input value={filterOm} onChange={e => setFilterOm(e.target.value)} placeholder="Filtrar OM…"
+            className="text-sm border border-slate-200 rounded-2xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 w-36" />
+        </div>
+      </div>
+
+      {loading
+        ? <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
+        : <DataTable<OrdenServicio>
+            data={displayedRows}
+            columns={columns}
+            searchPlaceholder="Buscar OC, OM, confeccionista…"
+            excelFileName="ordenes_servicio.xlsx"
+            excelSheetName="Órdenes de Servicio"
+          />
+      }
+    </div>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 
 export default function CitasDespachosCarga({ user }: Props) {
@@ -5342,6 +6263,7 @@ export default function CitasDespachosCarga({ user }: Props) {
           { key: 'asignacion', label: 'Asignación Placa × Planilla' },
           { key: 'despachos',  label: 'Despachos Dogama' },
           { key: 'citas',      label: 'Citas / Recogidas' },
+          { key: 'ordenes',    label: 'Órdenes de Servicio' },
           { key: 'correos',    label: 'Envío de Correos' },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
@@ -5354,6 +6276,7 @@ export default function CitasDespachosCarga({ user }: Props) {
       {tab === 'asignacion' && <AsignacionPlacaTab user={user} />}
       {tab === 'despachos'  && <DespachoTab user={user} />}
       {tab === 'citas'      && <CitasTab user={user} />}
+      {tab === 'ordenes'    && <OrdenesServicioTab user={user} />}
       {tab === 'correos'    && <CorreosTab user={user} />}
     </div>
   );

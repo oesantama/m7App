@@ -2002,6 +2002,8 @@ export const api = {
   // ── Fletes e Intermediación ───────────────────────────────────────────────
   dogamaGetFletes: () => fetchJson(`${API_URL}/dogama/fletes`),
   dogamaCreateFlete: (data: {
+    empresa?: string | null;
+    precio_unitario?: number | null;
     flete_minimo?: number | null;
     valor_intermediacion_minimo?: number | null;
     flete_maximo?: number | null;
@@ -2015,6 +2017,8 @@ export const api = {
       body: JSON.stringify(data),
     }),
   dogamaUpdateFlete: (id: number, data: {
+    empresa?: string | null;
+    precio_unitario?: number | null;
     flete_minimo?: number | null;
     valor_intermediacion_minimo?: number | null;
     flete_maximo?: number | null;
@@ -2027,6 +2031,62 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
+
+  dogamaGetOrdenesServicio: (filters?: { numero_oc?: string; numero_om?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.numero_oc) params.set('numero_oc', filters.numero_oc);
+    if (filters?.numero_om) params.set('numero_om', filters.numero_om);
+    const qs = params.toString();
+    return fetchJson(`${API_URL}/dogama/ordenes-servicio${qs ? '?' + qs : ''}`);
+  },
+  dogamaCreateOrdenServicio: (data: Record<string, any>) =>
+    fetchJson(`${API_URL}/dogama/ordenes-servicio`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  dogamaUpdateOrdenServicio: (id: number, data: Record<string, any>) =>
+    fetchJson(`${API_URL}/dogama/ordenes-servicio/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  dogamaPatchOrdenServicioEstado: (id: number, estado_id: string, usuario_actualizacion?: string) =>
+    fetchJson(`${API_URL}/dogama/ordenes-servicio/${id}/estado`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ estado_id, usuario_actualizacion }),
+    }),
+  dogamaDeleteOrdenServicio: (id: number) =>
+    fetchJson(`${API_URL}/dogama/ordenes-servicio/${id}`, { method: 'DELETE' }),
+
+  dogamaGetOsRecogidas: (os_id: number) =>
+    fetchJson(`${API_URL}/dogama/ordenes-servicio/${os_id}/recogidas`),
+  dogamaCreateOsRecogida: (os_id: number, data: Record<string, any>) =>
+    fetchJson(`${API_URL}/dogama/ordenes-servicio/${os_id}/recogidas`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  dogamaDeleteOsRecogida: (os_id: number, id: number) =>
+    fetchJson(`${API_URL}/dogama/ordenes-servicio/${os_id}/recogidas/${id}`, { method: 'DELETE' }),
+
+  dogamaImportOrdenesServicio: async (file: File, tipo_os: 'ida' | 'recogida') => {
+    const token = localStorage.getItem('token') ||
+                  localStorage.getItem('m7_token') ||
+                  localStorage.getItem('m7_auth_token') ||
+                  localStorage.getItem('m7_client_token');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('tipo_os', tipo_os);
+    const res = await fetch(`${API_URL}/dogama/ordenes-servicio/import`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
+    return res.json();
+  },
 
   dogamaGetNotifCorreos: (filters?: { estado?: string; fecha_desde?: string; fecha_hasta?: string; enc_id?: number }) => {
     const params = new URLSearchParams();

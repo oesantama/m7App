@@ -938,6 +938,8 @@ const ensureFletesTable = async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dogama_fletes_intermediacion (
       id                          SERIAL PRIMARY KEY,
+      empresa                     VARCHAR(255),
+      precio_unitario             NUMERIC(14,2),
       flete_minimo                NUMERIC(14,2),
       valor_intermediacion_minimo NUMERIC(14,2),
       flete_maximo                NUMERIC(14,2),
@@ -948,6 +950,11 @@ const ensureFletesTable = async () => {
       usuario_actualizacion       VARCHAR(50),
       fecha_actualizacion         TIMESTAMPTZ
     )
+  `);
+  await pool.query(`
+    ALTER TABLE dogama_fletes_intermediacion
+      ADD COLUMN IF NOT EXISTS empresa VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS precio_unitario NUMERIC(14,2)
   `);
 };
 
@@ -970,13 +977,15 @@ export const getFletes = async (req: Request, res: Response) => {
 
 export const createFlete = async (req: Request, res: Response) => {
   await ensureFletesTable();
-  const { flete_minimo, valor_intermediacion_minimo, flete_maximo, intermediacion_final, estado_id, usuario_creacion } = req.body;
+  const { empresa, precio_unitario, flete_minimo, valor_intermediacion_minimo, flete_maximo, intermediacion_final, estado_id, usuario_creacion } = req.body;
   try {
     const r = await pool.query(
       `INSERT INTO dogama_fletes_intermediacion
-         (flete_minimo, valor_intermediacion_minimo, flete_maximo, intermediacion_final, estado_id, usuario_creacion)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+         (empresa, precio_unitario, flete_minimo, valor_intermediacion_minimo, flete_maximo, intermediacion_final, estado_id, usuario_creacion)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
       [
+        empresa?.trim() || null,
+        precio_unitario != null ? Number(precio_unitario) : null,
         flete_minimo != null ? Number(flete_minimo) : null,
         valor_intermediacion_minimo != null ? Number(valor_intermediacion_minimo) : null,
         flete_maximo != null ? Number(flete_maximo) : null,
@@ -992,16 +1001,19 @@ export const createFlete = async (req: Request, res: Response) => {
 export const updateFlete = async (req: Request, res: Response) => {
   await ensureFletesTable();
   const { id } = req.params;
-  const { flete_minimo, valor_intermediacion_minimo, flete_maximo, intermediacion_final, estado_id, usuario_actualizacion } = req.body;
+  const { empresa, precio_unitario, flete_minimo, valor_intermediacion_minimo, flete_maximo, intermediacion_final, estado_id, usuario_actualizacion } = req.body;
   try {
     const r = await pool.query(
       `UPDATE dogama_fletes_intermediacion
-       SET flete_minimo=$1, valor_intermediacion_minimo=$2, flete_maximo=$3,
-           intermediacion_final=$4, estado_id=$5,
+       SET empresa=$1, precio_unitario=$2,
+           flete_minimo=$3, valor_intermediacion_minimo=$4, flete_maximo=$5,
+           intermediacion_final=$6, estado_id=$7,
            fecha_actualizacion=(NOW() AT TIME ZONE 'America/Bogota'),
-           usuario_actualizacion=$6
-       WHERE id=$7 RETURNING *`,
+           usuario_actualizacion=$8
+       WHERE id=$9 RETURNING *`,
       [
+        empresa?.trim() || null,
+        precio_unitario != null ? Number(precio_unitario) : null,
         flete_minimo != null ? Number(flete_minimo) : null,
         valor_intermediacion_minimo != null ? Number(valor_intermediacion_minimo) : null,
         flete_maximo != null ? Number(flete_maximo) : null,
@@ -2061,4 +2073,463 @@ export const deleteAuxiliarExterno = async (req: Request, res: Response): Promis
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
+};
+
+// ── ÓRDENES DE SERVICIO ───────────────────────────────────────────────────────
+
+const ensureOrdenesServicioTable = async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dogama_ordenes_servicio (
+      id                      SERIAL PRIMARY KEY,
+      numero_oc               VARCHAR(100) NOT NULL,
+      numero_om               VARCHAR(100),
+      confeccionista_id       INTEGER,
+      tipo_os                 VARCHAR(20) NOT NULL DEFAULT 'ida',
+      cantidad                INTEGER NOT NULL DEFAULT 0,
+      cantidad_entregada_cedi INTEGER NOT NULL DEFAULT 0,
+      precio_unitario         NUMERIC(14,2),
+      valor_total             NUMERIC(14,2),
+      flete                   NUMERIC(14,2),
+      tarifa                  NUMERIC(14,2),
+      manifiesto              VARCHAR(100),
+      remesa                  VARCHAR(100),
+      factura_inicial         VARCHAR(100),
+      fecha_factura           DATE,
+      estado_id               VARCHAR(20) NOT NULL DEFAULT 'EST-01',
+      usuario_creacion        TEXT,
+      fecha_creacion          TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'America/Bogota'),
+      usuario_actualizacion   TEXT,
+      fecha_actualizacion     TIMESTAMPTZ,
+      CONSTRAINT fk_os_conf FOREIGN KEY (confeccionista_id) REFERENCES dogama_confeccionistas(id) ON DELETE SET NULL,
+      CONSTRAINT fk_os_estado FOREIGN KEY (estado_id) REFERENCES estados(id)
+    )
+  `);
+  // Columnas añadidas después del diseño inicial
+  await pool.query(`ALTER TABLE dogama_ordenes_servicio ADD COLUMN IF NOT EXISTS codigo_sap VARCHAR(100)`);
+  await pool.query(`ALTER TABLE dogama_ordenes_servicio ADD COLUMN IF NOT EXISTS empresa VARCHAR(255)`);
+  await pool.query(`ALTER TABLE dogama_ordenes_servicio ADD COLUMN IF NOT EXISTS referencia_antigua VARCHAR(100)`);
+  // Índice único para deduplicación en importación masiva (COALESCE maneja NULLs en numero_om)
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_os_oc_om_tipo
+    ON dogama_ordenes_servicio (numero_oc, COALESCE(numero_om, ''), tipo_os)
+  `);
+};
+
+const OS_SELECT = `
+  SELECT
+    os.*,
+    dc.descripcion_conf AS confeccionista_nombre,
+    e.name              AS estado_nombre
+  FROM dogama_ordenes_servicio os
+  LEFT JOIN dogama_confeccionistas dc ON dc.id = os.confeccionista_id
+  LEFT JOIN estados                e  ON e.id  = os.estado_id
+`;
+
+export const getOrdenesServicio = async (req: Request, res: Response) => {
+  try {
+    await ensureOrdenesServicioTable();
+    const { numero_oc, numero_om } = req.query;
+    const conds: string[] = [];
+    const vals: any[] = [];
+    if (numero_oc) { conds.push(`os.numero_oc ILIKE $${vals.length + 1}`); vals.push(`%${numero_oc}%`); }
+    if (numero_om) { conds.push(`os.numero_om ILIKE $${vals.length + 1}`); vals.push(`%${numero_om}%`); }
+    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const r = await pool.query(`${OS_SELECT} ${where} ORDER BY os.fecha_creacion DESC, os.id DESC LIMIT 2000`, vals);
+    res.json(r.rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+};
+
+export const createOrdenServicio = async (req: Request, res: Response) => {
+  await ensureOrdenesServicioTable();
+  const {
+    numero_oc, numero_om, confeccionista_id, tipo_os,
+    cantidad, cantidad_entregada_cedi,
+    precio_unitario, valor_total, flete, tarifa,
+    manifiesto, remesa, factura_inicial, fecha_factura,
+    estado_id, usuario_creacion,
+  } = req.body;
+  if (!numero_oc?.trim()) return res.status(400).json({ error: 'numero_oc es obligatorio' });
+  try {
+    const r = await pool.query(
+      `INSERT INTO dogama_ordenes_servicio
+         (numero_oc, numero_om, confeccionista_id, tipo_os,
+          cantidad, cantidad_entregada_cedi,
+          precio_unitario, valor_total, flete, tarifa,
+          manifiesto, remesa, factura_inicial, fecha_factura,
+          estado_id, usuario_creacion)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+       RETURNING *`,
+      [
+        numero_oc.trim(),
+        numero_om?.trim() || null,
+        confeccionista_id ? Number(confeccionista_id) : null,
+        tipo_os || 'ida',
+        cantidad != null ? Number(cantidad) : 0,
+        cantidad_entregada_cedi != null ? Number(cantidad_entregada_cedi) : 0,
+        precio_unitario != null ? Number(precio_unitario) : null,
+        valor_total != null ? Number(valor_total) : null,
+        flete != null ? Number(flete) : null,
+        tarifa != null ? Number(tarifa) : null,
+        manifiesto?.trim() || null,
+        remesa?.trim() || null,
+        factura_inicial?.trim() || null,
+        fecha_factura || null,
+        estado_id || 'EST-01',
+        usuario_creacion || null,
+      ]
+    );
+    res.status(201).json(r.rows[0]);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+};
+
+export const updateOrdenServicio = async (req: Request, res: Response) => {
+  await ensureOrdenesServicioTable();
+  const { id } = req.params;
+  const {
+    numero_oc, numero_om, confeccionista_id, tipo_os,
+    cantidad, cantidad_entregada_cedi,
+    precio_unitario, valor_total, flete, tarifa,
+    manifiesto, remesa, factura_inicial, fecha_factura,
+    estado_id, usuario_actualizacion,
+  } = req.body;
+  if (!numero_oc?.trim()) return res.status(400).json({ error: 'numero_oc es obligatorio' });
+  try {
+    const r = await pool.query(
+      `UPDATE dogama_ordenes_servicio SET
+         numero_oc=$1, numero_om=$2, confeccionista_id=$3, tipo_os=$4,
+         cantidad=$5, cantidad_entregada_cedi=$6,
+         precio_unitario=$7, valor_total=$8, flete=$9, tarifa=$10,
+         manifiesto=$11, remesa=$12, factura_inicial=$13, fecha_factura=$14,
+         estado_id=$15,
+         fecha_actualizacion=(NOW() AT TIME ZONE 'America/Bogota'),
+         usuario_actualizacion=$16
+       WHERE id=$17 RETURNING *`,
+      [
+        numero_oc.trim(),
+        numero_om?.trim() || null,
+        confeccionista_id ? Number(confeccionista_id) : null,
+        tipo_os || 'ida',
+        cantidad != null ? Number(cantidad) : 0,
+        cantidad_entregada_cedi != null ? Number(cantidad_entregada_cedi) : 0,
+        precio_unitario != null ? Number(precio_unitario) : null,
+        valor_total != null ? Number(valor_total) : null,
+        flete != null ? Number(flete) : null,
+        tarifa != null ? Number(tarifa) : null,
+        manifiesto?.trim() || null,
+        remesa?.trim() || null,
+        factura_inicial?.trim() || null,
+        fecha_factura || null,
+        estado_id || 'EST-01',
+        usuario_actualizacion || null,
+        id,
+      ]
+    );
+    if (r.rowCount === 0) return res.status(404).json({ error: 'No encontrado' });
+    res.json(r.rows[0]);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+};
+
+export const deleteOrdenServicio = async (req: Request, res: Response) => {
+  await ensureOrdenesServicioTable();
+  try {
+    const r = await pool.query('DELETE FROM dogama_ordenes_servicio WHERE id=$1 RETURNING id', [req.params.id]);
+    if (r.rowCount === 0) return res.status(404).json({ error: 'No encontrado' });
+    res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+};
+
+export const patchOrdenServicioEstado = async (req: Request, res: Response) => {
+  await ensureOrdenesServicioTable();
+  const { id } = req.params;
+  const { estado_id, usuario_actualizacion } = req.body;
+  if (!estado_id) return res.status(400).json({ error: 'estado_id es obligatorio' });
+  try {
+    const r = await pool.query(
+      `UPDATE dogama_ordenes_servicio SET
+         estado_id=$1,
+         fecha_actualizacion=(NOW() AT TIME ZONE 'America/Bogota'),
+         usuario_actualizacion=$2
+       WHERE id=$3 RETURNING *`,
+      [estado_id, usuario_actualizacion || null, id]
+    );
+    if (r.rowCount === 0) return res.status(404).json({ error: 'No encontrado' });
+    res.json(r.rows[0]);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+};
+
+// ── IMPORTACIÓN MASIVA DE ÓRDENES DE SERVICIO DESDE CSV ──────────────────────
+
+function parseCSVLine(line: string, sep = ';'): string[] {
+  const fields: string[] = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { inQ = !inQ; }
+    else if (ch === sep && !inQ) { fields.push(cur.trim()); cur = ''; }
+    else { cur += ch; }
+  }
+  fields.push(cur.trim());
+  return fields;
+}
+
+function toNum(v: string | undefined): number | null {
+  if (!v || v.trim() === '') return null;
+  const n = parseFloat(v.replace(/,/g, '.'));
+  return isNaN(n) ? null : n;
+}
+
+function toDate(v: string | undefined): string | null {
+  if (!v || v.trim() === '') return null;
+  // Formats: "Mar 12, 2024 7:06 am"  or  "2024-03-12"
+  const d = new Date(v.trim());
+  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  return null;
+}
+
+// Detecta si el nombre de empresa es una variante de "COMODÍN" (producción interna sin confeccionista externo)
+function isComodin(v: string): boolean {
+  return /^com[o0][dm][i1]?[nd]?[i]?[n]?[a-z]*$/i.test(v.replace(/[\s_]/g, ''));
+}
+
+// Normaliza nombre de confeccionista para búsqueda (mayúsculas, sin espacios extra)
+function normConf(v: string): string { return v.toUpperCase().trim().replace(/\s+/g, ' '); }
+
+export const importOrdenesServicio = async (req: Request, res: Response) => {
+  await ensureOrdenesServicioTable();
+  const tipo_os: string = (req.body?.tipo_os || req.query?.tipo_os || 'ida') as string;
+  if (!req.file) return res.status(400).json({ error: 'Se requiere un archivo CSV' });
+
+  const raw = req.file.buffer.toString('utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = raw.split('\n').filter(l => l.trim().length > 0);
+  if (lines.length < 2) return res.status(400).json({ error: 'CSV vacío o sin datos' });
+
+  const headers = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, '').toLowerCase().trim());
+
+  const get = (row: string[], name: string) => {
+    const i = headers.indexOf(name);
+    if (i < 0) return '';
+    return (row[i] || '').replace(/^"|"$/g, '').trim();
+  };
+
+  // ── Caché de confeccionistas (nombre_upper → id) ──────────────────────────────
+  const confCache = new Map<string, number>();
+  const confRows = await pool.query('SELECT id, descripcion_conf FROM dogama_confeccionistas');
+  for (const r of confRows.rows) confCache.set(normConf(r.descripcion_conf), r.id);
+
+  // Resuelve el nombre de empresa a confeccionista_id.
+  // Si no existe en la tabla lo crea automáticamente.
+  const resolveConf = async (nombre: string): Promise<number | null> => {
+    if (!nombre || isComodin(nombre)) return null;
+    const key = normConf(nombre);
+    if (confCache.has(key)) return confCache.get(key)!;
+    // Búsqueda insensible a mayúsculas
+    const q = await pool.query(
+      `SELECT id FROM dogama_confeccionistas WHERE UPPER(TRIM(descripcion_conf)) = $1 LIMIT 1`,
+      [key]
+    );
+    if (q.rows.length) { confCache.set(key, q.rows[0].id); return q.rows[0].id; }
+    // No existe → crear automáticamente
+    const ins = await pool.query(
+      `INSERT INTO dogama_confeccionistas (descripcion_conf, direccion, usuariocreacion)
+       VALUES ($1, 'Sin dirección', 'importacion_csv')
+       ON CONFLICT (descripcion_conf, direccion) DO UPDATE SET descripcion_conf=EXCLUDED.descripcion_conf
+       RETURNING id`,
+      [nombre.trim()]
+    );
+    confCache.set(key, ins.rows[0].id);
+    return ins.rows[0].id;
+  };
+
+  // Cache de OS ida ya existentes: (oc_upper, om_upper) → confeccionista_id
+  // Se usa para que las recogidas hereden el confeccionista de su OS ida
+  const idaConfCache = new Map<string, number | null>();
+  if (tipo_os === 'recogida') {
+    const idaRows = await pool.query(
+      `SELECT numero_oc, numero_om, confeccionista_id FROM dogama_ordenes_servicio WHERE tipo_os='ida'`
+    );
+    for (const r of idaRows.rows) {
+      const k = `${(r.numero_oc || '').toUpperCase()}|${(r.numero_om || '').toUpperCase()}`;
+      if (!idaConfCache.has(k)) idaConfCache.set(k, r.confeccionista_id ?? null);
+    }
+  }
+
+  let inserted = 0, skipped = 0, errors = 0, confCreated = 0;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (!line.trim()) continue;
+      const row = parseCSVLine(line);
+
+      let numero_oc: string, numero_om: string | null, remesa: string | null,
+          manifiesto: string | null, factura_inicial: string | null,
+          flete: number | null, codigo_sap: string | null, cantidad: number,
+          valor_total: number | null, fecha_factura: string | null,
+          precio_unitario: number | null, tarifa: number | null,
+          empresa: string | null, referencia_antigua: string | null,
+          cantidad_entregada_cedi: number, confeccionista_id: number | null;
+
+      if (tipo_os === 'recogida') {
+        numero_oc           = get(row, '04_oc_uribe_oc_text') || '';
+        numero_om           = get(row, '07_om_uribe_text_text') || null;
+        remesa              = get(row, '14_remesa_text') || null;
+        manifiesto          = get(row, '15_manifiesto_text') || null;
+        factura_inicial     = get(row, '16__factura_text') || null;
+        flete               = toNum(get(row, '17_flete_de_ingreso_number')) ?? toNum(get(row, 'flete_number'));
+        codigo_sap          = get(row, '18_sap_text_text') || null;
+        cantidad            = Number(toNum(get(row, 'cantidad_number'))) || 0;
+        valor_total         = toNum(get(row, 'flete_number'));
+        fecha_factura       = toDate(get(row, '06_fecha_date')) ?? toDate(get(row, 'created date'));
+        precio_unitario     = null; tarifa = null;
+        empresa             = null; referencia_antigua = null;
+        cantidad_entregada_cedi = 0;
+        // Heredar confeccionista desde la OS ida que corresponde a este OC+OM
+        const idaKey = `${(numero_oc || '').toUpperCase()}|${(numero_om || '').toUpperCase()}`;
+        confeccionista_id = idaConfCache.get(idaKey) ?? null;
+      } else {
+        numero_oc           = get(row, 'n_mero_de_oc_text') || '';
+        numero_om           = get(row, 'n_mero_de_om_text') || null;
+        remesa              = get(row, '12_remesa_text') || null;
+        manifiesto          = get(row, '11_manifiesto_text') || null;
+        factura_inicial     = get(row, '09_factura_text') || null;
+        flete               = toNum(get(row, '13_flete_ida_number'));
+        codigo_sap          = null;
+        cantidad            = Number(toNum(get(row, 'cantidad_number'))) || 0;
+        valor_total         = toNum(get(row, 'valor_total_number'));
+        fecha_factura       = toDate(get(row, 'fecha_de_factura_date')) ?? toDate(get(row, 'created date'));
+        precio_unitario     = toNum(get(row, 'precio_unitario_number'));
+        tarifa              = toNum(get(row, 'tarifa_number'));
+        referencia_antigua  = get(row, '08_referencia_antigua_text') || null;
+        cantidad_entregada_cedi = Number(toNum(get(row, 'cantidad_recibida_number'))) || 0;
+        const empresaRaw    = get(row, 'empresa_text') || '';
+        empresa             = empresaRaw || null;
+        // Resolver empresa → confeccionista_id
+        const prevSize = confCache.size;
+        confeccionista_id   = empresaRaw ? await resolveConf(empresaRaw) : null;
+        if (confCache.size > prevSize) confCreated++;
+      }
+
+      if (!numero_oc) { skipped++; continue; }
+
+      try {
+        const r = await client.query(
+          `INSERT INTO dogama_ordenes_servicio
+             (numero_oc, numero_om, confeccionista_id, tipo_os,
+              cantidad, cantidad_entregada_cedi,
+              precio_unitario, valor_total, flete, tarifa,
+              manifiesto, remesa, factura_inicial, fecha_factura,
+              codigo_sap, empresa, referencia_antigua, estado_id, usuario_creacion)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'EST-01',$18)
+           ON CONFLICT (numero_oc, COALESCE(numero_om,''), tipo_os) DO NOTHING`,
+          [
+            numero_oc, numero_om, confeccionista_id, tipo_os,
+            cantidad, cantidad_entregada_cedi,
+            precio_unitario, valor_total, flete, tarifa,
+            manifiesto, remesa, factura_inicial, fecha_factura,
+            codigo_sap, empresa, referencia_antigua, 'importacion_csv',
+          ]
+        );
+        if ((r.rowCount ?? 0) > 0) inserted++; else skipped++;
+      } catch (e: any) { errors++; }
+    }
+
+    await client.query('COMMIT');
+    res.json({ inserted, skipped, errors, confCreated, total: lines.length - 1 });
+  } catch (e: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+};
+
+// ── RECOGIDAS POR ORDEN DE SERVICIO ──────────────────────────────────────────
+
+const ensureOsRecogidas = async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS dogama_os_recogidas (
+      id               SERIAL PRIMARY KEY,
+      os_id            INTEGER NOT NULL REFERENCES dogama_ordenes_servicio(id) ON DELETE CASCADE,
+      cantidad         INTEGER NOT NULL DEFAULT 0,
+      remesa           VARCHAR(100),
+      manifiesto       VARCHAR(100),
+      codigo_sap       VARCHAR(100),
+      flete            NUMERIC(14,2),
+      usuario_creacion TEXT,
+      fecha_creacion   TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'America/Bogota')
+    )
+  `);
+};
+
+const recalcCantidadEntregada = async (client: any, os_id: number) => {
+  await client.query(
+    `UPDATE dogama_ordenes_servicio
+     SET cantidad_entregada_cedi = COALESCE((
+       SELECT SUM(cantidad) FROM dogama_os_recogidas WHERE os_id = $1
+     ), 0)
+     WHERE id = $1`,
+    [os_id]
+  );
+};
+
+export const getOsRecogidas = async (req: Request, res: Response) => {
+  await ensureOsRecogidas();
+  const { os_id } = req.params;
+  try {
+    const r = await pool.query(
+      `SELECT * FROM dogama_os_recogidas WHERE os_id=$1 ORDER BY fecha_creacion ASC`,
+      [os_id]
+    );
+    res.json(r.rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+};
+
+export const createOsRecogida = async (req: Request, res: Response) => {
+  await ensureOsRecogidas();
+  const { os_id } = req.params;
+  const { cantidad, remesa, manifiesto, codigo_sap, flete, usuario_creacion } = req.body;
+  if (!cantidad || Number(cantidad) <= 0) return res.status(400).json({ error: 'cantidad debe ser mayor a 0' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const r = await client.query(
+      `INSERT INTO dogama_os_recogidas (os_id, cantidad, remesa, manifiesto, codigo_sap, flete, usuario_creacion)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [
+        Number(os_id),
+        Number(cantidad),
+        remesa?.trim() || null,
+        manifiesto?.trim() || null,
+        codigo_sap?.trim() || null,
+        flete != null ? Number(flete) : null,
+        usuario_creacion || null,
+      ]
+    );
+    await recalcCantidadEntregada(client, Number(os_id));
+    await client.query('COMMIT');
+    res.status(201).json(r.rows[0]);
+  } catch (e: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally { client.release(); }
+};
+
+export const deleteOsRecogida = async (req: Request, res: Response) => {
+  await ensureOsRecogidas();
+  const { os_id, id } = req.params;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const r = await client.query('DELETE FROM dogama_os_recogidas WHERE id=$1 AND os_id=$2 RETURNING id', [id, os_id]);
+    if (r.rowCount === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'No encontrado' }); }
+    await recalcCantidadEntregada(client, Number(os_id));
+    await client.query('COMMIT');
+    res.json({ success: true });
+  } catch (e: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally { client.release(); }
 };
