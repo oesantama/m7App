@@ -35,12 +35,11 @@ Dockerfile.*.local
 .claude/projects/
 
 # ── Scripts de Diagnóstico y Temporales ──────────────────────────────────────
-*.cjs
-*.js
-*.txt
-!package.json
-!run_migration.js
-!scripts/generate-manual.js
+tsc_output*.txt
+test-results/
+milla7_temp/
+scratch/
+dist_backend/
 
 # ── Archivos Pesados / Binarios ───────────────────────────────────────────────
 # Documentos Office y archivos comprimidos
@@ -72,7 +71,8 @@ playwright-report/
 
 # ── Base de Datos ─────────────────────────────────────────────────────────────
 *.sql
-!M7_PRODUCTION_SETUP.sql
+!backend/docs/*.sql
+!backend/docs/migrations/*.sql
 !backend/init_production_coolify.sql
 !backend/full_restore.sql
 !backend/scripts/MIGRACION_CAPACITACIONES.sql

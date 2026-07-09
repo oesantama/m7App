@@ -9,6 +9,7 @@ import ConsultaFacturas from './ConsultaFacturas';
 import ProcessPaymentLModal from './ProcessPaymentLModal';
 import * as XLSX from 'xlsx';
 import TableControls from './shared/TableControls';
+import { DataTable } from './shared/DataTable';
 import { formatCurrency } from '../utils/formatting';
 
 // Extendemos DocumentL localmente para manejar el estado de duplicado en la UI
@@ -78,8 +79,6 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const [corrParsedItems, setCorrParsedItems] = useState<any[]>([]);
   const [corrConfirmOpen, setCorrConfirmOpen] = useState(false);
   const [corrApplying, setCorrApplying] = useState(false);
-  const [corrPreviewSearch, setCorrPreviewSearch] = useState('');
-  const [corrPreviewPage, setCorrPreviewPage] = useState(1);
 
   // Estados para edición de count_2 en auditoría
   const [editingAuditItem, setEditingAuditItem] = useState<any | null>(null);
@@ -665,11 +664,12 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
             }
 
             // 1. Mapeo para RECEPCIÓN (Detalle Logístico / Conductor)
+            const rawUnit = val(iUnd) || val(iUnCodeDetail); // iUnd cubre columnas genéricas; iUnCodeDetail cubre 'UN'/'UN ORIG'
             group.items.push({
               articleId: sku,
               expectedQty: qty,
               receivedQty: 0, // Inicia en 0
-              unit: (val(iUnd) && val(iUnd).trim() !== '0' && val(iUnd).trim() !== '') ? val(iUnd).trim().toUpperCase() : 'UND',
+              unit: (rawUnit && rawUnit.trim() !== '0' && rawUnit.trim() !== '') ? rawUnit.trim().toUpperCase() : 'UND',
               volume: String(volVal),
               unitVolume: val(iVolUnidad),
               invoice: val(iFactura),
@@ -846,6 +846,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const iLat      = findIdx(['latitud', 'lat', 'latitude', 'coord y', 'coordinada y']);
         const iLng      = findIdx(['longitud', 'lng', 'longitude', 'coord x', 'coordinada x']);
         const iUnd      = findIdx(['um', 'und', 'unid', 'unidad', 'medida', 'u medida', 'u.m.', 'uom', 'u.m', 'umb', 'umv', 'u.med', 'un.med.', 'un.med', 'unidade', 'unidades']);
+        const iUnCodeDetail = isPlanR ? findIdx(['un']) : findIdx(['un orig']);
 
         if (iPlaca === -1 || iCarga === -1) {
           toast.error('No se detectaron columnas PLACA o CARGA en el archivo.');
@@ -896,7 +897,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
             peso:        iPeso !== -1  ? parseNumberM7(val(iPeso), isPlanR, 'weight') : undefined,
             lat:  iLat !== -1 && val(iLat)  ? (parseFloat(val(iLat).replace(',', '.'))  || null) : null,
             lng:  iLng !== -1 && val(iLng)  ? (parseFloat(val(iLng).replace(',', '.')) || null) : null,
-            unit: (iUnd !== -1 && val(iUnd).trim() !== '' && val(iUnd).trim() !== '0') ? val(iUnd).trim().toUpperCase() : undefined,
+            unit: (() => { const raw = (iUnd !== -1 && val(iUnd).trim() !== '' && val(iUnd).trim() !== '0') ? val(iUnd) : (iUnCodeDetail !== -1 ? val(iUnCodeDetail) : ''); return raw.trim() ? raw.trim().toUpperCase() : undefined; })(),
           });
         });
 
@@ -911,8 +912,6 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
         const result = await api.correctDocumentItems({ items, dryRun: true, changedBy: user.name });
         setCorrParsedItems(items);
         setCorrPreviewResult(result);
-        setCorrPreviewSearch('');
-        setCorrPreviewPage(1);
         setCorrConfirmOpen(true);
       } catch (err: any) {
         toast.error('Error al procesar el archivo: ' + (err.message || 'Error desconocido'));
@@ -1366,7 +1365,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
               <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-3">Campos que se actualizan</p>
                 <div className="flex flex-wrap gap-2">
-                  {['Ciudad', 'Dirección', 'Volumen', 'Barrio', 'Latitud / Longitud', 'Cant. Esperada', 'Peso'].map(f => (
+                  {['Ciudad', 'Dirección', 'Volumen', 'Barrio', 'Latitud / Longitud', 'Cant. Esperada', 'Peso', 'Unidad de Medida'].map(f => (
                     <span key={f} className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[9px] font-black text-slate-600 uppercase tracking-wide shadow-sm">{f}</span>
                   ))}
                 </div>
@@ -2007,98 +2006,47 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                 ⚠ ADVERTENCIA: Esta operación es irreversible. Se registrará un log de auditoría con los valores anteriores y los nuevos.
               </p>
 
-              {/* Search */}
-              <div className="mt-4">
-                <input
-                  type="text"
-                  placeholder="BUSCAR POR ARTÍCULO O FACTURA..."
-                  value={corrPreviewSearch}
-                  onChange={e => { setCorrPreviewSearch(e.target.value); setCorrPreviewPage(1); }}
-                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-[10px] font-bold text-slate-700 outline-none focus:border-orange-400 transition-all bg-slate-50"
-                />
-              </div>
             </div>
 
-            {/* Table */}
-            <div className="flex-1 overflow-y-auto p-6 min-h-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-[9px]">
-                  <thead>
-                    <tr className="text-slate-400 uppercase tracking-wide border-b border-slate-100">
-                      <th className="py-3 px-3 font-black">Estado</th>
-                      <th className="py-3 px-3 font-black">Artículo</th>
-                      <th className="py-3 px-3 font-black">Factura</th>
-                      <th className="py-3 px-3 font-black">Campo</th>
-                      <th className="py-3 px-3 font-black text-rose-600">Antes</th>
-                      <th className="py-3 px-3 font-black text-emerald-600">Después</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {corrPreviewResult.preview
-                      .filter((p: any) => {
-                        if (!corrPreviewSearch) return true;
-                        const s = corrPreviewSearch.toLowerCase();
-                        return p.articleId?.toLowerCase().includes(s) || p.invoice?.toLowerCase().includes(s) || p.documentId?.toLowerCase().includes(s);
-                      })
-                      .slice((corrPreviewPage - 1) * 10, corrPreviewPage * 10)
-                      .flatMap((p: any) => {
-                        if (!p.found) {
-                          return [(
-                            <tr key={`${p.documentId}-${p.articleId}-${p.invoice}-notfound`} className="bg-red-50/40">
-                              <td className="py-2 px-3"><span className="text-[8px] bg-red-100 text-red-600 font-black px-2 py-0.5 rounded-lg uppercase">No encontrado</span></td>
-                              <td className="py-2 px-3 font-black text-slate-700">{p.articleId}</td>
-                              <td className="py-2 px-3 text-slate-500 font-mono">{p.invoice}</td>
-                              <td colSpan={3} className="py-2 px-3 text-slate-400 italic text-[8px]">No existe en document_items con esos datos</td>
-                            </tr>
-                          )];
-                        }
-                        const fieldLabels: Record<string, string> = {
-                          city: 'Ciudad', address: 'Dirección', volume: 'Volumen',
-                          neighborhood: 'Barrio', expected_qty: 'Cant. Esperada', peso: 'Peso',
-                          latitude: 'Latitud', longitude: 'Longitud', unit: 'U.M.'
-                        };
-                        const changes = Object.entries(p.new)
-                          .filter(([k, v]) => v !== undefined && String(p.old[k] ?? '') !== String(v))
-                          .map(([k, v]) => ({ field: k, oldVal: p.old[k], newVal: v }));
-                        if (changes.length === 0) {
-                          return [(
-                            <tr key={`${p.documentId}-${p.articleId}-${p.invoice}-nochange`} className="bg-slate-50/50">
-                              <td className="py-2 px-3"><span className="text-[8px] bg-slate-100 text-slate-500 font-black px-2 py-0.5 rounded-lg uppercase">Sin cambio</span></td>
-                              <td className="py-2 px-3 font-black text-slate-500">{p.articleId}</td>
-                              <td className="py-2 px-3 text-slate-400 font-mono">{p.invoice}</td>
-                              <td colSpan={3} className="py-2 px-3 text-slate-300 italic text-[8px]">Los valores del archivo coinciden con los actuales</td>
-                            </tr>
-                          )];
-                        }
-                        return changes.map((ch, i) => (
-                          <tr key={`${p.documentId}-${p.articleId}-${p.invoice}-${ch.field}`} className="hover:bg-orange-50/20">
-                            {i === 0 ? (
-                              <td className="py-2 px-3" rowSpan={changes.length}>
-                                <span className="text-[8px] bg-orange-100 text-orange-700 font-black px-2 py-0.5 rounded-lg uppercase">Actualizar</span>
-                              </td>
-                            ) : null}
-                            {i === 0 ? <td className="py-2 px-3 font-black text-slate-900" rowSpan={changes.length}>{p.articleId}</td> : null}
-                            {i === 0 ? <td className="py-2 px-3 text-slate-500 font-mono" rowSpan={changes.length}>{p.invoice}</td> : null}
-                            <td className="py-2 px-3 text-slate-500 font-bold">{fieldLabels[ch.field] || ch.field}</td>
-                            <td className="py-2 px-3 text-rose-600 font-black line-through opacity-70">{String(ch.oldVal ?? '—')}</td>
-                            <td className="py-2 px-3 text-emerald-700 font-black">{String(ch.newVal ?? '—')}</td>
-                          </tr>
-                        ));
-                      })}
-                  </tbody>
-                </table>
-              </div>
-              {/* Pagination */}
-              {Math.ceil(corrPreviewResult.preview.filter((p: any) => !corrPreviewSearch || p.articleId?.toLowerCase().includes(corrPreviewSearch.toLowerCase()) || p.invoice?.toLowerCase().includes(corrPreviewSearch.toLowerCase())).length / 10) > 1 && (
-                <div className="flex justify-center items-center gap-4 mt-4">
-                  <button disabled={corrPreviewPage === 1} onClick={() => setCorrPreviewPage(p => p - 1)}
-                    className="p-2 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight className="rotate-180 w-4 h-4" /></button>
-                  <span className="text-[10px] font-black uppercase">Pág {corrPreviewPage}</span>
-                  <button disabled={corrPreviewPage * 10 >= corrPreviewResult.preview.length} onClick={() => setCorrPreviewPage(p => p + 1)}
-                    className="p-2 bg-white border rounded-xl disabled:opacity-20"><Icons.ChevronRight className="w-4 h-4" /></button>
+            {/* Table via DataTable */}
+            {(() => {
+              const fieldLabels: Record<string, string> = {
+                city: 'Ciudad', address: 'Dirección', volume: 'Volumen',
+                neighborhood: 'Barrio', expected_qty: 'Cant. Esperada', peso: 'Peso',
+                latitude: 'Latitud', longitude: 'Longitud', unit: 'U.M.'
+              };
+              type PreviewRow = { _key: string; estado: string; articulo: string; factura: string; campo: string; antes: string; despues: string; _status: 'update'|'nochange'|'notfound' };
+              const flatRows: PreviewRow[] = corrPreviewResult.preview.flatMap((p: any) => {
+                if (!p.found) return [{ _key: `${p.documentId}-${p.articleId}-${p.invoice}-nf`, estado: 'No encontrado', articulo: p.articleId, factura: p.invoice, campo: '—', antes: '—', despues: 'No existe en document_items', _status: 'notfound' as const }];
+                const changes = Object.entries(p.new).filter(([k, v]) => v !== undefined && String((p.old as any)[k] ?? '') !== String(v)).map(([k, v]) => ({ field: k, oldVal: (p.old as any)[k], newVal: v }));
+                if (changes.length === 0) return [{ _key: `${p.documentId}-${p.articleId}-${p.invoice}-nc`, estado: 'Sin cambio', articulo: p.articleId, factura: p.invoice, campo: '—', antes: '—', despues: 'Los valores del archivo coinciden con los actuales', _status: 'nochange' as const }];
+                return changes.map(ch => ({ _key: `${p.documentId}-${p.articleId}-${p.invoice}-${ch.field}`, estado: 'Actualizar', articulo: p.articleId, factura: p.invoice, campo: fieldLabels[ch.field] || ch.field, antes: String(ch.oldVal ?? '—'), despues: String(ch.newVal ?? '—'), _status: 'update' as const }));
+              });
+              return (
+                <div className="flex-1 overflow-y-auto min-h-0 px-6 pb-2">
+                  <DataTable<PreviewRow>
+                    data={flatRows}
+                    searchPlaceholder="Buscar por artículo o factura…"
+                    columns={[
+                      {
+                        header: 'Estado', key: 'estado', sortable: true,
+                        render: (r) => (
+                          <span className={`text-[8px] font-black px-2 py-0.5 rounded-lg uppercase whitespace-nowrap ${r._status === 'update' ? 'bg-orange-100 text-orange-700' : r._status === 'notfound' ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-500'}`}>
+                            {r.estado}
+                          </span>
+                        ),
+                      },
+                      { header: 'Artículo', key: 'articulo', sortable: true, render: (r) => <span className="font-black text-slate-900">{r.articulo}</span> },
+                      { header: 'Factura', key: 'factura', sortable: true, render: (r) => <span className="font-mono text-slate-500">{r.factura}</span> },
+                      { header: 'Campo', key: 'campo', sortable: true },
+                      { header: 'Antes', key: 'antes', sortable: false, render: (r) => r._status === 'update' ? <span className="text-rose-600 font-black line-through opacity-70">{r.antes}</span> : <span className="text-slate-300 italic text-[8px]">{r.antes === '—' ? r.despues : r.antes}</span> },
+                      { header: 'Después', key: 'despues', sortable: false, render: (r) => r._status === 'update' ? <span className="text-emerald-700 font-black">{r.despues}</span> : null },
+                    ]}
+                  />
                 </div>
-              )}
-            </div>
+              );
+            })()}
+
 
             {/* Footer buttons */}
             <div className="p-6 border-t bg-slate-50/50 flex justify-between items-center shrink-0 gap-4">

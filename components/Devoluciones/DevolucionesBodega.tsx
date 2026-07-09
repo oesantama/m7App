@@ -66,47 +66,6 @@ interface InvoiceData {
     items: InvoiceItem[];
 }
 
-// ─── ORDENAMIENTO GENÉRICO PARA TABLAS ────────────────────────────────────────
-function sortByKey<T extends Record<string, any>>(rows: T[], key: string | null, dir: 'asc'|'desc'): T[] {
-    if (!key) return rows;
-    const sorted = [...rows];
-    sorted.sort((a, b) => {
-        let av = a[key]; let bv = b[key];
-        if (av === null || av === undefined) av = '';
-        if (bv === null || bv === undefined) bv = '';
-        if (typeof av === 'number' && typeof bv === 'number') return dir === 'asc' ? av - bv : bv - av;
-        const ad = Date.parse(av); const bd = Date.parse(bv);
-        if (!isNaN(ad) && !isNaN(bd) && isNaN(Number(av)) && isNaN(Number(bv))) {
-            return dir === 'asc' ? ad - bd : bd - ad;
-        }
-        const as = String(av).trim().toLowerCase(); const bs = String(bv).trim().toLowerCase();
-        if (as < bs) return dir === 'asc' ? -1 : 1;
-        if (as > bs) return dir === 'asc' ? 1 : -1;
-        return 0;
-    });
-    return sorted;
-}
-
-interface SortThProps {
-    label: string; sortKey: string;
-    activeKey: string | null; dir: 'asc'|'desc';
-    onSort: (key: string) => void;
-    className?: string;
-}
-const SortTh: React.FC<SortThProps> = ({ label, sortKey, activeKey, dir, onSort, className }) => {
-    const active = activeKey === sortKey;
-    return (
-        <th onClick={() => onSort(sortKey)}
-            className={`px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest whitespace-nowrap cursor-pointer select-none hover:bg-slate-100/70 transition-colors ${className || ''}`}>
-            <span className="inline-flex items-center gap-1">
-                {label}
-                {active
-                    ? (dir === 'asc' ? <Icons.ChevronUp className="w-3 h-3 text-indigo-600" /> : <Icons.ChevronDown className="w-3 h-3 text-indigo-600" />)
-                    : <Icons.ChevronDown className="w-3 h-3 text-slate-300" />}
-            </span>
-        </th>
-    );
-};
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
@@ -127,6 +86,13 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         new Set(['PENDING','CONFIRMED','PRE_APPROVAL','PRE_APPROVED','SUPPLIER_EXIT'])
     );
     const [seguimientoSearch, setSeguimientoSearch] = React.useState('');
+    const _now = new Date();
+    const [supplierExitDateFrom, setSupplierExitDateFrom] = React.useState<string>(
+        `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-01`
+    );
+    const [supplierExitDateTo, setSupplierExitDateTo] = React.useState<string>(
+        new Date(_now.getFullYear(), _now.getMonth()+1, 0).toISOString().slice(0,10)
+    );
 
     // ── Tab: Sin registrar (desde conciliación) ───────────────────────────────
     const [concilPending, setConcilPending]       = React.useState<ConcilPendingInvoice[]>([]);
@@ -135,9 +101,6 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
     const [importingConcil, setImportingConcil]   = React.useState(false);
     const [concilExtras, setConcilExtras]         = React.useState<Record<string,{vendedor:string; return_reason:string; return_type:'COMPLETA'|'PARCIAL'}>>({});
     const [concilOtroMode, setConcilOtroMode]     = React.useState<Set<string>>(new Set());
-    const [concilSearch, setConcilSearch]         = React.useState('');
-    const [concilSortKey, setConcilSortKey]       = React.useState<string | null>(null);
-    const [concilSortDir, setConcilSortDir]       = React.useState<'asc'|'desc'>('asc');
     const [concilOtroText, setConcilOtroText]     = React.useState<Record<string,string>>({});
 
     const setConcilExtra = (invoiceId: string, field: string, value: string) =>
@@ -587,6 +550,24 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         finally { setAdvancingId(null); }
     };
 
+    // ── Confirmar facturación en lote (PENDING → CONFIRMED) ───────────────────
+    const handleConfirmFacturacionBatch = async (items: TrackingReturn[]) => {
+        const userName = user?.name ?? user?.email ?? 'FACTURACION';
+        const now = new Date().toISOString();
+        setAdvancingId(-1);
+        try {
+            await Promise.all(items.map(r => api.confirmReturnByFacturacion(r.id, userName)));
+            showToast(`Confirmación facturación exitosa (${items.length})`);
+            setTrackingReturns(prev => prev.map(r =>
+                items.some(i => i.id === r.id)
+                    ? { ...r, status: 'CONFIRMED', conciliacion_confirmada_at: now, conciliacion_confirmada_by: userName }
+                    : r
+            ));
+            setSelectedExcelIds(new Set());
+        } catch (e: any) { showToast(e?.message ?? 'Error al confirmar facturación', false); }
+        finally { setAdvancingId(null); }
+    };
+
     // ── Totales para badge ─────────────────────────────────────────────────────
     const selectedClientName = clients.find(c => c.id === selectedClientId)?.name ?? '';
     const tabs: { id: Tab; label: string; count?: number }[] = [
@@ -632,34 +613,27 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         { header: 'POR (COMPLETADO)', key: 'completed_by' },
     ];
 
-    // ── Sin Registrar: filtrado + ordenamiento ────────────────────────────────
-    const displayedConcilPending = React.useMemo(() => {
-        const term = concilSearch.trim().toLowerCase();
-        const filtered = !term ? concilPending : concilPending.filter(inv =>
-            [inv.invoice_id, inv.customer_name, inv.numero_planilla, inv.vehicle_plate, inv.fecha_placa, inv.plan_type]
-                .some(v => v && String(v).toLowerCase().includes(term))
-        );
-        return sortByKey(filtered, concilSortKey, concilSortDir);
-    }, [concilPending, concilSearch, concilSortKey, concilSortDir]);
-
-    const handleConcilSort = (key: string) => {
-        if (concilSortKey === key) {
-            setConcilSortDir(d => d === 'asc' ? 'desc' : 'asc');
-        } else {
-            setConcilSortKey(key);
-            setConcilSortDir('asc');
-        }
-    };
-
     // ── Seguimiento: filtrado + ordenamiento (compartido entre todas las etapas) ──
     const displayedTrackingReturns = React.useMemo(() => {
         const term = seguimientoSearch.trim().toLowerCase();
-        if (!term) return trackingReturns;
-        return trackingReturns.filter(r =>
-            [r.invoice_id, r.customer_name, r.vendedor, r.numero_planilla, r.return_reason, r.vehicle_plate]
-                .some(v => v && String(v).toLowerCase().includes(term))
-        );
-    }, [trackingReturns, seguimientoSearch]);
+        let rows = trackingReturns;
+        if (term) {
+            rows = rows.filter(r =>
+                [r.invoice_id, r.customer_name, r.vendedor, r.numero_planilla, r.return_reason, r.vehicle_plate]
+                    .some(v => v && String(v).toLowerCase().includes(term))
+            );
+        }
+        // Filtrar SUPPLIER_EXIT por mes en curso (rango configurable)
+        rows = rows.filter(r => {
+            if (r.status !== 'SUPPLIER_EXIT') return true;
+            const exitDate = r.supplier_exit_at?.slice(0, 10);
+            if (!exitDate) return true;
+            if (supplierExitDateFrom && exitDate < supplierExitDateFrom) return false;
+            if (supplierExitDateTo && exitDate > supplierExitDateTo) return false;
+            return true;
+        });
+        return rows;
+    }, [trackingReturns, seguimientoSearch, supplierExitDateFrom, supplierExitDateTo]);
 
 
     return (
@@ -1096,22 +1070,6 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                 </div>
                             </div>
 
-                            {/* Buscador */}
-                            {concilPending.length > 0 && (
-                                <div className="bg-white border border-slate-200 rounded-2xl p-3">
-                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2">Buscar</p>
-                                    <div className="relative">
-                                        <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                        <input
-                                            value={concilSearch}
-                                            onChange={e => setConcilSearch(e.target.value)}
-                                            placeholder="Buscar por factura, cliente, planilla, placa…"
-                                            className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] outline-none focus:bg-white focus:border-indigo-400 transition-colors"
-                                        />
-                                    </div>
-                                </div>
-                            )}
-
                             {/* Acciones */}
                             {concilPending.length > 0 && (
                                 <div className="flex items-center gap-3 flex-wrap">
@@ -1138,145 +1096,122 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                 </div>
                             )}
 
-                            {/* Tabla */}
-                            {concilLoading ? (
-                                <div className="flex justify-center py-20"><Icons.Loader className="w-6 h-6 text-slate-400 animate-spin" /></div>
-                            ) : displayedConcilPending.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-20 text-center">
-                                    <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mb-3">
-                                        <Icons.CheckCircle className="w-6 h-6 text-emerald-400" />
-                                    </div>
-                                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                                        {concilSearch ? 'Sin resultados para la búsqueda' : 'Todo registrado — sin pendientes de conciliación'}
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
-                                    <table className="w-full text-[10px]">
-                                        <thead>
-                                            <tr className="bg-slate-50 border-b border-slate-200">
-                                                <th className="px-3 py-2 w-8">
-                                                    <input type="checkbox"
-                                                        checked={selectedConcilIds.size > 0 && displayedConcilPending.every(i => selectedConcilIds.has(i.invoice_id))}
-                                                        onChange={e => setSelectedConcilIds(e.target.checked ? new Set(displayedConcilPending.map(i => i.invoice_id)) : new Set())}
-                                                        className="rounded" />
-                                                </th>
-                                                <SortTh label="Factura" sortKey="invoice_id" activeKey={concilSortKey} dir={concilSortDir} onSort={handleConcilSort} className="text-[8px]" />
-                                                <SortTh label="Cliente" sortKey="customer_name" activeKey={concilSortKey} dir={concilSortDir} onSort={handleConcilSort} className="text-[8px]" />
-                                                <SortTh label="Planilla" sortKey="numero_planilla" activeKey={concilSortKey} dir={concilSortDir} onSort={handleConcilSort} className="text-[8px]" />
-                                                <SortTh label="Placa" sortKey="vehicle_plate" activeKey={concilSortKey} dir={concilSortDir} onSort={handleConcilSort} className="text-[8px]" />
-                                                <SortTh label="Fecha" sortKey="fecha_placa" activeKey={concilSortKey} dir={concilSortDir} onSort={handleConcilSort} className="text-[8px]" />
-                                                <SortTh label="Plan" sortKey="plan_type" activeKey={concilSortKey} dir={concilSortDir} onSort={handleConcilSort} className="text-[8px]" />
-                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Art.</th>
-                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Tipo</th>
-                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Vendedor <span className="text-rose-500">*</span></th>
-                                                <th className="px-3 py-2 text-left font-black text-slate-500 uppercase tracking-widest text-[8px]">Motivo <span className="text-rose-500">*</span></th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {displayedConcilPending.map(inv => {
-                                                const sel = selectedConcilIds.has(inv.invoice_id);
-                                                return (
-                                                    <tr key={inv.invoice_id}
-                                                        onClick={() => setSelectedConcilIds(prev => {
-                                                            const n = new Set(prev);
-                                                            n.has(inv.invoice_id) ? n.delete(inv.invoice_id) : n.add(inv.invoice_id);
-                                                            return n;
-                                                        })}
-                                                        className={`cursor-pointer transition-colors ${sel ? 'bg-emerald-50' : 'hover:bg-slate-50/70'}`}>
-                                                        <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
-                                                            <input type="checkbox" checked={sel}
-                                                                onChange={() => setSelectedConcilIds(prev => {
-                                                                    const n = new Set(prev);
-                                                                    n.has(inv.invoice_id) ? n.delete(inv.invoice_id) : n.add(inv.invoice_id);
-                                                                    return n;
-                                                                })}
-                                                                className="rounded" />
-                                                        </td>
-                                                        <td className="px-3 py-2 font-black text-slate-800 text-[10px]">{inv.invoice_id}</td>
-                                                        <td className="px-3 py-2 text-slate-600 max-w-[130px] truncate text-[10px]" title={inv.customer_name}>{inv.customer_name ?? '—'}</td>
-                                                        <td className="px-3 py-2 text-slate-500 text-[10px]">{inv.numero_planilla ?? '—'}</td>
-                                                        <td className="px-3 py-2 text-slate-500 text-[10px]">{inv.vehicle_plate ?? '—'}</td>
-                                                        <td className="px-3 py-2 text-slate-500 whitespace-nowrap text-[10px]">{inv.fecha_placa ?? '—'}</td>
-                                                        <td className="px-3 py-2">
-                                                            {inv.plan_type && (
-                                                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-lg uppercase ${inv.plan_type.includes('R') ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>
-                                                                    {inv.plan_type}
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="px-3 py-2">
-                                                            <div className="flex flex-col gap-1 max-w-[150px]">
-                                                                {inv.items.map((it, i) => (
-                                                                    <div key={i} className="flex items-center justify-between gap-2 border-b border-slate-100 last:border-0 pb-0.5 last:pb-0 font-mono text-[9px]">
-                                                                        <span className="text-slate-600 font-bold truncate" title={it.article_name || it.article_id}>{it.article_id}</span>
-                                                                        <span className="text-indigo-600 font-black shrink-0">{it.quantity_returned} <span className="text-slate-400 font-normal text-[8px]">{it.unit || 'und'}</span></span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                        </td>
-                                                        {/* Tipo COMPLETA/PARCIAL */}
-                                                        <td className="px-2 py-2" onClick={e => e.stopPropagation()}>
-                                                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-lg uppercase whitespace-nowrap
-                                                                ${inv.return_type === 'COMPLETA' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
-                                                                {inv.return_type === 'COMPLETA' ? 'Completa' : 'Parcial'}
-                                                            </span>
-                                                        </td>
-                                                        {/* Vendedor */}
-                                                        <td className="px-2 py-2 min-w-[90px]" onClick={e => e.stopPropagation()}>
-                                                            <input
-                                                                type="text"
-                                                                placeholder="Cód. vendedor"
-                                                                value={concilExtras[inv.invoice_id]?.vendedor ?? ''}
-                                                                onChange={e => setConcilExtra(inv.invoice_id, 'vendedor', e.target.value)}
-                                                                className="w-full text-[9px] px-2 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
-                                                            />
-                                                        </td>
-                                                        {/* Motivo */}
-                                                        <td className="px-2 py-2 min-w-[150px]" onClick={e => e.stopPropagation()}>
-                                                            {concilOtroMode.has(inv.invoice_id) ? (
-                                                                <div className="flex gap-1">
-                                                                    <input
-                                                                        autoFocus
-                                                                        type="text"
-                                                                        placeholder="Escribir motivo..."
-                                                                        value={concilOtroText[inv.invoice_id] ?? ''}
-                                                                        onChange={e => setConcilOtroText(prev => ({ ...prev, [inv.invoice_id]: e.target.value }))}
-                                                                        onKeyDown={e => { if (e.key === 'Enter') confirmConcilOtro(inv.invoice_id); if (e.key === 'Escape') setConcilOtroMode(prev => { const n = new Set(prev); n.delete(inv.invoice_id); return n; }); }}
-                                                                        className="flex-1 text-[9px] px-2 py-1 border border-indigo-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white"
-                                                                    />
-                                                                    <button onClick={() => confirmConcilOtro(inv.invoice_id)}
-                                                                        className="text-[8px] px-1.5 py-1 bg-indigo-600 text-white rounded-lg font-black">✓</button>
-                                                                    <button onClick={() => setConcilOtroMode(prev => { const n = new Set(prev); n.delete(inv.invoice_id); return n; })}
-                                                                        className="text-[8px] px-1.5 py-1 bg-slate-200 text-slate-600 rounded-lg font-black">✕</button>
-                                                                </div>
-                                                            ) : (
-                                                                <select
-                                                                    value={concilExtras[inv.invoice_id]?.return_reason ?? ''}
-                                                                    onChange={e => {
-                                                                        if (e.target.value === '__otro__') {
-                                                                            setConcilOtroMode(prev => new Set([...prev, inv.invoice_id]));
-                                                                            setConcilOtroText(prev => ({ ...prev, [inv.invoice_id]: '' }));
-                                                                        } else {
-                                                                            setConcilExtra(inv.invoice_id, 'return_reason', e.target.value);
-                                                                        }
-                                                                    }}
-                                                                    className="w-full text-[9px] px-2 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white">
-                                                                    <option value="">— Seleccionar —</option>
-                                                                    {reasonOptions.map((r: ReturnReasonOption) => (
-                                                                        <option key={r.id} value={r.name}>{r.name}</option>
-                                                                    ))}
-                                                                    <option value="__otro__">➕ Otro (crear nuevo)...</option>
-                                                                </select>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
+                            {/* Tabla via DataTable */}
+                            <DataTable<ConcilPendingInvoice>
+                                data={concilPending}
+                                loading={concilLoading}
+                                searchPlaceholder="Buscar por factura, cliente, planilla, placa…"
+                                columns={[
+                                    {
+                                        header: '',
+                                        key: 'invoice_id',
+                                        sortable: false,
+                                        render: (inv: ConcilPendingInvoice) => (
+                                            <input type="checkbox"
+                                                checked={selectedConcilIds.has(inv.invoice_id)}
+                                                onChange={() => setSelectedConcilIds(prev => {
+                                                    const n = new Set(prev);
+                                                    n.has(inv.invoice_id) ? n.delete(inv.invoice_id) : n.add(inv.invoice_id);
+                                                    return n;
+                                                })}
+                                                onClick={e => e.stopPropagation()}
+                                                className="rounded accent-emerald-600 cursor-pointer"
+                                            />
+                                        ),
+                                    },
+                                    {
+                                        header: 'Factura', key: 'invoice_id', sortable: true, noWrap: true,
+                                        render: (inv: ConcilPendingInvoice) => <span className="font-black text-slate-900 font-mono">{inv.invoice_id}</span>,
+                                    },
+                                    {
+                                        header: 'Cliente', key: 'customer_name', sortable: true,
+                                        render: (inv: ConcilPendingInvoice) => (
+                                            <span title={inv.customer_name ?? ''}>{inv.customer_name ?? '—'}</span>
+                                        ),
+                                    },
+                                    { header: 'Planilla', key: 'numero_planilla', sortable: true },
+                                    { header: 'Placa', key: 'vehicle_plate', sortable: true, noWrap: true },
+                                    { header: 'Fecha', key: 'fecha_placa', sortable: true, noWrap: true },
+                                    {
+                                        header: 'Plan', key: 'plan_type', sortable: true,
+                                        render: (inv: ConcilPendingInvoice) => inv.plan_type ? (
+                                            <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-lg uppercase ${inv.plan_type.includes('R') ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                {inv.plan_type}
+                                            </span>
+                                        ) : <span className="text-slate-300">—</span>,
+                                    },
+                                    {
+                                        header: 'Art.', key: 'items' as keyof ConcilPendingInvoice, sortable: false,
+                                        render: (inv: ConcilPendingInvoice) => (
+                                            <div className="flex flex-col gap-0.5 max-w-[150px]">
+                                                {inv.items.map((it, i) => (
+                                                    <div key={i} className="flex items-center justify-between gap-2 font-mono text-[9px]">
+                                                        <span className="text-slate-600 font-bold truncate" title={it.article_name || it.article_id}>{it.article_id}</span>
+                                                        <span className="text-indigo-600 font-black shrink-0">{it.quantity_returned} <span className="text-slate-400 font-normal">{it.unit || 'und'}</span></span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ),
+                                    },
+                                    {
+                                        header: 'Tipo', key: 'return_type', sortable: true,
+                                        render: (inv: ConcilPendingInvoice) => (
+                                            <span className={`text-[8px] font-black px-2 py-0.5 rounded-lg uppercase whitespace-nowrap
+                                                ${inv.return_type === 'COMPLETA' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                {inv.return_type === 'COMPLETA' ? 'Completa' : 'Parcial'}
+                                            </span>
+                                        ),
+                                    },
+                                    {
+                                        header: 'Vendedor *', key: 'invoice_id' as keyof ConcilPendingInvoice, sortable: false,
+                                        render: (inv: ConcilPendingInvoice) => (
+                                            <input
+                                                type="text"
+                                                placeholder="Cód. vendedor"
+                                                value={concilExtras[inv.invoice_id]?.vendedor ?? ''}
+                                                onChange={e => setConcilExtra(inv.invoice_id, 'vendedor', e.target.value)}
+                                                onClick={e => e.stopPropagation()}
+                                                className="w-full text-[9px] px-2 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white min-w-[80px]"
+                                            />
+                                        ),
+                                    },
+                                    {
+                                        header: 'Motivo *', key: 'invoice_id' as keyof ConcilPendingInvoice, sortable: false,
+                                        render: (inv: ConcilPendingInvoice) => concilOtroMode.has(inv.invoice_id) ? (
+                                            <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                                                <input autoFocus type="text"
+                                                    placeholder="Escribir motivo..."
+                                                    value={concilOtroText[inv.invoice_id] ?? ''}
+                                                    onChange={e => setConcilOtroText(prev => ({ ...prev, [inv.invoice_id]: e.target.value }))}
+                                                    onKeyDown={e => { if (e.key === 'Enter') confirmConcilOtro(inv.invoice_id); if (e.key === 'Escape') setConcilOtroMode(prev => { const n = new Set(prev); n.delete(inv.invoice_id); return n; }); }}
+                                                    className="flex-1 text-[9px] px-2 py-1 border border-indigo-300 rounded-lg focus:outline-none min-w-[100px]"
+                                                />
+                                                <button onClick={() => confirmConcilOtro(inv.invoice_id)} className="text-[8px] px-1.5 py-1 bg-indigo-600 text-white rounded-lg font-black">✓</button>
+                                                <button onClick={() => setConcilOtroMode(prev => { const n = new Set(prev); n.delete(inv.invoice_id); return n; })} className="text-[8px] px-1.5 py-1 bg-slate-200 text-slate-600 rounded-lg font-black">✕</button>
+                                            </div>
+                                        ) : (
+                                            <select
+                                                value={concilExtras[inv.invoice_id]?.return_reason ?? ''}
+                                                onChange={e => {
+                                                    if (e.target.value === '__otro__') {
+                                                        setConcilOtroMode(prev => new Set([...prev, inv.invoice_id]));
+                                                        setConcilOtroText(prev => ({ ...prev, [inv.invoice_id]: '' }));
+                                                    } else {
+                                                        setConcilExtra(inv.invoice_id, 'return_reason', e.target.value);
+                                                    }
+                                                }}
+                                                onClick={e => e.stopPropagation()}
+                                                className="w-full text-[9px] px-2 py-1 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 bg-white min-w-[120px]">
+                                                <option value="">— Seleccionar —</option>
+                                                {reasonOptions.map((r: ReturnReasonOption) => (
+                                                    <option key={r.id} value={r.name}>{r.name}</option>
+                                                ))}
+                                                <option value="__otro__">➕ Otro (crear nuevo)...</option>
+                                            </select>
+                                        ),
+                                    },
+                                ]}
+                            />
                         </div>
                     )}
 
@@ -1284,9 +1219,9 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                         TAB: SEGUIMIENTO
                     ══════════════════════════════════════════════════════════ */}
                     {tab === 'seguimiento' && (() => {
-                        type Stage = { status: string; label: string; color: string; nextStatus?: string; actionLabel?: string; isPreApproval?: boolean };
+                        type Stage = { status: string; label: string; color: string; nextStatus?: string; actionLabel?: string; isPreApproval?: boolean; isFacturacion?: boolean };
                         const stages: Stage[] = [
-                            { status: 'PENDING',       label: 'Pendiente confirmación facturación',     color: 'amber' },
+                            { status: 'PENDING',       label: 'Pendiente confirmación facturación',     color: 'amber',   nextStatus: 'CONFIRMED',    actionLabel: 'Confirmar facturación', isFacturacion: true },
                             { status: 'CONFIRMED',     label: 'Confirmadas — enviar pre-aprobación',    color: 'emerald', nextStatus: 'PRE_APPROVAL', actionLabel: 'Enviar Pre-Aprobación', isPreApproval: true },
                             { status: 'PRE_APPROVAL',  label: 'Excel enviado — pendiente proveedor',    color: 'indigo',  nextStatus: 'PRE_APPROVED', actionLabel: 'Confirmar aprobación prov.' },
                             { status: 'PRE_APPROVED',  label: 'Aprobado proveedor — pendiente salida',  color: 'sky',     nextStatus: 'SUPPLIER_EXIT',actionLabel: 'Confirmar salida' },
@@ -1301,6 +1236,7 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                             violet:  'bg-violet-50 border-violet-200 text-violet-800',
                         };
                         const btnColor: Record<string,string> = {
+                            amber:   'bg-amber-500 hover:bg-amber-600',
                             emerald: 'bg-emerald-600 hover:bg-emerald-700',
                             indigo:  'bg-indigo-600 hover:bg-indigo-700',
                             sky:     'bg-sky-600 hover:bg-sky-700',
@@ -1485,15 +1421,47 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                                     {stage.nextStatus && sel.length > 0 && (
                                                         <button
                                                             disabled={advancingId === -1}
-                                                            onClick={() => stage.isPreApproval
-                                                                ? handleSendPreApproval(sel)
-                                                                : handleAdvanceBatch(sel.map(r => r.id), stage.nextStatus!, stage.actionLabel!)}
+                                                            onClick={() => stage.isFacturacion
+                                                                ? handleConfirmFacturacionBatch(sel)
+                                                                : stage.isPreApproval
+                                                                    ? handleSendPreApproval(sel)
+                                                                    : handleAdvanceBatch(sel.map(r => r.id), stage.nextStatus!, stage.actionLabel!)}
                                                             className={`flex items-center gap-1.5 px-3 py-1.5 text-white text-[9px] font-black uppercase tracking-widest rounded-xl disabled:opacity-50 ${btnColor[stage.color]}`}>
-                                                            {advancingId === -1 ? <Icons.Loader className="w-3 h-3 animate-spin" /> : <>{stage.actionLabel} ({sel.length})</>}
+                                                            {advancingId === -1
+                                                                ? <Icons.Loader className="w-3 h-3 animate-spin" />
+                                                                : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7"/></svg>{stage.actionLabel} ({sel.length})</>}
                                                         </button>
                                                     )}
                                                 </div>
                                             </div>
+
+                                            {/* Filtros de fecha — solo en SUPPLIER_EXIT */}
+                                            {stage.status === 'SUPPLIER_EXIT' && (
+                                                <div className="flex items-center gap-3 px-4 py-2 bg-violet-50/60 border-b border-violet-100">
+                                                    <span className="text-[8px] font-black text-violet-600 uppercase tracking-widest shrink-0">Filtrar por fecha de salida</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-[8px] text-violet-500 font-bold">Desde</label>
+                                                        <input type="date" value={supplierExitDateFrom}
+                                                            onChange={e => setSupplierExitDateFrom(e.target.value)}
+                                                            className="border border-violet-200 rounded-lg px-2 py-1 text-[10px] bg-white focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="text-[8px] text-violet-500 font-bold">Hasta</label>
+                                                        <input type="date" value={supplierExitDateTo}
+                                                            onChange={e => setSupplierExitDateTo(e.target.value)}
+                                                            className="border border-violet-200 rounded-lg px-2 py-1 text-[10px] bg-white focus:outline-none focus:ring-1 focus:ring-violet-400" />
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            const n = new Date();
+                                                            setSupplierExitDateFrom(`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-01`);
+                                                            setSupplierExitDateTo(new Date(n.getFullYear(), n.getMonth()+1, 0).toISOString().slice(0,10));
+                                                        }}
+                                                        className="text-[8px] px-2 py-1 bg-violet-100 hover:bg-violet-200 text-violet-700 font-black rounded-lg uppercase tracking-widest transition-colors">
+                                                        Mes actual
+                                                    </button>
+                                                </div>
+                                            )}
 
                                             {/* Tabla via DataTable */}
                                             <DataTable<TrackingReturn>
