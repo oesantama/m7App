@@ -104,6 +104,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     // Rutas locales para la fecha+cliente seleccionados — reemplaza el prop cuando hay selección explícita
     const [localRoutes, setLocalRoutes] = useState<any[] | null>(null);
     const [isFetchingRoutes, setIsFetchingRoutes] = useState(false);
+    const [refreshCounter, setRefreshCounter] = useState(0);
 
     useEffect(() => {
         if (!filterDate) { setLocalRoutes(null); return; }
@@ -198,7 +199,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [loadingPendingInvoices, setLoadingPendingInvoices] = useState(false);
     const [assignInvoiceSearch, setAssignInvoiceSearch] = useState('');
     const [isAssigningInvoice, setIsAssigningInvoice] = useState(false);
-    const [refreshCounter, setRefreshCounter] = useState(0);
 
     const handleRefresh = () => {
         routeInvoicesCache.current.clear();
