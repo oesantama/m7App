@@ -287,29 +287,34 @@ export const syncInventory = async (req: Request, res: Response) => {
         [docId, artId, inv]
       );
 
+      const scannedUnit = (item.unit && String(item.unit).trim() !== '' && String(item.unit).trim() !== '0') ? String(item.unit).trim().toUpperCase() : null;
+
       if (checkItem.rowCount && checkItem.rowCount > 0) {
         await client.query(`
           UPDATE document_items SET
-            notes = $1, batch = $2, count_1 = $3, count_2 = $4
+            notes = $1, batch = $2, count_1 = $3, count_2 = $4,
+            unit = COALESCE($6, unit)
           WHERE id = $5
         `, [
           item.inventoryNote || item.notes || '',
           item.batch || 'S/L',
           Number(item.count1 || 0),
           Number(item.count2 || item.countedQty || 0),
-          checkItem.rows[0].id
+          checkItem.rows[0].id,
+          scannedUnit
         ]);
       } else {
         await client.query(`
-          INSERT INTO document_items (document_id, article_id, notes, batch, count_1, count_2, expected_qty, invoice)
-          VALUES ($1, $2, $3, $4, $5, $6, 0, $7)
+          INSERT INTO document_items (document_id, article_id, notes, batch, count_1, count_2, expected_qty, invoice, unit)
+          VALUES ($1, $2, $3, $4, $5, $6, 0, $7, COALESCE($8, 'UND'))
         `, [
           docId, artId,
           item.inventoryNote || item.notes || '',
           item.batch || 'S/L',
           Number(item.count1 || 0),
           Number(item.count2 || item.countedQty || 0),
-          inv
+          inv,
+          scannedUnit
         ]);
       }
     }

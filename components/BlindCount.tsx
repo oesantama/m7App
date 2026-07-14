@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { Icons } from '../constants';
 import { toast } from 'sonner';
 import { Article, DocumentL, DocumentLItem, MasterRecord, DocStatus, User } from '../types';
-import { cleanSkuM7 } from '../utils/scanner';
+import { cleanSkuM7, extractUnitFromBarcode } from '../utils/scanner';
 
 interface BlindCountProps {
   document: DocumentL;
@@ -74,6 +74,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
     });
     return initial;
   });
+
+  const [scannedUnits, setScannedUnits] = useState<Record<string, string>>({});
 
   const [count1Data, setCount1Data] = useState<{ [articleId: string]: number }>(() => {
     const initial: { [id: string]: number } = {};
@@ -227,6 +229,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
         count1: count1Data[it.articleId] || 0,
         count2: counts[it.articleId] || 0,
         inventoryNote: itemObservations[it.articleId] || '',
+        unit: scannedUnits[it.articleId] || it.unit,
       }));
 
       try {
@@ -390,7 +393,13 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
     if (itemInDoc) {
         const targetId = itemInDoc.articleId;
-        
+
+        // Capturar unidad de medida embebida en el código (campo 2: SKU>UNIDAD>CANT>LOTE)
+        const detectedUnit = extractUnitFromBarcode(rawCode);
+        if (detectedUnit) {
+          setScannedUnits(prev => ({ ...prev, [targetId]: detectedUnit }));
+        }
+
         setCounts(prev => {
           const newQty = (Number(prev[targetId]) || 0) + 1;
           setLastScan({
@@ -404,9 +413,9 @@ const BlindCount: React.FC<BlindCountProps> = ({
         });
         setLastScannedAt(prev => ({ ...prev, [targetId]: Date.now() }));
         handleBingoEffects();
-        setCurrentPage(1); 
-        setScanInput(''); 
-        return; 
+        setCurrentPage(1);
+        setScanInput('');
+        return;
     }
 
     // === 2. HEURÍSTICA M7 V10 (Descomposición Inteligente en Vuelo) ===
@@ -617,9 +626,9 @@ const BlindCount: React.FC<BlindCountProps> = ({
       processingTimer.current = null;
     }
 
-    // PDF417 Ajover: el ':' indica que la ráfaga llegó completa → procesar AHORA, sin esperar Enter.
+    // PDF417 Ajover: separador en el código indica que la ráfaga llegó completa → procesar AHORA, sin esperar Enter.
     // Esto evita que el Enter del scanner dispare handleScan DESPUÉS del timer (doble-add).
-    if (val.includes(':') && val.length >= 5) {
+    if (val.length >= 5 && /[:Ñ><\?]/.test(val)) {
       enqueueScan(val);
       setScanInput('');
       return;
@@ -988,7 +997,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
       count1: count1Data[it.articleId] || 0,
       count2: counts[it.articleId] || 0,
       inventoryNote: itemObservations[it.articleId] || '',
-      status: (counts[it.articleId] || 0) === it.expectedQty ? 'Matches' : 'Mismatch'
+      status: (counts[it.articleId] || 0) === it.expectedQty ? 'Matches' : 'Mismatch',
+      unit: scannedUnits[it.articleId] || it.unit,
     }));
 
     try {

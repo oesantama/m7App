@@ -12,11 +12,14 @@
  *  - 1D barcodes:     codigo limpio sin separadores
  */
 
-/** Detecta el separador de campo del código de barras (: o Ñ) */
-export const detectBarcodeSep = (raw: string): ':' | 'Ñ' | null => {
+/** Detecta el separador de campo del código de barras (: Ñ > < ?) */
+export const detectBarcodeSep = (raw: string): ':' | 'Ñ' | '>' | '<' | '?' | null => {
   const up = raw.toUpperCase();
   if (up.includes('Ñ')) return 'Ñ';
   if (up.includes(':')) return ':';
+  if (up.includes('>')) return '>';
+  if (up.includes('<')) return '<';
+  if (up.includes('?')) return '?';
   return null;
 };
 
@@ -34,6 +37,25 @@ export const extractQtyFromBarcode = (raw: string): number => {
   return found ? Number(found) : 1;
 };
 
+/**
+ * Extrae la unidad de medida embebida en el código de barras (campo 2, después del SKU).
+ * Formato: SKU<sep>UNIDAD<sep>CANTIDAD<sep>LOTE<sep>...
+ * Ej: D403199>BL>1>A010236539 → 'BL'
+ * Retorna null si no hay separador o el campo no parece una unidad válida.
+ */
+export const extractUnitFromBarcode = (raw: string): string | null => {
+  const sep = detectBarcodeSep(raw);
+  if (!sep) return null;
+  const parts = raw.toUpperCase().split(sep).map(p => p.trim());
+  if (parts.length < 2) return null;
+  const candidate = parts[1];
+  // Unidad válida: texto alfabético corto (1-6 chars), sin números
+  if (candidate.length >= 1 && candidate.length <= 6 && /^[A-Z]+$/.test(candidate)) {
+    return candidate;
+  }
+  return null;
+};
+
 export const cleanSkuM7 = (raw: string): string => {
   if (!raw) return '';
 
@@ -49,13 +71,13 @@ export const cleanSkuM7 = (raw: string): string => {
     }
   }
 
-  // 2. PDF417 Ajover / Composite Barcodes: SKU es la parte ANTES del primer separador (':' o 'Ñ')
+  // 2. PDF417 Ajover / Composite Barcodes: SKU es la parte ANTES del primer separador
+  // Separadores soportados: : Ñ > < ?
   // Condicion: parte izquierda >= 3 chars para evitar falsos positivos
-  const separatorMatch = code.match(/[:Ñ]/);
+  const separatorMatch = code.match(/[:Ñ><\?]/);
   if (separatorMatch) {
     const idx = separatorMatch.index!;
     const left = code.substring(0, idx);
-    const right = code.substring(idx + 1);
     if (left.length >= 3) {
       code = left;
     }
@@ -69,7 +91,7 @@ export const cleanSkuM7 = (raw: string): string => {
   code = code.replace(/[\t\n]/g, '');
 
   // 5. Eliminar separadores al final
-  code = code.replace(/[:Ñ]+$/, '');
+  code = code.replace(/[:Ñ><\?]+$/, '');
 
   return code.trim();
 };
