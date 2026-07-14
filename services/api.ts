@@ -1562,6 +1562,8 @@ export const api = {
   // --- DASHBOARD & INTELLIGENCE ---
   getDashboardStats: (period: string) => fetchJson(`${API_URL}/dashboard/stats?period=${period}`),
   getDemandPrediction: () => fetchJson(`${API_URL}/dashboard/prediction`),
+  getGerenciaDashboard: (dateFrom: string, dateTo: string) =>
+    fetchJson(`${API_URL}/dashboard/gerencia?dateFrom=${dateFrom}&dateTo=${dateTo}`),
 
   // Novedades de Inventario
   getNovedades: (docId: string) => fetchJson(`${API_URL}/inventory-news/${docId}`),
@@ -2219,5 +2221,34 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
+
+  // BASC Module API Endpoints
+  bascGetSyncStatus: () => fetchJson(`${API_URL}/basc/sync/status`),
+  bascGetSyncHistory: () => fetchJson(`${API_URL}/basc/sync/history`),
+  bascTriggerSync: () => fetchJson(`${API_URL}/basc/sync/trigger`, { method: 'POST' }),
+  bascChat: (prompt: string) => fetchJson(`${API_URL}/basc/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt })
+  }),
+  bascDownloadReport: async () => {
+    const token = localStorage.getItem('token') || 
+                 localStorage.getItem('m7_token') || 
+                 localStorage.getItem('m7_auth_token') || 
+                 localStorage.getItem('m7_client_token');
+    
+    const response = await fetch(`${API_URL}/basc/reports/download`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!response.ok) throw new Error('Error al descargar reporte BASC');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `BASC_Reporte_Cumplimiento.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  },
 
 };

@@ -320,24 +320,10 @@ export const initScheduler = () => {
 
     console.log('[M7-SCHEDULER] Tarea "Limpieza Novedades" programada: Diariamente 01:00 AM | Retención: 5 días hábiles (L-V)');
 
-    // Sincronización Automática de Drive a Planillas (Exito Línea Blanca CLI-09)
-    // Cron para recuperar el atraso procesando en bloques de a 15, cada 15 minutos.
-    cron.schedule('*/15 * * * *', async () => {
-        console.log('[M7-SCHEDULER] Ejecutando sincronización de Drive vs Planillas...');
-        await syncDriveCumplidos();
-    }, {
-        timezone: 'America/Bogota'
-    });
-
-    // Cron temporal: solo por hoy (23 de mayo) a las 17:40
-    cron.schedule('40 17 23 5 *', async () => {
-        console.log('[M7-SCHEDULER] Ejecutando sincronización temporal (Solo por hoy a las 17:40)...');
-        await syncDriveCumplidos();
-    }, {
-        timezone: 'America/Bogota'
-    });
-
-    console.log('[M7-SCHEDULER] Tarea "Sync Drive a Planillas" programada: Lunes a Sábado 09:00 AM y (Temporalmente) hoy a las 17:40 PM | Cliente: CLI-09');
+    // DESHABILITADO: Sync Drive Planillas CLI-09 consumía todos los tokens Gemini sin resolver errores.
+    // Activar manualmente solo cuando haya cuota disponible y se corrija el AI Orchestrator.
+    // cron.schedule('*/15 * * * *', async () => { await syncDriveCumplidos(); }, { timezone: 'America/Bogota' });
+    console.log('[M7-SCHEDULER] DESHABILITADO: Sync_Drive_Planillas_CLI09 (consumo excesivo de tokens Gemini)');
 
     // Facturación Pendiente General: Lunes a Sábado a las 10:00 AM
     cron.schedule('0 10 * * 1-6', async () => {

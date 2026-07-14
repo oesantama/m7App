@@ -69,6 +69,7 @@ import geoRoutes from './geo.routes.js';
 import alertasWhatsappRoutes from './alertas-whatsapp.routes.js';
 import validationRoutes from './validation.routes.js';
 import hojasVidaRoutes, { hvPublicRouter } from './hojas-vida.routes.js';
+import bascRoutes from './basc.routes.js';
 
 const router = Router();
 
@@ -142,6 +143,7 @@ router.use('/alertas-whatsapp', alertasWhatsappRoutes);
 router.use('/validation', validationRoutes);
 router.use('/hv', hojasVidaRoutes);
 router.use('/public/hv', hvPublicRouter);
+router.use('/basc', bascRoutes);
 
 // Endpoint seguro: devuelve la API key de Gemini del backend al frontend autenticado
 router.get('/config/gemini-key', (req: any, res) => {

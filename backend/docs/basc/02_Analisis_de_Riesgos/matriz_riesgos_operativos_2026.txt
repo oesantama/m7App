@@ -1,0 +1,4 @@
+MATRIZ DE RIESGOS SGCS BASC 2026
+Riesgo 1: Contaminación de carga en ruta nacional. Nivel de probabilidad: Medio. Impacto: Crítico.
+Mitigación: Inspección de 17 puntos al contenedor antes del alistamiento y precintos de seguridad certificados de alta resistencia (ISO 17712).
+Riesgo 2: Pérdida de integridad de los datos de despacho. Mitigación: Copia de seguridad en la nube y auditoría por logs de transacciones.

@@ -1,0 +1,5 @@
+MANUAL DE SEGURIDAD SGCS BASC V5 - ORBIT M7
+Este manual describe los procedimientos estándar de seguridad física y control de accesos para dar cumplimiento al estándar BASC.
+1. Política de Control de Accesos: Todo personal y visitante debe ser plenamente identificado antes de ingresar a las instalaciones.
+2. Responsabilidad de la Gerencia: La gerencia general liderará la mejora continua del SGCS.
+3. El oficial de cumplimiento auditará cada bimestre el cumplimiento de las normas de prevención de lavado de activos.

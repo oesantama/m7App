@@ -364,23 +364,47 @@ const GrupoInterView: React.FC = () => {
       setUploadProgress(0);
       setDebugLogs([]);
       setProcessingStatus("Iniciando escaneo de documentos...");
-      
+
+      let receivedFinalEvent = false;
+
+      // Timeout de seguridad: si no hay evento final en 5 minutos, desbloquear overlay
+      const safetyTimer = setTimeout(() => {
+        if (!receivedFinalEvent) {
+          setProcessingStatus('⏱️ Tiempo de espera agotado. El servidor tardó demasiado. Verifique los resultados manualmente.');
+          setIsFinished(true);
+          toast.error('El procesamiento tardó demasiado. Revise si los cumplidos fueron registrados.');
+        }
+      }, 5 * 60 * 1000);
+
       await api.processGrupoInterPDF(pdfFile, pdfPlanilla, (data) => {
         if (data.type === 'log') {
           setDebugLogs(prev => [...prev, data.message]);
           setProcessingStatus(data.message);
           if (data.progress) setUploadProgress(data.progress);
         } else if (data.type === 'end') {
+          receivedFinalEvent = true;
+          clearTimeout(safetyTimer);
           setUploadProgress(100);
           setProcessingStatus(`COMPLETADO: ${data.matches} COINCIDENCIAS.`);
-          setIsFinished(true); // Marcamos el fin del proceso
+          setIsFinished(true);
           toast.success(`Se encontraron ${data.matches} coincidencias.`);
         } else if (data.type === 'error') {
-          setProcessingStatus(`ERROR: ${data.message}`);
-          setIsFinished(true); // Muestra el botón de cerrar
+          receivedFinalEvent = true;
+          clearTimeout(safetyTimer);
+          setProcessingStatus(`❌ ${data.message}`);
+          setIsFinished(true);
           toast.error(data.message);
         }
       });
+
+      clearTimeout(safetyTimer);
+      // Si el stream terminó sin evento 'end' ni 'error', notificar al usuario
+      if (!receivedFinalEvent) {
+        setProcessingStatus('⚠️ El servidor cerró la conexión sin respuesta. Verifique los resultados manualmente.');
+        setIsFinished(true);
+        toast.error('El proceso terminó sin confirmación del servidor.');
+      }
+
       fetchOrders();
     } catch (error: any) {
       toast.error(error.message || 'Error al procesar PDF');

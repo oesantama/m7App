@@ -82,6 +82,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const lastScannedRef = useRef<HTMLDivElement | null>(null);
     const groupScanDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const autoConfirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const assignScanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const autoConfirmIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const [autoConfirmCountdown, setAutoConfirmCountdown] = useState<number | null>(null);
     const confirmDispatchRef = useRef<() => void>(() => {});
@@ -113,7 +114,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             .catch(() => { if (!cancelled) setLocalRoutes([]); })
             .finally(() => { if (!cancelled) setIsFetchingRoutes(false); });
         return () => { cancelled = true; };
-    }, [filterDate, internalClientId]);
+    }, [filterDate, internalClientId, refreshCounter]);
     const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
     const [isReassigningPlate, setIsReassigningPlate] = useState(false);
 
@@ -197,6 +198,14 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [loadingPendingInvoices, setLoadingPendingInvoices] = useState(false);
     const [assignInvoiceSearch, setAssignInvoiceSearch] = useState('');
     const [isAssigningInvoice, setIsAssigningInvoice] = useState(false);
+    const [refreshCounter, setRefreshCounter] = useState(0);
+
+    const handleRefresh = () => {
+        routeInvoicesCache.current.clear();
+        setRefreshCounter(prev => prev + 1);
+        onRefresh();
+    };
+
     const mapRef = useRef<L.Map | null>(null);
     const markersRef = useRef<{ [key: string]: L.Marker }>({});
     const routeLinesRef = useRef<{ [key: string]: L.Polyline }>({});
@@ -239,6 +248,16 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [historyTab, setHistoryTab] = useState<'ENTREGAS' | 'DEVOLUCIONES'>('ENTREGAS');
     const [historyData, setHistoryData] = useState<any[]>([]);
     const [historyLoading, setHistoryLoading] = useState(false);
+
+    useEffect(() => {
+        return () => {
+            if (assignScanTimeoutRef.current) {
+                clearTimeout(assignScanTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const showHistoryModalTemp = false; // keep layout alignment
     const [showHistoryModal, setShowHistoryModal] = useState(false);
     const [historyFilters, setHistoryFilters] = useState({
         invoiceId: '', documentL: '', driverId: '', vehicleId: '', dateFrom: '', dateTo: '', deliveryType: '', status: ''
@@ -830,8 +849,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             toast.success(`${ok} factura${ok > 1 ? 's' : ''} liberada${ok > 1 ? 's' : ''} correctamente`);
             setUnassignObs('');
             setSelectedInvoicesToRemove(new Set());
+            routeInvoicesCache.current.delete(showReassignModal.route.id);
             loadModalInvoices(showReassignModal.route.id);
-            onRefresh();
+            handleRefresh();
         }
         if (fail > 0) toast.error(`${fail} no se pudieron liberar`);
     };
@@ -862,8 +882,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             setRepiceDestino('MISMO');
             setRepiceVehicleId('');
             setRepiceVehicleSearch('');
+            routeInvoicesCache.current.delete(showReassignModal.route.id);
             loadModalInvoices(showReassignModal.route.id);
-            onRefresh();
+            handleRefresh();
         }
         if (fail > 0) toast.error(`${fail} no se pudieron procesar`);
     };
@@ -885,11 +906,13 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
 
             if (res.success) {
                 toast.success("Vehículo reasignado exitosamente. Se ha creado una nueva ruta.");
+                const routeId = showReassignModal.route.id;
                 setShowReassignModal({ isOpen: false, route: null });
                 setReassignData({ newVehicleId: '', observations: '' });
                 setVehicleSearch('');
                 setVehicleDropOpen(false);
-                onRefresh();
+                routeInvoicesCache.current.delete(routeId);
+                handleRefresh();
             } else {
                 toast.error(res.error || "Error al reasignar vehículo");
             }
@@ -931,11 +954,27 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             setPendingInvoices(prev => prev.filter(inv =>
                 String(inv.invoiceNumber || inv.id).trim() !== String(invoiceId).trim()
             ));
+            routeInvoicesCache.current.delete(showReassignModal.route.id);
+            handleRefresh();
         } catch (err: any) {
             console.error('[ASSIGN-INVOICE-ERR]', err);
             toast.error(err.message || 'Error al asignar factura');
         } finally {
             setIsAssigningInvoice(false);
+        }
+    };
+
+    const processScannedInvoiceForAssignment = (invoiceNum: string) => {
+        const match = pendingInvoices.find((inv: any) => 
+            String(inv.invoiceNumber || inv.id || inv.invoice_number || inv.invoice_id || '').toUpperCase().trim() === invoiceNum
+        );
+        if (match) {
+            const targetId = match.id || match.invoice_id || match.invoiceNumber || match.invoice_number;
+            handleAssignInvoice(targetId);
+            setAssignInvoiceSearch('');
+        } else {
+            setAssignInvoiceSearch(invoiceNum);
+            toast.error(`Factura ${invoiceNum} no encontrada en facturas disponibles`);
         }
     };
 
@@ -1346,21 +1385,24 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         }
     }, [(selectedActiveRoute as any)?.id]);
 
-    // Sincronizar invoice_ids cuando activeRoutes se actualiza (ej: nuevas facturas asignadas externamente)
-    // NO cambia selectedActiveRoute (evita re-renders) — solo recarga facturas si cambió la lista de IDs
+    // Sincronizar activeRoute cuando activeRoutes o localRoutes cambian (ej: reasignación de placa o facturas)
     useEffect(() => {
         if (!selectedActiveRoute) return;
-        const freshRoute = activeRoutes.find((r: any) => r.id === (selectedActiveRoute as any).id);
+        const routesSource = localRoutes ?? activeRoutes;
+        const freshRoute = routesSource.find((r: any) => r.id === (selectedActiveRoute as any).id);
         if (!freshRoute) return;
+
+        const plateChanged = (freshRoute.plate || (freshRoute as any).vehicle_id) !== (selectedActiveRoute.plate || (selectedActiveRoute as any).vehicle_id);
+        const driverChanged = freshRoute.driver_id !== selectedActiveRoute.driver_id;
         const oldCount = ((selectedActiveRoute as any).invoice_ids || []).length;
         const newCount = ((freshRoute as any).invoice_ids || []).length;
-        if (newCount !== oldCount) {
+
+        if (newCount !== oldCount || plateChanged || driverChanged) {
             routeInvoicesCache.current.delete((freshRoute as any).id);
-            // Actualizar SOLO el campo invoice_ids en selectedActiveRoute para que el siguiente fetch traiga todos
-            setSelectedActiveRoute((prev: any) => prev ? { ...prev, invoice_ids: (freshRoute as any).invoice_ids } : prev);
+            setSelectedActiveRoute(freshRoute);
             loadRouteInvoicesData(freshRoute, setRouteInvoices, false);
         }
-    }, [activeRoutes]);
+    }, [activeRoutes, localRoutes]);
 
     // Persistir escaneado en localStorage mientras el usuario escanea
     useEffect(() => {
@@ -1709,7 +1751,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                 routeInvoicesCache.current.delete(selectedActiveRoute.id);
                 // Conservar panel abierto y refrescar — el usuario ve el estado actualizado
                 loadRouteInvoicesData(selectedActiveRoute, setRouteInvoices, false);
-                onRefresh();
+                handleRefresh();
             } finally {
                 setIsGroupDispatching(false);
             }
@@ -1913,7 +1955,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     loadRouteInvoicesData(selectedActiveRoute, setRouteInvoices, false);
                 }
                 // Refrescar contadores de ruta en el panel lateral
-                onRefresh();
+                handleRefresh();
             }
         } catch (e: any) { toast.error(e.message); } finally { setIsValidating(false); }
     };
@@ -1952,7 +1994,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         setInvoiceAllPending(prev => ({ ...prev, [invKey]: Array.isArray(fresh) ? fresh : [] }));
                     } catch {}
                 }
-                onRefresh();
+                if (selectedActiveRoute) {
+                    routeInvoicesCache.current.delete(selectedActiveRoute.id);
+                }
+                handleRefresh();
             }
         } catch (e: any) { toast.error(e.message); } finally { setIsValidating(false); }
     };
@@ -2004,7 +2049,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         : i
                 ));
                 setDeliveryModal(null);
-                onRefresh();
+                if (route?.id) {
+                    routeInvoicesCache.current.delete(route.id);
+                }
+                handleRefresh();
             }
         } catch (e: any) {
             toast.error(e.message || 'Error al confirmar entrega');
@@ -2121,7 +2169,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                     <button
                         onClick={() => {
                             fetchLocations();
-                            onRefresh();
+                            handleRefresh();
                             // Re-fetch rutas con la selección actual
                             if (filterDate) {
                                 api.getRoutes({ date: filterDate, ...(internalClientId ? { clientId: internalClientId } : {}) })
@@ -2197,7 +2245,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                         <div className="flex items-center justify-between mb-2 px-1">
                             <h3 className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Unidades en Ruta</h3>
                             <button
-                                onClick={onRefresh}
+                                onClick={handleRefresh}
                                 title="Refrescar información"
                                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-600 text-[8px] font-black uppercase tracking-widest transition-all active:scale-95">
                                 <Icons.RotateCcw className="w-3 h-3" />
@@ -2770,7 +2818,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                             loadRouteInvoicesData(currentFresh, setRouteInvoices, false);
                                             // Paso 2: pedir al padre que actualice activeRoutes (puede haber nuevas facturas asignadas)
                                             // El useEffect [activeRoutes] detectará el cambio en invoice_ids y re-cargará si hay nuevas
-                                            onRefresh();
+                                            handleRefresh();
                                         }}
                                         className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-1 hover:bg-slate-200 transition-all shrink-0"
                                         title="Re-consultar sin borrar escaneado"
@@ -3515,7 +3563,124 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                 className="flex-1 bg-transparent outline-none text-sm font-bold text-slate-900 placeholder:text-slate-400"
                                                 placeholder="Número de factura o cliente..."
                                                 value={assignInvoiceSearch}
-                                                onChange={e => setAssignInvoiceSearch(e.target.value)}
+                                                onPaste={(e) => {
+                                                    const pasted = e.clipboardData.getData('text');
+                                                    const scanMatch = pasted.match(/NumFac\w*[:\s=]+([A-Z0-9\-]+)/i);
+                                                    if (scanMatch) {
+                                                        e.preventDefault();
+                                                        const invoiceNum = scanMatch[1].toUpperCase();
+                                                        processScannedInvoiceForAssignment(invoiceNum);
+                                                        return;
+                                                    }
+
+                                                    // Multi-invoice split
+                                                    const tokens = pasted.split(/[\n\r\t]+/).map(t => t.trim().toUpperCase()).filter(t => t.length > 3);
+                                                    if (tokens.length > 1) {
+                                                        e.preventDefault();
+                                                        let added = 0; let notFound: string[] = [];
+                                                        for (const token of tokens) {
+                                                            const match = pendingInvoices.find((inv: any) =>
+                                                                String(inv.invoiceNumber || inv.id || inv.invoice_number || inv.invoice_id || '').toUpperCase().trim() === token
+                                                            );
+                                                            if (match) {
+                                                                const targetId = match.id || match.invoice_id || match.invoiceNumber || match.invoice_number;
+                                                                handleAssignInvoice(targetId);
+                                                                added++;
+                                                            } else {
+                                                                notFound.push(token);
+                                                            }
+                                                        }
+                                                        setAssignInvoiceSearch('');
+                                                        if (added > 0) toast.success(`${added} factura${added > 1 ? 's' : ''} asignada${added > 1 ? 's' : ''} a la ruta`);
+                                                        if (notFound.length > 0) toast.warning(`No encontradas: ${notFound.join(', ')}`, { duration: 6000 });
+                                                        return;
+                                                    }
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        const raw = assignInvoiceSearch.trim();
+                                                        if (!raw) return;
+                                                        const isScan = raw.length > 50 || /NumFac/i.test(raw);
+                                                        if (isScan) {
+                                                            e.preventDefault();
+                                                            if (assignScanTimeoutRef.current) {
+                                                                clearTimeout(assignScanTimeoutRef.current);
+                                                                assignScanTimeoutRef.current = null;
+                                                            }
+                                                            let invoiceNum: string | null = null;
+                                                            const numFacMatch = raw.match(/NumFac\w*[:\s=]+([A-Z0-9\-]+)/i);
+                                                            if (numFacMatch) {
+                                                                invoiceNum = numFacMatch[1].toUpperCase();
+                                                            } else {
+                                                                const candidates = raw.toUpperCase().match(/[A-Z]{1,5}[0-9]{4,12}/g) || [];
+                                                                for (const c of candidates) {
+                                                                    if (pendingInvoices.some((inv: any) => 
+                                                                        String(inv.invoiceNumber || inv.id || inv.invoice_number || inv.invoice_id || '').toUpperCase().trim() === c
+                                                                    )) {
+                                                                        invoiceNum = c;
+                                                                        break;
+                                                                    }
+                                                                }
+                                                                if (!invoiceNum && candidates.length > 0) {
+                                                                    invoiceNum = candidates[0];
+                                                                }
+                                                            }
+
+                                                            if (invoiceNum) {
+                                                                processScannedInvoiceForAssignment(invoiceNum);
+                                                            } else {
+                                                                setAssignInvoiceSearch('');
+                                                            }
+                                                        } else {
+                                                            const match = pendingInvoices.find((inv: any) =>
+                                                                String(inv.invoiceNumber || inv.id || inv.invoice_number || inv.invoice_id || '').toUpperCase().trim() === raw.toUpperCase()
+                                                            );
+                                                            if (match) {
+                                                                e.preventDefault();
+                                                                const targetId = match.id || match.invoice_id || match.invoiceNumber || match.invoice_number;
+                                                                handleAssignInvoice(targetId);
+                                                                setAssignInvoiceSearch('');
+                                                            }
+                                                        }
+                                                    }
+                                                }}
+                                                onChange={(e) => {
+                                                    const raw = e.target.value;
+                                                    setAssignInvoiceSearch(raw);
+
+                                                    const isScan = raw.length > 50 || /NumFac/i.test(raw);
+                                                    if (isScan) {
+                                                        if (assignScanTimeoutRef.current) {
+                                                            clearTimeout(assignScanTimeoutRef.current);
+                                                        }
+                                                        assignScanTimeoutRef.current = setTimeout(() => {
+                                                            let invoiceNum: string | null = null;
+                                                            const numFacMatch = raw.match(/NumFac\w*[:\s=]+([A-Z0-9\-]+)/i);
+                                                            if (numFacMatch) {
+                                                                invoiceNum = numFacMatch[1].toUpperCase();
+                                                            } else {
+                                                                const candidates = raw.toUpperCase().match(/[A-Z]{1,5}[0-9]{4,12}/g) || [];
+                                                                for (const c of candidates) {
+                                                                    if (pendingInvoices.some((inv: any) => 
+                                                                        String(inv.invoiceNumber || inv.id || inv.invoice_number || inv.invoice_id || '').toUpperCase().trim() === c
+                                                                    )) {
+                                                                        invoiceNum = c;
+                                                                        break;
+                                                                    }
+                                                                }
+                                                                if (!invoiceNum && candidates.length > 0) {
+                                                                    invoiceNum = candidates[0];
+                                                                }
+                                                            }
+
+                                                            if (invoiceNum) {
+                                                                processScannedInvoiceForAssignment(invoiceNum);
+                                                            } else {
+                                                                setAssignInvoiceSearch('');
+                                                            }
+                                                        }, 150);
+                                                    }
+                                                }}
                                             />
                                             {assignInvoiceSearch && (
                                                 <button onClick={() => setAssignInvoiceSearch('')}

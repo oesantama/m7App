@@ -848,12 +848,12 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         sendProgress({ type: 'end', message: `Motor Atómico Finalizado.`, matches: finalMatches });
         res.end();
         return;
-    } catch (error) {
+    } catch (error: any) {
         console.error('[GRUPO-INTER] Error Crítico de Procesamiento:', error);
         if (!res.headersSent) {
-            res.status(500).json({ message: 'Error interno en el núcleo de paralelización' });
+            res.status(500).json({ message: error?.message || 'Error interno en el núcleo de paralelización' });
         } else {
-            res.write(JSON.stringify({ type: 'end', message: 'Fallo interno crítico', matches: 0 }) + '\n');
+            res.write(JSON.stringify({ type: 'error', message: error?.message || 'Fallo interno crítico. Intente nuevamente.' }) + '\n');
             res.end();
         }
     } finally {

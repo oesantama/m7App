@@ -664,12 +664,19 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
             }
 
             // 1. Mapeo para RECEPCIÓN (Detalle Logístico / Conductor)
-            const rawUnit = val(iUnd) || val(iUnCodeDetail); // iUnd cubre columnas genéricas; iUnCodeDetail cubre 'UN'/'UN ORIG'
+            const rawUnit = (() => {
+              const uVal = val(iUnd).trim().toUpperCase();
+              const unVal = val(iUnCodeDetail).trim().toUpperCase();
+              const isValid = (u: string) => u && u !== '0' && /^[A-Z]+$/.test(u) && u.length <= 6;
+              if (isValid(uVal)) return uVal;
+              if (isValid(unVal)) return unVal;
+              return 'UND';
+            })();
             group.items.push({
               articleId: sku,
               expectedQty: qty,
               receivedQty: 0, // Inicia en 0
-              unit: (rawUnit && rawUnit.trim() !== '0' && rawUnit.trim() !== '') ? rawUnit.trim().toUpperCase() : 'UND',
+              unit: rawUnit,
               volume: String(volVal),
               unitVolume: val(iVolUnidad),
               invoice: val(iFactura),
@@ -897,7 +904,14 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
             peso:        iPeso !== -1  ? parseNumberM7(val(iPeso), isPlanR, 'weight') : undefined,
             lat:  iLat !== -1 && val(iLat)  ? (parseFloat(val(iLat).replace(',', '.'))  || null) : null,
             lng:  iLng !== -1 && val(iLng)  ? (parseFloat(val(iLng).replace(',', '.')) || null) : null,
-            unit: (() => { const raw = (iUnd !== -1 && val(iUnd).trim() !== '' && val(iUnd).trim() !== '0') ? val(iUnd) : (iUnCodeDetail !== -1 ? val(iUnCodeDetail) : ''); return raw.trim() ? raw.trim().toUpperCase() : undefined; })(),
+            unit: (() => {
+              const uVal = iUnd !== -1 ? val(iUnd).trim().toUpperCase() : '';
+              const unVal = iUnCodeDetail !== -1 ? val(iUnCodeDetail).trim().toUpperCase() : '';
+              const isValid = (u: string) => u && u !== '0' && /^[A-Z]+$/.test(u) && u.length <= 6;
+              if (isValid(uVal)) return uVal;
+              if (isValid(unVal)) return unVal;
+              return 'UND';
+            })(),
           });
         });
 

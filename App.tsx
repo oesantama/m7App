@@ -98,6 +98,7 @@ const HelpDesk = lazyWithRetry(() => import('./components/HelpDesk'));
 const ValidadorDocumentos = lazyWithRetry(() => import('./components/RRHH/ValidadorDocumentos'));
 const HojasDeVidaMain = lazyWithRetry(() => import('./components/HojasDeVida/HojasDeVidaMain'));
 const PublicDocForm = lazyWithRetry(() => import('./components/HojasDeVida/PublicDocForm'));
+const BascModule = lazyWithRetry(() => import('./components/BASC/BascModule'));
 
 // Import Admin Module
 const AdminDBManager = lazyWithRetry(() => import('./pages/AdminDBManager'));
@@ -338,14 +339,14 @@ const App: React.FC = () => {
     const hasPerm = (mod: string) => hasPermission(user, mod, 'view');
     const clientId = user.clientId || (user.clientIds && user.clientIds[0]) || 'CLI-01';
 
-    const staticTabs = ['dashboard', 'master', 'admin', 'seguridad', 'capacitaciones', 'formacion'];
+    const staticTabs = ['master', 'admin', 'seguridad', 'capacitaciones', 'formacion'];
     if (staticTabs.includes(activeTab)) return;
 
     const refreshOperational = async () => {
       try {
         const fetches: Promise<any>[] = [];
 
-        if (['documentos', 'recibido', 'recibido-manual', 'cumplidos', 'rutas'].includes(activeTab)) {
+        if (['dashboard', 'documentos', 'recibido', 'recibido-manual', 'cumplidos', 'rutas'].includes(activeTab)) {
           if (hasPerm('DOCUMENTOS_L') || hasPerm('RUTAS') || hasPerm('RECIBIDO_MATERIAL') || hasPerm('RECIBIDO_MANUAL')) {
             fetches.push(
               api.getDocuments(clientId).then(d => useAppStore.setState({ documents: d || [] })).catch(() => { })
@@ -353,7 +354,7 @@ const App: React.FC = () => {
           }
         }
 
-        if (['documentos', 'recibido', 'recibido-manual', 'cumplidos', 'rutas', 'despacho', 'dashboard-ajover'].includes(activeTab)) {
+        if (['dashboard', 'documentos', 'recibido', 'recibido-manual', 'cumplidos', 'rutas', 'despacho', 'dashboard-ajover'].includes(activeTab)) {
           if (hasPerm('DOCUMENTOS_L') || hasPerm('RUTAS') || hasPerm('DESPACHO_L') || hasPerm('RECIBIDO_MATERIAL')) {
             fetches.push(
               api.getInvoices(clientId).then(inv => useAppStore.setState({ invoices: inv || [] })).catch(() => { })
@@ -361,19 +362,19 @@ const App: React.FC = () => {
           }
         }
 
-        if (['rutas', 'despacho', 'dashboard-ajover'].includes(activeTab)) {
+        if (['dashboard', 'rutas', 'despacho', 'dashboard-ajover'].includes(activeTab)) {
           fetches.push(
             api.getRoutes().then(r => useAppStore.setState({ routes: r || [] })).catch(() => { })
           );
         }
 
-        if (['rutas', 'despacho', 'vinculo', 'dashboard-ajover'].includes(activeTab)) {
+        if (['dashboard', 'rutas', 'despacho', 'vinculo', 'dashboard-ajover'].includes(activeTab)) {
           fetches.push(
             api.getAssignments().then(a => useAppStore.setState({ assignments: a || [] })).catch(() => { })
           );
         }
 
-        if (['rutas', 'despacho', 'flotas', 'vinculo', 'dashboard-ajover'].includes(activeTab)) {
+        if (['dashboard', 'rutas', 'despacho', 'flotas', 'vinculo', 'dashboard-ajover'].includes(activeTab)) {
           fetches.push(
             api.getVehicles().then(v => useAppStore.setState({ vehicles: v || [] })).catch(() => { })
           );
@@ -1129,6 +1130,12 @@ const App: React.FC = () => {
         return (
           <React.Suspense fallback={<div className="p-10">Cargando Hojas de Vida DMS...</div>}>
             <HojasDeVidaMain />
+          </React.Suspense>
+        );
+      case 'basc':
+        return (
+          <React.Suspense fallback={<div className="p-10 text-center text-slate-400 text-sm">Cargando Módulo BASC...</div>}>
+            <BascModule activePageId={activePageId} setActivePageId={setActivePageId} />
           </React.Suspense>
         );
       default:

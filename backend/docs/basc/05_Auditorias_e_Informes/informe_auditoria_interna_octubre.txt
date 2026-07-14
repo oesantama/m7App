@@ -1,0 +1,5 @@
+INFORME DE AUDITORÍA INTERNA SGCS BASC - OCTUBRE
+Hallazgos Críticos:
+- Se encontró un vehículo despachado sin el registro completo de la inspección de 17 puntos en el sistema.
+- Se recomienda capacitar de inmediato al personal de patio.
+- Plan de Acción Correctiva (PAC): Plazo de 15 días hábiles para solventar y digitalizar la totalidad del histórico.

@@ -211,7 +211,7 @@ interface RoutePlannerProps {
   clients: MasterRecord[]; // Nueva prop
   onAssign: (vId: string, dId: string, cId: string) => void;
   onSaveRoute: (route: Partial<Route>) => void;
-  onRefresh?: () => void;
+  onRefresh?: (clientId?: string) => void;
 }
 
 
@@ -299,6 +299,9 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   useEffect(() => {
     api.getRoutes().then((r: any[]) => { if (Array.isArray(r)) setRoutes(r); }).catch(() => { });
     api.getDailyKPIs().then((d: any) => { if (d && typeof d === 'object') setDailyKPIs(d); }).catch(() => {});
+    return () => {
+      if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+    };
   }, []);
 
   // Recargar facturas automáticamente cuando el usuario cambia de cliente
@@ -362,6 +365,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     invoices_repice: number; shift2_routes: number; vehicles_active: number;
   } | null>(null);
   const scanSuppressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addInvoiceInputRef = useRef<HTMLInputElement>(null);
   const importExcelRef = useRef<HTMLInputElement>(null);
   const [importExcelPreview, setImportExcelPreview] = useState<{
@@ -401,7 +405,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       const res = await api.deleteDocument(id, user.name);
       if (res.success) {
         toast.success('Documento eliminado correctamente');
-        if (onRefresh) onRefresh();
+        if (onRefresh) onRefresh(selectedClient || undefined);
       } else {
         toast.error('Error al intentar eliminar');
       }
@@ -2326,10 +2330,17 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     setAuditComment('');
   };
 
-  const handleRepiceSearch = async () => {
-    const term = repiceSearch.term.trim();
+  const handleRepiceSearch = async (overrideTerm?: string) => {
+    const term = (overrideTerm !== undefined ? overrideTerm : repiceSearch.term).trim();
     if (!term) return;
-    setRepiceSearch(s => ({ ...s, loading: true, result: null, error: null, confirmOpen: false }));
+    setRepiceSearch(s => ({ 
+      ...s, 
+      term: overrideTerm !== undefined ? overrideTerm : s.term, 
+      loading: true, 
+      result: null, 
+      error: null, 
+      confirmOpen: false 
+    }));
     try {
       const res = await api.searchRepiceInvoice(term);
       if (res.success) {
@@ -2587,7 +2598,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
         // Actualizar rutas en el store inmediatamente (no esperar al onRefresh del padre)
         api.getRoutes().then((r: any[]) => { if (Array.isArray(r)) setRoutes(r); }).catch(() => { });
         api.getDailyKPIs().then((d: any) => { if (d && typeof d === 'object') setDailyKPIs(d); }).catch(() => {});
-        if (onRefresh) onRefresh();
+        if (onRefresh) onRefresh(selectedClient || undefined);
       } else {
         toast.error("Error al confirmar despacho");
       }
@@ -2946,7 +2957,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
       api.getRoutes().then((r: any[]) => { if (Array.isArray(r)) setRoutes(r); }).catch(() => { });
       api.getRoutingPatterns().then((d: any[]) => { if (Array.isArray(d)) setLearningPatterns(d); }).catch(() => {});
       api.getDailyKPIs().then((d: any) => { if (d && typeof d === 'object') setDailyKPIs(d); }).catch(() => {});
-      if (onRefresh) onRefresh();
+      if (onRefresh) onRefresh(selectedClient || undefined);
     } else if (failCount > 0) {
       toast.error("Error al procesar el despacho masivo. No se confirmó ninguna ruta.");
     }
@@ -3953,7 +3964,15 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                       <p className="text-[10px] font-bold text-slate-500 uppercase">{addInvoiceModal.tab === 'plan' ? 'Seleccione una factura pendiente' : 'Factura de repice (no está en el plan)'}</p>
                     </div>
                   </div>
-                  <button onClick={() => { setAddInvoiceModal({ isOpen: false, routeIndex: null, tab: 'plan' }); setModalSearchTerm(''); setImportExcelPreview(null); }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
+                  <button onClick={() => { 
+                    setAddInvoiceModal({ isOpen: false, routeIndex: null, tab: 'plan' }); 
+                    setModalSearchTerm(''); 
+                    setImportExcelPreview(null); 
+                    if (scanTimeoutRef.current) {
+                      clearTimeout(scanTimeoutRef.current);
+                      scanTimeoutRef.current = null;
+                    }
+                  }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center transition-all shadow-sm">
                     <Icons.X className="w-5 h-5 text-slate-400" />
                   </button>
                 </div>
@@ -4010,6 +4029,25 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                       value={modalSearchTerm}
                       onPaste={(e) => {
                         const pasted = e.clipboardData.getData('text');
+                        const scanMatch = pasted.match(/NumFac\w*[:\s=]+([A-Z0-9\-]+)/i);
+                        if (scanMatch) {
+                          e.preventDefault();
+                          const invoiceNum = scanMatch[1].toUpperCase();
+                          const match = unassignedInvoices.find(inv =>
+                            (inv.invoiceNumber || '').toUpperCase() === invoiceNum ||
+                            (inv.id || '').toUpperCase() === invoiceNum
+                          );
+                          if (match) {
+                            handleAddInvoiceToRoute(match);
+                            toast.success(`Factura ${invoiceNum} agregada a la ruta`);
+                            setModalSearchTerm('');
+                          } else {
+                            setModalSearchTerm(invoiceNum);
+                            toast.error(`Factura ${invoiceNum} no encontrada en el plan actual`);
+                          }
+                          return;
+                        }
+
                         // Detectar múltiples facturas: separadas por salto de línea, tab o espacios
                         const tokens = pasted.split(/[\n\r\t]+/).map(t => t.trim().toUpperCase()).filter(t => t.length > 3);
                         if (tokens.length > 1) {
@@ -4029,45 +4067,101 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                           return;
                         }
                       }}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        if (scanSuppressRef.current) {
-                          clearTimeout(scanSuppressRef.current);
-                          scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
-                          setModalSearchTerm('');
-                          return;
-                        }
-                        const isScan = raw.length > 50 || /NumFac/i.test(raw);
-                        if (isScan) {
-                          let invoiceNum: string | null = null;
-                          const numFacMatch = raw.match(/NumFac[:\s]*([A-Z0-9\-]+)/i);
-                          if (numFacMatch) invoiceNum = numFacMatch[1].toUpperCase();
-                          if (!invoiceNum) {
-                            const candidates = raw.toUpperCase().match(/[A-Z]{1,5}[0-9]{4,12}/g) || [];
-                            for (const c of candidates) {
-                              if (unassignedInvoices.some(inv => (inv.invoiceNumber || '').toUpperCase() === c)) {
-                                invoiceNum = c; break;
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const raw = modalSearchTerm;
+                          const isScan = raw.length > 50 || /NumFac/i.test(raw);
+                          if (isScan) {
+                            e.preventDefault();
+                            if (scanTimeoutRef.current) {
+                              clearTimeout(scanTimeoutRef.current);
+                              scanTimeoutRef.current = null;
+                            }
+                            let invoiceNum: string | null = null;
+                            const numFacMatch = raw.match(/NumFac\w*[:\s=]+([A-Z0-9\-]+)/i);
+                            if (numFacMatch) {
+                              invoiceNum = numFacMatch[1].toUpperCase();
+                            } else {
+                              const candidates = raw.toUpperCase().match(/[A-Z]{1,5}[0-9]{4,12}/g) || [];
+                              for (const c of candidates) {
+                                if (unassignedInvoices.some(inv => (inv.invoiceNumber || '').toUpperCase() === c)) {
+                                  invoiceNum = c;
+                                  break;
+                                }
+                              }
+                              if (!invoiceNum && candidates.length > 0) {
+                                invoiceNum = candidates[0];
                               }
                             }
-                            if (!invoiceNum && candidates.length > 0) invoiceNum = candidates[0];
+
+                            if (invoiceNum) {
+                              const match = unassignedInvoices.find(
+                                inv => (inv.invoiceNumber || '').toUpperCase() === invoiceNum
+                                  || (inv.id || '').toUpperCase() === invoiceNum
+                              );
+                              if (match) {
+                                handleAddInvoiceToRoute(match);
+                                toast.success(`Factura ${invoiceNum} agregada a la ruta`);
+                                setModalSearchTerm('');
+                              } else {
+                                setModalSearchTerm(invoiceNum);
+                                toast.error(`Factura ${invoiceNum} no encontrada en el plan actual`);
+                              }
+                            } else {
+                              setModalSearchTerm('');
+                            }
                           }
-                          setModalSearchTerm('');
-                          if (scanSuppressRef.current) clearTimeout(scanSuppressRef.current);
-                          scanSuppressRef.current = setTimeout(() => { scanSuppressRef.current = null; }, 1200);
-                          if (invoiceNum) {
-                            const match = unassignedInvoices.find(
-                              inv => (inv.invoiceNumber || '').toUpperCase() === invoiceNum
-                                || (inv.id || '').toUpperCase().includes(invoiceNum!)
-                            );
-                            if (match) { handleAddInvoiceToRoute(match); } else { setModalSearchTerm(invoiceNum); }
+                        }
+                      }}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const isScan = raw.length > 50 || /NumFac/i.test(raw);
+                        if (isScan) {
+                          setModalSearchTerm(raw);
+                          if (scanTimeoutRef.current) {
+                            clearTimeout(scanTimeoutRef.current);
                           }
+                          scanTimeoutRef.current = setTimeout(() => {
+                            let invoiceNum: string | null = null;
+                            const numFacMatch = raw.match(/NumFac\w*[:\s=]+([A-Z0-9\-]+)/i);
+                            if (numFacMatch) {
+                              invoiceNum = numFacMatch[1].toUpperCase();
+                            } else {
+                              const candidates = raw.toUpperCase().match(/[A-Z]{1,5}[0-9]{4,12}/g) || [];
+                              for (const c of candidates) {
+                                if (unassignedInvoices.some(inv => (inv.invoiceNumber || '').toUpperCase() === c)) {
+                                  invoiceNum = c;
+                                  break;
+                                }
+                              }
+                              if (!invoiceNum && candidates.length > 0) {
+                                invoiceNum = candidates[0];
+                              }
+                            }
+
+                            if (invoiceNum) {
+                              const match = unassignedInvoices.find(
+                                inv => (inv.invoiceNumber || '').toUpperCase() === invoiceNum
+                                  || (inv.id || '').toUpperCase() === invoiceNum
+                              );
+                              if (match) {
+                                handleAddInvoiceToRoute(match);
+                                toast.success(`Factura ${invoiceNum} agregada a la ruta`);
+                                setModalSearchTerm('');
+                              } else {
+                                setModalSearchTerm(invoiceNum);
+                                toast.error(`Factura ${invoiceNum} no encontrada en el plan actual`);
+                              }
+                            } else {
+                              setModalSearchTerm('');
+                            }
+                          }, 150);
                           return;
                         }
+
                         setModalSearchTerm(raw.toUpperCase());
                         if (raw.length >= 6) {
                           const term = raw.toLowerCase();
-                          // Solo auto-asigna cuando coinciden los últimos N dígitos exactos (sufijo)
-                          // para evitar falsos positivos con búsqueda substring
                           const exactSuffixMatches = unassignedInvoices.filter(inv =>
                             (inv.invoiceNumber || '').toLowerCase().endsWith(term) ||
                             (inv.orderNumber || '').toLowerCase().endsWith(term)
@@ -4118,13 +4212,76 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                         type="text"
                         placeholder="Número de factura REPICE..."
                         value={repiceSearch.term}
-                        onChange={e => setRepiceSearch(s => ({ ...s, term: e.target.value.toUpperCase(), result: null, error: null }))}
-                        onKeyDown={e => { if (e.key === 'Enter') handleRepiceSearch(); }}
+                        onPaste={(e) => {
+                          const pasted = e.clipboardData.getData('text');
+                          const scanMatch = pasted.match(/NumFac\w*[:\s=]+([A-Z0-9\-]+)/i);
+                          if (scanMatch) {
+                            e.preventDefault();
+                            const invoiceNum = scanMatch[1].toUpperCase();
+                            setRepiceSearch(s => ({ ...s, term: invoiceNum }));
+                            handleRepiceSearch(invoiceNum);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            const raw = repiceSearch.term;
+                            const isScan = raw.length > 50 || /NumFac/i.test(raw);
+                            if (isScan) {
+                              e.preventDefault();
+                              if (scanTimeoutRef.current) {
+                                clearTimeout(scanTimeoutRef.current);
+                                scanTimeoutRef.current = null;
+                              }
+                              let invoiceNum: string | null = null;
+                              const numFacMatch = raw.match(/NumFac\w*[:\s=]+([A-Z0-9\-]+)/i);
+                              if (numFacMatch) {
+                                invoiceNum = numFacMatch[1].toUpperCase();
+                              } else {
+                                const candidates = raw.toUpperCase().match(/[A-Z]{1,5}[0-9]{4,12}/g) || [];
+                                if (candidates.length > 0) invoiceNum = candidates[0];
+                              }
+                              if (invoiceNum) {
+                                setRepiceSearch(s => ({ ...s, term: invoiceNum }));
+                                handleRepiceSearch(invoiceNum);
+                              } else {
+                                setRepiceSearch(s => ({ ...s, term: '' }));
+                              }
+                            } else {
+                              handleRepiceSearch();
+                            }
+                          }
+                        }}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const isScan = raw.length > 50 || /NumFac/i.test(raw);
+                          if (isScan) {
+                            setRepiceSearch(s => ({ ...s, term: raw }));
+                            if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+                            scanTimeoutRef.current = setTimeout(() => {
+                              let invoiceNum: string | null = null;
+                              const numFacMatch = raw.match(/NumFac\w*[:\s=]+([A-Z0-9\-]+)/i);
+                              if (numFacMatch) {
+                                invoiceNum = numFacMatch[1].toUpperCase();
+                              } else {
+                                const candidates = raw.toUpperCase().match(/[A-Z]{1,5}[0-9]{4,12}/g) || [];
+                                if (candidates.length > 0) invoiceNum = candidates[0];
+                              }
+                              if (invoiceNum) {
+                                setRepiceSearch(s => ({ ...s, term: invoiceNum }));
+                                handleRepiceSearch(invoiceNum);
+                              } else {
+                                setRepiceSearch(s => ({ ...s, term: '' }));
+                              }
+                            }, 150);
+                            return;
+                          }
+                          setRepiceSearch(s => ({ ...s, term: raw.toUpperCase(), result: null, error: null }));
+                        }}
                         className="w-full pl-12 pr-4 py-4 bg-white border-2 border-amber-200 rounded-2xl text-[11px] font-black uppercase outline-none focus:border-amber-500 transition-all shadow-sm"
                       />
                     </div>
                     <button
-                      onClick={handleRepiceSearch}
+                      onClick={() => handleRepiceSearch()}
                       disabled={repiceSearch.loading || !repiceSearch.term.trim()}
                       className="px-5 py-4 bg-amber-500 text-white rounded-2xl text-[10px] font-black uppercase hover:bg-amber-600 transition-all shadow-sm disabled:opacity-40 shrink-0"
                     >

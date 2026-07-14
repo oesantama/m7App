@@ -224,7 +224,10 @@ const RecibidoManual: React.FC<RecibidoManualProps> = ({
             receivedQty: 0,
             countedQty: 0,
             status: 'Pending',
-            unit: (iUnd !== -1 && String(row[iUnd] || '').trim() !== '' && String(row[iUnd] || '').trim() !== '0') ? String(row[iUnd]).trim().toUpperCase() : 'UND',
+            unit: (() => {
+              const raw = iUnd !== -1 ? String(row[iUnd] || '').trim().toUpperCase() : '';
+              return (raw && raw !== '0' && /^[A-Z]+$/.test(raw) && raw.length <= 6) ? raw : 'UND';
+            })(),
             invoice: iFactura !== -1 ? String(row[iFactura]) : '',
             city: iCity !== -1 ? String(row[iCity]) : '',
             address: iDir !== -1 ? String(row[iDir]) : '',

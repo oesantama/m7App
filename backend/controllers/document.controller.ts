@@ -287,7 +287,8 @@ export const syncInventory = async (req: Request, res: Response) => {
         [docId, artId, inv]
       );
 
-      const scannedUnit = (item.unit && String(item.unit).trim() !== '' && String(item.unit).trim() !== '0') ? String(item.unit).trim().toUpperCase() : null;
+      const rawUnit = (item.unit && String(item.unit).trim() !== '' && String(item.unit).trim() !== '0') ? String(item.unit).trim().toUpperCase() : null;
+      const scannedUnit = (rawUnit && /^[A-Z]+$/.test(rawUnit) && rawUnit.length <= 6) ? rawUnit : null;
 
       if (checkItem.rowCount && checkItem.rowCount > 0) {
         await client.query(`
@@ -647,6 +648,9 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
           const invoice = item.invoice || 'S/I';
           if (!artId) continue;
 
+          const rawItemUnit = (item.unit && String(item.unit).trim() !== '' && String(item.unit).trim() !== '0') ? String(item.unit).trim().toUpperCase() : 'UND';
+          const validatedUnit = (rawItemUnit && /^[A-Z]+$/.test(rawItemUnit) && rawItemUnit.length <= 6) ? rawItemUnit : 'UND';
+
           // [M7-FIX] Estrategia SELECT → UPDATE/INSERT para evitar dependencia
           // del constraint unq_doc_art_inv que puede no existir en la BD
           const existingItem = await client.query(
@@ -674,7 +678,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
               WHERE document_id = $16 AND article_id = $17 AND invoice = $18
             `, [
               item.expectedQty || 0,
-              item.unit || 'und',
+              validatedUnit,
               item.volume || 0,
               item.unitVolume || '0',
               item.city || 'S/D',
@@ -700,7 +704,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
               item.expectedQty || 0,
               item.receivedQty || 0,
               item.orderNumber || 'S/I',
-              item.unit || 'und',
+              validatedUnit,
               invoice,
               item.volume || 0,
               item.unitVolume || '0',

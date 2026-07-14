@@ -1154,6 +1154,19 @@ const healSchema = async (client: any) => {
       UPDATE document_items SET item_status = 'EST-16' WHERE item_status = 'ELIMINADO'
     `);
 
+    // M7-FIX: Normalizar unidades de medida incorrectas que contienen números o no son puramente alfabéticas (ej: 'AJI01')
+    console.log('[M7-DB-HEAL] Normalizando unidades de medida incorrectas (ej: AJI01, etc.) a \'UND\'...');
+    await client.query(`
+      UPDATE document_items 
+      SET unit = 'UND' 
+      WHERE unit !~ '^[A-Za-z]+$' OR LENGTH(unit) > 6 OR unit IS NULL OR TRIM(unit) = '' OR TRIM(unit) = '0'
+    `);
+    await client.query(`
+      UPDATE delivery_return_items 
+      SET unit = 'UND' 
+      WHERE unit !~ '^[A-Za-z]+$' OR LENGTH(unit) > 6 OR unit IS NULL OR TRIM(unit) = '' OR TRIM(unit) = '0'
+    `);
+
   } catch (e: any) {
     console.error('[M7-DB-HEAL] Error en fase de estabilidad nuclear:', e.message);
   }
@@ -1843,6 +1856,59 @@ export const restoreSystem = async () => {
       INSERT INTO pages (id, name, route, parent_id, module_id, status_id)
       VALUES ('PAG-WA01', 'ALERTAS WHATSAPP', 'alertas-whatsapp', 'MOD-04', 'MOD-04', 'EST-01')
       ON CONFLICT (id) DO NOTHING;
+    `);
+
+    // ── MÓDULO BASC ─────────────────────────────────────────────────────
+    await client.query(`
+      INSERT INTO modules (id, name, icon_class, status_id) VALUES
+      ('MOD-BASC', 'GESTIÓN BASC', 'Shield', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon_class = EXCLUDED.icon_class, status_id = EXCLUDED.status_id;
+    `);
+
+    await client.query(`
+      INSERT INTO pages (id, name, route, parent_id, module_id, status_id) VALUES
+      ('PAG-BASC-01', 'DASHBOARD BASC', 'basc/dashboard', 'MOD-BASC', 'MOD-BASC', 'EST-01'),
+      ('PAG-BASC-02', 'GOOGLE DRIVE SYNC', 'basc/drive-sync', 'MOD-BASC', 'MOD-BASC', 'EST-01'),
+      ('PAG-BASC-03', 'AUDITOR IA BASC', 'basc/auditor-ai', 'MOD-BASC', 'MOD-BASC', 'EST-01'),
+      ('PAG-BASC-04', 'REPORTES BASC', 'basc/reportes', 'MOD-BASC', 'MOD-BASC', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, route = EXCLUDED.route, parent_id = EXCLUDED.parent_id, module_id = EXCLUDED.module_id, status_id = EXCLUDED.status_id;
+    `);
+
+    // Tablas BASC
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS basc_sync_logs (
+        id SERIAL PRIMARY KEY,
+        executed_at TIMESTAMPTZ DEFAULT NOW(),
+        status VARCHAR(20) DEFAULT 'RUNNING',
+        processed_files INTEGER DEFAULT 0,
+        new_files INTEGER DEFAULT 0,
+        errors_count INTEGER DEFAULT 0,
+        details TEXT,
+        duration_ms INTEGER DEFAULT 0
+      );
+
+      CREATE TABLE IF NOT EXISTS basc_documents (
+        id SERIAL PRIMARY KEY,
+        file_id VARCHAR(255) UNIQUE,
+        file_name VARCHAR(255) NOT NULL,
+        folder VARCHAR(100) NOT NULL,
+        drive_path TEXT,
+        drive_link TEXT,
+        mime_type VARCHAR(100),
+        size_bytes BIGINT,
+        sync_status VARCHAR(20) DEFAULT 'SYNCHRONIZED',
+        last_sync_at TIMESTAMPTZ DEFAULT NOW(),
+        error_message TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS basc_document_chunks (
+        id SERIAL PRIMARY KEY,
+        document_id INTEGER NOT NULL REFERENCES basc_documents(id) ON DELETE CASCADE,
+        chunk_index INTEGER NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_basc_chunks_doc ON basc_document_chunks(document_id);
     `);
 
     // ── WHATSAPP QUICK REPLIES ──────────────────────────────────────────

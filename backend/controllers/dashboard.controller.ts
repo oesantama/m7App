@@ -259,3 +259,147 @@ export const getDemandPrediction = async (req: Request, res: Response) => {
     });
   }
 };
+
+export const getGerenciaDashboard = async (req: Request, res: Response) => {
+  try {
+    const from = String(req.query.dateFrom || new Date(Date.now() - 30*86400000).toISOString().slice(0,10));
+    const to   = String(req.query.dateTo   || new Date().toISOString().slice(0,10));
+    const toEnd = `${to} 23:59:59`;
+
+    const [
+      recibidoRes, despachoRes, devTotalRes, docsRes,
+      vehiculosRes, conductoresRes, rutasRes,
+      despachoByDayRes, devByStatusRes, devByTypeRes
+    ] = await Promise.all([
+      // Recibido: documentos e ítems en el rango
+      pool.query(`
+        SELECT
+          COUNT(DISTINCT d.id) AS total_docs,
+          COUNT(di.id)         AS total_items,
+          COALESCE(SUM(CASE WHEN di.count_1 > 0 THEN di.count_1 ELSE 0 END), 0) AS items_auditados
+        FROM documents_l d
+        LEFT JOIN document_items di ON di.document_id = d.id
+        WHERE d.created_at BETWEEN $1 AND $2
+      `, [from, toEnd]),
+
+      // Despachos
+      pool.query(`
+        SELECT
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE status='COMPLETED') AS completados
+        FROM dispatch_assignments
+        WHERE created_at BETWEEN $1 AND $2
+      `, [from, toEnd]),
+
+      // Devoluciones totales
+      pool.query(`
+        SELECT COUNT(*) AS total FROM delivery_returns WHERE created_at BETWEEN $1 AND $2
+      `, [from, toEnd]),
+
+      // Documentos por estado
+      pool.query(`
+        SELECT status, COUNT(*) AS cnt FROM documents_l
+        WHERE created_at BETWEEN $1 AND $2 GROUP BY status ORDER BY cnt DESC
+      `, [from, toEnd]),
+
+      // Vehículos
+      pool.query(`
+        SELECT COUNT(*) AS total,
+               COUNT(*) FILTER (WHERE status_id='EST-01') AS activos
+        FROM vehicles WHERE status_id != 'ELIMINADO'
+      `),
+
+      // Conductores
+      pool.query(`
+        SELECT COUNT(*) AS total,
+               COUNT(*) FILTER (WHERE status_id='EST-01') AS activos
+        FROM drivers WHERE status_id NOT IN ('ELIMINADO','EST-02')
+      `),
+
+      // Rutas
+      pool.query(`
+        SELECT COUNT(*) AS total,
+               COUNT(*) FILTER (WHERE status_id='EST-10') AS activas
+        FROM routes
+      `),
+
+      // Despachos por día
+      pool.query(`
+        SELECT DATE(created_at) AS fecha, COUNT(*) AS total
+        FROM dispatch_assignments
+        WHERE created_at BETWEEN $1 AND $2
+        GROUP BY fecha ORDER BY fecha
+      `, [from, toEnd]),
+
+      // Devoluciones por estado
+      pool.query(`
+        SELECT COALESCE(status,'SIN ESTADO') AS estado, COUNT(*) AS cnt
+        FROM delivery_returns WHERE created_at BETWEEN $1 AND $2 GROUP BY estado
+      `, [from, toEnd]),
+
+      // Devoluciones por tipo
+      pool.query(`
+        SELECT COALESCE(return_type,'SIN TIPO') AS tipo, COUNT(*) AS cnt
+        FROM delivery_returns WHERE created_at BETWEEN $1 AND $2 GROUP BY tipo
+      `, [from, toEnd]),
+    ]);
+
+    const r = recibidoRes.rows[0];
+    const d = despachoRes.rows[0];
+    const v = vehiculosRes.rows[0];
+    const c = conductoresRes.rows[0];
+    const ru = rutasRes.rows[0];
+
+    const totalItems = Number(r.total_items) || 0;
+    const auditados  = Number(r.items_auditados) || 0;
+
+    const STATUS_LABEL: Record<string,string> = {
+      'EST-01':'Creado','EST-03':'Picking','EST-04':'En Inventario',
+      'EST-08':'Finalizado','EST-10':'Activo','EST-16':'Inactivo',
+      'COMPLETED':'Completado','PRE_APPROVED':'Pre-aprobado',
+      'CONFIRMED':'Confirmado','PENDING':'Pendiente',
+    };
+
+    res.json({
+      periodo: { from, to },
+      recibido: {
+        total_docs: Number(r.total_docs),
+        total_items: totalItems,
+        items_auditados: auditados,
+        pct_auditado: totalItems > 0 ? Math.round((auditados/totalItems)*100) : 0,
+      },
+      despacho: {
+        total: Number(d.total),
+        completados: Number(d.completados),
+        by_day: despachoByDayRes.rows.map(x => ({
+          fecha: String(x.fecha).slice(0,10),
+          despachos: Number(x.total)
+        })),
+      },
+      devoluciones: {
+        total: Number(devTotalRes.rows[0].total),
+        by_status: devByStatusRes.rows.map(x => ({
+          name: STATUS_LABEL[x.estado] || x.estado,
+          value: Number(x.cnt)
+        })),
+        by_type: devByTypeRes.rows.map(x => ({
+          name: x.tipo,
+          value: Number(x.cnt)
+        })),
+      },
+      documentos: {
+        total: docsRes.rows.reduce((s:number,x:any) => s+Number(x.cnt), 0),
+        by_status: docsRes.rows.map(x => ({
+          name: STATUS_LABEL[x.status] || x.status,
+          value: Number(x.cnt)
+        })),
+      },
+      vehiculos: { total: Number(v.total), activos: Number(v.activos) },
+      conductores: { total: Number(c.total), activos: Number(c.activos) },
+      rutas: { total: Number(ru.total), activas: Number(ru.activas) },
+    });
+  } catch (err: any) {
+    console.error('[M7-GERENCIA-DASH]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+};
