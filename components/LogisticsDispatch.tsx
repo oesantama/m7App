@@ -54,7 +54,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [routeInvoices, setRouteInvoices] = useState<any[]>([]);
     
     // MODALES Y FLUJO DE ASIGNACIÓN
-    const [viewingItemsInvoice, setViewingItemsInvoice] = useState<any | null>(null);
     const [assigningInvoice, setAssigningInvoice] = useState<any | null>(null);
     const [scannedItems, setScannedItems] = useState<Record<string, number>>({});
     const [isAccompanied, setIsAccompanied] = useState(false);
@@ -72,8 +71,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
     const [signatureKeys, setSignatureKeys] = useState<Record<string, string>>({});
     const [signNowMap, setSignNowMap] = useState<Record<string, boolean>>({});
     const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Control colapsable
-    const [invoiceSearchQuery, setInvoiceSearchQuery] = useState("");
-    const [dispatchTab, setDispatchTab] = useState<'individual' | 'grupal'>('individual');
     const [groupScannedItems, setGroupScannedItems] = useState<Record<string, number>>({});
     const [groupItemPickingModes, setGroupItemPickingModes] = useState<Record<string, 'UND' | 'CAJA' | 'STD'>>({});
     const [isGroupDispatching, setIsGroupDispatching] = useState(false);
@@ -145,10 +142,20 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         }).filter(item => item !== null) as (any)[];
     }, [assignments, vehicles, drivers, user.clientId]);
 
-    // Artículos agrupados de TODAS las facturas de la ruta activa (para despacho grupal)
+    // Facturas de la ruta que aún no fueron despachadas/entregadas (excluye EN RUTA/ENTREGADO/PARCIAL)
+    const pendingRouteInvoices = useMemo(() => {
+        return routeInvoices.filter((inv: any) =>
+            !['EST-11', 'EST-12', 'EST-13', 'EST-14'].includes(String(inv.itemStatus || inv.item_status || inv.status || ''))
+        );
+    }, [routeInvoices]);
+
+    // La ruta ya fue despachada por completo — no queda nada por escanear/confirmar
+    const isFullyDispatched = routeInvoices.length > 0 && pendingRouteInvoices.length === 0;
+
+    // Artículos agrupados de las facturas PENDIENTES de la ruta activa (para despacho grupal)
     const groupedItems = useMemo(() => {
         const map = new Map<string, any>();
-        for (const inv of routeInvoices) {
+        for (const inv of pendingRouteInvoices) {
             for (const item of (inv.items || [])) {
                 const sku = String(item.sku || item.articleId || '').trim().toUpperCase();
                 if (!sku) continue;
@@ -1716,10 +1723,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         const doDispatch = async () => {
             setIsGroupDispatching(true);
             try {
-                const pending = routeInvoices.filter(inv => {
-                    const st = String(inv.itemStatus || inv.item_status || inv.status || '');
-                    return !['EST-11','EST-12','EST-13','EST-14'].includes(st);
-                });
+                const pending = pendingRouteInvoices;
                 if (pending.length === 0) { toast.info('No hay facturas pendientes'); return; }
                 let ok = 0;
                 for (const inv of pending) {
@@ -1778,13 +1782,11 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
         if (autoConfirmIntervalRef.current) clearInterval(autoConfirmIntervalRef.current);
         setAutoConfirmCountdown(null);
 
-        if (dispatchTab !== 'grupal' || !selectedActiveRoute) return;
+        if (!selectedActiveRoute) return;
 
         const totalExpected = groupedItems.reduce((a: number, b: any) => a + Number(b.qty || 0), 0);
         const totalScanned = Object.values(groupScannedItems).reduce((a: number, b: number) => a + b, 0);
-        const pendingFacts = routeInvoices.filter((i: any) =>
-            !['EST-11','EST-12','EST-13','EST-14'].includes(String(i.itemStatus || i.item_status || ''))
-        ).length;
+        const pendingFacts = pendingRouteInvoices.length;
 
         if (totalExpected > 0 && totalScanned >= totalExpected && pendingFacts > 0) {
             const DELAY_SEC = 3 * 60;
@@ -1809,7 +1811,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
             if (autoConfirmIntervalRef.current) clearInterval(autoConfirmIntervalRef.current);
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [groupScannedItems, groupedItems, dispatchTab, (selectedActiveRoute as any)?.id, routeInvoices]);
+    }, [groupScannedItems, groupedItems, (selectedActiveRoute as any)?.id, pendingRouteInvoices]);
 
     // LOGICA DE NEGOCIO PARA DESPACHO (MOVIDA ANTES DEL RETURN)
     const handleManualAdd = (sku: string, qty: number) => {
@@ -2457,8 +2459,11 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                                     className="flex-1 py-2.5 bg-indigo-600 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center justify-center gap-1.5 shadow-lg"
                                                     onClick={(e) => { e.stopPropagation(); setSelectedActiveRoute(route); }}
                                                 >
-                                                    <Icons.Package className="w-3 h-3" />
-                                                    Despacho
+                                                    {totalRouteInvoices > 0 && percent >= 100 ? (
+                                                        <><Icons.Eye className="w-3 h-3" /> Ver Detalle</>
+                                                    ) : (
+                                                        <><Icons.Package className="w-3 h-3" /> Despacho</>
+                                                    )}
                                                 </button>
                                                 <button
                                                     className="flex-1 py-2.5 bg-slate-900 text-white rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-600 transition-all flex items-center justify-center gap-1.5 shadow-lg"
@@ -2652,9 +2657,9 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                        <h3 className="text-xl font-black text-slate-900 tracking-tighter uppercase">{selectedActiveRoute.plate}</h3>
                                        <p className="text-[10px] font-bold text-slate-500 uppercase">{selectedActiveRoute.driver_name || 'Sin Conductor'}</p>
                                    </div>
-                                   {dispatchTab === 'grupal' && (() => {
+                                   {(() => {
                                        const totalArt = groupedItems.length;
-                                       const totalFact = routeInvoices.length;
+                                       const totalFact = pendingRouteInvoices.length;
                                        const scanned = Object.values(groupScannedItems).reduce((a: number, b: number) => a + b, 0);
                                        const totalExp = groupedItems.reduce((a: number, b: any) => a + Number(b.qty || 0), 0);
                                        const pctScan = totalExp > 0 ? Math.round((scanned / totalExp) * 100) : 0;
@@ -2677,62 +2682,47 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                    })()}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
-                                    <button onClick={() => { setSelectedActiveRoute(null); setDispatchTab('individual'); setGroupItemPickingModes({}); }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 transition-all">
+                                    <button onClick={() => { setSelectedActiveRoute(null); setGroupItemPickingModes({}); }} className="w-10 h-10 bg-white hover:bg-slate-100 rounded-full flex items-center justify-center border border-slate-200 transition-all">
                                         <Icons.X className="w-5 h-5 text-slate-400" />
                                     </button>
                                 </div>
                             </div>
-
-                            {/* TABS */}
-                            <div className="flex gap-2 mb-2">
-                                <button
-                                    onClick={() => setDispatchTab('individual')}
-                                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${dispatchTab === 'individual' ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
-                                >
-                                    <Icons.Truck className="w-3.5 h-3.5 inline mr-1" />
-                                    Despacho Individual
-                                </button>
-                                <button
-                                    onClick={() => setDispatchTab('grupal')}
-                                    className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${dispatchTab === 'grupal' ? 'bg-emerald-600 text-white shadow-lg' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}
-                                >
-                                    <Icons.Package className="w-3.5 h-3.5 inline mr-1" />
-                                    Despacho Grupal
-                                </button>
-                            </div>
-
-                            {/* Stats + search (solo en tab individual) */}
-                            {dispatchTab === 'individual' && (
-                            <div className="flex flex-wrap gap-2 items-center">
-                                <div className="flex-1 min-w-[200px] relative">
-                                    <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                                    <input
-                                        type="text"
-                                        placeholder="BUSCAR FACTURA O CLIENTE..."
-                                        value={invoiceSearchQuery}
-                                        onChange={(e) => { setInvoiceSearchQuery(e.target.value); }}
-                                        className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-bold uppercase outline-none focus:border-slate-300"
-                                    />
-                                </div>
-                                <div className="flex gap-2">
-                                    <div className="px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
-                                        <p className="text-[7px] font-black text-slate-400 uppercase">Documentos</p>
-                                        <p className="text-sm font-black text-slate-900">{routeInvoices.length}</p>
-                                    </div>
-                                    <div className="px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
-                                        <p className="text-[7px] font-black text-slate-400 uppercase">Volumen</p>
-                                        <p className="text-sm font-black text-emerald-600">
-                                            {(Number(routeInvoices.reduce((acc: number, inv: any) => acc + (Number(inv.volumeM3) || 0), 0)) || 0).toFixed(2)}<span className="text-[9px] ml-0.5">m³</span>
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            )}
                         </div>
 
-                        {/* ── TAB: DESPACHO GRUPAL ─────────────────────────────── */}
-                        {dispatchTab === 'grupal' && (
                         <div className="flex-1 flex flex-col overflow-hidden">
+                        {isFullyDispatched ? (
+                            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 custom-scrollbar bg-slate-50/50">
+                                <div className="mb-1 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-[10px] font-bold text-blue-700 flex items-center gap-2">
+                                    <Icons.CheckCircle className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                    Ruta despachada — {routeInvoices.length} factura{routeInvoices.length !== 1 ? 's' : ''} en estado EN RUTA o superior.
+                                </div>
+                                {routeInvoices.map((inv: any, idx: number) => {
+                                    const status = String(inv.itemStatus || inv.item_status || inv.status || '');
+                                    const itemCount = (inv.items || []).length;
+                                    const qtyTotal = (inv.items || []).reduce((a: number, it: any) => a + Number(it.qty || it.expectedQty || 0), 0);
+                                    return (
+                                        <div key={inv.id || idx} className="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 font-bold text-xs shrink-0">
+                                                    {idx + 1}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-[13px] font-black text-slate-900 truncate">#{inv.invoiceNumber || inv.id}</p>
+                                                    <p className="text-[9px] font-bold text-slate-400 uppercase truncate">{inv.customerName || 'S/N'}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <p className="text-[10px] font-black text-slate-600">{itemCount} art. · {qtyTotal} und</p>
+                                                {status === 'EST-11' && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[8px] font-black rounded-full">EN RUTA</span>}
+                                                {status === 'EST-12' && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black rounded-full">ENTREGADO</span>}
+                                                {status === 'EST-13' && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded-full">PARCIAL</span>}
+                                                {status === 'EST-14' && <span className="px-2 py-0.5 bg-slate-200 text-slate-700 text-[8px] font-black rounded-full">CERRADO</span>}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ) : (<>
                             {/* Scanner */}
                             <div className="bg-amber-50 px-4 py-3 border-b border-amber-100 flex items-center gap-3">
                                 <input
@@ -2775,14 +2765,6 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Lectora Activa</span>
                                 </div>
                             </div>
-
-                            {/* Banner ruta ya despachada */}
-                            {routeInvoices.length > 0 && routeInvoices.every(i => ['EST-11','EST-12','EST-13','EST-14'].includes(String((i as any).itemStatus||(i as any).item_status||''))) && (
-                                <div className="mx-4 mt-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-[10px] font-bold text-blue-700 flex items-center gap-2">
-                                    <Icons.CheckCircle className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                                    Ruta ya despachada — todas las facturas están en estado EN RUTA o superior. El escaneado mostrado corresponde a la sesión anterior.
-                                </div>
-                            )}
 
                             {/* Búsqueda de artículos + Refrescar */}
                             <div className="px-4 pt-2 pb-1 bg-white border-b border-slate-100">
@@ -2933,7 +2915,7 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     disabled={isGroupDispatching}
                                     className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
-                                    {isGroupDispatching ? <><Icons.RotateCcw className="w-4 h-4 animate-spin" /> PROCESANDO...</> : <><Icons.Check className="w-4 h-4" /> CONFIRMAR DESPACHO GRUPAL ({routeInvoices.filter(i => !['EST-11','EST-12','EST-13','EST-14'].includes(String(i.itemStatus||i.item_status||''))).length} FACTURAS)</>}
+                                    {isGroupDispatching ? <><Icons.RotateCcw className="w-4 h-4 animate-spin" /> PROCESANDO...</> : <><Icons.Check className="w-4 h-4" /> CONFIRMAR DESPACHO GRUPAL ({pendingRouteInvoices.length} FACTURAS)</>}
                                 </button>
                                 <button onClick={() => {
                                     if (selectedActiveRoute) localStorage.removeItem(`dispatch_scan_${selectedActiveRoute.id}`);
@@ -2942,148 +2924,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                                     Limpiar
                                 </button>
                             </div>
-                        </div>
-                        )}
-
-                        {/* ── TAB: DESPACHO INDIVIDUAL ─────────────────────────── */}
-                        {dispatchTab === 'individual' && (<>
-                        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 custom-scrollbar bg-slate-50/50">
-                            {routeInvoices
-                                .filter(inv => {
-                                    if (!invoiceSearchQuery) return true;
-                                    const norm = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-                                    const query = norm(invoiceSearchQuery);
-                                    return norm(String(inv.invoiceNumber || '')).includes(query) ||
-                                           norm(String(inv.customerName  || '')).includes(query) ||
-                                           norm(String(inv.id            || '')).includes(query);
-                                })
-                                .map((inv: any, idx: number) => {
-                                    const invKey = inv.invoiceNumber || inv.id;
-                                    // dispatchedIds: override inmune a stale-data
-                                    const wasDispatched = dispatchedIds.has(cleanId(invKey));
-                                    const effectiveStatus = wasDispatched ? 'EST-11' : (inv.itemStatus || inv.status || '');
-                                    const hasPendingSignature = pendingSignatures.some(ps => ps.invoiceId === inv.id || ps.invoiceId === inv.invoiceNumber);
-                                    // All unsigned signatures for this invoice (any user) — used to block ENTREGAR
-                                    const allPendingForInv = invoiceAllPending[invKey] || [];
-                                    const pendingBodega = allPendingForInv.some(p => p.role === 'BODEGA');
-                                    const pendingConductor = allPendingForInv.some(p => p.role === 'CONDUCTOR');
-                                    return (
-                                        <div key={`${inv.id || idx}`} className="p-4 bg-white border border-slate-100 rounded-[1.5rem] shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-emerald-400/40 transition-all group">
-                                            <div className="flex items-center gap-4 w-full sm:w-auto">
-                                                <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 font-bold text-xs shrink-0 group-hover:bg-slate-900 group-hover:text-emerald-400 transition-colors">
-                                                    {idx + 1}
-                                                </div>
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                        <h5 className="text-[14px] font-black text-slate-900">#{inv.invoiceNumber || inv.id}</h5>
-                                                        {effectiveStatus === 'EST-11' && <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[8px] font-black rounded-full">EN RUTA</span>}
-                                                        {effectiveStatus === 'EST-12' && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[8px] font-black rounded-full">ENTREGADO</span>}
-                                                        {effectiveStatus === 'EST-13' && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-[8px] font-black rounded-full">PARCIAL</span>}
-                                                        {pendingBodega && <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[8px] font-black rounded-full animate-pulse">FIRMA BODEGA</span>}
-                                                        {pendingConductor && <span className="px-2 py-0.5 bg-violet-100 text-violet-700 text-[8px] font-black rounded-full animate-pulse">FIRMA CONDUCTOR</span>}
-                                                        {String(inv.planType || '').toUpperCase() === 'PLAN R'
-                                                            ? <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-black rounded-full">PLAN R</span>
-                                                            : <span className="px-2 py-0.5 bg-sky-100 text-sky-700 text-[8px] font-black rounded-full">PLAN NORMAL</span>
-                                                        }
-                                                    </div>
-                                                    <p className="text-[10px] font-bold text-slate-500 uppercase leading-none">{inv.customerName || 'S/N'}</p>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-2 w-full sm:w-auto justify-end flex-wrap">
-                                                <button
-                                                    onClick={() => setViewingItemsInvoice(inv)}
-                                                    className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all border border-slate-200"
-                                                    title="Ver Artículos"
-                                                >
-                                                    <Icons.Eye className="w-4 h-4" />
-                                                </button>
-
-                                                {/* DESPACHAR — todos los planes, solo si NO está en ruta y no tiene firma pendiente */}
-                                                {!['EST-11','EST-12','EST-13','EST-14'].includes(effectiveStatus) && !hasPendingSignature && (
-                                                    <button
-                                                        onClick={() => {
-                                                            // M7-FIX: Enriquecer items con el maestro para tener los factores de conversión (CAJA, STD)
-                                                            const enrichedItems = (inv.items || []).map((it: any) => {
-                                                                const master = articlesMaster.find(a => 
-                                                                    String(a.sku || '').trim().toUpperCase() === String(it.sku || '').trim().toUpperCase() ||
-                                                                    String(a.id || '').trim().toUpperCase() === String(it.sku || '').trim().toUpperCase()
-                                                                );
-                                                                if (master) {
-                                                                    return {
-                                                                        ...it,
-                                                                        factorInter: master.factor_inter || master.factorInter || 0,
-                                                                        factorStd:   master.factor_std   || master.factorStd   || 0,
-                                                                        uomInterName: master.uom_inter_name || master.uomInterName || master.unidad_intermedia || 'CAJA',
-                                                                        uomStdName:   master.uom_std_name   || master.uomStdName   || master.unidad_estandar   || 'STD',
-                                                                        unit: master.unit || master.unidad_estandar || it.unit || 'UND'
-                                                                    };
-                                                                }
-                                                                return it;
-                                                            });
-
-                                                            setAssigningInvoice({ ...inv, items: enrichedItems });
-                                                            // Por defecto, todas las firmas en DESPUÉS para agilizar
-                                                            setSignNowMap({ [user.id]: false });
-                                                        }}
-                                                        className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase hover:bg-blue-700 transition-all flex items-center gap-2 shadow-lg"
-                                                    >
-                                                        <Icons.Truck className="w-4 h-4" />
-                                                        Despachar
-                                                    </button>
-                                                )}
-
-                                                {/* ENTREGAR — solo Plan Normal, EN RUTA + el usuario actual no tiene firma propia pendiente */}
-                                                {effectiveStatus === 'EST-11' && !hasPendingSignature && String(inv.planType || '').toUpperCase() !== 'PLAN R' && (
-                                                    <button
-                                                        onClick={() => {
-                                                            const items = (inv.items || []).map((it: any) => ({
-                                                                sku: it.sku,
-                                                                articleName: it.articleName || it.article_name || it.sku,
-                                                                unit: it.unit || 'UND',
-                                                                quantityDelivered: Number(it.qty || it.expectedQty || 0),
-                                                                quantityReturned: 0,
-                                                                notes: ''
-                                                            }));
-                                                            setDeliveryItems(items);
-                                                            setDeliveryType('FULL');
-                                                            setDeliveryModal({ isOpen: true, invoice: inv, route: selectedActiveRoute });
-                                                        }}
-                                                        className="px-4 py-2.5 bg-emerald-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-emerald-600 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
-                                                    >
-                                                        <Icons.CheckCircle className="w-4 h-4" />
-                                                        Entregar
-                                                    </button>
-                                                )}
-
-                                                {/* SUBIR SOPORTE — deshabilitado temporalmente */}
-                                                {/* {(['EST-12','EST-13','EST-14'].includes(effectiveStatus)) && (
-                                                    <button
-                                                        onClick={() => setVoucherModal({ isOpen: true, invoice: inv })}
-                                                        className="px-4 py-2.5 bg-amber-500 text-white rounded-xl text-[10px] font-black uppercase hover:bg-amber-600 transition-all flex items-center gap-2"
-                                                    >
-                                                        <Icons.Upload className="w-4 h-4" />
-                                                        Soporte
-                                                    </button>
-                                                )} */}
-
-                                                {/* FIRMAR — firma pendiente */}
-                                                {hasPendingSignature && (
-                                                    <button
-                                                        onClick={() => handleDelayedSignature(inv)}
-                                                        className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase hover:bg-indigo-700 transition-all flex items-center gap-2"
-                                                    >
-                                                        <Icons.Signature className="w-4 h-4" />
-                                                        Firma Pend.
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                        </>)}
                         </div>
 
-                        {/* Footer individual: planilla + cerrar */}
+                        {/* Footer: planilla + cerrar */}
                         <div className="p-6 bg-white border-t border-slate-100 flex flex-col sm:flex-row gap-4 shrink-0 rounded-b-[2rem]">
                             <button
                                 className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-600 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
@@ -3095,41 +2939,10 @@ const LogisticsDispatch: React.FC<LogisticsDispatchProps> = ({
                             </button>
                             <button
                                 className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-slate-200 transition-all"
-                                onClick={() => { setSelectedActiveRoute(null); setDispatchTab('individual'); setGroupItemPickingModes({}); }}
+                                onClick={() => { setSelectedActiveRoute(null); setGroupItemPickingModes({}); }}
                             >
                                 CERRAR DETALLE
                             </button>
-                        </div>
-                        </>)}
-                    </div>
-                </div>
-            )}
-
-            {/* MODAL: VER ARTÍCULOS */}
-            {viewingItemsInvoice && (
-                <div className="fixed inset-0 z-[700] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden animate-in zoom-in-95">
-                        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                            <div>
-                                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tighter">Artículos del Documento</h3>
-                                <p className="text-[10px] font-bold text-slate-500 uppercase">Factura: {viewingItemsInvoice.invoiceNumber || viewingItemsInvoice.id}</p>
-                            </div>
-                            <button onClick={() => setViewingItemsInvoice(null)} className="w-10 h-10 hover:bg-slate-200 rounded-full flex items-center justify-center transition-all">
-                                <Icons.X className="w-5 h-5 text-slate-400" />
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-8 space-y-3 custom-scrollbar">
-                                {(viewingItemsInvoice.items || []).map((item: any, i: number) => (
-                                    <div key={i} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex justify-between items-center hover:bg-white hover:shadow-md transition-all">
-                                        <div>
-                                            <p className="text-sm font-black text-slate-900">{item.articleName || item.sku || 'Artículo'}</p>
-                                            <p className="text-[9px] font-bold text-slate-400 uppercase">SKU: {item.sku || 'N/A'}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-lg font-black text-indigo-600">{item.qty || item.expectedQty || 0} <span className="text-[10px] text-slate-400">{item.unit || 'UND'}</span></p>
-                                        </div>
-                                    </div>
-                                ))}
                         </div>
                     </div>
                 </div>
