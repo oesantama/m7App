@@ -668,6 +668,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
           notificationEmail: newRecord.notificationEmail || '',
           tipoNotificacionId: newRecord.tipoNotificacionId,
           statusId: newRecord.statusId,
+          clientIds: newRecord.clientIds || [],
           createdBy: newRecord.createdBy || user.name,
           updatedBy: user.name
         };
@@ -1811,6 +1812,65 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
               </select>
             </div>
             {renderStatusField()}
+
+            <div className="md:col-span-2 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2 flex items-center gap-2">
+                Operación / Clientes <span className="normal-case font-bold text-slate-400">(opcional)</span>
+              </label>
+              <p className="text-[10px] font-bold text-slate-400 ml-2 mt-1 mb-4">
+                {formData.clientIds && formData.clientIds.length > 0
+                  ? `Solo recibirá correos de recibido/inventario de los clientes seleccionados.`
+                  : `Sin clientes seleccionados = recibe notificaciones de TODOS los clientes.`}
+              </p>
+
+              {formData.clientIds && formData.clientIds.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-4 p-3 bg-emerald-50/50 border border-emerald-100 rounded-2xl">
+                  {clients
+                    .filter((c: any) => formData.clientIds.includes(c.id))
+                    .map((c: any) => (
+                      <span key={c.id} className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-500 text-slate-900 rounded-xl font-black text-[9px] uppercase tracking-wide shadow-sm border border-emerald-400">
+                        {c.name}
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, clientIds: formData.clientIds.filter((id: string) => id !== c.id) })}
+                          className="hover:text-red-700 font-black ml-1 text-[11px] leading-none cursor-pointer transition-colors"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                </div>
+              )}
+
+              <div className="relative mb-3">
+                <input
+                  type="text"
+                  placeholder="BUSCAR CLIENTE..."
+                  value={userClientSearch}
+                  onChange={(e) => setUserClientSearch(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-[10px] font-black outline-none focus:border-emerald-500 placeholder:text-slate-400 uppercase"
+                />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">🔍</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[220px] overflow-y-auto custom-scrollbar pr-2">
+                {clients
+                  .filter((c: any) => {
+                    const term = userClientSearch.trim().toLowerCase();
+                    if (!term) return true;
+                    return c.name?.toLowerCase().includes(term) || formData.clientIds?.includes(c.id);
+                  })
+                  .map((c: any) => (
+                    <label key={c.id} className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all cursor-pointer ${formData.clientIds?.includes(c.id) ? 'bg-emerald-50 border-emerald-500' : 'bg-slate-50 border-transparent hover:border-slate-200'}`}>
+                      <input type="checkbox" checked={formData.clientIds?.includes(c.id)} onChange={e => {
+                        const ids = formData.clientIds || [];
+                        setFormData({ ...formData, clientIds: e.target.checked ? [...ids, c.id] : ids.filter((id: string) => id !== c.id) });
+                      }} className="w-4 h-4 accent-emerald-500 rounded cursor-pointer" />
+                      <span className="text-[10px] font-black uppercase text-slate-900">{c.name}</span>
+                    </label>
+                  ))}
+              </div>
+            </div>
           </div>
         );
 
@@ -2066,6 +2126,22 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                                 {(item as any).tipoNotificacionName}
                               </span>
                             )}
+                            {activeMaster === 'masterNotificaciones' && (() => {
+                              const cIds: string[] = Array.isArray((item as any).clientIds) ? (item as any).clientIds : [];
+                              if (cIds.length === 0) {
+                                return (
+                                  <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded w-fit text-[8px] font-black uppercase mt-1">
+                                    Todos los clientes
+                                  </span>
+                                );
+                              }
+                              const names = clients.filter((c: any) => cIds.includes(c.id)).map((c: any) => c.name);
+                              return (
+                                <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded w-fit text-[8px] font-black uppercase mt-1 truncate max-w-[220px]" title={names.join(', ')}>
+                                  {names.length > 0 ? names.join(', ') : `${cIds.length} cliente(s)`}
+                                </span>
+                              );
+                            })()}
                           </div>
                         </div>
                       </div>

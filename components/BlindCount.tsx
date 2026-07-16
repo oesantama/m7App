@@ -268,8 +268,17 @@ const BlindCount: React.FC<BlindCountProps> = ({
                  let matchedPrefix = false;
                  for(const id of planIds) {
                      if(buffer.startsWith(id)) {
-                         foundTokens.push(id);
-                         buffer = buffer.substring(id.length).trim();
+                         // M7-FIX: Capturar el segmento COMPLETO del código (SKU + separador + unidad + cantidad + lote),
+                         // no solo el SKU — antes se descartaba la unidad embebida al partir ráfagas de varios códigos.
+                         // Se corta donde empieza el siguiente SKU conocido, o al final del buffer si no hay otro.
+                         const rest = buffer.substring(id.length);
+                         let cutIndex = rest.length;
+                         for (const otherId of planIds) {
+                             const idx = rest.indexOf(otherId);
+                             if (idx !== -1 && idx < cutIndex) cutIndex = idx;
+                         }
+                         foundTokens.push(id + rest.substring(0, cutIndex));
+                         buffer = rest.substring(cutIndex).trim();
                          matchedPrefix = true;
                          break;
                      }
@@ -1221,7 +1230,10 @@ const BlindCount: React.FC<BlindCountProps> = ({
       </div>
 
       {/* DISEÑO RESPONSIVO M7: LADO A LADO EN DESKTOP, UNO SOBRE OTRO EN TABLET/MOBILE */}
-      <div className="flex-1 flex flex-col lg:flex-row min-h-0 bg-white overflow-hidden h-[calc(100vh-250px)]">
+      {/* M7-FIX: se quitó el h-[calc(100vh-250px)] fijo — el offset asumido no coincide con la altura
+          real del header en todos los dispositivos, dejando la tabla comprimida. flex-1 + min-h-0 hace
+          que ocupe exactamente el espacio restante, calculado por el navegador en cualquier tablet. */}
+      <div className="flex-1 flex flex-col lg:flex-row min-h-0 bg-white overflow-hidden">
         
         {/* TABLA 1: PLAN DE AUDITORÍA (IZQUIERDA / ARRIBA) - M7-MOD: Ocupa el 80% en LG para dar más espacio */}
         <div className="flex-1 lg:flex-[0.8] flex flex-col min-h-0 w-full overflow-hidden border-b-4 lg:border-b-0 lg:border-r-4 border-slate-100">
@@ -1360,7 +1372,11 @@ const BlindCount: React.FC<BlindCountProps> = ({
         </div>
 
         {/* TABLA 2: INCIDENCIAS / NOVEDADES (DERECHA / ABAJO) - M7-MOD: Ancho reducido para priorizar el plan */}
-        <div className="w-full lg:w-[320px] h-[350px] lg:h-auto flex flex-col bg-slate-50 overflow-hidden shrink-0 border-t-8 lg:border-t-0 border-slate-100 shadow-inner lg:shadow-none">
+        {/* M7-FIX: antes reservaba 350px fijos en modo apilado (tablet/portrait) aunque no hubiera
+            incidencias — le robaba espacio a la tabla de conteo, que es lo importante. Ahora colapsa a
+            solo el encabezado cuando está vacío, y usa una altura relativa al viewport (no un número
+            fijo) cuando sí hay incidencias que mostrar. */}
+        <div className={`w-full lg:w-[320px] ${incidents.length > 0 ? 'max-h-[42vh]' : ''} lg:h-auto lg:max-h-none flex flex-col bg-slate-50 overflow-hidden shrink-0 border-t-8 lg:border-t-0 border-slate-100 shadow-inner lg:shadow-none`}>
           <div className="px-6 py-4 bg-white border-b border-slate-200 flex justify-between items-center shrink-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-slate-900 text-amber-500 rounded-xl flex items-center justify-center shadow-md">
@@ -1370,12 +1386,14 @@ const BlindCount: React.FC<BlindCountProps> = ({
                 <h4 className="text-[12px] font-black text-slate-900 uppercase tracking-tighter">
                   Incidencias {incidents.length > 0 && <span className="text-amber-500 ml-1">({incidents.length})</span>}
                 </h4>
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Captura de ráfagas</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                  {incidents.length > 0 ? 'Captura de ráfagas' : 'Sin incidencias'}
+                </p>
               </div>
             </div>
             {incidents.length > 0 && (
-              <button 
-                onClick={() => setShowClearIncidentsDialog(true)} 
+              <button
+                onClick={() => setShowClearIncidentsDialog(true)}
                 className="text-[9px] font-black text-red-500 uppercase tracking-widest"
               >
                 Limpiar
@@ -1383,8 +1401,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
             )}
           </div>
 
+          {incidents.length > 0 && (
           <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3 bg-slate-50/50">
-            {incidents.length > 0 ? (
               <div className="space-y-3">
                 {incidents.map(inc => (
                   <div key={inc.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col group transition-all hover:border-amber-400">
@@ -1438,13 +1456,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center py-20 opacity-20 grayscale">
-                <Icons.Check className="w-10 h-10 text-slate-300 mb-2" />
-                <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">Sin incidencias</p>
-              </div>
-            )}
           </div>
+          )}
         </div>
       </div>
 

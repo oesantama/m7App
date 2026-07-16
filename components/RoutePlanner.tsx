@@ -366,6 +366,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   } | null>(null);
   const scanSuppressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Ignora el resto de la ráfaga (NitFac, DocAdq, ValFac...) una vez ya se extrajo el NumFac
+  const scanLockTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addInvoiceInputRef = useRef<HTMLInputElement>(null);
   const importExcelRef = useRef<HTMLInputElement>(null);
   const [importExcelPreview, setImportExcelPreview] = useState<{
@@ -4115,9 +4117,46 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                       }}
                       onChange={(e) => {
                         const raw = e.target.value;
+
+                        // M7-FIX: mientras se ignora el resto de una ráfaga ya procesada (NitFac, DocAdq, ValFac...),
+                        // descartar estos caracteres residuales para que no se filtren como búsqueda manual.
+                        if (scanLockTimeoutRef.current) {
+                          clearTimeout(scanLockTimeoutRef.current);
+                          scanLockTimeoutRef.current = setTimeout(() => {
+                            scanLockTimeoutRef.current = null;
+                            setModalSearchTerm('');
+                          }, 400);
+                          return;
+                        }
+
                         const isScan = raw.length > 50 || /NumFac/i.test(raw);
                         if (isScan) {
                           setModalSearchTerm(raw);
+
+                          // Procesar apenas el campo NumFac esté completo — delimitado por el inicio del
+                          // siguiente campo (FecFac). No hace falta esperar a que termine de llegar el
+                          // resto de la ráfaga (NitFac, DocAdq, ValFac, ValIva, CUFE...), que es lo que
+                          // hacía sentir la lectora "lenta".
+                          const earlyMatch = raw.match(/NumFac\w*[^A-Z0-9]*([A-Z0-9\-]+?)[^A-Z0-9]*FecFac/i);
+                          if (earlyMatch) {
+                            if (scanTimeoutRef.current) { clearTimeout(scanTimeoutRef.current); scanTimeoutRef.current = null; }
+                            const invoiceNum = earlyMatch[1].toUpperCase();
+                            const match = unassignedInvoices.find(
+                              inv => (inv.invoiceNumber || '').toUpperCase() === invoiceNum
+                                || (inv.id || '').toUpperCase() === invoiceNum
+                            );
+                            if (match) {
+                              handleAddInvoiceToRoute(match);
+                              toast.success(`Factura ${invoiceNum} agregada a la ruta`);
+                            } else {
+                              toast.error(`Factura ${invoiceNum} no encontrada en el plan actual`);
+                            }
+                            setModalSearchTerm('');
+                            // Ignorar el resto de la ráfaga que aún está llegando (NitFac, DocAdq, ValFac...)
+                            scanLockTimeoutRef.current = setTimeout(() => { scanLockTimeoutRef.current = null; }, 400);
+                            return;
+                          }
+
                           if (scanTimeoutRef.current) {
                             clearTimeout(scanTimeoutRef.current);
                           }

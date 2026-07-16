@@ -280,11 +280,12 @@ export const syncInventory = async (req: Request, res: Response) => {
       if (!artId) continue;
       const inv = (item.invoice || 'S/I');
 
-      // [M7-PATCH] Estrategia SELECT -> UPDATE/INSERT para evitar error de constraint único
-      // Ahora incluimos el invoice para ser más específicos y evitar colisiones
+      // El conteo/unidad es único por SKU dentro del documento (consolidado en el frontend antes de sincronizar).
+      // Si el mismo SKU aparece en varias facturas de este documento, deben quedar TODAS con el mismo valor —
+      // antes solo se actualizaba una fila (LIMIT 1) y las demás facturas quedaban con la unidad/lote desactualizados.
       const checkItem = await client.query(
-        'SELECT id FROM document_items WHERE document_id = $1 AND article_id = $2 AND (invoice = $3 OR invoice = \'S/I\') LIMIT 1',
-        [docId, artId, inv]
+        'SELECT id FROM document_items WHERE document_id = $1 AND article_id = $2',
+        [docId, artId]
       );
 
       const rawUnit = (item.unit && String(item.unit).trim() !== '' && String(item.unit).trim() !== '0') ? String(item.unit).trim().toUpperCase() : null;
@@ -295,14 +296,15 @@ export const syncInventory = async (req: Request, res: Response) => {
           UPDATE document_items SET
             notes = $1, batch = $2, count_1 = $3, count_2 = $4,
             unit = COALESCE($6, unit)
-          WHERE id = $5
+          WHERE document_id = $5 AND article_id = $7
         `, [
           item.inventoryNote || item.notes || '',
           item.batch || 'S/L',
           Number(item.count1 || 0),
           Number(item.count2 || item.countedQty || 0),
-          checkItem.rows[0].id,
-          scannedUnit
+          docId,
+          scannedUnit,
+          artId
         ]);
       } else {
         await client.query(`
@@ -326,12 +328,14 @@ export const syncInventory = async (req: Request, res: Response) => {
     if (!isPartial) {
       try {
         // A. Consultar TODOS los correos activos — tabla notificaciones (principal) + fallback master_records
+        // client_ids vacío/NULL en notificaciones = notificación global (aplica a todos los clientes, compat. hacia atrás)
         const configRes = await pool.query(`
           SELECT n.notification_email, n.tipo_notificacion_id
           FROM notificaciones n
           JOIN tipos_notificacion tn ON n.tipo_notificacion_id = tn.id
           WHERE (tn.name ILIKE 'INVENTARIO AJOVER' OR tn.id ILIKE 'TGN-01')
           AND n.status_id = 'EST-01'
+          AND (n.client_ids IS NULL OR array_length(n.client_ids, 1) IS NULL OR $1 = ANY(n.client_ids))
           UNION
           SELECT mr.notification_email, mr.tipo_notificacion_id
           FROM master_records mr
@@ -339,7 +343,7 @@ export const syncInventory = async (req: Request, res: Response) => {
           WHERE (tn.name ILIKE 'INVENTARIO AJOVER' OR tn.id ILIKE 'TGN-01')
           AND mr.status_id = 'EST-01'
           AND mr.category = 'masterNotificaciones'
-        `);
+        `, [clientId]);
 
         const configs = configRes.rows;
         const targetEmails: string[] = configs.map((c: any) => c.notification_email).filter((e: any) => e);

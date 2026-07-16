@@ -38,7 +38,7 @@ export default defineConfig(({ mode }) => {
             theme_color: '#10b981',
             background_color: '#020617',
             display: 'standalone',
-            orientation: 'portrait-primary',
+            orientation: 'any',
             icons: [
               { src: 'm7-icon-192.png', sizes: '192x192', type: 'image/png' },
               { src: 'm7-icon-512.png', sizes: '512x512', type: 'image/png' },
