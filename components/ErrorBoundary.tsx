@@ -57,9 +57,27 @@ class ErrorBoundary extends Component<Props, State> {
               >
                 Recargar Página
               </button>
-              <button 
-                onClick={() => {
-                    localStorage.clear();
+              <button
+                onClick={async () => {
+                    // M7-FIX: antes solo limpiaba localStorage. En Firefox la cuota de
+                    // almacenamiento se cuenta junto con el Cache Storage del Service Worker
+                    // (donde vive el bundle de la PWA) — si ese caché ya está grande, borrar
+                    // solo localStorage no bajaba lo suficiente y el QuotaExceededError volvía
+                    // de inmediato. Ahora hace un reset completo de todo lo que ocupa cuota.
+                    try { localStorage.clear(); } catch {}
+                    try { sessionStorage.clear(); } catch {}
+                    try {
+                      if ('caches' in window) {
+                        const cacheNames = await caches.keys();
+                        await Promise.all(cacheNames.map(name => caches.delete(name)));
+                      }
+                    } catch {}
+                    try {
+                      if ('serviceWorker' in navigator) {
+                        const registrations = await navigator.serviceWorker.getRegistrations();
+                        await Promise.all(registrations.map(r => r.unregister()));
+                      }
+                    } catch {}
                     window.location.reload();
                 }}
                 className="px-6 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl font-bold transition-all"
