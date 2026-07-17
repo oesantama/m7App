@@ -138,7 +138,7 @@ const getVisionModel = (modelName?: string, forceApiKey?: string) => {
     }
     
     // M7-DYNAMIC-MODEL: Uso dinámico
-    const modelId = modelName || "gemini-flash-latest"; 
+    const modelId = modelName || "gemini-2.5-flash"; 
     
     const keyForLog = apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4);
     console.log(`[OCR-NUCLEAR] 🧠 Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}] | Modelo: ${modelId} | Key: ${keyForLog}`);
@@ -164,6 +164,16 @@ async function generateContentWithRetry(modelNameStr: string, promptData: any, s
             return result;
         } catch (error: any) {
             const errorStr = (error.toString() + (error.message || '')).toLowerCase();
+            const isLeakedError = errorStr.includes('leaked') || errorStr.includes('filtrada') || errorStr.includes('reported as leaked');
+            if (isLeakedError) {
+                const leakedMessage = `❌ Llave API de Gemini bloqueada/filtrada. Por favor actualice el archivo .env con una llave activa.`;
+                sendProgress({
+                    type: 'log',
+                    message: `⚠️ ${workerLabel} ${leakedMessage}`
+                });
+                throw new Error(leakedMessage);
+            }
+
             const isQuotaError = errorStr.includes('429') || error.status === 429 || errorStr.includes('quota');
             const isNetworkError = errorStr.includes('error fetching') || errorStr.includes('fetch failed') ||
                 errorStr.includes('econnreset') || errorStr.includes('econnrefused') ||
@@ -712,64 +722,151 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             return;
         }
 
-        const keys = getAPIKeysPool();
-        const apiKey = keys[0]; 
-        const modelName = process.env.AI_MODEL || "gemini-flash-latest";
-        let visionModel = getVisionModel(modelName, apiKey);
+        const keysToCheck = getAPIKeysPool();
         
-        sendProgress({ type: 'log', message: `🚀 Iniciando Motor Atómico PÁGINA POR PÁGINA para ${totalPages} páginas...` });
+        if (keysToCheck.length === 0) {
+            sendProgress({ type: 'log', message: '❌ Error: No se encontraron llaves API de Gemini en el archivo .env.' });
+            sendProgress({ type: 'error', message: 'No hay llaves de API de Gemini configuradas.' });
+            res.end();
+            return;
+        }
+
+        sendProgress({ type: 'log', message: '🔑 Validando estado de las llaves API de Gemini...' });
+        
+        const keyChecks = await Promise.all(keysToCheck.map(async (key, idx) => {
+            try {
+                const resCheck = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
+                const data = await resCheck.json().catch(() => ({}));
+                if (resCheck.status === 200) {
+                    return { key, valid: true, isLeaked: false };
+                } else {
+                    const msg = data?.error?.message || '';
+                    const isLeaked = msg.toLowerCase().includes('leaked') || msg.toLowerCase().includes('filtrada');
+                    return { key, valid: false, isLeaked, msg };
+                }
+            } catch (err: any) {
+                return { key, valid: false, isLeaked: false, msg: err.message };
+            }
+        }));
+
+        const leakedCount = keyChecks.filter(c => c.isLeaked).length;
+        const keys = keyChecks.filter(c => c.valid).map(c => c.key);
+
+        if (keys.length === 0) {
+            let errorMsg = '❌ ERROR: Todas las llaves API de Gemini están inactivas o deshabilitadas.';
+            if (leakedCount > 0) {
+                errorMsg = `❌ ERROR CRÍTICO: Google ha bloqueado las ${leakedCount} llaves API de Gemini configuradas en el archivo .env porque fueron reportadas como filtradas (leaked). Por favor, configure una nueva llave de Gemini válida en el archivo .env para habilitar el OCR de imágenes.`;
+            }
+            sendProgress({ type: 'log', message: errorMsg });
+            sendProgress({ type: 'error', message: 'Llaves de API bloqueadas o filtradas por Google. Actualice su .env.' });
+            res.end();
+            return;
+        }
+
+        sendProgress({ type: 'log', message: `✅ ${keys.length} llave(s) API activa(s) y listas para procesar.` });
+        
+        // 🟢 PRE-FASE: Extracción de texto local de todo el PDF en una sola pasada rápida
+        sendProgress({ type: 'log', message: `⚡ Analizando texto local del PDF...` });
+        const localPagesMap = new Map<number, string>();
+        try {
+            let pageNum = 0;
+            const options = {
+                pagerender: async (pageData: any) => {
+                    const textContent = await pageData.getTextContent();
+                    let text = '';
+                    for (const item of textContent.items) {
+                        text += item.str + ' ';
+                    }
+                    localPagesMap.set(pageNum, text);
+                    pageNum++;
+                    return text;
+                }
+            };
+            await pdfParse(fileContent, options);
+        } catch (pdfParseErr) {
+            console.error('[GRUPO-INTER] Error doing initial pdf-parse:', pdfParseErr);
+        }
+
+        sendProgress({ type: 'log', message: `🚀 Iniciando Motor Atómico con orquestación en paralelo...` });
         
         let finalMatches = 0;
         const username = req.body.username || 'System OCR';
 
-        for (let i = 0; i < totalPages; i++) {
-            // [M7-PERF] Cedemos el event loop vitalmente para que los HealthChecks no fallen (Previene 502/504 por saturación)
-            await sleep(200);
+        // Mutex/Lock simple para evitar condiciones de carrera en el mapeo de base de datos e histórico
+        const dbMutex = {
+            locked: false,
+            async acquire() {
+                while (this.locked) {
+                    await new Promise(r => setTimeout(r, 10));
+                }
+                this.locked = true;
+            },
+            release() {
+                this.locked = false;
+            }
+        };
 
-            sendProgress({ type: 'log', message: `Analizando página ${i + 1} de ${totalPages}...` });
-            
-            const subPdf = await PDFDocument.create();
-            const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [i]);
-            subPdf.addPage(copiedPage);
-            const pageBase64 = await subPdf.saveAsBase64();
-            const pageBuffer = Buffer.from(pageBase64, 'base64');
-            
+        const processPage = async (pageIndex: number, workerId: number) => {
+            const keyIndex = workerId % keys.length;
+            const workerContext = { id: workerId, keyIndex };
+            const workerLabel = `[W${workerId + 1}]`;
+
+            const localText = localPagesMap.get(pageIndex) || '';
             let foundMatchesInPage: any[] = [];
             let localExtractionSuccess = false;
 
-            // 🟢 FASE 1: Intento de extracción LOCAL ultrarrápida
-            try {
-                const pdfData = await pdfParse(pageBuffer);
-                const localText = pdfData.text || '';
-                
-                if (localText.length > 50) {
-                    // Limpiar el texto: extraer todas las secuencias numéricas (de al menos 4 dígitos para evitar falsos positivos)
-                    const numbersInText = localText.replace(/\D+/g, ' ').split(' ').filter((n: string) => n.length >= 4);
-                    const uniqueNumbers = new Set(numbersInText);
+            // FASE 1: Intento de extracción LOCAL ultrarrápida robusta
+            if (localText.length > 50) {
+                const cleanText = localText.toLowerCase();
+                const cleanTextAlphanumeric = cleanText.replace(/[^a-z0-9]/g, '');
+                const cleanTextDigits = cleanText.replace(/[^0-9]/g, '');
+                const tokens = cleanText.split(/[^0-9]+/);
+
+                // Hacemos una copia de numericList para buscar
+                const currentPending = [...numericList];
+                for (const num of currentPending) {
+                    const originalDoc = numericDocsMap.get(num) || '';
                     
-                    for (const num of numericList) {
-                        if (uniqueNumbers.has(num)) {
-                            foundMatchesInPage.push(num);
-                        }
-                    }
-                    
-                    if (foundMatchesInPage.length > 0) {
-                        sendProgress({ type: 'log', message: `⚡ Lectura LOCAL exitosa en Pág ${i + 1}. Evitando uso de IA.` });
-                        localExtractionSuccess = true;
+                    // A. Coincidencia exacta del documento original (alfanumérico, ej. "FV100043587")
+                    const cleanOriginal = originalDoc.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const matchesOriginal = cleanOriginal.length >= 4 && cleanTextAlphanumeric.includes(cleanOriginal);
+
+                    // B. Coincidencia exacta del número de factura como token numérico
+                    const matchesToken = tokens.includes(num);
+
+                    // C. Coincidencia de la secuencia de dígitos (para números largos >= 6 dígitos para evitar falsos positivos)
+                    const matchesSequence = num.length >= 6 && cleanTextDigits.includes(num);
+
+                    if (matchesOriginal || matchesToken || matchesSequence) {
+                        foundMatchesInPage.push(num);
                     }
                 }
-            } catch (localErr) {
-                console.error(`[GRUPO-INTER] Error en OCR local pág ${i + 1}:`, localErr);
+                
+                if (foundMatchesInPage.length > 0) {
+                    sendProgress({ type: 'log', message: `⚡ ${workerLabel} Pág ${pageIndex + 1}: Lectura LOCAL exitosa (${foundMatchesInPage.join(', ')}). Evitando uso de IA.` });
+                    localExtractionSuccess = true;
+                }
             }
 
-            // 🟠 FASE 2: Si la lectura local falla o no encuentra números, usar Gemini (con fallback de modelos)
-            if (!localExtractionSuccess) {
-                sendProgress({ type: 'log', message: `🤖 Lectura local insuficiente en Pág ${i + 1}. Iniciando OCR IA...` });
+            // FASE 2: Si la lectura local falla, usar Gemini
+            let pageBase64 = '';
+            const getPageBase64 = async () => {
+                if (pageBase64) return pageBase64;
+                const subPdf = await PDFDocument.create();
+                const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [pageIndex]);
+                subPdf.addPage(copiedPage);
+                pageBase64 = await subPdf.saveAsBase64();
+                return pageBase64;
+            };
+
+            if (!localExtractionSuccess && numericList.length > 0) {
+                sendProgress({ type: 'log', message: `🤖 ${workerLabel} Pág ${pageIndex + 1}: Lectura local insuficiente. Iniciando OCR IA...` });
                 
+                const currentPending = [...numericList];
                 const prompt = `Actúa como un motor OCR de logística. 
                 Analiza esta página PDF.
                 Busca EXCLUSIVAMENTE las siguientes secuencias numéricas (ignora prefijos como 'FEV', 'FV', o cualquier otra letra alrededor):
-                [${numericList.join(', ')}]
+                [${currentPending.join(', ')}]
                 
                 REGLAS:
                 1. Escanea la página.
@@ -779,71 +876,105 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 4. Si no hay coincidencias, responde: {"matches": []}
                 5. Prohibido agregar formato markdown o texto adicional, solo el JSON raw.`;
 
-                const fallBackModels = ["gemini-2.0-flash", "gemini-2.5-flash", "gemini-flash-latest"];
+                const fallBackModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
                 let geminiSuccess = false;
 
-                for (let modelAttempts = 0; modelAttempts < fallBackModels.length; modelAttempts++) {
-                    if (geminiSuccess) break;
-                    
-                    const currentModelName = fallBackModels[modelAttempts];
-                    try {
-                        const result = await generateContentWithRetry(currentModelName, [
-                            { text: prompt },
-                            { inlineData: { data: pageBase64, mimeType: "application/pdf" } }
-                        ], sendProgress, 2); // Reducido maxRetries a 2 por modelo
-
-                        const response = await result.response;
-                        const textResponse = response.text().trim();
+                try {
+                    const b64 = await getPageBase64();
+                    for (let modelAttempts = 0; modelAttempts < fallBackModels.length; modelAttempts++) {
+                        if (geminiSuccess) break;
                         
-                        const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
-                        if (jsonMatch) {
-                            const data = JSON.parse(jsonMatch[0]);
-                            foundMatchesInPage = data.matches || [];
-                            geminiSuccess = true;
-                        } else {
-                            sendProgress({ type: 'log', message: `⚠️ Página ${i + 1}: Respuesta inválida del modelo ${currentModelName}.` });
+                        const currentModelName = fallBackModels[modelAttempts];
+                        try {
+                            const result = await generateContentWithRetry(currentModelName, [
+                                { text: prompt },
+                                { inlineData: { data: b64, mimeType: "application/pdf" } }
+                            ], sendProgress, 2, workerContext);
+
+                            const response = await result.response;
+                            const textResponse = response.text().trim();
+                            
+                            const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
+                            if (jsonMatch) {
+                                const data = JSON.parse(jsonMatch[0]);
+                                foundMatchesInPage = data.matches || [];
+                                geminiSuccess = true;
+                            } else {
+                                sendProgress({ type: 'log', message: `⚠️ ${workerLabel} Página ${pageIndex + 1}: Respuesta inválida del modelo ${currentModelName}.` });
+                            }
+                        } catch (pageError: any) {
+                            sendProgress({ type: 'log', message: `❌ ${workerLabel} Error con modelo ${currentModelName} en pág ${pageIndex + 1}: ${pageError?.message?.substring(0, 100)}...` });
                         }
-                    } catch (pageError: any) {
-                        sendProgress({ type: 'log', message: `❌ Error con modelo ${currentModelName} en pág ${i + 1}: ${pageError?.message?.substring(0, 50)}...` });
                     }
+                } catch (pdfErr: any) {
+                    sendProgress({ type: 'log', message: `❌ ${workerLabel} Error al preparar página ${pageIndex + 1}: ${pdfErr.message}` });
                 }
             }
 
-            // 🔵 FASE 3: Procesar los matches encontrados (sea local o IA)
-            for (const item of foundMatchesInPage) {
-                const matchedNum = String(item).replace(/\D/g, '');
-                const originalDocId = numericDocsMap.get(matchedNum);
+            // FASE 3: Procesar los matches encontrados (bajo mutex para evitar race conditions)
+            if (foundMatchesInPage.length > 0) {
+                await dbMutex.acquire();
+                try {
+                    for (const item of foundMatchesInPage) {
+                        const matchedNum = String(item).replace(/\D/g, '');
+                        const originalDocId = numericDocsMap.get(matchedNum);
 
-                if (originalDocId) {
-                    sendProgress({ type: 'log', message: `✅ Match exacto: ${originalDocId} (encontrado como ${matchedNum}) en Pág ${i + 1}...` });
-                    
-                    const base64PagePrefix = `data:application/pdf;base64,${pageBase64}`;
+                        if (originalDocId && numericList.includes(matchedNum)) {
+                            sendProgress({ type: 'log', message: `✅ Match exacto: ${originalDocId} (encontrado como ${matchedNum}) en Pág ${pageIndex + 1}...` });
+                            
+                            const b64 = await getPageBase64();
+                            const base64PagePrefix = `data:application/pdf;base64,${b64}`;
 
-                    await pool.query(
-                        "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $3",
-                        [base64PagePrefix, username, originalDocId]
-                    );
+                            await pool.query(
+                                "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $3",
+                                [base64PagePrefix, username, originalDocId]
+                            );
 
-                    // Registrar en histórico
-                    const pedRes = await pool.query("SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1", [originalDocId]);
-                    if (pedRes.rows.length > 0) {
-                        await pool.query(
-                            "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', $2, 'System OCR')",
-                            [pedRes.rows[0].id, localExtractionSuccess ? 'PDF Procesado Automáticamente (Extracción Local Rápida)' : 'PDF Procesado Automáticamente (IA)']
-                        );
+                            // Registrar en histórico
+                            const pedRes = await pool.query("SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1", [originalDocId]);
+                            if (pedRes.rows.length > 0) {
+                                await pool.query(
+                                    "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', $2, 'System OCR')",
+                                    [pedRes.rows[0].id, localExtractionSuccess ? 'PDF Procesado Automáticamente (Extracción Local Rápida)' : 'PDF Procesado Automáticamente (IA)']
+                                );
+                            }
+                            
+                            // Remover de la lista pendiente global para no volver a buscarlo y acelerar el proceso
+                            const idx = numericList.indexOf(matchedNum);
+                            if (idx > -1) numericList.splice(idx, 1);
+                            
+                            finalMatches++;
+                        }
                     }
-                    
-                    // Remover de la lista pendiente para no volver a buscarlo y acelerar el proceso
-                    const idx = numericList.indexOf(matchedNum);
-                    if (idx > -1) numericList.splice(idx, 1);
-                    
-                    finalMatches++;
+                } finally {
+                    dbMutex.release();
                 }
             }
-            
-            // Emit progress
-            sendProgress({ type: 'progress', page: i + 1, percent: Math.round(((i + 1) / totalPages) * 100) });
-        }
+        };
+
+        const concurrencyLimit = Math.min(4, keys.length || 1);
+        let activePageCount = 0;
+
+        // Cola de páginas a procesar
+        const pageIndices = Array.from({ length: totalPages }, (_, i) => i);
+        
+        const workerPromises = Array.from({ length: concurrencyLimit }, async (_, workerId) => {
+            while (pageIndices.length > 0) {
+                const pageIndex = pageIndices.shift();
+                if (pageIndex === undefined) break;
+                
+                try {
+                    await processPage(pageIndex, workerId);
+                } catch (pageErr: any) {
+                    sendProgress({ type: 'log', message: `❌ Error procesando página ${pageIndex + 1}: ${pageErr.message}` });
+                }
+                
+                activePageCount++;
+                sendProgress({ type: 'progress', page: activePageCount, percent: Math.round((activePageCount / totalPages) * 100) });
+            }
+        });
+
+        await Promise.all(workerPromises);
 
         sendProgress({ type: 'end', message: `Motor Atómico Finalizado.`, matches: finalMatches });
         res.end();

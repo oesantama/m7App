@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import { api } from '../services/api';
 import { useAppStore } from '../stores/useAppStore';
+import { DataTable, ColumnDef } from './shared/DataTable';
 
 interface Order {
   id: number;
@@ -95,9 +96,16 @@ const GrupoInterView: React.FC = () => {
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showManifestPreview, setShowManifestPreview] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState<'operacion' | 'manifiesto' | null>(null);
-  const [previewFilter, setPreviewFilter] = useState('');
-  const [previewPage, setPreviewPage] = useState(1);
-  const itemsPerPagePreview = 10;
+
+  // Columnas dinámicas para el DataTable de previsualización — el Excel cargado define sus propias columnas
+  const previewColumns: ColumnDef<any>[] = React.useMemo(() => {
+    if (!previewData[0]) return [];
+    return Object.keys(previewData[0]).map((key) => ({
+      header: key,
+      key,
+      maxWidth: '220px',
+    }));
+  }, [previewData]);
   
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -1425,20 +1433,13 @@ const GrupoInterView: React.FC = () => {
               
               <div className="flex-1 overflow-y-auto bg-slate-50 flex flex-col">
                  <div className="p-4 md:p-6">
-                    <div className="w-full overflow-x-auto bg-white rounded-xl shadow-sm border border-slate-100">
-                       <table className="w-full text-[10px] text-left border-collapse">
-                          <thead className="bg-slate-100 font-black uppercase text-slate-600 border-b">
-                             <tr>{previewData[0] && Object.keys(previewData[0]).map(k => <th key={k} className="p-3 px-4 whitespace-nowrap">{k}</th>)}</tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                             {previewData.slice(0, 100).map((r, i) => (
-                               <tr key={i} className="hover:bg-blue-50/30 transition-colors">
-                                 {Object.values(r).map((v:any, j) => <td key={j} className="p-3 px-4 text-slate-500 truncate max-w-[200px]">{String(v)}</td>)}
-                               </tr>
-                             ))}
-                          </tbody>
-                       </table>
-                    </div>
+                    <DataTable<any>
+                      data={previewData}
+                      columns={previewColumns}
+                      searchPlaceholder="Buscar factura, cliente, NIT..."
+                      excelFileName="previsualizacion_carga_valorizados.xlsx"
+                      excelSheetName="Valorizados"
+                    />
                  </div>
 
                  <div className="p-4 md:p-6 bg-white border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 px-4 md:px-8">

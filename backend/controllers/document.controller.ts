@@ -2067,7 +2067,7 @@ export const updateItemInvoice = async (req: any, res: Response) => {
 };
 
 // ─── Parse PDF: extrae remisiones/facturas via Gemini Vision AI ──────────────
-const PDF_FALLBACK_MODELS = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+const PDF_FALLBACK_MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
 
 export const parsePdfRemisiones = async (req: any, res: Response) => {
   try {
