@@ -3,10 +3,8 @@ import { exec } from 'child_process';
 import util from 'util';
 import fs from 'fs';
 import path from 'path';
-import { createRequire } from 'module';
 import { AIOrchestrator } from './ai-orchestrator/orchestrator.js';
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+import { pdfParse } from '../utils/pdfParser.js';
 
 const execAsync = util.promisify(exec);
 

@@ -5,10 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import { PDFDocument } from 'pdf-lib';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createRequire } from 'module';
-
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+import { pdfParse } from '../utils/pdfParser.js';
 
 // Función para obtener el pool de API Keys desde el CSV
 const getAPIKeysPool = (): string[] => {
@@ -174,12 +171,18 @@ async function generateContentWithRetry(modelNameStr: string, promptData: any, s
                 throw new Error(leakedMessage);
             }
 
-            const isQuotaError = errorStr.includes('429') || error.status === 429 || errorStr.includes('quota');
-            const isNetworkError = errorStr.includes('error fetching') || errorStr.includes('fetch failed') ||
+            const isQuotaError = errorStr.includes('429') || error.status === 429 || errorStr.includes('quota') || errorStr.includes('too many requests');
+            
+            // Un error de red real no debería tener un código de estado HTTP de error de aplicación (4xx, 5xx)
+            const hasHttpStatusError = errorStr.includes('400') || errorStr.includes('403') || errorStr.includes('404') || errorStr.includes('500') || errorStr.includes('503') || isQuotaError;
+            
+            const isNetworkError = !hasHttpStatusError && (
+                errorStr.includes('error fetching') || errorStr.includes('fetch failed') ||
                 errorStr.includes('econnreset') || errorStr.includes('econnrefused') ||
                 errorStr.includes('etimedout') || errorStr.includes('enotfound') ||
                 errorStr.includes('network') || errorStr.includes('socket') ||
-                (error.cause && String(error.cause).toLowerCase().includes('fetch'));
+                (error.cause && String(error.cause).toLowerCase().includes('fetch'))
+            );
 
             if (isNetworkError && i < maxRetries - 1) {
                 const waitSec = Math.pow(2, i) * 3; // 3s, 6s, 12s...

@@ -56,6 +56,10 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   const [clients, setClients] = useState<GDocClient[]>([]);
   const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [clientsReady, setClientsReady] = useState(false);
+  // M7-FIX: un solo cargue con selector obligado (evita que el usuario suba el archivo
+  // equivocado al botón equivocado — el tipo de plan ahora es una decisión explícita, no
+  // una elección implícita al hacer clic en una de dos zonas de arrastre parecidas).
+  const [uploadPlanType, setUploadPlanType] = useState<'' | 'Plan Normal' | 'Plan R'>('');
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
 
   // Estados para Modal de Detalle (Recepción/Auditoría)
@@ -455,10 +459,6 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
            });
         };
         
-        // Detección Exacta para Validación Cruzada (Solicitud Usuario)
-        const iExactUnOrig = headers.findIndex(h => h.toLowerCase().trim() === 'un orig');
-        const iExactUn = headers.findIndex(h => h.toLowerCase().trim() === 'un');
-
         const iPlaca = findIdx(['placa', 'vehículo', 'vehiculo', 'plate']);
         // Quitamos "carga" de términos genéricos que pueden coincidir con "carga wms" si queremos ser estrictos, 
         // pero con la prioridad exacta "Carga" ganará a "Carga WMS".
@@ -479,40 +479,10 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
              return;
         }
 
-        // VALIDACIÓN ESTRICTA POR TIPO DE PLAN (Solicitud Usuario)
-        if (type === 'Plan Normal') {
-          if (iExactUnOrig === -1) {
-            setSyncError({
-              title: "FORMATO INCORRECTO: PLAN NORMAL",
-              message: "Usted seleccionó PLAN NORMAL y el documento NO coincide con lo requerido para el cargue.",
-              duplicates: []
-            });
-            return;
-          }
-        }
-
-        if (type === 'Plan R') {
-          // Si tiene 'UN ORIG', es un Plan Normal, debe ser bloqueado en la opción de Plan R
-          if (iExactUnOrig !== -1) {
-            setSyncError({
-              title: "FORMATO CRUZADO DETECTADO",
-              message: "Usted seleccionó PLAN R y el documento NO coincide con lo requerido para el cargue (Se detectó formato PLAN NORMAL).",
-              duplicates: []
-            });
-            return;
-          }
-          
-          // Debe tener la columna 'UN' exacta
-          if (iExactUn === -1) {
-            setSyncError({
-              title: "FORMATO INCORRECTO: PLAN R",
-              message: "Usted seleccionó PLAN R y el documento NO coincide con lo requerido para el cargue.",
-              duplicates: []
-            });
-            return;
-          }
-        }
-
+        // M7-FIX (solicitud usuario): la selección del usuario en el dropdown MANDA — ya no se
+        // bloquea el cargue si el archivo no coincide exactamente con el formato esperado del
+        // tipo elegido. El usuario puede subir un Plan R con formato de Plan Normal (o viceversa)
+        // y el documento se guarda con el tipo que él seleccionó explícitamente, no el detectado.
         const isPlanR = type === 'Plan R';
 
         // Lógica Específica por Tipo de Plan
@@ -1000,6 +970,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
           if (onRefresh) onRefresh();
           toast.success(`Procesados ${payloadDocs.length} documentos (Creación/Actualización).`);
           setPreview(null);
+          setUploadPlanType('');
         } else {
           toast.error(`Error del servidor: ${res.error || 'Desconocido'}`);
         }
@@ -1104,25 +1075,42 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                       <span className="text-[9px] text-amber-600 font-bold uppercase tracking-wide">Selecciona un cliente para cargar planes</span>
                     )}
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <div className="bg-emerald-50/20 p-8 rounded-[2rem] border-2 border-dashed border-emerald-100 flex flex-col items-center justify-center text-center hover:border-emerald-500 hover:bg-emerald-50/40 transition-all group">
-                        <div className="w-12 h-12 bg-white text-emerald-600 rounded-xl flex items-center justify-center mb-4 shadow-sm border border-emerald-50 group-hover:scale-110 transition-transform"><Icons.Excel className="w-6 h-6" /></div>
-                        <h3 className="text-sm font-black text-slate-900 uppercase">Plan Normal</h3>
-                        <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 tracking-widest">Excel con columnas "UN ORIG"</p>
-                        <label className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black text-[9px] uppercase mt-6 cursor-pointer shadow-md hover:bg-emerald-600 transition-all active:scale-95">
-                           Subir Normal
-                           <input type="file" accept=".xlsx,.xls" className="hidden" onChange={e=>handleFileUpload(e, 'Plan Normal')} />
-                        </label>
+                  <div className="max-w-2xl mx-auto bg-slate-50/40 p-8 rounded-[2rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-center">
+                     <div className="w-12 h-12 bg-white text-slate-600 rounded-xl flex items-center justify-center mb-4 shadow-sm border border-slate-100"><Icons.Excel className="w-6 h-6" /></div>
+                     <h3 className="text-sm font-black text-slate-900 uppercase">Cargar Plan</h3>
+                     <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 tracking-widest">Indica el tipo de plan antes de subir el archivo</p>
+
+                     <div className="w-full max-w-xs mt-6">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5 text-left">Tipo de Plan *</label>
+                        <select
+                          value={uploadPlanType}
+                          onChange={e => setUploadPlanType(e.target.value as '' | 'Plan Normal' | 'Plan R')}
+                          className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl text-xs font-black text-slate-700 bg-white outline-none focus:border-slate-900 transition-all uppercase"
+                        >
+                          <option value="">— Selecciona el tipo de plan —</option>
+                          <option value="Plan Normal">Plan Normal</option>
+                          <option value="Plan R">Plan R</option>
+                        </select>
                      </div>
-                     <div className="bg-blue-50/20 p-8 rounded-[2rem] border-2 border-dashed border-blue-100 flex flex-col items-center justify-center text-center hover:border-blue-500 hover:bg-blue-50/40 transition-all group">
-                        <div className="w-12 h-12 bg-white text-blue-600 rounded-xl flex items-center justify-center mb-4 shadow-sm border border-blue-50 group-hover:scale-110 transition-transform"><Icons.Excel className="w-6 h-6" /></div>
-                        <h3 className="text-sm font-black text-slate-900 uppercase">Plan R</h3>
-                        <p className="text-[8px] text-slate-400 font-bold uppercase mt-1 tracking-widest">Excel/CSV con columnas "UN"</p>
-                        <label className="bg-slate-900 text-white px-8 py-3 rounded-xl font-black text-[9px] uppercase mt-6 cursor-pointer shadow-md hover:bg-blue-600 transition-all active:scale-95">
-                           Subir Plan R
-                           <input type="file" accept=".csv,.xlsx,.xls" className="hidden" onChange={e=>handleFileUpload(e, 'Plan R')} />
-                        </label>
-                     </div>
+
+                     {/* M7-FIX: el botón de subir solo aparece cuando cliente Y tipo de plan
+                         están seleccionados — evita mostrar un botón "activo" que en realidad
+                         va a fallar por falta de cliente. */}
+                     {selectedClientId && uploadPlanType ? (
+                       <label className="px-8 py-3 rounded-xl font-black text-[9px] uppercase mt-6 shadow-md transition-all active:scale-95 bg-slate-900 text-white cursor-pointer hover:bg-emerald-600">
+                          Subir Archivo
+                          <input
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            className="hidden"
+                            onChange={e => handleFileUpload(e, uploadPlanType)}
+                          />
+                       </label>
+                     ) : (
+                       <p className="text-[9px] font-bold text-amber-600 uppercase tracking-wide mt-6">
+                         {!selectedClientId ? 'Selecciona un cliente' : 'Selecciona el tipo de plan'} para continuar
+                       </p>
+                     )}
                   </div>
 
                   <div className="space-y-8">
@@ -1241,7 +1229,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
                        <div className="flex items-center gap-2">
                           <button onClick={() => exportToExcel(filteredPreviewItems, "M7_Prevalidacion")} className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all border border-emerald-400" title="Exportar"><Icons.Excel className="w-4 h-4" /></button>
-                          <button onClick={()=>setPreview(null)} className="p-2 bg-slate-800 text-slate-400 rounded-lg hover:bg-red-500 hover:text-white transition-all" title="Cerrar"><Icons.X className="w-4 h-4" /></button>
+                          <button onClick={()=>{setPreview(null); setUploadPlanType('');}} className="p-2 bg-slate-800 text-slate-400 rounded-lg hover:bg-red-500 hover:text-white transition-all" title="Cerrar"><Icons.X className="w-4 h-4" /></button>
                        </div>
                     </div>
 
@@ -1281,7 +1269,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                     </div>
 
                     <div className="p-4 border-t bg-slate-50 flex justify-between items-center shrink-0">
-                       <button onClick={()=>setPreview(null)} className="px-6 py-2 bg-white text-slate-500 border rounded-xl font-bold text-[9px] uppercase hover:bg-slate-100 transition-all">Cancelar</button>
+                       <button onClick={()=>{setPreview(null); setUploadPlanType('');}} className="px-6 py-2 bg-white text-slate-500 border rounded-xl font-bold text-[9px] uppercase hover:bg-slate-100 transition-all">Cancelar</button>
                        <div className="flex gap-4 items-center">
                          <span className="text-[10px] font-black text-slate-400 uppercase">Confirmar {preview.mapped.length} documentos</span>
                          <button onClick={handleSync} className="px-10 py-2 bg-slate-900 text-white rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-600 transition-all active:scale-95 shadow-lg">Iniciar Sincronización</button>

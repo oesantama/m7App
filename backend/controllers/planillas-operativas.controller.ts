@@ -3,10 +3,8 @@ import pool from '../config/database.js';
 import { syncDriveCumplidos } from '../services/drive-gemini.service.js';
 import { AIOrchestrator } from '../services/ai-orchestrator/orchestrator.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createRequire } from 'module';
 import { performLocalOCR } from '../utils/ocr.js';
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+import { pdfParse } from '../utils/pdfParser.js';
 
 
 // ─── Inicialización y Migración de Esquema ──────────────────────────────────
