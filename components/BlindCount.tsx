@@ -119,9 +119,31 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
   // M7 AI BRAIN: Memoria Auto-Regenerativa (Aprendizaje por Operador)
   const [aiBrain, setAiBrain] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('m7_ai_brain_relations');
-    return saved ? JSON.parse(saved) : {};
+    try {
+      const saved = localStorage.getItem('m7_ai_brain_relations');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
   });
+
+  // M7-FIX: el brain crecía sin límite (un código basura nuevo por entrada, para siempre) hasta
+  // llenar la cuota de localStorage y tumbar la app entera con QuotaExceededError, porque el
+  // setItem no estaba protegido. Ahora se topa a las N entradas más recientes y el guardado
+  // nunca lanza — si falla, solo se queda sin persistir esa vez, no rompe el conteo.
+  const AI_BRAIN_MAX_ENTRIES = 500;
+  const persistAiBrain = (brain: Record<string, string>): Record<string, string> => {
+    const keys = Object.keys(brain);
+    const trimmed = keys.length > AI_BRAIN_MAX_ENTRIES
+      ? Object.fromEntries(keys.slice(keys.length - AI_BRAIN_MAX_ENTRIES).map(k => [k, brain[k]]))
+      : brain;
+    try {
+      localStorage.setItem('m7_ai_brain_relations', JSON.stringify(trimmed));
+    } catch (err) {
+      console.warn('[M7-AI-BRAIN] No se pudo guardar el aprendizaje (cuota de almacenamiento excedida)', err);
+    }
+    return trimmed;
+  };
 
   // M7 V12 BACKGROUND WORKER: Cola virtual para procesos pesados de escáner.
   const scanQueue = useRef<string[]>([]);
@@ -346,11 +368,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
               toAutoIgnore.forEach(inc => {
                   if (inc.code) newBrainUpdates[inc.code] = '*IGNORE*';
               });
-              setAiBrain(prevBrain => {
-                 const nextBrain = { ...prevBrain, ...newBrainUpdates };
-                 localStorage.setItem('m7_ai_brain_relations', JSON.stringify(nextBrain));
-                 return nextBrain;
-              });
+              setAiBrain(prevBrain => persistAiBrain({ ...prevBrain, ...newBrainUpdates }));
           }
           return toKeep;
       });
@@ -377,8 +395,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
             // El cerebro se equivocó por una ráfaga previa. Lo "desbaneamos" en caliente.
             const nextBrain = { ...aiBrain };
             delete nextBrain[input];
-            setAiBrain(nextBrain);
-            localStorage.setItem('m7_ai_brain_relations', JSON.stringify(nextBrain));
+            setAiBrain(persistAiBrain(nextBrain));
             // Dejamos que continúe el flujo para procesar la lectura ahora limpia
         } else {
             // Es OP real o basura real confirmada
@@ -461,8 +478,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
          
          // Inmediatamente alimentamos el Cerebro Auto-Regenerador para el futuro
          const newBrain = { ...aiBrain, [input]: targetId };
-         setAiBrain(newBrain);
-         localStorage.setItem('m7_ai_brain_relations', JSON.stringify(newBrain));
+         setAiBrain(persistAiBrain(newBrain));
 
          setLastScan({ 
             id: Math.random(),
@@ -507,8 +523,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
                 
                 // Enseñar al cerebro que este código gigante significa 'targetId'
                 const newBrain = { ...aiBrain, [input]: targetId };
-                setAiBrain(newBrain);
-                localStorage.setItem('m7_ai_brain_relations', JSON.stringify(newBrain));
+                setAiBrain(persistAiBrain(newBrain));
 
                 handleBingoEffects();
                 setCurrentPage(1); // M7 V16: Auto-Focus
@@ -536,8 +551,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
     if (!isKnownProduct && Date.now() - lastValidScanAt.current <= 800) {
         // Silenciador de ráfagas para códigos desconocidos (ej: lotes)
         const newBrain = { ...aiBrain, [input]: '*IGNORE*' };
-        setAiBrain(newBrain);
-        localStorage.setItem('m7_ai_brain_relations', JSON.stringify(newBrain));
+        setAiBrain(persistAiBrain(newBrain));
         setScanInput('');
         return; 
     }
@@ -583,8 +597,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
     if (!/^[a-zA-Z]/i.test(input) && !inMaster) {
         // Enseñar al bot para que lo descarte más rápido todavía la prox. vez (Caché O(1))
         const newBrain = { ...aiBrain, [input]: '*IGNORE*' };
-        setAiBrain(newBrain);
-        localStorage.setItem('m7_ai_brain_relations', JSON.stringify(newBrain));
+        setAiBrain(persistAiBrain(newBrain));
         setScanInput('');
         return;
     }
@@ -936,8 +949,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
     if (action === 'ignore' && incident.code) {
         const newBrain = { ...aiBrain, [incident.code]: '*IGNORE*' };
-        setAiBrain(newBrain);
-        localStorage.setItem('m7_ai_brain_relations', JSON.stringify(newBrain));
+        setAiBrain(persistAiBrain(newBrain));
         toast.success('Regla de IA guardada', { description: `El sistema ignorará silenciosamente esta ráfaga de basura.` });
     } else if (action === 'confirm') {
       const targetCode = cleanSkuM7(incident.suggestion || incident.code);
@@ -977,8 +989,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
       // Solo si la ráfaga incidente era diferente a la conclusión forzada y existía.
       if (incident.code && incident.code !== targetCode) {
          const newBrain = { ...aiBrain, [incident.code]: targetCode };
-         setAiBrain(newBrain);
-         localStorage.setItem('m7_ai_brain_relations', JSON.stringify(newBrain));
+         setAiBrain(persistAiBrain(newBrain));
          toast.success('M7 AI Memoria Actualizada', { description: `Ráfaga configurada para procesarse automáticamente en el futuro.` });
       }
     }

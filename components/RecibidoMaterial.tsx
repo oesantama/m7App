@@ -226,6 +226,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         toast.success("Inventario finalizado y sincronizado.");
         localStorage.removeItem(`m7_offline_count_${selectedDocForCount.id}`);
         localStorage.removeItem(`m7_extras_${selectedDocForCount.id}`);
+        localStorage.removeItem(`m7_incidents_${selectedDocForCount.id}`);
 
         setSelectedDocForCount(null);
 

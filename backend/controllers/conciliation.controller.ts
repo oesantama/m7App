@@ -4,6 +4,7 @@ import pool from '../config/database.js';
 // @ts-ignore – xlsx está instalado en el servidor; no hay node_modules local
 import * as XLSX from 'xlsx';
 import { readFileSync, unlink } from 'fs';
+import { clearInvoicesCache } from './document.controller.js';
 
 // ─── GET /conciliation/pending ───────────────────────────────────────────────
 // Documentos Plan R con estado EST-12 (entregado) o EST-13 (parcial) que aún
@@ -1957,17 +1958,34 @@ export const addMissingInvoice = async (req: Request, res: Response) => {
         const finalUnCode = unCode ? unCode.trim() : 'AJV21';
         const finalClientRef = clientRef ? clientRef.trim() : '';
 
-        // Preparar artículos
-        const finalItems = (items && items.length > 0) ? items : [{ articleId: 'GENERICO', expectedQty: 1, peso: null, volume: null, orderNumber: null }];
+        // Validar y preparar artículos
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ success: false, error: 'Debe registrar al menos un artículo' });
+        }
+
+        const finalItems = items.map((item: any) => ({
+            articleId: String(item.articleId || '').trim().toUpperCase(),
+            expectedQty: Number(item.expectedQty) || 1,
+            unit: String(item.unit || 'UND').trim().toUpperCase(),
+            peso: item.peso !== undefined && item.peso !== null && item.peso !== '' ? Number(item.peso) : null,
+            volume: item.volume !== undefined && item.volume !== null && item.volume !== '' ? Number(item.volume) : null,
+            orderNumber: item.orderNumber ? String(item.orderNumber).trim() : null
+        }));
+
+        if (finalItems.some(it => !it.articleId)) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ success: false, error: 'Todos los artículos deben tener SKU / Artículo' });
+        }
 
         // Insertar cada ítem
         for (const item of finalItems) {
             await client.query(
                 `INSERT INTO document_items (
                     document_id, invoice, customer_name, item_status, expected_qty, 
-                    un_code, client_ref, city, address, peso, volume, order_number, article_id
+                    un_code, client_ref, city, address, peso, volume, order_number, article_id, unit
                  )
-                 VALUES ($1, $2, $3, 'PENDIENTE', $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                 VALUES ($1, $2, $3, 'EST-03', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
                 [
                     documentId, 
                     invoiceNumber, 
@@ -1980,7 +1998,8 @@ export const addMissingInvoice = async (req: Request, res: Response) => {
                     item.peso ? Number(item.peso) : null,
                     item.volume ? Number(item.volume) : null,
                     item.orderNumber || null,
-                    item.articleId || 'GENERICO'
+                    item.articleId || 'GENERICO',
+                    item.unit
                 ]
             );
         }
@@ -2002,6 +2021,7 @@ export const addMissingInvoice = async (req: Request, res: Response) => {
         }
 
         await client.query('COMMIT');
+        clearInvoicesCache();
         res.json({ success: true, message: 'Factura añadida exitosamente' });
     } catch (err: any) {
         await client.query('ROLLBACK');

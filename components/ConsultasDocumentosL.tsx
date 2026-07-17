@@ -44,6 +44,16 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const [searchResults, setSearchResults] = useState<DocumentL[] | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<DocumentL | null>(null);
 
+  React.useEffect(() => {
+    if (selectedDoc) {
+      const source = searchResults !== null ? searchResults : documents;
+      const updated = source.find(d => d.id === selectedDoc.id);
+      if (updated) {
+        setSelectedDoc(updated);
+      }
+    }
+  }, [documents, searchResults]);
+
   // States for Document L Payment Upload
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showAddMissingInvoiceModal, setShowAddMissingInvoiceModal] = useState(false);

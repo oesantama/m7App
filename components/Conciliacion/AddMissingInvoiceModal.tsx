@@ -25,13 +25,13 @@ const AddMissingInvoiceModal: React.FC<AddMissingInvoiceModalProps> = ({ isOpen,
     const [address, setAddress] = useState('');
     
     // Artículos (items)
-    const [items, setItems] = useState([{ articleId: '', expectedQty: 1 as number | '', peso: '' as number | '', volume: '' as number | '', orderNumber: '' }]);
+    const [items, setItems] = useState([{ articleId: '', expectedQty: 1 as number | '', unit: 'UND', peso: '' as number | '', volume: '' as number | '', orderNumber: '' }]);
     
     const [loading, setLoading] = useState(false);
 
     if (!isOpen) return null;
 
-    const addItem = () => setItems([...items, { articleId: '', expectedQty: 1, peso: '', volume: '', orderNumber: '' }]);
+    const addItem = () => setItems([...items, { articleId: '', expectedQty: 1, unit: 'UND', peso: '', volume: '', orderNumber: '' }]);
     const removeItem = (idx: number) => setItems(items.filter((_, i) => i !== idx));
 
     const updateItem = (idx: number, field: string, value: any) => {
@@ -47,18 +47,40 @@ const AddMissingInvoiceModal: React.FC<AddMissingInvoiceModalProps> = ({ isOpen,
             return;
         }
 
+        if (items.length === 0) {
+            toast.error('Debe registrar al menos un artículo');
+            return;
+        }
+
+        // Validate items are fully populated
+        for (let i = 0; i < items.length; i++) {
+            const it = items[i];
+            if (!it.articleId.trim()) {
+                toast.error(`El artículo #${i + 1} no tiene SKU / Artículo`);
+                return;
+            }
+            if (it.expectedQty === '' || Number(it.expectedQty) <= 0) {
+                toast.error(`El artículo #${i + 1} debe tener una cantidad válida mayor a 0`);
+                return;
+            }
+            if (!it.unit || !it.unit.trim()) {
+                toast.error(`El artículo #${i + 1} no tiene Unidad de Medida (UM)`);
+                return;
+            }
+        }
+
         try {
             setLoading(true);
             const userStr = localStorage.getItem('user');
             const userId = userStr ? JSON.parse(userStr).id : '';
 
-            // Clean empty items
-            const cleanedItems = items.filter(it => it.articleId || it.orderNumber || (it.expectedQty && Number(it.expectedQty) > 0)).map(it => ({
-                articleId: it.articleId || 'GENERICO',
-                expectedQty: Number(it.expectedQty) || 1,
+            const cleanedItems = items.map(it => ({
+                articleId: it.articleId.trim().toUpperCase(),
+                expectedQty: Number(it.expectedQty),
+                unit: it.unit.trim().toUpperCase(),
                 peso: it.peso !== '' ? Number(it.peso) : undefined,
                 volume: it.volume !== '' ? Number(it.volume) : undefined,
-                orderNumber: it.orderNumber || undefined
+                orderNumber: it.orderNumber.trim() || undefined
             }));
 
             await api.addMissingInvoice({
@@ -73,7 +95,7 @@ const AddMissingInvoiceModal: React.FC<AddMissingInvoiceModalProps> = ({ isOpen,
                 unCode: unCode || undefined,
                 city: city || undefined,
                 address: address || undefined,
-                items: cleanedItems.length > 0 ? cleanedItems : undefined
+                items: cleanedItems
             });
 
             toast.success('Factura adicionada correctamente');
@@ -159,19 +181,98 @@ const AddMissingInvoiceModal: React.FC<AddMissingInvoiceModalProps> = ({ isOpen,
                             </div>
                         </div>
 
-                        {/* ACORDEÓN DE CAMPOS OPCIONALES */}
+                        {/* SECCIÓN ARTÍCULOS DE LA FACTURA (OBLIGATORIA) */}
+                        <div className="border border-slate-700 rounded-xl p-4 bg-slate-800/30 space-y-4">
+                            <div className="flex justify-between items-center mb-1">
+                                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                                    Artículos de la Factura * <span className="text-[10px] text-slate-500 normal-case font-normal">(Mínimo 1 artículo)</span>
+                                </h4>
+                                <button 
+                                    type="button" 
+                                    onClick={addItem} 
+                                    className="text-xs bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 px-2.5 py-1 rounded-lg transition-colors font-medium"
+                                >
+                                    + Agregar Artículo
+                                </button>
+                            </div>
+                            
+                            <div className="space-y-3">
+                                {items.map((item, idx) => (
+                                    <div key={idx} className="flex flex-wrap items-end gap-2 bg-slate-900/50 p-2.5 rounded-lg border border-slate-700/50">
+                                        <div className="flex-1 min-w-[120px]">
+                                            <label className="block text-[10px] text-slate-400 mb-1">SKU / Artículo *</label>
+                                            <input 
+                                                type="text" 
+                                                value={item.articleId} 
+                                                onChange={(e) => updateItem(idx, 'articleId', e.target.value)} 
+                                                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-emerald-500" 
+                                                placeholder="SKU o Descripción" 
+                                                required 
+                                            />
+                                        </div>
+                                        <div className="w-20">
+                                            <label className="block text-[10px] text-slate-400 mb-1">Cant. *</label>
+                                            <input 
+                                                type="number" 
+                                                value={item.expectedQty} 
+                                                onChange={(e) => updateItem(idx, 'expectedQty', e.target.value ? Number(e.target.value) : '')} 
+                                                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-emerald-500" 
+                                                min="1" 
+                                                placeholder="1" 
+                                                required 
+                                            />
+                                        </div>
+                                        <div className="w-20">
+                                            <label className="block text-[10px] text-slate-400 mb-1">UM *</label>
+                                            <input 
+                                                type="text" 
+                                                value={item.unit} 
+                                                onChange={(e) => updateItem(idx, 'unit', e.target.value)} 
+                                                className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-emerald-500" 
+                                                placeholder="UND" 
+                                                required 
+                                            />
+                                        </div>
+                                        <div className="w-24">
+                                            <label className="block text-[10px] text-slate-500 mb-1">Peso</label>
+                                            <input type="number" step="0.01" value={item.peso} onChange={(e) => updateItem(idx, 'peso', e.target.value ? Number(e.target.value) : '')} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-emerald-500" min="0" placeholder="0.00" />
+                                        </div>
+                                        <div className="w-24">
+                                            <label className="block text-[10px] text-slate-500 mb-1">Volumen</label>
+                                            <input type="number" step="0.0001" value={item.volume} onChange={(e) => updateItem(idx, 'volume', e.target.value ? Number(e.target.value) : '')} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-emerald-500" min="0" placeholder="0.0000" />
+                                        </div>
+                                        <div className="flex-1 min-w-[100px]">
+                                            <label className="block text-[10px] text-slate-500 mb-1">Pedido / Orden</label>
+                                            <input type="text" value={item.orderNumber} onChange={(e) => updateItem(idx, 'orderNumber', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs focus:outline-none focus:border-emerald-500" placeholder="N° Orden" />
+                                        </div>
+                                        {items.length > 1 && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => removeItem(idx)} 
+                                                className="h-7 w-7 flex justify-center items-center rounded bg-red-900/30 text-red-400 hover:bg-red-600 hover:text-white transition-colors" 
+                                                title="Quitar artículo"
+                                            >
+                                                ×
+                                            </button>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* ACORDEÓN DE DETALLES ADICIONALES (OPCIONALES) */}
                         <div className="border border-slate-700 rounded-xl overflow-hidden">
                             <button
                                 type="button"
                                 onClick={() => setShowOptionals(!showOptionals)}
                                 className="w-full bg-slate-800/80 px-4 py-3 flex justify-between items-center text-sm font-bold text-slate-300 hover:text-white transition-colors"
                             >
-                                <span>{showOptionals ? 'Ocultar' : 'Mostrar'} Detalles Adicionales y Artículos (Opcionales)</span>
+                                <span>{showOptionals ? 'Ocultar' : 'Mostrar'} Detalles Adicionales (Opcionales)</span>
                                 <span className={`transform transition-transform ${showOptionals ? 'rotate-180' : ''}`}>▼</span>
                             </button>
                             
                             {showOptionals && (
-                                <div className="p-4 bg-slate-800/30 space-y-6 border-t border-slate-700">
+                                <div className="p-4 bg-slate-800/30 space-y-4 border-t border-slate-700">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="block text-xs font-medium text-slate-400 mb-1">Nombre del Cliente</label>
@@ -192,45 +293,6 @@ const AddMissingInvoiceModal: React.FC<AddMissingInvoiceModalProps> = ({ isOpen,
                                         <div className="md:col-span-2">
                                             <label className="block text-xs font-medium text-slate-400 mb-1">Dirección</label>
                                             <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-white text-sm" placeholder="Ej. Kr 32 106 A 10" />
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="border-t border-slate-700 pt-4">
-                                        <div className="flex justify-between items-center mb-3">
-                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Artículos de la Factura</h4>
-                                            <button type="button" onClick={addItem} className="text-xs bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/40 px-2 py-1 rounded transition-colors">+ Agregar Artículo</button>
-                                        </div>
-                                        
-                                        <div className="space-y-3">
-                                            {items.map((item, idx) => (
-                                                <div key={idx} className="flex flex-wrap items-end gap-2 bg-slate-900/50 p-2.5 rounded-lg border border-slate-700/50">
-                                                    <div className="flex-1 min-w-[120px]">
-                                                        <label className="block text-[10px] text-slate-500 mb-1">SKU / Artículo</label>
-                                                        <input type="text" value={item.articleId} onChange={(e) => updateItem(idx, 'articleId', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs" placeholder="SKU o Descripción" />
-                                                    </div>
-                                                    <div className="w-20">
-                                                        <label className="block text-[10px] text-slate-500 mb-1">Cant.</label>
-                                                        <input type="number" value={item.expectedQty} onChange={(e) => updateItem(idx, 'expectedQty', e.target.value ? Number(e.target.value) : '')} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs" min="1" placeholder="1" />
-                                                    </div>
-                                                    <div className="w-24">
-                                                        <label className="block text-[10px] text-slate-500 mb-1">Peso</label>
-                                                        <input type="number" step="0.01" value={item.peso} onChange={(e) => updateItem(idx, 'peso', e.target.value ? Number(e.target.value) : '')} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs" min="0" placeholder="0.00" />
-                                                    </div>
-                                                    <div className="w-24">
-                                                        <label className="block text-[10px] text-slate-500 mb-1">Volumen</label>
-                                                        <input type="number" step="0.0001" value={item.volume} onChange={(e) => updateItem(idx, 'volume', e.target.value ? Number(e.target.value) : '')} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs" min="0" placeholder="0.0000" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-[100px]">
-                                                        <label className="block text-[10px] text-slate-500 mb-1">Pedido / Orden</label>
-                                                        <input type="text" value={item.orderNumber} onChange={(e) => updateItem(idx, 'orderNumber', e.target.value)} className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs" placeholder="N° Orden" />
-                                                    </div>
-                                                    {items.length > 1 && (
-                                                        <button type="button" onClick={() => removeItem(idx)} className="h-7 w-7 flex justify-center items-center rounded bg-red-900/30 text-red-400 hover:bg-red-600 hover:text-white transition-colors" title="Quitar artículo">
-                                                            ×
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ))}
                                         </div>
                                     </div>
                                 </div>
