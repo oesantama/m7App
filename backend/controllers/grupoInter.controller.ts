@@ -4,8 +4,8 @@ import * as XLSX from 'xlsx';
 import path from 'path';
 import fs from 'fs';
 import { PDFDocument } from 'pdf-lib';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { pdfParse } from '../utils/pdfParser.js';
+import { AIOrchestrator } from '../services/ai-orchestrator/orchestrator.js';
 
 // Función para obtener el pool de API Keys desde el CSV
 const getAPIKeysPool = (): string[] => {
@@ -121,151 +121,6 @@ const ensureSchema = async () => {
         console.error('[GRUPO-INTER] Error al normalizar esquema:', e);
     }
 };
-
-// Variable para rastrear qué llave estamos usando (Round Robin)
-let currentKeyIndex = 0;
-
-// Función para obtener el modelo de visión con inicialización perezosa (Lazy)
-const getVisionModel = (modelName?: string, forceApiKey?: string) => {
-    const keys = getAPIKeysPool();
-    const apiKey = forceApiKey || keys[currentKeyIndex % keys.length] || '';
-    
-    if (!apiKey) {
-        console.error('[OCR-NUCLEAR] ❌ ERROR CRÍTICO: No se detectó ninguna API Key válida en el pool.');
-    }
-    
-    // M7-DYNAMIC-MODEL: Uso dinámico
-    const modelId = modelName || "gemini-2.5-flash"; 
-    
-    const keyForLog = apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4);
-    console.log(`[OCR-NUCLEAR] 🧠 Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}] | Modelo: ${modelId} | Key: ${keyForLog}`);
-    
-    const genAI = new GoogleGenerativeAI(apiKey);
-    return genAI.getGenerativeModel({ model: modelId });
-};
-
-// No inicializar globalmente para evitar capturar process.env vacío al arranque
-let visionModel: any = null;
-
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-async function generateContentWithRetry(modelNameStr: string, promptData: any, sendProgress: Function, maxRetries = 4, workerContext?: { id: number, keyIndex: number }) {
-    const keys = getAPIKeysPool();
-    let localModel = getVisionModel(modelNameStr, workerContext ? keys[workerContext.keyIndex] : keys[currentKeyIndex % keys.length]);
-    let poolTrialCount = 0;
-    const workerLabel = workerContext ? `[W${workerContext.id + 1}]` : '';
-
-    for (let i = 0; i < maxRetries; i++) {
-        try {
-            const result = await localModel.generateContent(promptData);
-            return result;
-        } catch (error: any) {
-            const errorStr = (error.toString() + (error.message || '')).toLowerCase();
-            const isLeakedError = errorStr.includes('leaked') || errorStr.includes('filtrada') || errorStr.includes('reported as leaked');
-            if (isLeakedError) {
-                const leakedMessage = `❌ Llave API de Gemini bloqueada/filtrada. Por favor actualice el archivo .env con una llave activa.`;
-                sendProgress({
-                    type: 'log',
-                    message: `⚠️ ${workerLabel} ${leakedMessage}`
-                });
-                throw new Error(leakedMessage);
-            }
-
-            const isQuotaError = errorStr.includes('429') || error.status === 429 || errorStr.includes('quota') || errorStr.includes('too many requests');
-            
-            // Un error de red real no debería tener un código de estado HTTP de error de aplicación (4xx, 5xx)
-            const hasHttpStatusError = errorStr.includes('400') || errorStr.includes('403') || errorStr.includes('404') || errorStr.includes('500') || errorStr.includes('503') || isQuotaError;
-            
-            const isNetworkError = !hasHttpStatusError && (
-                errorStr.includes('error fetching') || errorStr.includes('fetch failed') ||
-                errorStr.includes('econnreset') || errorStr.includes('econnrefused') ||
-                errorStr.includes('etimedout') || errorStr.includes('enotfound') ||
-                errorStr.includes('network') || errorStr.includes('socket') ||
-                (error.cause && String(error.cause).toLowerCase().includes('fetch'))
-            );
-
-            if (isNetworkError && i < maxRetries - 1) {
-                const waitSec = Math.pow(2, i) * 3; // 3s, 6s, 12s...
-                sendProgress({
-                    type: 'log',
-                    message: `🌐 ${workerLabel} Error de red en pág. Reintentando en ${waitSec}s... (${i + 1}/${maxRetries})`,
-                    isWaiting: true
-                });
-                await sleep(waitSec * 1000);
-                continue;
-            }
-
-            if (isQuotaError && i < maxRetries - 1) {
-                // FASE 1: Extraer tiempo de espera sugerido por Google
-                let waitSeconds = 0;
-                const matchFull = errorStr.match(/retry in ([\d.]+)(s|ms)/);
-                
-                if (matchFull) {
-                    waitSeconds = parseFloat(matchFull[1]);
-                    if (matchFull[2].toLowerCase().startsWith('m')) waitSeconds /= 1000;
-                    waitSeconds += 2; // Margen de seguridad nuclear
-                }
-
-                // FASE 2: Comportamiento Aislado (MODO WORKER v1.9.25)
-                if (workerContext) {
-                    // En modo trabajador, NO rotamos llaves. Esperamos sobre la nuestra.
-                    // Esto evita el "Thundering Herd" (todos volcándose sobre la misma llave siguiente).
-                    const backoff = Math.max(waitSeconds, Math.pow(2, i) * 5); // Backoff inteligente local
-                    sendProgress({ 
-                        type: 'log', 
-                        message: `⚠️ ${workerLabel} Cuota excedida. Reintentando en ${Math.round(backoff)}s sobre Key [${workerContext.keyIndex + 1}]...`,
-                        isWaiting: true 
-                    });
-                    await sleep(backoff * 1000);
-                    continue;
-                }
-
-                // FASE 3: Rotación Tradicional (Para contexto secuencial/chatbot)
-                if (keys.length > 1) {
-                    currentKeyIndex++;
-                    poolTrialCount++;
-                    const nextKey = keys[currentKeyIndex % keys.length];
-                    
-                    if (poolTrialCount >= keys.length) {
-                        const pauseTime = Math.max(30, waitSeconds);
-                        sendProgress({ 
-                            type: 'log', 
-                            message: `⚠️ POOL SATURADO. Pausa Nuclear de ${Math.round(pauseTime)}s...`,
-                            isWaiting: true 
-                        });
-                        await sleep(pauseTime * 1000);
-                        poolTrialCount = 0;
-                    } else {
-                        // [M7-PERF] Al rotar a una NUEVA llave, ignoramos el castigo de la llave agotada.
-                        const shortWait = 2; // Solo 2s para prevenir spam a la red
-                        sendProgress({ 
-                            type: 'log', 
-                            message: `⚠️ Rotando a Key [${(currentKeyIndex % keys.length) + 1}/${keys.length}] (${shortWait}s)...` 
-                        });
-                        await sleep(shortWait * 1000);
-                    }
-                    
-                    localModel = getVisionModel(modelNameStr, nextKey);
-                    continue;
-                }
-
-                // FASE 4: Backup Backoff
-                if (waitSeconds === 0) {
-                    waitSeconds = Math.pow(1.5, i) * 15 + Math.random() * 5;
-                }
-                sendProgress({ 
-                    type: 'log', 
-                    message: `⚠️ ${workerLabel} Reintentando en ${Math.round(waitSeconds)}s...`,
-                    isWaiting: true 
-                });
-                await sleep(waitSeconds * 1000);
-                continue;
-            }
-            throw error;
-        }
-    }
-    throw new Error(`Milla 7: ${workerLabel} Agotó cuota tras ${maxRetries} intentos.`);
-}
 
 export const uploadExcel = async (req: any, res: Response): Promise<void> => {
     try {
@@ -810,8 +665,6 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         };
 
         const processPage = async (pageIndex: number, workerId: number) => {
-            const keyIndex = workerId % keys.length;
-            const workerContext = { id: workerId, keyIndex };
             const workerLabel = `[W${workerId + 1}]`;
 
             const localText = localPagesMap.get(pageIndex) || '';
@@ -879,38 +732,31 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 4. Si no hay coincidencias, responde: {"matches": []}
                 5. Prohibido agregar formato markdown o texto adicional, solo el JSON raw.`;
 
-                const fallBackModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
-                let geminiSuccess = false;
-
+                // M7-FIX: se migró del SDK de Gemini directo (con fallback de modelos y rotación de
+                // llaves manual en memoria) al AIOrchestrator — mismo motor que ya usan BASC,
+                // Validación y Planillas Operativas. Gana: rotación de llaves coordinada entre TODA
+                // la app (no un contador aislado por módulo), caché automático (evita re-gastar cuota
+                // si la misma página ya se analizó) y posible fallback a otro proveedor de IA.
                 try {
                     const b64 = await getPageBase64();
-                    for (let modelAttempts = 0; modelAttempts < fallBackModels.length; modelAttempts++) {
-                        if (geminiSuccess) break;
-                        
-                        const currentModelName = fallBackModels[modelAttempts];
-                        try {
-                            const result = await generateContentWithRetry(currentModelName, [
-                                { text: prompt },
-                                { inlineData: { data: b64, mimeType: "application/pdf" } }
-                            ], sendProgress, 2, workerContext);
+                    const result = await AIOrchestrator.execute({
+                        prompt,
+                        imageBuffer: Buffer.from(b64, 'base64'),
+                        imageMimeType: 'application/pdf',
+                        taskType: 'ocr',
+                    });
 
-                            const response = await result.response;
-                            const textResponse = response.text().trim();
-                            
-                            const jsonMatch = textResponse.match(/\{[\s\S]*\}/);
-                            if (jsonMatch) {
-                                const data = JSON.parse(jsonMatch[0]);
-                                foundMatchesInPage = data.matches || [];
-                                geminiSuccess = true;
-                            } else {
-                                sendProgress({ type: 'log', message: `⚠️ ${workerLabel} Página ${pageIndex + 1}: Respuesta inválida del modelo ${currentModelName}.` });
-                            }
-                        } catch (pageError: any) {
-                            sendProgress({ type: 'log', message: `❌ ${workerLabel} Error con modelo ${currentModelName} en pág ${pageIndex + 1}: ${pageError?.message?.substring(0, 100)}...` });
-                        }
+                    const cleanJsonStr = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
+                    const jsonMatch = cleanJsonStr.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        const data = JSON.parse(jsonMatch[0]);
+                        foundMatchesInPage = data.matches || [];
+                        sendProgress({ type: 'log', message: `✅ ${workerLabel} Pág ${pageIndex + 1}: OCR IA vía orquestador (${result.providerId}/${result.modelId}${result.cached ? ', caché' : ''}).` });
+                    } else {
+                        sendProgress({ type: 'log', message: `⚠️ ${workerLabel} Página ${pageIndex + 1}: Respuesta inválida del modelo de IA.` });
                     }
-                } catch (pdfErr: any) {
-                    sendProgress({ type: 'log', message: `❌ ${workerLabel} Error al preparar página ${pageIndex + 1}: ${pdfErr.message}` });
+                } catch (pageError: any) {
+                    sendProgress({ type: 'log', message: `❌ ${workerLabel} Error de IA en pág ${pageIndex + 1}: ${pageError?.message?.substring(0, 150)}...` });
                 }
             }
 
