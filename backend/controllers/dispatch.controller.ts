@@ -1274,8 +1274,12 @@ export const getInvoiceReturnData = async (req: Request, res: Response) => {
         `, [inv]);
 
         // Mapa article_id → total ya devuelto
+        // M7-FIX: las devoluciones REVERSADAS (CANCELLED) no cuentan como "ya devuelto" — al
+        // reversar antes de la confirmación de facturación, la factura debe quedar libre para
+        // volver a registrar la devolución desde cero.
         const returnedByArticle: Record<string, number> = {};
         for (const row of prevReturnsResult.rows) {
+            if (row.return_status === 'CANCELLED') continue;
             const aid = String(row.article_id || '').trim().toUpperCase();
             returnedByArticle[aid] = (returnedByArticle[aid] || 0) + Number(row.qty_returned);
         }
@@ -1877,6 +1881,62 @@ export const confirmReturnFacturacion = async (req: Request, res: Response) => {
     } catch (err: any) {
         console.error('[M7-RETURNS] confirmReturnFacturacion:', err.message);
         res.status(500).json({ error: err.message });
+    }
+};
+
+// ─── POST /api/dispatch/delivery-returns/:id/reverse ─────────────────────────
+// Reversa (cancela) una devolución — SOLO permitido antes de que facturación la
+// confirme (status PENDING/PROCESSED). No borra el registro: lo marca CANCELLED
+// y deja un log del movimiento para trazabilidad (quién, cuándo, por qué).
+export const reverseReturn = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { reason, reversedBy } = req.body;
+
+    if (!reason || !String(reason).trim()) {
+        return res.status(400).json({ error: 'Debe indicar el motivo de la reversión' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const current = await client.query(
+            `SELECT status FROM delivery_returns WHERE id = $1 FOR UPDATE`,
+            [id]
+        );
+        if (!current.rowCount) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ error: 'Devolución no encontrada' });
+        }
+
+        const statusBefore = current.rows[0].status;
+        if (!['PENDING', 'PROCESSED'].includes(statusBefore)) {
+            await client.query('ROLLBACK');
+            return res.status(409).json({ error: `No se puede reversar: la devolución ya fue confirmada por facturación (estado actual: ${statusBefore}).` });
+        }
+
+        await client.query(`
+            UPDATE delivery_returns
+            SET status = 'CANCELLED',
+                reversed_at = NOW(),
+                reversed_by = $1,
+                reversal_reason = $2
+            WHERE id = $3
+        `, [reversedBy || 'USUARIO', reason, id]);
+
+        await client.query(`
+            INSERT INTO delivery_returns_log (return_id, action, status_before, status_after, observation, usuario)
+            VALUES ($1, 'REVERSADA', $2, 'CANCELLED', $3, $4)
+        `, [id, statusBefore, reason, reversedBy || 'USUARIO']);
+
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error('[M7-RETURNS] reverseReturn:', err.message);
+        res.status(500).json({ error: err.message });
+    } finally {
+        client.release();
     }
 };
 

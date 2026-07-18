@@ -327,6 +327,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ confirmedBy }),
     }),
+  reverseReturn: (id: number, reason: string, reversedBy: string) =>
+    fetchJson(`${API_URL}/dispatch/delivery-returns/${id}/reverse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason, reversedBy }),
+    }),
   confirmDocReceived: (id: string, confirmedBy: string) =>
     fetchJson(`${API_URL}/dispatch/approval-batches/${id}/confirm-doc-received`, {
       method: 'POST',

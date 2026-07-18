@@ -1790,6 +1790,23 @@ export const restoreSystem = async () => {
       ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS completed_by       TEXT;
       ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS excel_downloaded_at TIMESTAMPTZ;
       ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS return_type TEXT CHECK (return_type IN ('COMPLETA','PARCIAL'));
+
+      -- Reversión de devolución (solo permitida antes de confirmación de facturación, PENDING/PROCESSED)
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS reversed_at    TIMESTAMPTZ;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS reversed_by    TEXT;
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS reversal_reason TEXT;
+
+      -- Log de movimientos del pipeline de devoluciones (auditoría: quién, cuándo, qué cambió)
+      CREATE TABLE IF NOT EXISTS delivery_returns_log (
+        id             SERIAL PRIMARY KEY,
+        return_id      TEXT NOT NULL,
+        action         TEXT NOT NULL,
+        status_before  TEXT,
+        status_after   TEXT,
+        observation    TEXT,
+        usuario        TEXT,
+        created_at     TIMESTAMPTZ DEFAULT NOW()
+      );
     `);
 
     await client.query('COMMIT');

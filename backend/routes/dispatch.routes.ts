@@ -31,6 +31,7 @@ import {
     getBodegaReturnsHistory,
     confirmReturnConciliation,
     confirmReturnFacturacion,
+    reverseReturn,
     confirmDocReceived,
     getReturnsForInvoice,
     getReturnsTracking,
@@ -82,6 +83,7 @@ router.get('/approval-batches',                         getApprovalBatches);
 router.get('/approval-batch/:batchCode',                getApprovalBatchByCode);
 router.post('/approval-batches/:id/send-email',         sendApprovalBatchEmail);
 router.post('/delivery-returns/:id/confirm-facturacion', confirmReturnFacturacion);
+router.post('/delivery-returns/:id/reverse',              reverseReturn);
 router.post('/approval-batches/:id/confirm-doc-received', confirmDocReceived);
 
 // Motivos de devolución (maestra)

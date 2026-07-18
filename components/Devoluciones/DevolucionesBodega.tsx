@@ -82,6 +82,9 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
     const [trackingLoading, setTrackingLoading]   = React.useState(false);
     const [selectedExcelIds, setSelectedExcelIds] = React.useState<Set<number>>(new Set());
     const [advancingId, setAdvancingId]           = React.useState<number | null>(null);
+    const [reverseModal, setReverseModal]         = React.useState<TrackingReturn[] | null>(null);
+    const [reverseReason, setReverseReason]       = React.useState('');
+    const [reversing, setReversing]               = React.useState(false);
     const [visibleStatuses, setVisibleStatuses]   = React.useState<Set<string>>(
         new Set(['PENDING','CONFIRMED','PRE_APPROVAL','PRE_APPROVED','SUPPLIER_EXIT'])
     );
@@ -566,6 +569,34 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
             setSelectedExcelIds(new Set());
         } catch (e: any) { showToast(e?.message ?? 'Error al confirmar facturación', false); }
         finally { setAdvancingId(null); }
+    };
+
+    // ── Reversar devolución en lote (solo PENDING/PROCESSED, antes de confirmar facturación) ──
+    const handleReverseBatch = async () => {
+        if (!reverseModal || !reverseReason.trim()) return;
+        const userName = user?.name ?? user?.email ?? 'USUARIO';
+        setReversing(true);
+        try {
+            const results = await Promise.allSettled(
+                reverseModal.map(r => api.reverseReturn(r.id, reverseReason.trim(), userName))
+            );
+            const okIds = reverseModal.filter((_, i) => results[i].status === 'fulfilled').map(r => r.id);
+            const failCount = results.length - okIds.length;
+
+            if (okIds.length > 0) {
+                setTrackingReturns(prev => prev.filter(r => !okIds.includes(r.id)));
+                setSelectedExcelIds(new Set());
+                showToast(`Devolución(es) reversada(s): ${okIds.length}${failCount > 0 ? ` — ${failCount} no se pudieron reversar` : ''}`, failCount === 0);
+            } else {
+                showToast('No se pudo reversar ninguna devolución', false);
+            }
+            setReverseModal(null);
+            setReverseReason('');
+        } catch (e: any) {
+            showToast(e?.message ?? 'Error al reversar', false);
+        } finally {
+            setReversing(false);
+        }
     };
 
     // ── Totales para badge ─────────────────────────────────────────────────────
@@ -1417,6 +1448,16 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                                                             Excel{sel.length > 0 ? ` (${sel.length})` : ''}
                                                         </button>
                                                     )}
+                                                    {/* Reversar — SOLO en PENDING (antes de confirmar facturación) */}
+                                                    {stage.isFacturacion && sel.length > 0 && (
+                                                        <button
+                                                            disabled={advancingId === -1 || reversing}
+                                                            onClick={() => setReverseModal(sel)}
+                                                            className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-black uppercase tracking-widest rounded-xl disabled:opacity-50">
+                                                            <Icons.X className="w-3 h-3" />
+                                                            Reversar ({sel.length})
+                                                        </button>
+                                                    )}
                                                     {/* Acción de avance de estado — solo cuando hay seleccionados */}
                                                     {stage.nextStatus && sel.length > 0 && (
                                                         <button
@@ -1618,6 +1659,49 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
                 </>
             )}
         </div>
+
+        {/* Modal: motivo obligatorio para reversar devolución (solo PENDING/PROCESSED) */}
+        {reverseModal && (
+            <div className="fixed inset-0 z-[500] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-white w-full max-w-md rounded-[2rem] shadow-2xl p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 bg-rose-100 text-rose-600 rounded-xl flex items-center justify-center shrink-0">
+                            <Icons.Alert className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-black text-slate-900 uppercase">Reversar devolución</h3>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{reverseModal.length} devolución(es) seleccionada(s)</p>
+                        </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mb-3">
+                        Esta acción cancela la devolución antes de que facturación la confirme. Quedará registrada en el log de movimientos con el motivo indicado.
+                    </p>
+                    <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-1.5">Motivo de la reversión *</label>
+                    <textarea
+                        value={reverseReason}
+                        onChange={e => setReverseReason(e.target.value)}
+                        placeholder="Ej: se registró por error, factura equivocada..."
+                        className="w-full h-24 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:border-rose-500 resize-none"
+                        autoFocus
+                    />
+                    <div className="flex gap-3 mt-5">
+                        <button
+                            onClick={() => { setReverseModal(null); setReverseReason(''); }}
+                            disabled={reversing}
+                            className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50">
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={handleReverseBatch}
+                            disabled={reversing || !reverseReason.trim()}
+                            className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                            {reversing ? <Icons.Loader className="w-3.5 h-3.5 animate-spin" /> : <Icons.X className="w-3.5 h-3.5" />}
+                            {reversing ? 'Reversando...' : 'Confirmar Reversión'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
 
         </>
     );
