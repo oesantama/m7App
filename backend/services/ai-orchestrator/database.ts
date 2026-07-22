@@ -416,13 +416,16 @@ export async function getActiveModels(): Promise<AIModel[]> {
 }
 
 export async function getKeysForProvider(providerId: string): Promise<AIKey[]> {
+    // Desbloquear automáticamente llaves bloqueadas temporalmente por límites de cuota si ha pasado 1 minuto
+    await pool.query(`UPDATE ai_keys SET status = 'active', consecutive_errors = 0 WHERE status = 'blocked' AND (last_used_at IS NULL OR last_used_at < NOW() - INTERVAL '1 minute')`);
+
     const result = await pool.query(
         `SELECT id, provider_id AS "providerId", api_key_encrypted AS "apiKeyEncrypted", 
                 label, status, quota_limit_tokens AS "quotaLimitTokens", quota_used_tokens AS "quotaUsedTokens", 
                 quota_reset_at AS "quotaResetAt", consecutive_errors AS "consecutiveErrors", 
                 last_used_at AS "lastUsedAt", latency_avg_ms AS "latencyAvgMs"
          FROM ai_keys 
-         WHERE provider_id = $1 AND status != 'blocked'
+         WHERE provider_id = $1 AND status != 'disabled'
          ORDER BY consecutive_errors ASC, last_used_at NULLS FIRST`,
         [providerId]
     );
@@ -455,6 +458,7 @@ export async function updateKeyMetrics(keyId: number, success: boolean, latencyM
         await pool.query(
             `UPDATE ai_keys 
              SET consecutive_errors = 0,
+                 status = 'active',
                  quota_used_tokens = quota_used_tokens + $1,
                  last_used_at = CURRENT_TIMESTAMP,
                  latency_avg_ms = (latency_avg_ms * 9 + $2) / 10
@@ -466,7 +470,7 @@ export async function updateKeyMetrics(keyId: number, success: boolean, latencyM
             `UPDATE ai_keys 
              SET consecutive_errors = consecutive_errors + 1,
                  last_used_at = CURRENT_TIMESTAMP,
-                 status = CASE WHEN consecutive_errors + 1 >= 5 THEN 'blocked'::varchar ELSE status END
+                 status = CASE WHEN consecutive_errors + 1 >= 10 THEN 'blocked'::varchar ELSE status END
              WHERE id = $1`,
             [keyId]
         );
