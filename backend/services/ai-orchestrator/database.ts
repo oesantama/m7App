@@ -345,20 +345,18 @@ async function seedDefaults() {
     // Unblock any blocked keys
     await pool.query(`UPDATE ai_keys SET status = 'active', consecutive_errors = 0 WHERE status = 'blocked'`);
 
-    // Sync legacy GEMINI_API_KEYS into the table to initialize automatically
+    // Sync GEMINI_API_KEYS from environment variables directly into the database on startup
     const rawKeys = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
     const keys = rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
-    for (let i = 0; i < keys.length; i++) {
-        const encrypted = encrypt(keys[i]);
-        const label = `Gemini Key ${i + 1} (From .env)`;
-        const existing = await pool.query(`SELECT id FROM ai_keys WHERE label = $1 OR api_key_encrypted = $2`, [label, encrypted]);
-        if (existing.rows.length === 0) {
+    if (keys.length > 0) {
+        await pool.query(`DELETE FROM ai_keys WHERE provider_id = 'gemini'`);
+        for (let i = 0; i < keys.length; i++) {
+            const encrypted = encrypt(keys[i]);
+            const label = `Gemini Key ${i + 1} (From .env)`;
             await pool.query(
                 `INSERT INTO ai_keys (provider_id, api_key_encrypted, label, status) VALUES ($1, $2, $3, $4)`,
                 ['gemini', encrypted, label, 'active']
             );
-        } else {
-            await pool.query(`UPDATE ai_keys SET status = 'active', consecutive_errors = 0 WHERE id = $1`, [existing.rows[0].id]);
         }
     }
 
