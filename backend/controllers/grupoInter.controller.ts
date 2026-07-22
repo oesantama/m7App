@@ -35,6 +35,7 @@ const ensureSchema = async () => {
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS f_ultimo_corte TIMESTAMP WITH TIME ZONE;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS clasificacion TEXT;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS numero_guia TEXT;
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS nro_guia TEXT;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS latitud NUMERIC;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS longitud NUMERIC;
             ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS ruta TEXT;
@@ -522,6 +523,7 @@ export const uploadManifestExcel = async (req: Request, res: Response): Promise<
 
 export const processPDF = async (req: any, res: Response): Promise<void> => {
     try {
+        await ensureSchema();
         if (!req.file || !req.file.path) {
             res.status(400).json({ message: 'No se subió ningún PDF' });
             return;
