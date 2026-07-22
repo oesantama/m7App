@@ -4,6 +4,7 @@ import Dashboard from './Dashboard';
 import DriveSync from './DriveSync';
 import AuditorAI from './AuditorAI';
 import Reportes from './Reportes';
+import BascUploader from './BascUploader';
 import { Icons } from '../../constants';
 
 interface BascModuleProps {
@@ -41,6 +42,8 @@ const BascModule: React.FC<BascModuleProps> = ({ activePageId, setActivePageId }
         return <AuditorAI />;
       case 'PAG-BASC-04':
         return <Reportes tree={tree} loading={loading} />;
+      case 'PAG-BASC-05':
+        return <BascUploader />;
       case 'PAG-BASC-01':
       default:
         return <Dashboard tree={tree} loading={loading} onNavigate={setActivePageId} />;

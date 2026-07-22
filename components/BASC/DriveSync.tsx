@@ -78,13 +78,7 @@ const DriveSync: React.FC<DriveSyncProps> = ({ tree, loading, onRefresh }) => {
     }
   };
 
-  const displayNames: Record<string, string> = {
-    '01_Normativa_y_Manuales': '01. Normativas y Manuales BASC',
-    '02_Analisis_de_Riesgos': '02. Matrices y Análisis de Riesgos',
-    '03_Asociados_de_Negocio': '03. Control de Asociados de Negocio',
-    '04_Seguridad_Fisica_y_Personal': '04. Seguridad Física y del Personal',
-    '05_Auditorias_e_Informes': '05. Auditorías, Informes y PAC'
-  };
+  const displayNames: Record<string, string> = {};
 
   return (
     <div className="flex-1 flex flex-col p-6 md:p-10 bg-slate-950 text-white min-h-full overflow-y-auto">

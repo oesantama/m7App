@@ -19,7 +19,9 @@ const AuditorAI: React.FC = () => {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -30,20 +32,28 @@ const AuditorAI: React.FC = () => {
   }, [messages, loading]);
 
   const handleSend = async (textToSend: string) => {
-    if (!textToSend.trim()) return;
+    if (!textToSend.trim() && files.length === 0) return;
 
+    const attachedFilesText = files.length > 0 ? ` [${files.length} archivo(s) adjunto(s)]` : '';
     const userMsg: Message = {
       sender: 'user',
-      text: textToSend,
+      text: (textToSend || 'Por favor valida los documentos adjuntos.') + attachedFilesText,
       timestamp: new Date()
     };
 
     setMessages(prev => [...prev, userMsg]);
     setInput('');
+    const filesToSend = [...files];
+    setFiles([]); // clear immediately
     setLoading(true);
 
+    const historyToSend = messages.slice(1).map(m => ({
+      role: m.sender === 'ai' ? 'model' : 'user',
+      text: m.text
+    }));
+
     try {
-      const res = await api.bascChat(textToSend);
+      const res = await api.bascChat(textToSend || 'Valida los documentos adjuntos de acuerdo a la norma BASC', filesToSend, historyToSend);
       if (res && res.success) {
         setMessages(prev => [
           ...prev,
@@ -200,26 +210,67 @@ const AuditorAI: React.FC = () => {
             </div>
           )}
 
+          {/* File Previews */}
+          {files.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-2 px-2">
+              {files.map((f, i) => (
+                <div key={i} className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/50 text-slate-300 px-3 py-1.5 rounded-lg text-xs font-bold">
+                  <Icons.FileText className="w-3.5 h-3.5 text-purple-400" />
+                  <span className="max-w-[150px] truncate">{f.name}</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setFiles(files.filter((_, idx) => idx !== i))}
+                    className="text-slate-500 hover:text-red-400 ml-1"
+                  >
+                    <Icons.X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Form Input */}
           <form
             onSubmit={e => {
               e.preventDefault();
               handleSend(input);
             }}
-            className="flex items-center gap-3 bg-slate-900 border border-slate-800/85 hover:border-slate-700/80 p-1.5 rounded-2xl focus-within:border-purple-500 transition-all"
+            className="flex items-center gap-2 bg-slate-900 border border-slate-800/85 hover:border-slate-700/80 p-1.5 rounded-2xl focus-within:border-purple-500 transition-all"
           >
+            <input 
+              type="file"
+              multiple
+              className="hidden"
+              ref={fileInputRef}
+              onChange={e => {
+                if (e.target.files) {
+                  setFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+                }
+              }}
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.md"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading}
+              className="p-2.5 text-slate-400 hover:text-purple-400 hover:bg-slate-800/50 rounded-xl transition-all disabled:opacity-50 shrink-0"
+              title="Adjuntar Archivos"
+            >
+              <Icons.Paperclip className="w-5 h-5" />
+            </button>
+
             <input
               type="text"
               value={input}
               onChange={e => setInput(e.target.value)}
               placeholder="Realice una consulta de auditoría BASC (ej: manual de seguridad, hallazgos...)"
               disabled={loading}
-              className="flex-1 bg-transparent border-0 outline-none text-sm text-white placeholder-slate-500 px-3 py-2 disabled:opacity-50"
+              className="flex-1 bg-transparent border-0 outline-none text-sm text-white placeholder-slate-500 px-2 py-2 disabled:opacity-50"
             />
 
             <button
               type="submit"
-              disabled={loading || !input.trim()}
+              disabled={loading || (!input.trim() && files.length === 0)}
               className="p-3 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white rounded-xl transition-all shadow-md shadow-purple-500/10 active:scale-95 disabled:opacity-40 shrink-0"
             >
               <Icons.Send className="w-4 h-4" />

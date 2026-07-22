@@ -58,6 +58,7 @@ const ApprovalManager = lazyWithRetry(() => import('./components/ApprovalManager
 const ChatbotWidget = lazyWithRetry(() => import('./components/ChatbotWidget'));
 const DriverGamification = lazyWithRetry(() => import('./components/DriverGamification'));
 const ExecutiveDashboard = lazyWithRetry(() => import('./components/ExecutiveDashboard'));
+const CyberModule = lazyWithRetry(() => import('./components/Cybersecurity/CyberModule'));
 const GrupoInterView = lazyWithRetry(() => import('./components/GrupoInterView'));
 const MastersuiteReport = lazyWithRetry(() => import('./components/MastersuiteReport'));
 const TrainingAdmin = lazyWithRetry(() => import('./components/TrainingAdmin'));
@@ -1048,6 +1049,8 @@ const App: React.FC = () => {
         return <ConsultaInventario user={user!} />;
       case 'salida-proveedor':
         return <SalidaProveedor user={user!} />;
+      case 'cybersecurity':
+        return <CyberModule />;
       case 'capacitaciones':
         return <CentroCapacitaciones user={user!} />;
       case 'noticias-avisos':

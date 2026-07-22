@@ -48,6 +48,7 @@ import ghMiscelaneosRoutes from './gh-miscelaneos.routes.js';
 import ghPersonalRoutes from './gh-personal.routes.js';
 import cfgCiudadesRoutes from './cfg-ciudades.routes.js';
 import ghVisitasRoutes from './gh-visitas.routes.js';
+import cybersecurityRoutes from './cybersecurity.routes.js';
 import deliveryScheduleRoutes from './delivery-schedule.routes.js';
 import ajoverB36Routes from './ajover-b36.routes.js';
 import managementReportRoutes from './management-report.routes.js';
@@ -144,6 +145,7 @@ router.use('/validation', validationRoutes);
 router.use('/hv', hojasVidaRoutes);
 router.use('/public/hv', hvPublicRouter);
 router.use('/basc', bascRoutes);
+router.use('/cybersecurity', cybersecurityRoutes);
 
 // Endpoint seguro: devuelve la API key de Gemini del backend al frontend autenticado
 router.get('/config/gemini-key', (req: any, res) => {

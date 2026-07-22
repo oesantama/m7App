@@ -52,6 +52,14 @@ const Dashboard: React.FC<DashboardProps> = ({ tree, loading, onNavigate }) => {
           </button>
           
           <button
+            onClick={() => onNavigate('PAG-BASC-05')}
+            className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-400 hover:to-indigo-400 text-white px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-300 shadow-lg shadow-blue-500/20 active:scale-95"
+          >
+            <Icons.Upload className="w-4 h-4" />
+            Validar Docs
+          </button>
+          
+          <button
             onClick={() => onNavigate('PAG-BASC-02')}
             className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-white px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-300"
           >
