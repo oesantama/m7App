@@ -637,6 +637,8 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         sendProgress({ type: 'log', message: `🚀 Iniciando Motor Atómico de Procesamiento...` });
         
         let finalMatches = 0;
+        let aiErrorCount = 0;
+        let lastAiError = '';
         const matchedDetails: Array<{ id: number; doc: string; page: number; method: string }> = [];
         const username = req.body.username || 'System OCR';
 
@@ -775,8 +777,10 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                         }
                         ocrSuccess = true;
                     } catch (pageError: any) {
+                        aiErrorCount++;
+                        lastAiError = pageError?.message || 'Error en llamada de IA';
                         if (attempts >= 2) {
-                            sendProgress({ type: 'log', message: `⚠️ ${workerLabel} Nota en pág ${pageIndex + 1}: ${pageError?.message?.substring(0, 100)}` });
+                            sendProgress({ type: 'log', message: `⚠️ ${workerLabel} Nota en pág ${pageIndex + 1}: ${lastAiError.substring(0, 100)}` });
                         } else {
                             await new Promise(r => setTimeout(r, 400));
                         }
@@ -859,6 +863,13 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         });
 
         await Promise.all(workerPromises);
+
+        if (finalMatches === 0 && aiErrorCount > 0) {
+            sendProgress({
+                type: 'log',
+                message: `⚠️ ALERTA DE CONFIGURACIÓN IA: Se intentó analizar las imágenes escaneadas pero las llaves API de Gemini/OpenRouter rechazaron la petición (${lastAiError.substring(0, 100)}). Por favor configure una llave Gemini válida (AIzaSy...) en las variables de entorno de Coolify.`
+            });
+        }
 
         sendProgress({ type: 'end', message: `Motor Atómico Finalizado.`, matches: finalMatches, matchedDetails });
         res.end();
