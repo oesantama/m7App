@@ -560,54 +560,55 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             return;
         }
 
-        // M7-ATOMIC-OCR v2: Mapa de Variaciones Multi-Clave (Exactas, Numéricas, Sin Ceros, etc.)
-        const numericDocsMap = new Map<string, string>();
-        const registerVariation = (variant: string, originalDoc: string) => {
+        // M7-ATOMIC-OCR v3: Mapa de Variaciones por ID de Pedido (ID Primario de BD)
+        const idMap = new Map<string, number>();
+        const docNameMap = new Map<number, string>();
+
+        const registerVariation = (variant: string, pedidoId: number, originalDoc: string) => {
             if (!variant) return;
             const cleanStr = String(variant).trim();
             if (!cleanStr) return;
             
+            docNameMap.set(pedidoId, originalDoc);
+
             // 1. Raw exact (upper)
-            numericDocsMap.set(cleanStr.toUpperCase(), originalDoc);
+            idMap.set(cleanStr.toUpperCase(), pedidoId);
             
             // 2. Alphanumeric clean (sin guiones/espacios)
             const alphaClean = cleanStr.toUpperCase().replace(/[^A-Z0-9]/g, '');
-            if (alphaClean) numericDocsMap.set(alphaClean, originalDoc);
+            if (alphaClean) idMap.set(alphaClean, pedidoId);
             
-            // 3. Dígitos puros
+            // 3. Dígitos puros (solo si tiene al menos 3 dígitos)
             const digitsOnly = cleanStr.replace(/\D/g, '');
-            if (digitsOnly) {
-                numericDocsMap.set(digitsOnly, originalDoc);
+            if (digitsOnly && digitsOnly.length >= 3) {
+                idMap.set(digitsOnly, pedidoId);
                 // 4. Dígitos sin ceros a la izquierda
                 const noLeadingZeros = digitsOnly.replace(/^0+/, '');
-                if (noLeadingZeros) numericDocsMap.set(noLeadingZeros, originalDoc);
+                if (noLeadingZeros && noLeadingZeros.length >= 3) {
+                    idMap.set(noLeadingZeros, pedidoId);
+                }
             }
         };
 
         for (const row of pendingRows) {
+            const pedidoId = row.id;
             const orig = row.numero_documento;
             if (orig) {
-                registerVariation(orig, orig);
+                registerVariation(orig, pedidoId, orig);
             }
             if (row.no_factura_m7) {
-                registerVariation(row.no_factura_m7, orig);
-            }
-            if (row.numero_guia) {
-                registerVariation(row.numero_guia, orig);
-            }
-            if (row.nro_guia) {
-                registerVariation(row.nro_guia, orig);
+                registerVariation(row.no_factura_m7, pedidoId, orig || row.no_factura_m7);
             }
         }
 
-        if (numericDocsMap.size === 0) {
+        if (idMap.size === 0) {
             sendProgress({ type: 'log', message: 'No hay pedidos con identificadores válidos.' });
             sendProgress({ type: 'end', message: 'No hay pedidos válidos para analizar.', matches: 0 });
             res.end();
             return;
         }
 
-        sendProgress({ type: 'log', message: `✅ Indexadas ${pendingRows.length} facturas pendientes (${numericDocsMap.size} variaciones de código).` });
+        sendProgress({ type: 'log', message: `✅ Indexadas ${pendingRows.length} facturas pendientes (${idMap.size} variaciones de código por ID).` });
         
         // 🟢 PRE-FASE: Extracción de texto local del PDF completo
         sendProgress({ type: 'log', message: `⚡ Analizando texto local del PDF (${totalPages} páginas)...` });
@@ -654,7 +655,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             const workerLabel = `[W${workerId + 1}]`;
 
             const localText = localPagesMap.get(pageIndex) || '';
-            let foundMatchesInPage: string[] = [];
+            let foundMatchesInPage: number[] = [];
             let localExtractionSuccess = false;
 
             let pageBase64 = '';
@@ -674,45 +675,48 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 const cleanTextDigits = cleanTextUpper.replace(/[^0-9]/g, '');
                 const tokens = cleanTextUpper.split(/[^A-Z0-9]+/);
 
-                const currentKeys = Array.from(numericDocsMap.keys());
-                const pageMatches = new Set<string>();
+                const currentKeys = Array.from(idMap.keys());
+                const pageMatches = new Set<number>();
 
                 for (const key of currentKeys) {
-                    const originalDoc = numericDocsMap.get(key);
-                    if (!originalDoc) continue;
+                    const pid = idMap.get(key);
+                    if (!pid) continue;
 
                     // Coincidencia 1: Alfanumérica exacta (ej. FV100045369 o FP1543)
                     if (key.length >= 4 && cleanTextAlphanumeric.includes(key)) {
-                        pageMatches.add(originalDoc);
+                        pageMatches.add(pid);
                         continue;
                     }
 
                     // Coincidencia 2: Secuencia de dígitos (para números de >= 5 dígitos)
                     const isPureDigits = /^\d+$/.test(key);
                     if (isPureDigits && key.length >= 5 && cleanTextDigits.includes(key)) {
-                        pageMatches.add(originalDoc);
+                        pageMatches.add(pid);
                         continue;
                     }
 
                     // Coincidencia 3: Token exacto en el texto del PDF
                     if (tokens.includes(key)) {
-                        pageMatches.add(originalDoc);
+                        pageMatches.add(pid);
                         continue;
                     }
                 }
 
                 if (pageMatches.size > 0) {
                     foundMatchesInPage = Array.from(pageMatches);
-                    sendProgress({ type: 'log', message: `⚡ ${workerLabel} Pág ${pageIndex + 1}: Lectura LOCAL exitosa (${foundMatchesInPage.join(', ')}).` });
+                    const docLabels = foundMatchesInPage.map(id => docNameMap.get(id) || id);
+                    sendProgress({ type: 'log', message: `⚡ ${workerLabel} Pág ${pageIndex + 1}: Lectura LOCAL exitosa (${docLabels.join(', ')}).` });
                     localExtractionSuccess = true;
                 }
             }
 
             // FASE 2: Si la lectura local no encontró coincidencias en la página, usar AI OCR (para PDFs escaneados)
-            if (!localExtractionSuccess && numericDocsMap.size > 0) {
+            if (!localExtractionSuccess && idMap.size > 0) {
                 sendProgress({ type: 'log', message: `🤖 ${workerLabel} Pág ${pageIndex + 1}: Sin texto plano local. Ejecutando OCR de IA...` });
                 
-                const sampleDocs = Array.from(new Set(numericDocsMap.values())).slice(0, 100);
+                const samplePids = Array.from(new Set(idMap.values())).slice(0, 100);
+                const sampleDocs = samplePids.map(id => docNameMap.get(id)).filter(Boolean);
+
                 const prompt = `Actúa como un motor OCR de logística. 
                 Analiza esta página PDF escaneada.
                 Busca EXCLUSIVAMENTE si aparece alguna de estas facturas o documentos (ignorando espacios o prefijos como FEV, FV, FP, TI, FI):
@@ -741,13 +745,14 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                         const rawMatches: string[] = data.matches || [];
                         for (const m of rawMatches) {
                             const cleanM = String(m).trim().toUpperCase();
-                            const matchedDoc = numericDocsMap.get(cleanM) || numericDocsMap.get(cleanM.replace(/\D/g, ''));
-                            if (matchedDoc) {
-                                foundMatchesInPage.push(matchedDoc);
+                            const matchedPid = idMap.get(cleanM) || idMap.get(cleanM.replace(/\D/g, ''));
+                            if (matchedPid && !foundMatchesInPage.includes(matchedPid)) {
+                                foundMatchesInPage.push(matchedPid);
                             }
                         }
                         if (foundMatchesInPage.length > 0) {
-                            sendProgress({ type: 'log', message: `✅ ${workerLabel} Pág ${pageIndex + 1}: OCR IA detectó (${foundMatchesInPage.join(', ')}) vía ${result.providerId}/${result.modelId}.` });
+                            const docLabels = foundMatchesInPage.map(id => docNameMap.get(id) || id);
+                            sendProgress({ type: 'log', message: `✅ ${workerLabel} Pág ${pageIndex + 1}: OCR IA detectó (${docLabels.join(', ')}) vía ${result.providerId}/${result.modelId}.` });
                         }
                     }
                 } catch (pageError: any) {
@@ -755,38 +760,39 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 }
             }
 
-            // FASE 3: Guardar coincidencias en la base de datos (bajo mutex)
+            // FASE 3: Guardar coincidencias en la base de datos (por ID primario) bajo mutex
             if (foundMatchesInPage.length > 0) {
                 await dbMutex.acquire();
                 try {
-                    for (const originalDocId of foundMatchesInPage) {
-                        sendProgress({ type: 'log', message: `🎯 Marcando Entregado: ${originalDocId} (Pág ${pageIndex + 1})` });
+                    for (const pid of foundMatchesInPage) {
+                        const originalDocName = docNameMap.get(pid) || String(pid);
                         
                         const b64 = await getPageBase64();
                         const base64PagePrefix = `data:application/pdf;base64,${b64}`;
 
-                        await pool.query(
-                            "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $3",
-                            [base64PagePrefix, username, originalDocId]
+                        const updateRes = await pool.query(
+                            "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE id = $3 AND estado != 'Entregado'",
+                            [base64PagePrefix, username, pid]
                         );
 
-                        // Registrar en histórico
-                        const pedRes = await pool.query("SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1", [originalDocId]);
-                        if (pedRes.rows.length > 0) {
+                        if (updateRes.rowCount && updateRes.rowCount > 0) {
+                            sendProgress({ type: 'log', message: `🎯 Marcado Entregado en BD: ID ${pid} (${originalDocName}) (Pág ${pageIndex + 1})` });
+                            
+                            // Registrar en histórico
                             await pool.query(
                                 "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', $2, $3)",
-                                [pedRes.rows[0].id, localExtractionSuccess ? 'PDF Procesado (Lectura Local Rápida)' : 'PDF Procesado (OCR IA)', username]
+                                [pid, localExtractionSuccess ? 'PDF Procesado (Lectura Local Rápida)' : 'PDF Procesado (OCR IA)', username]
                             );
-                        }
-                        
-                        // Eliminar de las variaciones para no re-procesarlo en otras páginas
-                        for (const [k, v] of Array.from(numericDocsMap.entries())) {
-                            if (v === originalDocId) {
-                                numericDocsMap.delete(k);
+                            
+                            // Eliminar todas las variaciones de este ID para no re-procesarlo en otras páginas
+                            for (const [k, v] of Array.from(idMap.entries())) {
+                                if (v === pid) {
+                                    idMap.delete(k);
+                                }
                             }
+                            
+                            finalMatches++;
                         }
-                        
-                        finalMatches++;
                     }
                 } finally {
                     dbMutex.release();
