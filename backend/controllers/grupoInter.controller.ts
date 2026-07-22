@@ -541,18 +541,10 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         sendProgress({ type: 'start', totalPages });
 
         const planilla = req.body.planilla?.trim();
-        let queryStr = "SELECT id, numero_documento, no_factura_m7, numero_guia, nro_guia, estado FROM grupo_inter_pedidos WHERE 1=1";
-        let queryParams: any[] = [];
+        const queryStr = "SELECT id, numero_documento, no_factura_m7, numero_guia, nro_guia, estado FROM grupo_inter_pedidos";
+        sendProgress({ type: 'log', message: `🔍 Indexando facturas para escaneo de PDF...` });
         
-        if (planilla) {
-            queryStr += " AND (numero_planilla = $1 OR estado != 'Entregado')";
-            queryParams.push(planilla);
-            sendProgress({ type: 'log', message: `🔍 Analizando Planilla: ${planilla} + Facturas Pendientes` });
-        } else {
-            queryStr += " AND estado != 'Entregado'";
-        }
-        
-        const ordersResult = await pool.query(queryStr, queryParams);
+        const ordersResult = await pool.query(queryStr);
         const pendingRows = ordersResult.rows;
 
         if (pendingRows.length === 0) {
