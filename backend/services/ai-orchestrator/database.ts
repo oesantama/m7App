@@ -137,12 +137,8 @@ export async function ensureOrchestratorSchema() {
 
         await client.query('COMMIT');
 
-        // Seed default providers and models if empty
-        const providerCount = await pool.query('SELECT COUNT(*) FROM ai_providers');
-        if (parseInt(providerCount.rows[0].count) === 0) {
-            console.log('[ORCH-DB] Seeding default AI Orchestrator configurations...');
-            await seedDefaults();
-        }
+        // Sincronizar proveedores, modelos (incluyendo multimodal OpenRouter/Gemini) y llaves de .env en cada inicio
+        await seedDefaults();
 
     } catch (e) {
         await client.query('ROLLBACK');
@@ -326,7 +322,9 @@ async function seedDefaults() {
 
     for (const p of providers) {
         await pool.query(
-            `INSERT INTO ai_providers (id, name, status, priority) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING`,
+            `INSERT INTO ai_providers (id, name, status, priority) 
+             VALUES ($1, $2, $3, $4) 
+             ON CONFLICT (id) DO UPDATE SET status = 'active', priority = EXCLUDED.priority`,
             [p.id, p.name, p.status, p.priority]
         );
     }
@@ -334,38 +332,64 @@ async function seedDefaults() {
     for (const m of models) {
         await pool.query(
             `INSERT INTO ai_models (id, provider_id, name, task_types, cost_per_1k_input_tokens, cost_per_1k_output_tokens, context_window, is_multimodal, status, accuracy_score)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (id) DO NOTHING`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+             ON CONFLICT (id) DO UPDATE SET 
+                task_types = EXCLUDED.task_types, 
+                is_multimodal = EXCLUDED.is_multimodal, 
+                status = 'active', 
+                accuracy_score = EXCLUDED.accuracy_score`,
             [m.id, m.provider_id, m.name, m.task_types, m.cost_input, m.cost_output, m.context, m.multimodal, m.status, m.accuracy]
         );
     }
+
+    // Unblock any blocked keys
+    await pool.query(`UPDATE ai_keys SET status = 'active', consecutive_errors = 0 WHERE status = 'blocked'`);
 
     // Sync legacy GEMINI_API_KEYS into the table to initialize automatically
     const rawKeys = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
     const keys = rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
     for (let i = 0; i < keys.length; i++) {
         const encrypted = encrypt(keys[i]);
-        await pool.query(
-            `INSERT INTO ai_keys (provider_id, api_key_encrypted, label, status) VALUES ($1, $2, $3, $4)`,
-            ['gemini', encrypted, `Gemini Key ${i + 1} (From .env)`, 'active']
-        );
+        const label = `Gemini Key ${i + 1} (From .env)`;
+        const existing = await pool.query(`SELECT id FROM ai_keys WHERE label = $1 OR api_key_encrypted = $2`, [label, encrypted]);
+        if (existing.rows.length === 0) {
+            await pool.query(
+                `INSERT INTO ai_keys (provider_id, api_key_encrypted, label, status) VALUES ($1, $2, $3, $4)`,
+                ['gemini', encrypted, label, 'active']
+            );
+        } else {
+            await pool.query(`UPDATE ai_keys SET status = 'active', consecutive_errors = 0 WHERE id = $1`, [existing.rows[0].id]);
+        }
     }
 
-    // Seed empty OpenRouter key if present in env
+    // Seed OpenRouter key if present in env
     const openrouterKey = process.env.OPENROUTER_API_KEY || '';
     if (openrouterKey) {
-        await pool.query(
-            `INSERT INTO ai_keys (provider_id, api_key_encrypted, label, status) VALUES ($1, $2, $3, $4)`,
-            ['openrouter', encrypt(openrouterKey), 'Primary OpenRouter Key', 'active']
-        );
+        const encrypted = encrypt(openrouterKey);
+        const existing = await pool.query(`SELECT id FROM ai_keys WHERE provider_id = 'openrouter'`);
+        if (existing.rows.length === 0) {
+            await pool.query(
+                `INSERT INTO ai_keys (provider_id, api_key_encrypted, label, status) VALUES ($1, $2, $3, $4)`,
+                ['openrouter', encrypted, 'Primary OpenRouter Key', 'active']
+            );
+        } else {
+            await pool.query(`UPDATE ai_keys SET api_key_encrypted = $1, status = 'active', consecutive_errors = 0 WHERE id = $2`, [encrypted, existing.rows[0].id]);
+        }
     }
 
     // Seed Groq key if present in env
     const groqKey = process.env.GROQ_API_KEY || '';
     if (groqKey) {
-        await pool.query(
-            `INSERT INTO ai_keys (provider_id, api_key_encrypted, label, status) VALUES ($1, $2, $3, $4)`,
-            ['groq', encrypt(groqKey), 'Primary Groq Key', 'active']
-        );
+        const encrypted = encrypt(groqKey);
+        const existing = await pool.query(`SELECT id FROM ai_keys WHERE provider_id = 'groq'`);
+        if (existing.rows.length === 0) {
+            await pool.query(
+                `INSERT INTO ai_keys (provider_id, api_key_encrypted, label, status) VALUES ($1, $2, $3, $4)`,
+                ['groq', encrypted, 'Primary Groq Key', 'active']
+            );
+        } else {
+            await pool.query(`UPDATE ai_keys SET api_key_encrypted = $1, status = 'active', consecutive_errors = 0 WHERE id = $2`, [encrypted, existing.rows[0].id]);
+        }
     }
 }
 
