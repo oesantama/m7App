@@ -101,15 +101,16 @@ export const getCampaignStats = async (req: Request, res: Response) => {
 export const trackPhishingEvent = async (req: Request, res: Response) => {
   try {
     const { campaignId, userEmail, eventType } = req.params;
+    const eventTypeStr = String(eventType || '').toUpperCase();
     const ip = req.ip || req.connection?.remoteAddress;
     const userAgent = req.headers['user-agent'];
 
     await pool.query(
       `INSERT INTO cyber_phishing_events (campaign_id, user_email, event_type, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5)`,
-      [campaignId, userEmail, eventType.toUpperCase(), ip, userAgent]
+      [campaignId, userEmail, eventTypeStr, ip, userAgent]
     );
 
-    if (eventType.toUpperCase() === 'OPEN') {
+    if (eventTypeStr === 'OPEN') {
       const pixel = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64');
       res.writeHead(200, { 'Content-Type': 'image/gif', 'Content-Length': pixel.length });
       res.end(pixel);

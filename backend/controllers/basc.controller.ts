@@ -580,7 +580,7 @@ export const uploadAndValidate = async (req: Request, res: Response) => {
       fs.mkdirSync(folderPath, { recursive: true });
     }
 
-    const results = [];
+    const results: any[] = [];
 
     for (const file of files) {
       // Fix multer latin1 utf8 encoding issue
@@ -732,7 +732,7 @@ Indica:
         }
 
         let correctedFileBase64 = null;
-        let correctedFileName = undefined;
+        let correctedFileName: string | undefined = undefined;
         if (ext === '.xlsx' || ext === '.xls') {
           try {
             const workbook = xlsx.read(file.buffer, { type: 'buffer' });
