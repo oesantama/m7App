@@ -3,7 +3,7 @@ import pool from '../config/database.js';
 import * as XLSX from 'xlsx';
 import path from 'path';
 import fs from 'fs';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, degrees } from 'pdf-lib';
 import { pdfParse } from '../utils/pdfParser.js';
 import { AIOrchestrator } from '../services/ai-orchestrator/orchestrator.js';
 
@@ -541,13 +541,15 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         sendProgress({ type: 'start', totalPages });
 
         const planilla = req.body.planilla?.trim();
-        let queryStr = "SELECT id, numero_documento, no_factura_m7, numero_guia, nro_guia FROM grupo_inter_pedidos WHERE estado != 'Entregado'";
+        let queryStr = "SELECT id, numero_documento, no_factura_m7, numero_guia, nro_guia, estado FROM grupo_inter_pedidos WHERE 1=1";
         let queryParams: any[] = [];
         
         if (planilla) {
             queryStr += " AND numero_planilla = $1";
             queryParams.push(planilla);
-            sendProgress({ type: 'log', message: `🔍 Optimizando búsqueda a la Planilla: ${planilla}` });
+            sendProgress({ type: 'log', message: `🔍 Analizando Planilla: ${planilla}` });
+        } else {
+            queryStr += " AND estado != 'Entregado'";
         }
         
         const ordersResult = await pool.query(queryStr, queryParams);
@@ -608,7 +610,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             return;
         }
 
-        sendProgress({ type: 'log', message: `✅ Indexadas ${pendingRows.length} facturas pendientes (${idMap.size} variaciones de código por ID).` });
+        sendProgress({ type: 'log', message: `✅ Indexadas ${pendingRows.length} facturas de la planilla (${idMap.size} variaciones por ID).` });
         
         // 🟢 PRE-FASE: Extracción de texto local del PDF completo
         sendProgress({ type: 'log', message: `⚡ Analizando texto local del PDF (${totalPages} páginas)...` });
@@ -664,6 +666,17 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 if (pageBase64) return pageBase64;
                 const subPdf = await PDFDocument.create();
                 const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [pageIndex]);
+                
+                // Normalizar la rotación de la página a 0 grados si viene rotada en los metadatos del PDF
+                try {
+                    const currentRot = copiedPage.getRotation().angle;
+                    if (currentRot !== 0) {
+                        copiedPage.setRotation(degrees(0));
+                    }
+                } catch (rotErr) {
+                    // Ignorar si la página no admite lectura de rotación
+                }
+                
                 subPdf.addPage(copiedPage);
                 pageBase64 = await subPdf.saveAsBase64();
                 return pageBase64;
@@ -729,35 +742,45 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 4. Responde ÚNICAMENTE con un JSON estricto: {"matches": ["100313226"]}
                 5. Si no hay coincidencias, responde: {"matches": []}`;
 
-                try {
-                    const b64 = await getPageBase64();
-                    const result = await AIOrchestrator.execute({
-                        prompt,
-                        imageBuffer: Buffer.from(b64, 'base64'),
-                        imageMimeType: 'application/pdf',
-                        taskType: 'ocr',
-                        maxTokens: 1000
-                    });
+                let attempts = 0;
+                let ocrSuccess = false;
+                while (attempts < 2 && !ocrSuccess) {
+                    attempts++;
+                    try {
+                        const b64 = await getPageBase64();
+                        const result = await AIOrchestrator.execute({
+                            prompt,
+                            imageBuffer: Buffer.from(b64, 'base64'),
+                            imageMimeType: 'application/pdf',
+                            taskType: 'ocr',
+                            maxTokens: 1000
+                        });
 
-                    const cleanJsonStr = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
-                    const jsonMatch = cleanJsonStr.match(/\{[\s\S]*\}/);
-                    if (jsonMatch) {
-                        const data = JSON.parse(jsonMatch[0]);
-                        const rawMatches: string[] = data.matches || [];
-                        for (const m of rawMatches) {
-                            const cleanDigits = String(m).trim().replace(/\D/g, '');
-                            const matchedPid = idMap.get(cleanDigits) || idMap.get(cleanDigits.replace(/^0+/, '')) || idMap.get(String(m).trim().toUpperCase());
-                            if (matchedPid && !foundMatchesInPage.includes(matchedPid)) {
-                                foundMatchesInPage.push(matchedPid);
+                        const cleanJsonStr = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
+                        const jsonMatch = cleanJsonStr.match(/\{[\s\S]*\}/);
+                        if (jsonMatch) {
+                            const data = JSON.parse(jsonMatch[0]);
+                            const rawMatches: string[] = data.matches || [];
+                            for (const m of rawMatches) {
+                                const cleanDigits = String(m).trim().replace(/\D/g, '');
+                                const matchedPid = idMap.get(cleanDigits) || idMap.get(cleanDigits.replace(/^0+/, '')) || idMap.get(String(m).trim().toUpperCase());
+                                if (matchedPid && !foundMatchesInPage.includes(matchedPid)) {
+                                    foundMatchesInPage.push(matchedPid);
+                                }
+                            }
+                            if (foundMatchesInPage.length > 0) {
+                                const docLabels = foundMatchesInPage.map(id => docNameMap.get(id) || id);
+                                sendProgress({ type: 'log', message: `✅ ${workerLabel} Pág ${pageIndex + 1}: OCR IA detectó (${docLabels.join(', ')}) vía ${result.providerId}/${result.modelId}.` });
                             }
                         }
-                        if (foundMatchesInPage.length > 0) {
-                            const docLabels = foundMatchesInPage.map(id => docNameMap.get(id) || id);
-                            sendProgress({ type: 'log', message: `✅ ${workerLabel} Pág ${pageIndex + 1}: OCR IA detectó (${docLabels.join(', ')}) vía ${result.providerId}/${result.modelId}.` });
+                        ocrSuccess = true;
+                    } catch (pageError: any) {
+                        if (attempts >= 2) {
+                            sendProgress({ type: 'log', message: `⚠️ ${workerLabel} Nota en pág ${pageIndex + 1}: ${pageError?.message?.substring(0, 100)}` });
+                        } else {
+                            await new Promise(r => setTimeout(r, 400));
                         }
                     }
-                } catch (pageError: any) {
-                    sendProgress({ type: 'log', message: `⚠️ ${workerLabel} Nota en pág ${pageIndex + 1}: ${pageError?.message?.substring(0, 100)}` });
                 }
             }
 
@@ -767,12 +790,14 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 try {
                     for (const pid of foundMatchesInPage) {
                         const originalDocName = docNameMap.get(pid) || String(pid);
+                        const rowObj = pendingRows.find(r => r.id === pid);
+                        const isNewDelivery = rowObj?.estado !== 'Entregado';
                         
                         const b64 = await getPageBase64();
                         const base64PagePrefix = `data:application/pdf;base64,${b64}`;
 
                         const updateRes = await pool.query(
-                            "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE id = $3 AND estado != 'Entregado'",
+                            "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = COALESCE(fecha_entregado, CURRENT_TIMESTAMP) WHERE id = $3",
                             [base64PagePrefix, username, pid]
                         );
 
@@ -780,17 +805,19 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                             const method = localExtractionSuccess ? 'Lectura Local Rápida' : 'OCR IA';
                             sendProgress({ type: 'log', message: `🎯 Marcado Entregado en BD: ID ${pid} (${originalDocName}) (Pág ${pageIndex + 1})` });
                             
-                            // Registrar en histórico
-                            await pool.query(
-                                "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', $2, $3)",
-                                [pid, `PDF Procesado (${method})`, username]
-                            );
+                            // Registrar en histórico solo si recién cambió de estado
+                            if (isNewDelivery) {
+                                await pool.query(
+                                    "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', $2, $3)",
+                                    [pid, `PDF Procesado (${method})`, username]
+                                );
+                            }
                             
                             matchedDetails.push({
                                 id: pid,
                                 doc: originalDocName,
                                 page: pageIndex + 1,
-                                method
+                                method: isNewDelivery ? method : `${method} (Re-confirmado)`
                             });
 
                             // Eliminar todas las variaciones de este ID para no re-procesarlo en otras páginas
