@@ -539,7 +539,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         sendProgress({ type: 'start', totalPages });
 
         const planilla = req.body.planilla?.trim();
-        let queryStr = "SELECT numero_documento, no_factura_m7 FROM grupo_inter_pedidos WHERE estado != 'Entregado'";
+        let queryStr = "SELECT id, numero_documento, no_factura_m7, numero_guia, nro_guia FROM grupo_inter_pedidos WHERE estado != 'Entregado'";
         let queryParams: any[] = [];
         
         if (planilla) {
@@ -558,73 +558,57 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             return;
         }
 
-        // M7-ATOMIC-OCR: Motor Atómico Numérico Exclusivo (v1.9.31)
-        // Extraemos solo la parte numérica de los pedidos porque el PDF puede traerlos sin letras o con otras letras (ej. TR-GENI vs TI)
+        // M7-ATOMIC-OCR v2: Mapa de Variaciones Multi-Clave (Exactas, Numéricas, Sin Ceros, etc.)
         const numericDocsMap = new Map<string, string>();
+        const registerVariation = (variant: string, originalDoc: string) => {
+            if (!variant) return;
+            const cleanStr = String(variant).trim();
+            if (!cleanStr) return;
+            
+            // 1. Raw exact (upper)
+            numericDocsMap.set(cleanStr.toUpperCase(), originalDoc);
+            
+            // 2. Alphanumeric clean (sin guiones/espacios)
+            const alphaClean = cleanStr.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            if (alphaClean) numericDocsMap.set(alphaClean, originalDoc);
+            
+            // 3. Dígitos puros
+            const digitsOnly = cleanStr.replace(/\D/g, '');
+            if (digitsOnly) {
+                numericDocsMap.set(digitsOnly, originalDoc);
+                // 4. Dígitos sin ceros a la izquierda
+                const noLeadingZeros = digitsOnly.replace(/^0+/, '');
+                if (noLeadingZeros) numericDocsMap.set(noLeadingZeros, originalDoc);
+            }
+        };
+
         for (const row of pendingRows) {
-            if (row.numero_documento) {
-                const numPartDoc = String(row.numero_documento).replace(/\D/g, '');
-                if (numPartDoc) numericDocsMap.set(numPartDoc, row.numero_documento);
+            const orig = row.numero_documento;
+            if (orig) {
+                registerVariation(orig, orig);
             }
             if (row.no_factura_m7) {
-                const numPartFac = String(row.no_factura_m7).replace(/\D/g, '');
-                if (numPartFac) numericDocsMap.set(numPartFac, row.numero_documento);
+                registerVariation(row.no_factura_m7, orig);
+            }
+            if (row.numero_guia) {
+                registerVariation(row.numero_guia, orig);
+            }
+            if (row.nro_guia) {
+                registerVariation(row.nro_guia, orig);
             }
         }
-        const numericList = Array.from(numericDocsMap.keys());
 
-        if (numericList.length === 0) {
-            sendProgress({ type: 'log', message: 'No hay pedidos con formato numérico.' });
+        if (numericDocsMap.size === 0) {
+            sendProgress({ type: 'log', message: 'No hay pedidos con identificadores válidos.' });
             sendProgress({ type: 'end', message: 'No hay pedidos válidos para analizar.', matches: 0 });
             res.end();
             return;
         }
 
-        const keysToCheck = getAPIKeysPool();
+        sendProgress({ type: 'log', message: `✅ Indexadas ${pendingRows.length} facturas pendientes (${numericDocsMap.size} variaciones de código).` });
         
-        if (keysToCheck.length === 0) {
-            sendProgress({ type: 'log', message: '❌ Error: No se encontraron llaves API de Gemini en el archivo .env.' });
-            sendProgress({ type: 'error', message: 'No hay llaves de API de Gemini configuradas.' });
-            res.end();
-            return;
-        }
-
-        sendProgress({ type: 'log', message: '🔑 Validando estado de las llaves API de Gemini...' });
-        
-        const keyChecks = await Promise.all(keysToCheck.map(async (key, idx) => {
-            try {
-                const resCheck = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
-                const data = await resCheck.json().catch(() => ({}));
-                if (resCheck.status === 200) {
-                    return { key, valid: true, isLeaked: false };
-                } else {
-                    const msg = data?.error?.message || '';
-                    const isLeaked = msg.toLowerCase().includes('leaked') || msg.toLowerCase().includes('filtrada');
-                    return { key, valid: false, isLeaked, msg };
-                }
-            } catch (err: any) {
-                return { key, valid: false, isLeaked: false, msg: err.message };
-            }
-        }));
-
-        const leakedCount = keyChecks.filter(c => c.isLeaked).length;
-        const keys = keyChecks.filter(c => c.valid).map(c => c.key);
-
-        if (keys.length === 0) {
-            let errorMsg = '❌ ERROR: Todas las llaves API de Gemini están inactivas o deshabilitadas.';
-            if (leakedCount > 0) {
-                errorMsg = `❌ ERROR CRÍTICO: Google ha bloqueado las ${leakedCount} llaves API de Gemini configuradas en el archivo .env porque fueron reportadas como filtradas (leaked). Por favor, configure una nueva llave de Gemini válida en el archivo .env para habilitar el OCR de imágenes.`;
-            }
-            sendProgress({ type: 'log', message: errorMsg });
-            sendProgress({ type: 'error', message: 'Llaves de API bloqueadas o filtradas por Google. Actualice su .env.' });
-            res.end();
-            return;
-        }
-
-        sendProgress({ type: 'log', message: `✅ ${keys.length} llave(s) API activa(s) y listas para procesar.` });
-        
-        // 🟢 PRE-FASE: Extracción de texto local de todo el PDF en una sola pasada rápida
-        sendProgress({ type: 'log', message: `⚡ Analizando texto local del PDF...` });
+        // 🟢 PRE-FASE: Extracción de texto local del PDF completo
+        sendProgress({ type: 'log', message: `⚡ Analizando texto local del PDF (${totalPages} páginas)...` });
         const localPagesMap = new Map<number, string>();
         try {
             let pageNum = 0;
@@ -642,10 +626,10 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             };
             await pdfParse(fileContent, options);
         } catch (pdfParseErr) {
-            console.error('[GRUPO-INTER] Error doing initial pdf-parse:', pdfParseErr);
+            console.error('[GRUPO-INTER] Error realizando lectura local del PDF:', pdfParseErr);
         }
 
-        sendProgress({ type: 'log', message: `🚀 Iniciando Motor Atómico con orquestación en paralelo...` });
+        sendProgress({ type: 'log', message: `🚀 Iniciando Motor Atómico de Procesamiento...` });
         
         let finalMatches = 0;
         const username = req.body.username || 'System OCR';
@@ -668,43 +652,9 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             const workerLabel = `[W${workerId + 1}]`;
 
             const localText = localPagesMap.get(pageIndex) || '';
-            let foundMatchesInPage: any[] = [];
+            let foundMatchesInPage: string[] = [];
             let localExtractionSuccess = false;
 
-            // FASE 1: Intento de extracción LOCAL ultrarrápida robusta
-            if (localText.length > 50) {
-                const cleanText = localText.toLowerCase();
-                const cleanTextAlphanumeric = cleanText.replace(/[^a-z0-9]/g, '');
-                const cleanTextDigits = cleanText.replace(/[^0-9]/g, '');
-                const tokens = cleanText.split(/[^0-9]+/);
-
-                // Hacemos una copia de numericList para buscar
-                const currentPending = [...numericList];
-                for (const num of currentPending) {
-                    const originalDoc = numericDocsMap.get(num) || '';
-                    
-                    // A. Coincidencia exacta del documento original (alfanumérico, ej. "FV100043587")
-                    const cleanOriginal = originalDoc.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const matchesOriginal = cleanOriginal.length >= 4 && cleanTextAlphanumeric.includes(cleanOriginal);
-
-                    // B. Coincidencia exacta del número de factura como token numérico
-                    const matchesToken = tokens.includes(num);
-
-                    // C. Coincidencia de la secuencia de dígitos (para números largos >= 6 dígitos para evitar falsos positivos)
-                    const matchesSequence = num.length >= 6 && cleanTextDigits.includes(num);
-
-                    if (matchesOriginal || matchesToken || matchesSequence) {
-                        foundMatchesInPage.push(num);
-                    }
-                }
-                
-                if (foundMatchesInPage.length > 0) {
-                    sendProgress({ type: 'log', message: `⚡ ${workerLabel} Pág ${pageIndex + 1}: Lectura LOCAL exitosa (${foundMatchesInPage.join(', ')}). Evitando uso de IA.` });
-                    localExtractionSuccess = true;
-                }
-            }
-
-            // FASE 2: Si la lectura local falla, usar Gemini
             let pageBase64 = '';
             const getPageBase64 = async () => {
                 if (pageBase64) return pageBase64;
@@ -715,28 +665,63 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 return pageBase64;
             };
 
-            if (!localExtractionSuccess && numericList.length > 0) {
-                sendProgress({ type: 'log', message: `🤖 ${workerLabel} Pág ${pageIndex + 1}: Lectura local insuficiente. Iniciando OCR IA...` });
+            // FASE 1: Extracción LOCAL rápida y robusta
+            if (localText.length > 5) {
+                const cleanTextUpper = localText.toUpperCase();
+                const cleanTextAlphanumeric = cleanTextUpper.replace(/[^A-Z0-9]/g, '');
+                const cleanTextDigits = cleanTextUpper.replace(/[^0-9]/g, '');
+                const tokens = cleanTextUpper.split(/[^A-Z0-9]+/);
+
+                const currentKeys = Array.from(numericDocsMap.keys());
+                const pageMatches = new Set<string>();
+
+                for (const key of currentKeys) {
+                    const originalDoc = numericDocsMap.get(key);
+                    if (!originalDoc) continue;
+
+                    // Coincidencia 1: Alfanumérica exacta (ej. FV100045369 o FP1543)
+                    if (key.length >= 4 && cleanTextAlphanumeric.includes(key)) {
+                        pageMatches.add(originalDoc);
+                        continue;
+                    }
+
+                    // Coincidencia 2: Secuencia de dígitos (para números de >= 5 dígitos)
+                    const isPureDigits = /^\d+$/.test(key);
+                    if (isPureDigits && key.length >= 5 && cleanTextDigits.includes(key)) {
+                        pageMatches.add(originalDoc);
+                        continue;
+                    }
+
+                    // Coincidencia 3: Token exacto en el texto del PDF
+                    if (tokens.includes(key)) {
+                        pageMatches.add(originalDoc);
+                        continue;
+                    }
+                }
+
+                if (pageMatches.size > 0) {
+                    foundMatchesInPage = Array.from(pageMatches);
+                    sendProgress({ type: 'log', message: `⚡ ${workerLabel} Pág ${pageIndex + 1}: Lectura LOCAL exitosa (${foundMatchesInPage.join(', ')}).` });
+                    localExtractionSuccess = true;
+                }
+            }
+
+            // FASE 2: Si la lectura local no encontró coincidencias en la página, usar AI OCR (para PDFs escaneados)
+            if (!localExtractionSuccess && numericDocsMap.size > 0) {
+                sendProgress({ type: 'log', message: `🤖 ${workerLabel} Pág ${pageIndex + 1}: Sin texto plano local. Ejecutando OCR de IA...` });
                 
-                const currentPending = [...numericList];
+                const sampleDocs = Array.from(new Set(numericDocsMap.values())).slice(0, 100);
                 const prompt = `Actúa como un motor OCR de logística. 
-                Analiza esta página PDF.
-                Busca EXCLUSIVAMENTE las siguientes secuencias numéricas (ignora prefijos como 'FEV', 'FV', o cualquier otra letra alrededor):
-                [${currentPending.join(', ')}]
+                Analiza esta página PDF escaneada.
+                Busca EXCLUSIVAMENTE si aparece alguna de estas facturas o documentos (ignorando espacios o prefijos como FEV, FV, FP, TI, FI):
+                [${sampleDocs.join(', ')}]
                 
                 REGLAS:
-                1. Escanea la página.
-                2. Si encuentras un número que coincida EXACTAMENTE con uno de la lista (ignorando letras), inclúyelo en la lista "matches".
-                3. Responde SOLO con un JSON estricto con esta estructura exacta:
-                {"matches": ["NUMERO_1", "NUMERO_2"]}
-                4. Si no hay coincidencias, responde: {"matches": []}
-                5. Prohibido agregar formato markdown o texto adicional, solo el JSON raw.`;
+                1. Escanea visualmente la página.
+                2. Si encuentras un número de factura que coincida exactamente con alguno de la lista (o sus dígitos), inclúyelo en "matches".
+                3. Responde SOLO con un JSON estricto: {"matches": ["FACTURA_1", "FACTURA_2"]}
+                4. Si no hay coincidencias, responde: {"matches": []}`;
 
-                // M7-FIX: se migró del SDK de Gemini directo (con fallback de modelos y rotación de
-                // llaves manual en memoria) al AIOrchestrator — mismo motor que ya usan BASC,
-                // Validación y Planillas Operativas. Gana: rotación de llaves coordinada entre TODA
-                // la app (no un contador aislado por módulo), caché automático (evita re-gastar cuota
-                // si la misma página ya se analizó) y posible fallback a otro proveedor de IA.
                 try {
                     const b64 = await getPageBase64();
                     const result = await AIOrchestrator.execute({
@@ -744,56 +729,62 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                         imageBuffer: Buffer.from(b64, 'base64'),
                         imageMimeType: 'application/pdf',
                         taskType: 'ocr',
+                        maxTokens: 1000
                     });
 
                     const cleanJsonStr = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
                     const jsonMatch = cleanJsonStr.match(/\{[\s\S]*\}/);
                     if (jsonMatch) {
                         const data = JSON.parse(jsonMatch[0]);
-                        foundMatchesInPage = data.matches || [];
-                        sendProgress({ type: 'log', message: `✅ ${workerLabel} Pág ${pageIndex + 1}: OCR IA vía orquestador (${result.providerId}/${result.modelId}${result.cached ? ', caché' : ''}).` });
-                    } else {
-                        sendProgress({ type: 'log', message: `⚠️ ${workerLabel} Página ${pageIndex + 1}: Respuesta inválida del modelo de IA.` });
+                        const rawMatches: string[] = data.matches || [];
+                        for (const m of rawMatches) {
+                            const cleanM = String(m).trim().toUpperCase();
+                            const matchedDoc = numericDocsMap.get(cleanM) || numericDocsMap.get(cleanM.replace(/\D/g, ''));
+                            if (matchedDoc) {
+                                foundMatchesInPage.push(matchedDoc);
+                            }
+                        }
+                        if (foundMatchesInPage.length > 0) {
+                            sendProgress({ type: 'log', message: `✅ ${workerLabel} Pág ${pageIndex + 1}: OCR IA detectó (${foundMatchesInPage.join(', ')}) vía ${result.providerId}/${result.modelId}.` });
+                        }
                     }
                 } catch (pageError: any) {
-                    sendProgress({ type: 'log', message: `❌ ${workerLabel} Error de IA en pág ${pageIndex + 1}: ${pageError?.message?.substring(0, 150)}...` });
+                    sendProgress({ type: 'log', message: `⚠️ ${workerLabel} Nota en pág ${pageIndex + 1}: ${pageError?.message?.substring(0, 100)}` });
                 }
             }
 
-            // FASE 3: Procesar los matches encontrados (bajo mutex para evitar race conditions)
+            // FASE 3: Guardar coincidencias en la base de datos (bajo mutex)
             if (foundMatchesInPage.length > 0) {
                 await dbMutex.acquire();
                 try {
-                    for (const item of foundMatchesInPage) {
-                        const matchedNum = String(item).replace(/\D/g, '');
-                        const originalDocId = numericDocsMap.get(matchedNum);
+                    for (const originalDocId of foundMatchesInPage) {
+                        sendProgress({ type: 'log', message: `🎯 Marcando Entregado: ${originalDocId} (Pág ${pageIndex + 1})` });
+                        
+                        const b64 = await getPageBase64();
+                        const base64PagePrefix = `data:application/pdf;base64,${b64}`;
 
-                        if (originalDocId && numericList.includes(matchedNum)) {
-                            sendProgress({ type: 'log', message: `✅ Match exacto: ${originalDocId} (encontrado como ${matchedNum}) en Pág ${pageIndex + 1}...` });
-                            
-                            const b64 = await getPageBase64();
-                            const base64PagePrefix = `data:application/pdf;base64,${b64}`;
+                        await pool.query(
+                            "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $3",
+                            [base64PagePrefix, username, originalDocId]
+                        );
 
+                        // Registrar en histórico
+                        const pedRes = await pool.query("SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1", [originalDocId]);
+                        if (pedRes.rows.length > 0) {
                             await pool.query(
-                                "UPDATE grupo_inter_pedidos SET acta_entrega_b64 = $1, estado = 'Entregado', update_at = CURRENT_TIMESTAMP, update_by = $2, fecha_entregado = CURRENT_TIMESTAMP WHERE numero_documento = $3",
-                                [base64PagePrefix, username, originalDocId]
+                                "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', $2, $3)",
+                                [pedRes.rows[0].id, localExtractionSuccess ? 'PDF Procesado (Lectura Local Rápida)' : 'PDF Procesado (OCR IA)', username]
                             );
-
-                            // Registrar en histórico
-                            const pedRes = await pool.query("SELECT id FROM grupo_inter_pedidos WHERE numero_documento = $1", [originalDocId]);
-                            if (pedRes.rows.length > 0) {
-                                await pool.query(
-                                    "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', $2, 'System OCR')",
-                                    [pedRes.rows[0].id, localExtractionSuccess ? 'PDF Procesado Automáticamente (Extracción Local Rápida)' : 'PDF Procesado Automáticamente (IA)']
-                                );
-                            }
-                            
-                            // Remover de la lista pendiente global para no volver a buscarlo y acelerar el proceso
-                            const idx = numericList.indexOf(matchedNum);
-                            if (idx > -1) numericList.splice(idx, 1);
-                            
-                            finalMatches++;
                         }
+                        
+                        // Eliminar de las variaciones para no re-procesarlo en otras páginas
+                        for (const [k, v] of Array.from(numericDocsMap.entries())) {
+                            if (v === originalDocId) {
+                                numericDocsMap.delete(k);
+                            }
+                        }
+                        
+                        finalMatches++;
                     }
                 } finally {
                     dbMutex.release();
@@ -801,7 +792,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             }
         };
 
-        const concurrencyLimit = Math.min(4, keys.length || 1);
+        const concurrencyLimit = 3;
         let activePageCount = 0;
 
         // Cola de páginas a procesar

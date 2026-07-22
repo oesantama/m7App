@@ -132,6 +132,9 @@ export async function ensureOrchestratorSchema() {
             );
         `);
 
+        // Auto-recuperación de llaves bloqueadas temporalmente por cuotas pasadas
+        await client.query(`UPDATE ai_keys SET status = 'active', consecutive_errors = 0 WHERE status = 'blocked'`);
+
         await client.query('COMMIT');
 
         // Seed default providers and models if empty
@@ -208,7 +211,19 @@ async function seedDefaults() {
             status: 'active',
             accuracy: 95.0
         },
-        // OpenRouter (DeepSeek, Llama, Qwen, Mistral, GLM, Kimi, Grok)
+        // OpenRouter (Gemini, DeepSeek, Llama, Qwen, Mistral, GLM, Kimi, Grok)
+        {
+            id: 'google/gemini-2.5-flash',
+            provider_id: 'openrouter',
+            name: 'Gemini 2.5 Flash (OpenRouter Multimodal)',
+            task_types: ['ocr', 'vision', 'chat', 'summary', 'extraction', 'translation', 'manual_generation', 'qa'],
+            cost_input: 0.000075,
+            cost_output: 0.0003,
+            context: 1048576,
+            multimodal: true,
+            status: 'active',
+            accuracy: 95.0
+        },
         {
             id: 'deepseek-chat',
             provider_id: 'openrouter',

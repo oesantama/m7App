@@ -64,6 +64,8 @@ export class OpenRouterAdapter implements ProviderAdapter {
 
         if (request.maxTokens !== undefined) {
             data.max_tokens = request.maxTokens;
+        } else {
+            data.max_tokens = 1000;
         }
 
         // Enforce JSON format for extraction/OCR
