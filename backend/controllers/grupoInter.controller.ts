@@ -635,6 +635,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         sendProgress({ type: 'log', message: `🚀 Iniciando Motor Atómico de Procesamiento...` });
         
         let finalMatches = 0;
+        const matchedDetails: Array<{ id: number; doc: string; page: number; method: string }> = [];
         const username = req.body.username || 'System OCR';
 
         // Mutex/Lock simple para evitar condiciones de carrera en el mapeo de base de datos e histórico
@@ -668,37 +669,31 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 return pageBase64;
             };
 
-            // FASE 1: Extracción LOCAL rápida y robusta
+            // FASE 1: Extracción LOCAL rápida y robusta (por secuencias numéricas y alfanuméricas)
             if (localText.length > 5) {
                 const cleanTextUpper = localText.toUpperCase();
                 const cleanTextAlphanumeric = cleanTextUpper.replace(/[^A-Z0-9]/g, '');
-                const cleanTextDigits = cleanTextUpper.replace(/[^0-9]/g, '');
-                const tokens = cleanTextUpper.split(/[^A-Z0-9]+/);
-
-                const currentKeys = Array.from(idMap.keys());
+                
+                // Extraer todas las secuencias puramente numéricas de 4 o más dígitos presentes en el texto del PDF
+                const digitSequencesInPdf = localText.match(/\d{4,12}/g) || [];
                 const pageMatches = new Set<number>();
 
+                // Coincidencia rápida A: Por secuencias de dígitos encontradas en el PDF
+                for (const seq of digitSequencesInPdf) {
+                    const pid = idMap.get(seq) || idMap.get(seq.replace(/^0+/, ''));
+                    if (pid) {
+                        pageMatches.add(pid);
+                    }
+                }
+
+                // Coincidencia rápida B: Por tokens y subcadenas alfanuméricas
+                const currentKeys = Array.from(idMap.keys());
                 for (const key of currentKeys) {
                     const pid = idMap.get(key);
                     if (!pid) continue;
 
-                    // Coincidencia 1: Alfanumérica exacta (ej. FV100045369 o FP1543)
                     if (key.length >= 4 && cleanTextAlphanumeric.includes(key)) {
                         pageMatches.add(pid);
-                        continue;
-                    }
-
-                    // Coincidencia 2: Secuencia de dígitos (para números de >= 5 dígitos)
-                    const isPureDigits = /^\d+$/.test(key);
-                    if (isPureDigits && key.length >= 5 && cleanTextDigits.includes(key)) {
-                        pageMatches.add(pid);
-                        continue;
-                    }
-
-                    // Coincidencia 3: Token exacto en el texto del PDF
-                    if (tokens.includes(key)) {
-                        pageMatches.add(pid);
-                        continue;
                     }
                 }
 
@@ -710,23 +705,29 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 }
             }
 
-            // FASE 2: Si la lectura local no encontró coincidencias en la página, usar AI OCR (para PDFs escaneados)
+            // FASE 2: Si la lectura local no encontró coincidencias en la página, usar AI OCR (para PDFs escaneados / rotados)
             if (!localExtractionSuccess && idMap.size > 0) {
-                sendProgress({ type: 'log', message: `🤖 ${workerLabel} Pág ${pageIndex + 1}: Sin texto plano local. Ejecutando OCR de IA...` });
+                sendProgress({ type: 'log', message: `🤖 ${workerLabel} Pág ${pageIndex + 1}: Sin texto plano local. Ejecutando OCR de IA (Lectura omnidireccional 0°/90°/180°)...` });
                 
                 const samplePids = Array.from(new Set(idMap.values())).slice(0, 100);
-                const sampleDocs = samplePids.map(id => docNameMap.get(id)).filter(Boolean);
+                const sampleDocNumbers = samplePids.map(id => {
+                    const fullDoc = docNameMap.get(id) || '';
+                    const digits = fullDoc.replace(/\D/g, '');
+                    return digits.length >= 4 ? digits : fullDoc;
+                }).filter(Boolean);
 
-                const prompt = `Actúa como un motor OCR de logística. 
-                Analiza esta página PDF escaneada.
-                Busca EXCLUSIVAMENTE si aparece alguna de estas facturas o documentos (ignorando espacios o prefijos como FEV, FV, FP, TI, FI):
-                [${sampleDocs.join(', ')}]
+                const prompt = `Actúa como un motor OCR de logística de ultra-precisión. 
+                ATENCIÓN CRÍTICA: La página de la factura o acta puede estar ROTADA (a 90° de lado, 180° boca abajo o 270°). Lee visualmente en TODAS LAS ORIENTACIONES.
                 
-                REGLAS:
-                1. Escanea visualmente la página.
-                2. Si encuentras un número de factura que coincida exactamente con alguno de la lista (o sus dígitos), inclúyelo en "matches".
-                3. Responde SOLO con un JSON estricto: {"matches": ["FACTURA_1", "FACTURA_2"]}
-                4. Si no hay coincidencias, responde: {"matches": []}`;
+                Busca EXCLUSIVAMENTE si aparece alguna de estas secuencias NUMÉRICAS de factura (ignora completamente letras o prefijos como FEV, FV, FI, FP, TI, FGENI):
+                [${sampleDocNumbers.join(', ')}]
+                
+                REGLAS ESTRUCTURALES:
+                1. Inspecciona la página completa en cualquier dirección o rotación.
+                2. Extrae cualquier número de 4 a 10 dígitos que veas en la página.
+                3. Si el número extraído coincide con alguna secuencia de la lista, inclúyelo en el arreglo "matches".
+                4. Responde ÚNICAMENTE con un JSON estricto: {"matches": ["100313226"]}
+                5. Si no hay coincidencias, responde: {"matches": []}`;
 
                 try {
                     const b64 = await getPageBase64();
@@ -744,8 +745,8 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                         const data = JSON.parse(jsonMatch[0]);
                         const rawMatches: string[] = data.matches || [];
                         for (const m of rawMatches) {
-                            const cleanM = String(m).trim().toUpperCase();
-                            const matchedPid = idMap.get(cleanM) || idMap.get(cleanM.replace(/\D/g, ''));
+                            const cleanDigits = String(m).trim().replace(/\D/g, '');
+                            const matchedPid = idMap.get(cleanDigits) || idMap.get(cleanDigits.replace(/^0+/, '')) || idMap.get(String(m).trim().toUpperCase());
                             if (matchedPid && !foundMatchesInPage.includes(matchedPid)) {
                                 foundMatchesInPage.push(matchedPid);
                             }
@@ -776,14 +777,22 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                         );
 
                         if (updateRes.rowCount && updateRes.rowCount > 0) {
+                            const method = localExtractionSuccess ? 'Lectura Local Rápida' : 'OCR IA';
                             sendProgress({ type: 'log', message: `🎯 Marcado Entregado en BD: ID ${pid} (${originalDocName}) (Pág ${pageIndex + 1})` });
                             
                             // Registrar en histórico
                             await pool.query(
                                 "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', $2, $3)",
-                                [pid, localExtractionSuccess ? 'PDF Procesado (Lectura Local Rápida)' : 'PDF Procesado (OCR IA)', username]
+                                [pid, `PDF Procesado (${method})`, username]
                             );
                             
+                            matchedDetails.push({
+                                id: pid,
+                                doc: originalDocName,
+                                page: pageIndex + 1,
+                                method
+                            });
+
                             // Eliminar todas las variaciones de este ID para no re-procesarlo en otras páginas
                             for (const [k, v] of Array.from(idMap.entries())) {
                                 if (v === pid) {
@@ -824,7 +833,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
 
         await Promise.all(workerPromises);
 
-        sendProgress({ type: 'end', message: `Motor Atómico Finalizado.`, matches: finalMatches });
+        sendProgress({ type: 'end', message: `Motor Atómico Finalizado.`, matches: finalMatches, matchedDetails });
         res.end();
         return;
     } catch (error: any) {

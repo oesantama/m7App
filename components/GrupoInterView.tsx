@@ -120,6 +120,7 @@ const GrupoInterView: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingStatus, setProcessingStatus] = useState("Iniciando...");
   const [isFinished, setIsFinished] = useState(false);
+  const [matchedDetails, setMatchedDetails] = useState<Array<{ id: number; doc: string; page: number; method: string }>>([]);
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState("");
  
@@ -394,6 +395,9 @@ const GrupoInterView: React.FC = () => {
           clearTimeout(safetyTimer);
           setUploadProgress(100);
           setProcessingStatus(`COMPLETADO: ${data.matches} COINCIDENCIAS.`);
+          if (data.matchedDetails) {
+            setMatchedDetails(data.matchedDetails);
+          }
           setIsFinished(true);
           toast.success(`Se encontraron ${data.matches} coincidencias.`);
         } else if (data.type === 'error') {
@@ -643,7 +647,7 @@ const GrupoInterView: React.FC = () => {
       {/* Overlay de Carga con Barra de Progreso */}
       {(loading || isProcessing) && (
         <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white p-10 rounded-[40px] shadow-2xl flex flex-col items-center max-w-sm w-full border border-white/20">
+          <div className={`bg-white p-8 rounded-[40px] shadow-2xl flex flex-col items-center w-full border border-white/20 transition-all ${isFinished && matchedDetails.length > 0 ? 'max-w-xl' : 'max-w-sm'}`}>
             {!isFinished && (
               <div className="relative w-16 h-16 mb-6">
                 <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
@@ -651,32 +655,65 @@ const GrupoInterView: React.FC = () => {
               </div>
             )}
             {isFinished && (
-              <div className="p-4 bg-emerald-100 text-emerald-600 rounded-full mb-6">
-                <CheckCircle size={40} />
+              <div className="p-4 bg-emerald-100 text-emerald-600 rounded-full mb-4">
+                <CheckCircle size={36} />
               </div>
             )}
-            <h3 className="text-lg font-black text-slate-900 mb-2 uppercase tracking-tight text-center">
+            <h3 className="text-base font-black text-slate-900 mb-2 uppercase tracking-tight text-center">
               {isProcessing ? (processingStatus || 'Analizando PDF...') : 'Sincronizando...'}
             </h3>
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest text-center px-4">
-              Por favor espere mientras el núcleo de M7 procesa su información
+            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest text-center px-4 mb-4">
+              {isFinished ? 'Facturas actualizadas a estado Entregado en la base de datos' : 'Por favor espere mientras el núcleo de M7 procesa su información'}
             </p>
+
             {isProcessing && !isFinished && (
-              <div className="w-full mt-6 h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div className="w-full mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
                 <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
               </div>
             )}
             
+            {isFinished && matchedDetails.length > 0 && (
+              <div className="w-full max-h-56 overflow-y-auto border border-slate-200 rounded-2xl bg-slate-50 p-3 my-3">
+                <div className="text-[10px] font-black uppercase text-slate-500 mb-2 flex items-center justify-between">
+                  <span>Facturas Coincidentes ({matchedDetails.length})</span>
+                  <span>Estado BD</span>
+                </div>
+                <table className="w-full text-left text-[11px]">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase text-[9px]">
+                      <th className="pb-1 px-2">Documento</th>
+                      <th className="pb-1 px-2">Ubicación</th>
+                      <th className="pb-1 px-2">Método</th>
+                      <th className="pb-1 px-2 text-right">Resultado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {matchedDetails.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-100/80">
+                        <td className="py-1.5 px-2 font-mono font-bold text-slate-800">{item.doc}</td>
+                        <td className="py-1.5 px-2 text-slate-600 font-medium">Pág. {item.page}</td>
+                        <td className="py-1.5 px-2 text-slate-500 text-[10px]">{item.method}</td>
+                        <td className="py-1.5 px-2 text-right font-bold text-emerald-600">✓ Entregado</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
             {isFinished && (
               <button 
                 onClick={() => {
                   setIsProcessing(false);
                   setIsFinished(false);
+                  setMatchedDetails([]);
+                  // Limpiar filtro de status para asegurar que se muestren las facturas entregadas
+                  setFilters(prev => ({ ...prev, status: '' }));
                   fetchOrders(searchTerm);
                 }}
-                className="mt-8 w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition shadow-xl shadow-blue-100 active:scale-95"
+                className="mt-4 w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition shadow-xl active:scale-95"
               >
-                Aceptar / Cerrar
+                Aceptar y Actualizar Tabla
               </button>
             )}
           </div>
