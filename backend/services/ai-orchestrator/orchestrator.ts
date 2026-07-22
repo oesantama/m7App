@@ -174,17 +174,8 @@ export class AIOrchestrator {
                         costUsd: 0
                     });
 
-                    // Check if error is retryable (quota 429, timeout, server error 5xx)
-                    const errStr = errorMsg.toLowerCase();
-                    const isQuotaOrServer = errStr.includes('429') || errStr.includes('quota') || errStr.includes('503') || errStr.includes('500') || errStr.includes('overloaded');
-                    
-                    if (!isQuotaOrServer) {
-                        // If it's a structural or auth error, don't try other keys of this model, fail-over to next model/provider immediately
-                        break; 
-                    }
-                    
-                    // If it is a quota/server error, try next key in the loop
-                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    // If it is a quota/server or key error, try next key in loop after a brief delay
+                    await new Promise(resolve => setTimeout(resolve, 800));
                 }
             }
         }

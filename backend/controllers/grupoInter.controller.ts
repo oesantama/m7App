@@ -545,9 +545,9 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         let queryParams: any[] = [];
         
         if (planilla) {
-            queryStr += " AND numero_planilla = $1";
+            queryStr += " AND (numero_planilla = $1 OR estado != 'Entregado')";
             queryParams.push(planilla);
-            sendProgress({ type: 'log', message: `🔍 Analizando Planilla: ${planilla}` });
+            sendProgress({ type: 'log', message: `🔍 Analizando Planilla: ${planilla} + Facturas Pendientes` });
         } else {
             queryStr += " AND estado != 'Entregado'";
         }
