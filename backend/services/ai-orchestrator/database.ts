@@ -184,16 +184,16 @@ async function seedDefaults() {
             accuracy: 90.0
         },
         {
-            id: 'gemini-2.5-flash',
+            id: 'gemini-2.0-flash-lite',
             provider_id: 'gemini',
-            name: 'Gemini 2.5 Flash',
+            name: 'Gemini 2.0 Flash Lite',
             task_types: ['ocr', 'vision', 'chat', 'summary', 'extraction', 'translation', 'manual_generation', 'qa'],
             cost_input: 0.000075,
             cost_output: 0.0003,
             context: 1048576,
             multimodal: true,
             status: 'active',
-            accuracy: 92.0
+            accuracy: 88.0
         },
         {
             id: 'gemini-1.5-pro',

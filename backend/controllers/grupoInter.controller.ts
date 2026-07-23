@@ -6,6 +6,8 @@ import fs from 'fs';
 import { PDFDocument, degrees } from 'pdf-lib';
 import { pdfParse } from '../utils/pdfParser.js';
 import { AIOrchestrator } from '../services/ai-orchestrator/orchestrator.js';
+import { performLocalPageOCR } from '../utils/ocr.js';
+import Tesseract from 'tesseract.js';
 
 // Función para obtener el pool de API Keys desde el CSV
 const getAPIKeysPool = (): string[] => {
@@ -593,6 +595,12 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             if (row.no_factura_m7) {
                 registerVariation(row.no_factura_m7, pedidoId, orig || row.no_factura_m7);
             }
+            if (row.numero_guia) {
+                registerVariation(row.numero_guia, pedidoId, orig || row.numero_guia);
+            }
+            if (row.nro_guia) {
+                registerVariation(row.nro_guia, pedidoId, orig || row.nro_guia);
+            }
         }
 
         if (idMap.size === 0) {
@@ -631,8 +639,18 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         let finalMatches = 0;
         let aiErrorCount = 0;
         let lastAiError = '';
+        let aiDisabledGlobally = false;
+        let aiDisabledWarningSent = false;
         const matchedDetails: Array<{ id: number; doc: string; page: number; method: string }> = [];
         const username = req.body.username || 'System OCR';
+
+        // Precargar worker Tesseract para OCR local rápido en servidor
+        let tesseractWorker: any = null;
+        try {
+            tesseractWorker = await Tesseract.createWorker('eng');
+        } catch (tessErr) {
+            console.warn('[GRUPO-INTER] No se pudo inicializar worker Tesseract:', tessErr);
+        }
 
         // Mutex/Lock simple para evitar condiciones de carrera en el mapeo de base de datos e histórico
         const dbMutex = {
@@ -648,72 +666,80 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             }
         };
 
+        const matchTextAgainstMap = (text: string): number[] => {
+            if (!text || text.length < 3) return [];
+            const pageMatches = new Set<number>();
+            const cleanTextUpper = text.toUpperCase();
+            const cleanTextAlpha = cleanTextUpper.replace(/[^A-Z0-9]/g, '');
+
+            const digitSequences = text.match(/\d{4,12}/g) || [];
+            for (const seq of digitSequences) {
+                const pid = idMap.get(seq) || idMap.get(seq.replace(/^0+/, ''));
+                if (pid) pageMatches.add(pid);
+            }
+
+            for (const [key, pid] of idMap.entries()) {
+                if (key.length >= 4 && cleanTextAlpha.includes(key)) {
+                    pageMatches.add(pid);
+                }
+            }
+
+            return Array.from(pageMatches);
+        };
+
         const processPage = async (pageIndex: number, workerId: number) => {
             const workerLabel = `[W${workerId + 1}]`;
-
             const localText = localPagesMap.get(pageIndex) || '';
             let foundMatchesInPage: number[] = [];
-            let localExtractionSuccess = false;
+            let matchMethod = '';
 
             let pageBase64 = '';
             const getPageBase64 = async () => {
                 if (pageBase64) return pageBase64;
                 const subPdf = await PDFDocument.create();
                 const [copiedPage] = await subPdf.copyPages(mainPdfDoc, [pageIndex]);
-                
-                // Normalizar la rotación de la página a 0 grados si viene rotada en los metadatos del PDF
                 try {
                     const currentRot = copiedPage.getRotation().angle;
                     if (currentRot !== 0) {
                         copiedPage.setRotation(degrees(0));
                     }
-                } catch (rotErr) {
-                    // Ignorar si la página no admite lectura de rotación
-                }
-                
+                } catch (rotErr) {}
                 subPdf.addPage(copiedPage);
                 pageBase64 = await subPdf.saveAsBase64();
                 return pageBase64;
             };
 
-            // FASE 1: Extracción LOCAL rápida y robusta (por secuencias numéricas y alfanuméricas)
+            // TIER 1: Extracción LOCAL rápida y directa (Texto vectorial plano del PDF)
             if (localText.length > 5) {
-                const cleanTextUpper = localText.toUpperCase();
-                const cleanTextAlphanumeric = cleanTextUpper.replace(/[^A-Z0-9]/g, '');
-                
-                // Extraer todas las secuencias puramente numéricas de 4 o más dígitos presentes en el texto del PDF
-                const digitSequencesInPdf = localText.match(/\d{4,12}/g) || [];
-                const pageMatches = new Set<number>();
-
-                // Coincidencia rápida A: Por secuencias de dígitos encontradas en el PDF
-                for (const seq of digitSequencesInPdf) {
-                    const pid = idMap.get(seq) || idMap.get(seq.replace(/^0+/, ''));
-                    if (pid) {
-                        pageMatches.add(pid);
-                    }
-                }
-
-                // Coincidencia rápida B: Por tokens y subcadenas alfanuméricas
-                const currentKeys = Array.from(idMap.keys());
-                for (const key of currentKeys) {
-                    const pid = idMap.get(key);
-                    if (!pid) continue;
-
-                    if (key.length >= 4 && cleanTextAlphanumeric.includes(key)) {
-                        pageMatches.add(pid);
-                    }
-                }
-
-                if (pageMatches.size > 0) {
-                    foundMatchesInPage = Array.from(pageMatches);
+                const vectorMatches = matchTextAgainstMap(localText);
+                if (vectorMatches.length > 0) {
+                    foundMatchesInPage = vectorMatches;
+                    matchMethod = 'Lectura Local Rápida';
                     const docLabels = foundMatchesInPage.map(id => docNameMap.get(id) || id);
-                    sendProgress({ type: 'log', message: `⚡ ${workerLabel} Pág ${pageIndex + 1}: Lectura LOCAL exitosa (${docLabels.join(', ')}).` });
-                    localExtractionSuccess = true;
+                    sendProgress({ type: 'log', message: `⚡ ${workerLabel} Pág ${pageIndex + 1}: Lectura Vectorial exitosa (${docLabels.join(', ')}).` });
                 }
             }
 
-            // FASE 2: Si la lectura local no encontró coincidencias en la página, usar AI OCR (para PDFs escaneados / rotados)
-            if (!localExtractionSuccess && idMap.size > 0) {
+            // TIER 2: Si no hubo coincidencia vectorial, ejecutar OCR Local Tesseract (Gratuito / Sin API Keys)
+            if (foundMatchesInPage.length === 0 && idMap.size > 0 && req.file?.path) {
+                try {
+                    const tessText = await performLocalPageOCR(req.file.path, pageIndex, tesseractWorker);
+                    if (tessText && tessText.length > 3) {
+                        const tessMatches = matchTextAgainstMap(tessText);
+                        if (tessMatches.length > 0) {
+                            foundMatchesInPage = tessMatches;
+                            matchMethod = 'OCR Local Tesseract';
+                            const docLabels = foundMatchesInPage.map(id => docNameMap.get(id) || id);
+                            sendProgress({ type: 'log', message: `🔍 ${workerLabel} Pág ${pageIndex + 1}: OCR Local Tesseract detectó (${docLabels.join(', ')}).` });
+                        }
+                    }
+                } catch (tessErr) {
+                    // Fallthrough to Tier 3 if Tesseract fails
+                }
+            }
+
+            // TIER 3: Si Tier 1 y Tier 2 no hallaron nada, ejecutar OCR IA con Gemini/OpenRouter (si IA activa)
+            if (foundMatchesInPage.length === 0 && idMap.size > 0 && !aiDisabledGlobally) {
                 sendProgress({ type: 'log', message: `🤖 ${workerLabel} Pág ${pageIndex + 1}: Sin texto plano local. Ejecutando OCR de IA (Lectura omnidireccional 0°/90°/180°)...` });
                 
                 const samplePids = Array.from(new Set(idMap.values())).slice(0, 100);
@@ -736,51 +762,54 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 4. Responde ÚNICAMENTE con un JSON estricto: {"matches": ["100313226"]}
                 5. Si no hay coincidencias, responde: {"matches": []}`;
 
-                let attempts = 0;
-                let ocrSuccess = false;
-                while (attempts < 2 && !ocrSuccess) {
-                    attempts++;
-                    try {
-                        const b64 = await getPageBase64();
-                        const result = await AIOrchestrator.execute({
-                            prompt,
-                            imageBuffer: Buffer.from(b64, 'base64'),
-                            imageMimeType: 'application/pdf',
-                            taskType: 'ocr',
-                            maxTokens: 1000
-                        });
+                try {
+                    const b64 = await getPageBase64();
+                    const result = await AIOrchestrator.execute({
+                        prompt,
+                        imageBuffer: Buffer.from(b64, 'base64'),
+                        imageMimeType: 'application/pdf',
+                        taskType: 'ocr',
+                        maxTokens: 1000
+                    });
 
-                        const cleanJsonStr = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
-                        const jsonMatch = cleanJsonStr.match(/\{[\s\S]*\}/);
-                        if (jsonMatch) {
-                            const data = JSON.parse(jsonMatch[0]);
-                            const rawMatches: string[] = data.matches || [];
-                            for (const m of rawMatches) {
-                                const cleanDigits = String(m).trim().replace(/\D/g, '');
-                                const matchedPid = idMap.get(cleanDigits) || idMap.get(cleanDigits.replace(/^0+/, '')) || idMap.get(String(m).trim().toUpperCase());
-                                if (matchedPid && !foundMatchesInPage.includes(matchedPid)) {
-                                    foundMatchesInPage.push(matchedPid);
-                                }
-                            }
-                            if (foundMatchesInPage.length > 0) {
-                                const docLabels = foundMatchesInPage.map(id => docNameMap.get(id) || id);
-                                sendProgress({ type: 'log', message: `✅ ${workerLabel} Pág ${pageIndex + 1}: OCR IA detectó (${docLabels.join(', ')}) vía ${result.providerId}/${result.modelId}.` });
+                    const cleanJsonStr = result.text.replace(/```json/g, '').replace(/```/g, '').trim();
+                    const jsonMatch = cleanJsonStr.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        const data = JSON.parse(jsonMatch[0]);
+                        const rawMatches: string[] = data.matches || [];
+                        for (const m of rawMatches) {
+                            const cleanDigits = String(m).trim().replace(/\D/g, '');
+                            const matchedPid = idMap.get(cleanDigits) || idMap.get(cleanDigits.replace(/^0+/, '')) || idMap.get(String(m).trim().toUpperCase());
+                            if (matchedPid && !foundMatchesInPage.includes(matchedPid)) {
+                                foundMatchesInPage.push(matchedPid);
                             }
                         }
-                        ocrSuccess = true;
-                    } catch (pageError: any) {
-                        aiErrorCount++;
-                        lastAiError = pageError?.message || 'Error en llamada de IA';
-                        if (attempts >= 2) {
-                            sendProgress({ type: 'log', message: `⚠️ ${workerLabel} Nota en pág ${pageIndex + 1}: ${lastAiError.substring(0, 100)}` });
-                        } else {
-                            await new Promise(r => setTimeout(r, 400));
+                        if (foundMatchesInPage.length > 0) {
+                            matchMethod = `OCR IA (${result.providerId}/${result.modelId})`;
+                            const docLabels = foundMatchesInPage.map(id => docNameMap.get(id) || id);
+                            sendProgress({ type: 'log', message: `✅ ${workerLabel} Pág ${pageIndex + 1}: OCR IA detectó (${docLabels.join(', ')}) vía ${result.providerId}/${result.modelId}.` });
                         }
+                    }
+                } catch (pageError: any) {
+                    aiErrorCount++;
+                    lastAiError = pageError?.message || 'Error en llamada de IA';
+
+                    if (lastAiError.includes('failed to fulfill task') || lastAiError.includes('No active AI models') || lastAiError.includes('API key')) {
+                        aiDisabledGlobally = true;
+                        if (!aiDisabledWarningSent) {
+                            aiDisabledWarningSent = true;
+                            sendProgress({
+                                type: 'log',
+                                message: `⚠️ Servicio de IA no disponible en este entorno. Procesamiento continuado mediante Motor OCR Local Tesseract.`
+                            });
+                        }
+                    } else {
+                        sendProgress({ type: 'log', message: `⚠️ ${workerLabel} Nota en pág ${pageIndex + 1}: ${lastAiError.substring(0, 100)}` });
                     }
                 }
             }
 
-            // FASE 3: Guardar coincidencias en la base de datos (por ID primario) bajo mutex
+            // Guardar coincidencias en base de datos
             if (foundMatchesInPage.length > 0) {
                 await dbMutex.acquire();
                 try {
@@ -798,14 +827,13 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                         );
 
                         if (updateRes.rowCount && updateRes.rowCount > 0) {
-                            const method = localExtractionSuccess ? 'Lectura Local Rápida' : 'OCR IA';
+                            const finalMethod = matchMethod || 'OCR Híbrido';
                             sendProgress({ type: 'log', message: `🎯 Marcado Entregado en BD: ID ${pid} (${originalDocName}) (Pág ${pageIndex + 1})` });
                             
-                            // Registrar en histórico solo si recién cambió de estado
                             if (isNewDelivery) {
                                 await pool.query(
                                     "INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario) VALUES ($1, 'Entregado', $2, $3)",
-                                    [pid, `PDF Procesado (${method})`, username]
+                                    [pid, `PDF Procesado (${finalMethod})`, username]
                                 );
                             }
                             
@@ -813,10 +841,9 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                                 id: pid,
                                 doc: originalDocName,
                                 page: pageIndex + 1,
-                                method: isNewDelivery ? method : `${method} (Re-confirmado)`
+                                method: isNewDelivery ? finalMethod : `${finalMethod} (Re-confirmado)`
                             });
 
-                            // Eliminar todas las variaciones de este ID para no re-procesarlo en otras páginas
                             for (const [k, v] of Array.from(idMap.entries())) {
                                 if (v === pid) {
                                     idMap.delete(k);
@@ -835,7 +862,6 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         const concurrencyLimit = 3;
         let activePageCount = 0;
 
-        // Cola de páginas a procesar
         const pageIndices = Array.from({ length: totalPages }, (_, i) => i);
         
         const workerPromises = Array.from({ length: concurrencyLimit }, async (_, workerId) => {
@@ -856,11 +882,8 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
 
         await Promise.all(workerPromises);
 
-        if (finalMatches === 0 && aiErrorCount > 0) {
-            sendProgress({
-                type: 'log',
-                message: `⚠️ ALERTA DE CONFIGURACIÓN IA: Se intentó analizar las imágenes escaneadas pero las llaves API de Gemini/OpenRouter rechazaron la petición (${lastAiError.substring(0, 100)}). Por favor configure una llave Gemini válida (AIzaSy...) en las variables de entorno de Coolify.`
-            });
+        if (tesseractWorker) {
+            try { await tesseractWorker.terminate(); } catch (_) {}
         }
 
         sendProgress({ type: 'end', message: `Motor Atómico Finalizado.`, matches: finalMatches, matchedDetails });

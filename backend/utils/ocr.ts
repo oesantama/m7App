@@ -43,3 +43,41 @@ export const performLocalOCR = async (pdfBuffer: Buffer): Promise<string> => {
         }
     }
 };
+
+export const performLocalPageOCR = async (pdfFilePath: string, pageIndex: number, worker?: any): Promise<string> => {
+    const tmpId = crypto.randomBytes(6).toString('hex');
+    const outPrefix = path.join('/tmp', `m7-p${pageIndex + 1}-${tmpId}`);
+    
+    try {
+        const pageNum = pageIndex + 1;
+        await execAsync(`pdftoppm -png -r 150 -f ${pageNum} -l ${pageNum} "${pdfFilePath}" "${outPrefix}"`);
+        
+        const files = fs.readdirSync('/tmp').filter(f => f.startsWith(`m7-p${pageNum}-${tmpId}`) && f.endsWith('.png'));
+        if (files.length === 0) return '';
+        
+        const imgPath = path.join('/tmp', files[0]);
+        
+        let localWorker = worker;
+        let createdWorker = false;
+        if (!localWorker) {
+            localWorker = await Tesseract.createWorker('eng');
+            createdWorker = true;
+        }
+        
+        const { data: { text } } = await localWorker.recognize(imgPath);
+        
+        if (fs.existsSync(imgPath)) {
+            try { fs.unlinkSync(imgPath); } catch (_) {}
+        }
+        
+        if (createdWorker && localWorker) {
+            await localWorker.terminate();
+        }
+        
+        return text || '';
+    } catch (e) {
+        console.error(`[OCR Local Pág ${pageIndex + 1}] Error:`, e);
+        return '';
+    }
+};
+

@@ -13,6 +13,7 @@ dist/
 dist-ssr/
 dist_backend/
 *.local
+*.traineddata
 
 # ── Fuentes Legadas (carpeta histórica, no va al repositorio) ─────────────────
 legacy_sources/
