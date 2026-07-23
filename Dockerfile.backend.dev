@@ -10,6 +10,7 @@ WORKDIR /app
 RUN apk add --no-cache \
       ca-certificates \
       tzdata \
+      poppler-utils \
       chromium \
       nss \
       freetype \

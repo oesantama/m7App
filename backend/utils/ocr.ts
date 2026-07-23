@@ -50,7 +50,8 @@ export const performLocalPageOCR = async (pdfFilePath: string, pageIndex: number
     
     try {
         const pageNum = pageIndex + 1;
-        await execAsync(`pdftoppm -png -r 150 -f ${pageNum} -l ${pageNum} "${pdfFilePath}" "${outPrefix}"`);
+        // Renderizado a 200 DPI para ultra-precisión en dígitos de facturas y actas escaneadas
+        await execAsync(`pdftoppm -png -r 200 -f ${pageNum} -l ${pageNum} "${pdfFilePath}" "${outPrefix}"`);
         
         const files = fs.readdirSync('/tmp').filter(f => f.startsWith(`m7-p${pageNum}-${tmpId}`) && f.endsWith('.png'));
         if (files.length === 0) return '';
@@ -60,7 +61,7 @@ export const performLocalPageOCR = async (pdfFilePath: string, pageIndex: number
         let localWorker = worker;
         let createdWorker = false;
         if (!localWorker) {
-            localWorker = await Tesseract.createWorker('eng');
+            localWorker = await Tesseract.createWorker(['eng', 'spa']);
             createdWorker = true;
         }
         
@@ -75,8 +76,8 @@ export const performLocalPageOCR = async (pdfFilePath: string, pageIndex: number
         }
         
         return text || '';
-    } catch (e) {
-        console.error(`[OCR Local Pág ${pageIndex + 1}] Error:`, e);
+    } catch (e: any) {
+        console.error(`[OCR Local Pág ${pageIndex + 1}] Error:`, e?.message || e);
         return '';
     }
 };

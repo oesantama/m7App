@@ -24,7 +24,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Instalación minimalista de sistema
-RUN apk add --no-cache ca-certificates tzdata rclone ghostscript \
+RUN apk add --no-cache ca-certificates tzdata rclone ghostscript poppler-utils \
       chromium \
       nss \
       freetype \

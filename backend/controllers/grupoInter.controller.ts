@@ -647,7 +647,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         // Precargar worker Tesseract para OCR local rápido en servidor
         let tesseractWorker: any = null;
         try {
-            tesseractWorker = await Tesseract.createWorker('eng');
+            tesseractWorker = await Tesseract.createWorker(['eng', 'spa']);
         } catch (tessErr) {
             console.warn('[GRUPO-INTER] No se pudo inicializar worker Tesseract:', tessErr);
         }
