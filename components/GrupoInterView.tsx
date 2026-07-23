@@ -644,77 +644,148 @@ const GrupoInterView: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 p-6 font-sans text-slate-900">
-      {/* Overlay de Carga con Barra de Progreso */}
+      {/* Overlay y Reporte Completo de Procesamiento de PDF */}
       {(loading || isProcessing) && (
-        <div className="fixed inset-0 z-[400] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
-          <div className={`bg-white p-8 rounded-[40px] shadow-2xl flex flex-col items-center w-full border border-white/20 transition-all ${isFinished && matchedDetails.length > 0 ? 'max-w-xl' : 'max-w-sm'}`}>
-            {!isFinished && (
-              <div className="relative w-16 h-16 mb-6">
-                <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
-                <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
-              </div>
-            )}
-            {isFinished && (
-              <div className="p-4 bg-emerald-100 text-emerald-600 rounded-full mb-4">
-                <CheckCircle size={36} />
-              </div>
-            )}
-            <h3 className="text-base font-black text-slate-900 mb-2 uppercase tracking-tight text-center">
-              {isProcessing ? (processingStatus || 'Analizando PDF...') : 'Sincronizando...'}
-            </h3>
-            <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest text-center px-4 mb-4">
-              {isFinished ? 'Facturas actualizadas a estado Entregado en la base de datos' : 'Por favor espere mientras el núcleo de M7 procesa su información'}
-            </p>
-
-            {isProcessing && !isFinished && (
-              <div className="w-full mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
-              </div>
-            )}
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
+          <div className={`bg-white rounded-[32px] shadow-2xl flex flex-col w-full max-h-[90vh] overflow-hidden border border-slate-100 transition-all ${isFinished ? 'max-w-3xl' : 'max-w-md p-8'}`}>
             
-            {isFinished && matchedDetails.length > 0 && (
-              <div className="w-full max-h-56 overflow-y-auto border border-slate-200 rounded-2xl bg-slate-50 p-3 my-3">
-                <div className="text-[10px] font-black uppercase text-slate-500 mb-2 flex items-center justify-between">
-                  <span>Facturas Coincidentes ({matchedDetails.length})</span>
-                  <span>Estado BD</span>
+            {!isFinished && (
+              <div className="flex flex-col items-center py-4">
+                <div className="relative w-16 h-16 mb-6">
+                  <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
                 </div>
-                <table className="w-full text-left text-[11px]">
-                  <thead>
-                    <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase text-[9px]">
-                      <th className="pb-1 px-2">Documento</th>
-                      <th className="pb-1 px-2">Ubicación</th>
-                      <th className="pb-1 px-2">Método</th>
-                      <th className="pb-1 px-2 text-right">Resultado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {matchedDetails.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-slate-100/80">
-                        <td className="py-1.5 px-2 font-mono font-bold text-slate-800">{item.doc}</td>
-                        <td className="py-1.5 px-2 text-slate-600 font-medium">Pág. {item.page}</td>
-                        <td className="py-1.5 px-2 text-slate-500 text-[10px]">{item.method}</td>
-                        <td className="py-1.5 px-2 text-right font-bold text-emerald-600">✓ Entregado</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <h3 className="text-base font-black text-slate-900 mb-2 uppercase tracking-tight text-center">
+                  {processingStatus || 'Analizando PDF...'}
+                </h3>
+                <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest text-center px-4 mb-4">
+                  Por favor espere mientras el núcleo de M7 procesa su información
+                </p>
+                <div className="w-full mt-2 h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-600 transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                </div>
               </div>
             )}
 
             {isFinished && (
-              <button 
-                onClick={() => {
-                  setIsProcessing(false);
-                  setIsFinished(false);
-                  setMatchedDetails([]);
-                  // Limpiar filtro de status para asegurar que se muestren las facturas entregadas
-                  setFilters(prev => ({ ...prev, status: '' }));
-                  fetchOrders(searchTerm);
-                }}
-                className="mt-4 w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition shadow-xl active:scale-95"
-              >
-                Aceptar y Actualizar Tabla
-              </button>
+              <div className="flex flex-col h-full overflow-hidden">
+                {/* Cabecera del Informe */}
+                <div className="p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-3 rounded-2xl ${matchedDetails.length > 0 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'}`}>
+                      <CheckCircle size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black tracking-tight uppercase">Informe de Procesamiento de PDF</h3>
+                      <p className="text-xs text-slate-400 font-medium">Resultados del escaneo atómico de cumplidos</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-500/30">
+                      Coincidencias: {matchedDetails.length}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Cuerpo del Informe scrollable */}
+                <div className="p-6 overflow-y-auto space-y-6 flex-1 bg-slate-50">
+                  
+                  {/* Resumen Métricas */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Coincidencias BD</span>
+                      <span className="text-2xl font-black text-emerald-600">{matchedDetails.length}</span>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Eventos del Sistema</span>
+                      <span className="text-2xl font-black text-blue-600">{debugLogs.length}</span>
+                    </div>
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm col-span-2 sm:col-span-1">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Estado Final</span>
+                      <span className="text-sm font-black text-slate-800 uppercase truncate block">
+                        {matchedDetails.length > 0 ? '✓ Facturas Actualizadas' : 'Sin coincidencias nuevas'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Tabla de Facturas Coincidentes */}
+                  {matchedDetails.length > 0 && (
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 overflow-hidden">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-700 mb-3 flex items-center gap-2">
+                        <span>🎯 Facturas Actualizadas a Estado Entregado ({matchedDetails.length})</span>
+                      </h4>
+                      <div className="max-h-48 overflow-y-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-200 text-slate-400 font-bold uppercase text-[9px] sticky top-0 bg-white">
+                              <th className="pb-2 px-2">Documento / Factura</th>
+                              <th className="pb-2 px-2">Página PDF</th>
+                              <th className="pb-2 px-2">Método de Lectura</th>
+                              <th className="pb-2 px-2 text-right">Resultado BD</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {matchedDetails.map((item, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="py-2 px-2 font-mono font-bold text-slate-800">{item.doc}</td>
+                                <td className="py-2 px-2 text-slate-600 font-medium">Página {item.page}</td>
+                                <td className="py-2 px-2 text-slate-500 text-[10px] font-medium">{item.method}</td>
+                                <td className="py-2 px-2 text-right font-bold text-emerald-600">✓ Entregado</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Registro Completo de Consola en Vivo (Audit Logs) */}
+                  <div className="bg-slate-900 rounded-2xl p-4 shadow-inner text-slate-200">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center justify-between">
+                      <span>💻 Registro de Ejecución y Auditoría del Servidor</span>
+                      <span className="text-[9px] text-slate-500">Útil para capturas de pantalla</span>
+                    </h4>
+                    <div className="max-h-44 overflow-y-auto space-y-1 font-mono text-[11px] leading-relaxed text-slate-300 p-2 bg-slate-950/80 rounded-xl border border-slate-800">
+                      {debugLogs.length === 0 && <div className="text-slate-500 italic">No hay logs registrados.</div>}
+                      {debugLogs.map((logMsg, i) => {
+                        const isErr = logMsg.includes('❌') || logMsg.includes('Error') || logMsg.includes('vencidas');
+                        const isWarn = logMsg.includes('⚠️') || logMsg.includes('ALERTA') || logMsg.includes('Nota');
+                        const isOk = logMsg.includes('✅') || logMsg.includes('🎯') || logMsg.includes('⚡');
+                        
+                        return (
+                          <div 
+                            key={i} 
+                            className={`py-0.5 px-1 rounded ${
+                              isErr ? 'bg-rose-950/70 text-rose-300 font-bold border-l-2 border-rose-500' :
+                              isWarn ? 'bg-amber-950/70 text-amber-300 border-l-2 border-amber-500' :
+                              isOk ? 'text-emerald-300' : 'text-slate-300'
+                            }`}
+                          >
+                            {logMsg}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Footer Botón Aceptar */}
+                <div className="p-4 bg-white border-t border-slate-200 flex justify-end">
+                  <button 
+                    onClick={() => {
+                      setIsProcessing(false);
+                      setIsFinished(false);
+                      setMatchedDetails([]);
+                      setFilters(prev => ({ ...prev, status: '' }));
+                      fetchOrders(searchTerm);
+                    }}
+                    className="w-full sm:w-auto px-10 py-3.5 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition shadow-xl active:scale-95"
+                  >
+                    Aceptar y Actualizar Tabla
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>
