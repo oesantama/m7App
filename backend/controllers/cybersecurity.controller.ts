@@ -126,6 +126,8 @@ export const sendCampaign = async (req: Request, res: Response) => {
     const user = process.env.EMAIL_USER || process.env.SMTP_USER;
     const pass = process.env.EMAIL_PASSWORD || process.env.SMTP_PASS;
 
+    console.log(`[CYBER-SMTP-DEBUG] Config: Host=${host}, Port=${port}, Secure=${secure}, User=${user}, Recipients=${recipients.join(',')}`);
+
     if (host && recipients.length > 0) {
       const nodemailer = await import('nodemailer');
       const transporter = nodemailer.createTransport({
@@ -133,24 +135,33 @@ export const sendCampaign = async (req: Request, res: Response) => {
         port,
         secure,
         auth: { user, pass },
+        tls: { rejectUnauthorized: false }
       });
 
       for (const email of recipients) {
-        const baseUrl = process.env.VITE_API_URL || 'http://localhost:8081';
+        const baseUrl = process.env.VITE_API_URL || 'https://orbitm7.m7apps.com';
         const trackingUrl = `${baseUrl}/api/cybersecurity/track/${campaign.id}/${encodeURIComponent(email)}/CLICK`;
 
-        await transporter.sendMail({
-          from: `"Milla Siete Seguridad TI" <${user || 'soporte@qinspecting.com'}>`,
-          to: email,
-          subject: campaign.subject,
-          html: `${campaign.body_html}<br><br><p><a href="${trackingUrl}" style="background:#0f7b6c; color:white; padding:10px 18px; border-radius:6px; text-decoration:none; font-weight:bold; display:inline-block;">Realizar Verificación de Concientización</a></p>`,
-        });
+        try {
+          const info = await transporter.sendMail({
+            from: `"Milla Siete Seguridad TI" <${user || 'soporte@qinspecting.com'}>`,
+            to: email,
+            subject: campaign.subject,
+            html: `${campaign.body_html}<br><br><p><a href="${trackingUrl}" style="background:#0f7b6c; color:white; padding:10px 18px; border-radius:6px; text-decoration:none; font-weight:bold; display:inline-block;">Realizar Verificación de Concientización</a></p>`,
+          });
+          console.log(`[CYBER-SMTP-SUCCESS] Correo enviado a ${email}: MessageID=${info.messageId}`);
+        } catch (mailErr: any) {
+          console.error(`[CYBER-SMTP-ERROR] Error enviando a ${email}:`, mailErr.message);
+        }
       }
+    } else {
+      console.warn(`[CYBER-SMTP-WARN] No se intentó el envío. Host=${host}, Destinatarios=${recipients.length}`);
     }
 
     await pool.query("UPDATE cyber_phishing_campaigns SET status = 'SENT', sent_at = CURRENT_TIMESTAMP WHERE id = $1", [id]);
     res.json({ success: true, message: `Campaña distribuida exitosamente a ${recipients.length} destinatario(s).` });
   } catch (err: any) {
+    console.error('[CYBER-SEND-FATAL]', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
