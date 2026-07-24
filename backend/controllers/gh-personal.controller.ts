@@ -214,7 +214,7 @@ const initTables = async () => {
   }
 };
 
-initTables();
+export const initGhPersonalTables = initTables;
 
 export const getPersonal = async (req: Request, res: Response) => {
   try {
