@@ -40,7 +40,8 @@ export const ID_MAP: Record<string, string> = {
   'BASC_DASHBOARD': 'PAG-BASC-01',
   'BASC_DRIVE_SYNC': 'PAG-BASC-02',
   'BASC_AUDITOR_AI': 'PAG-BASC-03',
-  'BASC_REPORTES': 'PAG-BASC-04'
+  'BASC_REPORTES': 'PAG-BASC-04',
+  'CIBERSEGURIDAD': 'PAG-CYBER'
 };
 
 /**

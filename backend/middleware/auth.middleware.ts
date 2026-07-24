@@ -29,6 +29,23 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
     }
 };
 
+export const requireSuperAdmin = (req: AuthRequest, res: Response, next: NextFunction) => {
+    const user = req.user;
+    if (!user) {
+        return res.status(401).json({ success: false, error: 'Usuario no autenticado.' });
+    }
+    const isSuperAdminRole = user.roleId === 'ROL-01' || user.role_id === 'ROL-01';
+    const isSuperAdminEmail = user.email?.toLowerCase() === 'directorti@millasiete.com';
+    if (!isSuperAdminRole && !isSuperAdminEmail) {
+        console.warn(`[SECURITY-ALERT] Intento de acceso no autorizado por: ${user.email}`);
+        return res.status(403).json({
+            success: false,
+            error: 'Acceso denegado. Módulo restringido exclusivamente al SuperAdmin.'
+        });
+    }
+    next();
+};
+
 const ID_MAP: Record<string, string> = {
     'ARTICULOS': 'PAG-01',
     'CLIENTES': 'PAG-03',

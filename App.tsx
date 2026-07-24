@@ -1050,7 +1050,7 @@ const App: React.FC = () => {
       case 'salida-proveedor':
         return <SalidaProveedor user={user!} />;
       case 'cybersecurity':
-        return <CyberModule />;
+        return <CyberModule user={user!} />;
       case 'capacitaciones':
         return <CentroCapacitaciones user={user!} />;
       case 'noticias-avisos':

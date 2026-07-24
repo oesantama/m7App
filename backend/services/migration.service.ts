@@ -806,6 +806,45 @@ const healSchema = async (client: any) => {
     } catch (e) {}
   }
 
+  // FASE: CREACIÓN DE TABLAS DE CIBERSEGURIDAD
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cyber_phishing_campaigns (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        sender_name VARCHAR(100),
+        sender_email VARCHAR(100),
+        subject VARCHAR(255),
+        body_html TEXT,
+        target_group VARCHAR(100),
+        status VARCHAR(50) DEFAULT 'DRAFT',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        sent_at TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS cyber_phishing_events (
+        id SERIAL PRIMARY KEY,
+        campaign_id INTEGER REFERENCES cyber_phishing_campaigns(id),
+        user_email VARCHAR(100),
+        event_type VARCHAR(50),
+        ip_address VARCHAR(100),
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS cyber_training_plans (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        file_url VARCHAR(500),
+        required_for_role VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  } catch (err: any) {
+    console.error('[M7-DB] Error creando tablas de Ciberseguridad:', err.message);
+  }
+
   // FASE: RESYNC DE SECUENCIAS SERIAL — evita "duplicate key value violates unique constraint pkey"
   for (const table of serialTables) {
     try {
@@ -1394,6 +1433,7 @@ export const restoreSystem = async () => {
 
       -- Administración (MOD-06)
       ('PAG-SQL', 'Gestor DB', 'admin-db', 'MOD-06', 'MOD-06', 'EST-01'),
+      ('PAG-CYBER', 'Ciberseguridad', 'cybersecurity', 'MOD-06', 'MOD-06', 'EST-01'),
 
       -- Grupo Inter (MOD-07)
       ('PAG-31', 'GESTIÓN OPERATIVA', 'grupo-inter-ops', 'MOD-07', 'MOD-07', 'EST-01'),
