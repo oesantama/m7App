@@ -128,10 +128,15 @@ export const sendCampaign = async (req: Request, res: Response) => {
       const trackingUrl = `${baseUrl}/api/cybersecurity/track/${campaign.id}/${encodeURIComponent(email)}/CLICK`;
 
       let finalHtml = campaign.body_html || '';
-      const buttonHtml = `<a href="${trackingUrl}" style="background:#0f7b6c; color:white; padding:12px 22px; border-radius:8px; text-decoration:none; font-weight:bold; display:inline-block; margin: 15px 0;">Verificar Información</a>`;
+      const buttonHtml = `<a href="${trackingUrl}" style="background-color: #dc2626; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; font-family: sans-serif; display: inline-block; margin: 16px 0; shadow: 0 4px 6px rgba(0,0,0,0.1);">Confirmar / Verificar Identidad</a>`;
+
+      // Si el contenido no tiene etiquetas HTML de bloque, formatear los saltos de línea \n
+      if (!/<[a-z][\s\S]*>/i.test(finalHtml)) {
+        finalHtml = finalHtml.replace(/\n/g, '<br />');
+      }
 
       if (finalHtml.includes('{{LINK_BOTON}}')) {
-        finalHtml = finalHtml.replace(/\{\{LINK_BOTON\}\}/g, trackingUrl);
+        finalHtml = finalHtml.replace(/\{\{LINK_BOTON\}\}/g, buttonHtml);
       } else {
         finalHtml = `${finalHtml}<br><br><p>${buttonHtml}</p>`;
       }

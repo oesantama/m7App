@@ -387,13 +387,22 @@ export const PhishingSimulator: React.FC<PhishingSimulatorProps> = ({ currentUse
                 <label className="block text-xs font-bold text-slate-400 uppercase">
                   Contenido Informativo (HTML / Texto)
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setBodyHtml(prev => prev + ' {{LINK_BOTON}}')}
-                  className="text-xs bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 px-3 py-1 rounded-lg border border-amber-500/20 font-mono font-bold transition-all"
-                >
-                  + Insertar variable &#123;&#123;LINK_BOTON&#125;&#125;
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBodyHtml(prev => prev + ' <b>Texto en Negrita</b>')}
+                    className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1 rounded-lg border border-slate-700 font-bold transition-all"
+                  >
+                    <b>B</b> Negrita
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBodyHtml(prev => prev + ' {{LINK_BOTON}}')}
+                    className="text-xs bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 px-3 py-1 rounded-lg border border-amber-500/20 font-mono font-bold transition-all"
+                  >
+                    + Insertar Botón &#123;&#123;LINK_BOTON&#125;&#125;
+                  </button>
+                </div>
               </div>
 
               <textarea
