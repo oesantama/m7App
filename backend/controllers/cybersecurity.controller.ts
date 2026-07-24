@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { sendEmail } from '../services/notification.service.js';
 import pool from '../config/database.js';
 
 // --- INITIALIZE DB TABLES ---
@@ -120,55 +121,50 @@ export const sendCampaign = async (req: Request, res: Response) => {
       recipients = usersRes.rows.map((u: any) => u.email).filter(Boolean);
     }
 
-    const host = process.env.EMAIL_HOST || process.env.SMTP_HOST;
-    const port = Number(process.env.EMAIL_PORT || process.env.SMTP_PORT || 465);
-    const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
-    const user = process.env.EMAIL_USER || process.env.SMTP_USER;
-    const pass = process.env.EMAIL_PASSWORD || process.env.SMTP_PASS;
+    const results: Array<{ email: string; success: boolean; messageId?: string; error?: string }> = [];
 
-    console.log(`[CYBER-SMTP-DEBUG] Config: Host=${host}, Port=${port}, Secure=${secure}, User=${user}, Recipients=${recipients.join(',')}`);
+    for (const email of recipients) {
+      const baseUrl = process.env.VITE_API_URL || 'https://orbitm7.m7apps.com';
+      const trackingUrl = `${baseUrl}/api/cybersecurity/track/${campaign.id}/${encodeURIComponent(email)}/CLICK`;
 
-    if (host && recipients.length > 0) {
-      const nodemailer = await import('nodemailer');
-      const transporter = nodemailer.createTransport({
-        host,
-        port,
-        secure,
-        auth: { user, pass },
-        tls: { rejectUnauthorized: false }
-      });
+      let finalHtml = campaign.body_html || '';
+      const buttonHtml = `<a href="${trackingUrl}" style="background:#0f7b6c; color:white; padding:12px 22px; border-radius:8px; text-decoration:none; font-weight:bold; display:inline-block; margin: 15px 0;">Verificar Información</a>`;
 
-      for (const email of recipients) {
-        const baseUrl = process.env.VITE_API_URL || 'https://orbitm7.m7apps.com';
-        const trackingUrl = `${baseUrl}/api/cybersecurity/track/${campaign.id}/${encodeURIComponent(email)}/CLICK`;
-
-        let finalHtml = campaign.body_html || '';
-        const buttonHtml = `<a href="${trackingUrl}" style="background:#0f7b6c; color:white; padding:12px 22px; border-radius:8px; text-decoration:none; font-weight:bold; display:inline-block; margin: 15px 0;">Verificar Información</a>`;
-
-        if (finalHtml.includes('{{LINK_BOTON}}')) {
-          finalHtml = finalHtml.replace(/\{\{LINK_BOTON\}\}/g, trackingUrl);
-        } else {
-          finalHtml = `${finalHtml}<br><br><p>${buttonHtml}</p>`;
-        }
-
-        try {
-          const info = await transporter.sendMail({
-            from: `"Milla Siete TI" <${user || 'soporte@qinspecting.com'}>`,
-            to: email,
-            subject: campaign.subject,
-            html: finalHtml,
-          });
-          console.log(`[CYBER-SMTP-SUCCESS] Correo enviado a ${email}: MessageID=${info.messageId}`);
-        } catch (mailErr: any) {
-          console.error(`[CYBER-SMTP-ERROR] Error enviando a ${email}:`, mailErr.message);
-        }
+      if (finalHtml.includes('{{LINK_BOTON}}')) {
+        finalHtml = finalHtml.replace(/\{\{LINK_BOTON\}\}/g, trackingUrl);
+      } else {
+        finalHtml = `${finalHtml}<br><br><p>${buttonHtml}</p>`;
       }
-    } else {
-      console.warn(`[CYBER-SMTP-WARN] No se intentó el envío. Host=${host}, Destinatarios=${recipients.length}`);
+
+      try {
+        const sendRes = await sendEmail(email, campaign.subject, finalHtml);
+        console.log(`[CYBER-EMAIL-SUCCESS] Correo enviado a ${email}: MessageID=${sendRes?.messageId}`);
+        results.push({ email, success: true, messageId: sendRes?.messageId });
+      } catch (mailErr: any) {
+        console.error(`[CYBER-EMAIL-ERROR] Error enviando a ${email}:`, mailErr.message);
+        results.push({ email, success: false, error: mailErr.message });
+      }
     }
 
+    const failedCount = results.filter(r => !r.success).length;
+    const successCount = results.filter(r => r.success).length;
+
     await pool.query("UPDATE cyber_phishing_campaigns SET status = 'SENT', sent_at = CURRENT_TIMESTAMP WHERE id = $1", [id]);
-    res.json({ success: true, message: `Campaña distribuida exitosamente a ${recipients.length} destinatario(s).` });
+
+    if (failedCount > 0 && successCount === 0) {
+      return res.status(500).json({
+        success: false,
+        error: `Error al enviar correo: ${results[0]?.error || 'Error desconocido'}`
+      });
+    }
+
+    res.json({
+      success: true,
+      message: failedCount > 0
+        ? `Enviado a ${successCount} destinatario(s), pero fallaron ${failedCount}. Detalle: ${results.find(r => !r.success)?.error}`
+        : `Campaña distribuida exitosamente a ${successCount} destinatario(s).`,
+      results
+    });
   } catch (err: any) {
     console.error('[CYBER-SEND-FATAL]', err.message);
     res.status(500).json({ success: false, error: err.message });
