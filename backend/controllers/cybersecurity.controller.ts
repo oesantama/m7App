@@ -142,12 +142,21 @@ export const sendCampaign = async (req: Request, res: Response) => {
         const baseUrl = process.env.VITE_API_URL || 'https://orbitm7.m7apps.com';
         const trackingUrl = `${baseUrl}/api/cybersecurity/track/${campaign.id}/${encodeURIComponent(email)}/CLICK`;
 
+        let finalHtml = campaign.body_html || '';
+        const buttonHtml = `<a href="${trackingUrl}" style="background:#0f7b6c; color:white; padding:12px 22px; border-radius:8px; text-decoration:none; font-weight:bold; display:inline-block; margin: 15px 0;">Verificar Información</a>`;
+
+        if (finalHtml.includes('{{LINK_BOTON}}')) {
+          finalHtml = finalHtml.replace(/\{\{LINK_BOTON\}\}/g, trackingUrl);
+        } else {
+          finalHtml = `${finalHtml}<br><br><p>${buttonHtml}</p>`;
+        }
+
         try {
           const info = await transporter.sendMail({
-            from: `"Milla Siete Seguridad TI" <${user || 'soporte@qinspecting.com'}>`,
+            from: `"Milla Siete TI" <${user || 'soporte@qinspecting.com'}>`,
             to: email,
             subject: campaign.subject,
-            html: `${campaign.body_html}<br><br><p><a href="${trackingUrl}" style="background:#0f7b6c; color:white; padding:10px 18px; border-radius:6px; text-decoration:none; font-weight:bold; display:inline-block;">Realizar Verificación de Concientización</a></p>`,
+            html: finalHtml,
           });
           console.log(`[CYBER-SMTP-SUCCESS] Correo enviado a ${email}: MessageID=${info.messageId}`);
         } catch (mailErr: any) {

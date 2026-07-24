@@ -333,8 +333,8 @@ export const PhishingSimulator: React.FC<PhishingSimulatorProps> = ({ currentUse
 
       {/* MODAL CREAR / EDITAR */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-xl overflow-hidden shadow-2xl p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl p-6 sm:p-8 space-y-5 my-8">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
               <h3 className="text-xl font-bold text-white">
                 {editingCampaignId ? 'Editar Jornada' : 'Crear Jornada de Concientización'}
@@ -344,26 +344,28 @@ export const PhishingSimulator: React.FC<PhishingSimulatorProps> = ({ currentUse
               </button>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Título de la Jornada</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ej: Jornada Preventiva Q3 BASC"
-                className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-2.5 rounded-xl text-sm"
-              />
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Título de la Jornada</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Ej: Jornada Preventiva Q3 BASC"
+                  className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-2.5 rounded-xl text-sm"
+                />
+              </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Asunto del Correo</label>
-              <input
-                type="text"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="Actualización de Seguridad TI"
-                className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-2.5 rounded-xl text-sm"
-              />
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Asunto del Correo</label>
+                <input
+                  type="text"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  placeholder="Ej: [Urgente] Verificación de Nómina"
+                  className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-2.5 rounded-xl text-sm"
+                />
+              </div>
             </div>
 
             <div>
@@ -381,21 +383,36 @@ export const PhishingSimulator: React.FC<PhishingSimulatorProps> = ({ currentUse
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Contenido Informativo (HTML / Texto)</label>
+              <div className="flex justify-between items-center mb-1.5">
+                <label className="block text-xs font-bold text-slate-400 uppercase">
+                  Contenido Informativo (HTML / Texto)
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setBodyHtml(prev => prev + ' {{LINK_BOTON}}')}
+                  className="text-xs bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 px-3 py-1 rounded-lg border border-amber-500/20 font-mono font-bold transition-all"
+                >
+                  + Insertar variable &#123;&#123;LINK_BOTON&#125;&#125;
+                </button>
+              </div>
+
               <textarea
-                rows={4}
+                rows={10}
                 value={bodyHtml}
                 onChange={(e) => setBodyHtml(e.target.value)}
-                placeholder="Estimado colaborador, le invitamos a revisar las nuevas políticas..."
-                className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-2.5 rounded-xl text-sm resize-none font-mono text-xs"
+                placeholder="Escribe el cuerpo del mensaje..."
+                className="w-full bg-slate-950 border border-slate-800 text-white p-4 rounded-xl text-xs font-mono leading-relaxed resize-y min-h-[220px]"
               />
+              <span className="text-[11px] text-slate-500 mt-1 block">
+                Usa <code>&#123;&#123;LINK_BOTON&#125;&#125;</code> para posicionar el enlace de seguimiento donde desees en tu texto.
+              </span>
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setShowModal(false)} className="px-4 py-2 text-xs font-bold text-slate-400">
                 Cancelar
               </button>
-              <button onClick={handleSaveCampaign} className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white px-5 py-2 rounded-xl text-xs font-bold shadow-lg shadow-red-500/20">
+              <button onClick={handleSaveCampaign} className="bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white px-6 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-red-500/20">
                 {editingCampaignId ? 'Guardar Cambios' : 'Guardar Jornada'}
               </button>
             </div>
