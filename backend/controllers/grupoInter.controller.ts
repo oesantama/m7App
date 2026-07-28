@@ -857,6 +857,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                                 page: pageIndex + 1,
                                 method: isNewDelivery ? finalMethod : `${finalMethod} (Re-confirmado)`
                             });
+                            sendProgress({ type: 'match_live', matches: matchedDetails.length });
 
                             for (const [k, v] of Array.from(idMap.entries())) {
                                 if (v === pid) {

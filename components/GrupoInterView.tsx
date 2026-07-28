@@ -390,6 +390,8 @@ const GrupoInterView: React.FC = () => {
           setDebugLogs(prev => [...prev, data.message]);
           setProcessingStatus(data.message);
           if (data.progress) setUploadProgress(data.progress);
+        } else if (data.type === 'match_live') {
+          setProcessingStatus(`🎯 ¡Coincidencia hallada en tiempo real! (${data.matches} acumuladas)`);
         } else if (data.type === 'end') {
           receivedFinalEvent = true;
           clearTimeout(safetyTimer);

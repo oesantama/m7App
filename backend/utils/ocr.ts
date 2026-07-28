@@ -50,8 +50,8 @@ export const performLocalPageOCR = async (pdfFilePath: string, pageIndex: number
     const outPrefix = path.join('/tmp', `m7-p${pageNum}-${tmpId}`);
     
     try {
-        // Renderizado a 200 DPI para ultra-precisión en dígitos de facturas y actas escaneadas
-        await execAsync(`pdftoppm -png -r 200 -f ${pageNum} -l ${pageNum} "${pdfFilePath}" "${outPrefix}"`);
+        // Normalizado a 2000px máximo para ultra-precisión sin desbordamiento en hojas de tamaño personalizado/gigante
+        await execAsync(`pdftoppm -png -scale-to 2000 -f ${pageNum} -l ${pageNum} "${pdfFilePath}" "${outPrefix}"`);
         
         const files = fs.readdirSync('/tmp').filter(f => f.startsWith(`m7-p${pageNum}-${tmpId}`) && f.endsWith('.png'));
         if (files.length === 0) return '';
@@ -73,7 +73,7 @@ export const performLocalPageOCR = async (pdfFilePath: string, pageIndex: number
         if (!hasDigits) {
             const rotPrefix = path.join('/tmp', `m7-p${pageNum}-${tmpId}-r90`);
             try {
-                await execAsync(`pdftoppm -png -r 200 -rot 90 -f ${pageNum} -l ${pageNum} "${pdfFilePath}" "${rotPrefix}"`);
+                await execAsync(`pdftoppm -png -scale-to 2000 -rot 90 -f ${pageNum} -l ${pageNum} "${pdfFilePath}" "${rotPrefix}"`);
                 const rotFiles = fs.readdirSync('/tmp').filter(f => f.startsWith(`m7-p${pageNum}-${tmpId}-r90`) && f.endsWith('.png'));
                 if (rotFiles.length > 0) {
                     const rotImgPath = path.join('/tmp', rotFiles[0]);
