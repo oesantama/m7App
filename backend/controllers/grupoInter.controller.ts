@@ -819,6 +819,10 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 }
             }
 
+            if (foundMatchesInPage.length === 0) {
+                sendProgress({ type: 'log', message: `ℹ️ ${workerLabel} Pág ${pageIndex + 1}: Analizada sin coincidencia.` });
+            }
+
             // Guardar coincidencias en base de datos
             if (foundMatchesInPage.length > 0) {
                 await dbMutex.acquire();

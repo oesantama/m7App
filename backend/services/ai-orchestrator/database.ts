@@ -416,8 +416,25 @@ export async function getActiveModels(): Promise<AIModel[]> {
 }
 
 export async function getKeysForProvider(providerId: string): Promise<AIKey[]> {
-    // Desbloquear automáticamente llaves bloqueadas temporalmente por límites de cuota si ha pasado 1 minuto
-    await pool.query(`UPDATE ai_keys SET status = 'active', consecutive_errors = 0 WHERE status = 'blocked' AND (last_used_at IS NULL OR last_used_at < NOW() - INTERVAL '1 minute')`);
+    // Desbloquear automáticamente llaves bloqueadas por errores temporales
+    await pool.query(`UPDATE ai_keys SET status = 'active', consecutive_errors = 0 WHERE status = 'blocked' OR status = 'exhausted'`);
+
+    // Auto-sincronizar desde process.env si la base de datos se quedó sin llaves activas
+    if (providerId === 'gemini') {
+        const rawKeys = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+        const envKeys = rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
+        const checkActive = await pool.query(`SELECT COUNT(*) FROM ai_keys WHERE provider_id = 'gemini' AND status = 'active'`);
+        if (parseInt(checkActive.rows[0].count || '0', 10) === 0 && envKeys.length > 0) {
+            await pool.query(`DELETE FROM ai_keys WHERE provider_id = 'gemini'`);
+            for (let i = 0; i < envKeys.length; i++) {
+                const encrypted = encrypt(envKeys[i]);
+                await pool.query(
+                    `INSERT INTO ai_keys (provider_id, api_key_encrypted, label, status) VALUES ('gemini', $1, $2, 'active')`,
+                    [encrypted, `Gemini Key ${i + 1} (From .env)`]
+                );
+            }
+        }
+    }
 
     const result = await pool.query(
         `SELECT id, provider_id AS "providerId", api_key_encrypted AS "apiKeyEncrypted", 

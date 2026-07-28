@@ -46,10 +46,10 @@ export const performLocalOCR = async (pdfBuffer: Buffer): Promise<string> => {
 
 export const performLocalPageOCR = async (pdfFilePath: string, pageIndex: number, worker?: any): Promise<string> => {
     const tmpId = crypto.randomBytes(6).toString('hex');
-    const outPrefix = path.join('/tmp', `m7-p${pageIndex + 1}-${tmpId}`);
+    const pageNum = pageIndex + 1;
+    const outPrefix = path.join('/tmp', `m7-p${pageNum}-${tmpId}`);
     
     try {
-        const pageNum = pageIndex + 1;
         // Renderizado a 200 DPI para ultra-precisión en dígitos de facturas y actas escaneadas
         await execAsync(`pdftoppm -png -r 200 -f ${pageNum} -l ${pageNum} "${pdfFilePath}" "${outPrefix}"`);
         
@@ -65,10 +65,25 @@ export const performLocalPageOCR = async (pdfFilePath: string, pageIndex: number
             createdWorker = true;
         }
         
-        const { data: { text } } = await localWorker.recognize(imgPath);
-        
-        if (fs.existsSync(imgPath)) {
-            try { fs.unlinkSync(imgPath); } catch (_) {}
+        let { data: { text } } = await localWorker.recognize(imgPath);
+        if (fs.existsSync(imgPath)) { try { fs.unlinkSync(imgPath); } catch (_) {} }
+
+        // Si el escaneo a 0° no detectó secuencias numéricas de facturas (posible acta rotada 90° de lado)
+        const hasDigits = /\d{4,10}/.test(text || '');
+        if (!hasDigits) {
+            const rotPrefix = path.join('/tmp', `m7-p${pageNum}-${tmpId}-r90`);
+            try {
+                await execAsync(`pdftoppm -png -r 200 -rot 90 -f ${pageNum} -l ${pageNum} "${pdfFilePath}" "${rotPrefix}"`);
+                const rotFiles = fs.readdirSync('/tmp').filter(f => f.startsWith(`m7-p${pageNum}-${tmpId}-r90`) && f.endsWith('.png'));
+                if (rotFiles.length > 0) {
+                    const rotImgPath = path.join('/tmp', rotFiles[0]);
+                    const rotRes = await localWorker.recognize(rotImgPath);
+                    if (rotRes.data?.text) {
+                        text = (text || '') + '\n' + rotRes.data.text;
+                    }
+                    if (fs.existsSync(rotImgPath)) { try { fs.unlinkSync(rotImgPath); } catch (_) {} }
+                }
+            } catch (_) {}
         }
         
         if (createdWorker && localWorker) {
