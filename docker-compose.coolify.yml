@@ -86,6 +86,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.m7app-backend.rule=Host(`apiapps.m7apps.com`)"
       - "traefik.http.services.m7app-backend.loadbalancer.server.port=8080"
+      - "traefik.http.services.m7app-backend.loadbalancer.responseForwarding.flushInterval=100ms"
     depends_on:
       postgres:
         condition: service_healthy

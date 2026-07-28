@@ -524,6 +524,7 @@ export const uploadManifestExcel = async (req: Request, res: Response): Promise<
 
 
 export const processPDF = async (req: any, res: Response): Promise<void> => {
+    let pingInterval: any = null;
     try {
         await ensureSchema();
         if (!req.file || !req.file.path) {
@@ -538,7 +539,16 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
         res.setHeader('Content-Type', 'application/x-ndjson');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
-        const sendProgress = (msg: any) => res.write(JSON.stringify(msg) + '\n');
+        res.setHeader('X-Accel-Buffering', 'no');
+        const sendProgress = (msg: any) => {
+            if (!res.writableEnded) {
+                res.write(JSON.stringify(msg) + '\n');
+            }
+        };
+
+        pingInterval = setInterval(() => {
+            sendProgress({ type: 'ping' });
+        }, 3000);
         
         sendProgress({ type: 'start', totalPages });
 
@@ -886,6 +896,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             try { await tesseractWorker.terminate(); } catch (_) {}
         }
 
+        if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
         sendProgress({ type: 'end', message: `Motor Atómico Finalizado.`, matches: finalMatches, matchedDetails });
         res.end();
         return;
@@ -898,6 +909,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             res.end();
         }
     } finally {
+        if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
         if (req.file && req.file.path) {
             fs.unlink(req.file.path, (err) => {
                 if (err) console.error('[GRUPO-INTER] Error borrando temporal PDF:', err);

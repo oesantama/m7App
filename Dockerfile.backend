@@ -48,6 +48,7 @@ COPY --from=builder /app/backend/config/keys ./backend/config/keys
 COPY --from=builder /app/components ./components
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/eng.traineddata ./eng.traineddata
 
 EXPOSE 8080
 

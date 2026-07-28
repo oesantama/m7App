@@ -1693,6 +1693,7 @@ export const api = {
         if (line.trim()) {
           try {
             const data = JSON.parse(line);
+            if (data.type === 'ping') continue;
             onProgress(data);
           } catch (e) {
             console.warn("Error parseando línea de stream:", line);
@@ -1704,7 +1705,9 @@ export const api = {
     if (buffer.trim()) {
       try {
         const data = JSON.parse(buffer);
-        onProgress(data);
+        if (data.type !== 'ping') {
+          onProgress(data);
+        }
       } catch (e) {
         console.warn("Error parseando buffer final de stream:", buffer);
       }
