@@ -869,7 +869,7 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             }
         };
 
-        const concurrencyLimit = 3;
+        const concurrencyLimit = 2;
         let activePageCount = 0;
 
         const pageIndices = Array.from({ length: totalPages }, (_, i) => i);
@@ -887,6 +887,9 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 
                 activePageCount++;
                 sendProgress({ type: 'progress', page: activePageCount, percent: Math.round((activePageCount / totalPages) * 100) });
+                
+                // [M7-PERF] Cedemos el event loop de Node.js para atajar peticiones HTTP entrantes (/api/*, /health) sin causar 504 Gateway Timeout
+                await new Promise(resolve => setTimeout(resolve, 100));
             }
         });
 
