@@ -278,7 +278,7 @@ export const generateScriptToken = async (req: Request, res: Response) => {
 // ─── GET /it-activos/script/dl/:token (público, un solo uso, expira en 15 min) ───
 export const downloadScriptByToken = async (req: Request, res: Response) => {
     purgeExpiredTokens();
-    const { token } = req.params;
+    const token = String(req.params.token || '');
     const entry = scriptTokens.get(token);
 
     if (!entry || entry.expiresAt < Date.now()) {
