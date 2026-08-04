@@ -845,6 +845,74 @@ export const api = {
     a.remove();
   },
 
+  // Inventarios Activos TI
+  itActivos: {
+    list: (params?: { serial?: string; custodio?: string; area?: string; estado?: string }) => {
+      const qs = params ? new URLSearchParams(Object.entries(params).filter(([, v]) => !!v) as any).toString() : '';
+      return fetchJson(`${API_URL}/it-activos${qs ? `?${qs}` : ''}`);
+    },
+    getBySerial: (serial: string) => fetchJson(`${API_URL}/it-activos/${encodeURIComponent(serial)}`),
+    getAreas: () => fetchJson(`${API_URL}/it-activos/areas`),
+    upsert: (data: any) => fetchJson(`${API_URL}/it-activos/manual`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+    detectOs: (): 'windows' | 'linux' | 'mac' => {
+      const ua = `${navigator.userAgent} ${(navigator as any).platform || ''}`.toLowerCase();
+      if (ua.includes('mac') || ua.includes('darwin')) return 'mac';
+      if (ua.includes('linux') && !ua.includes('android')) return 'linux';
+      return 'windows';
+    },
+    downloadScript: async () => {
+      const token = localStorage.getItem('token') ||
+                   localStorage.getItem('m7_token') ||
+                   localStorage.getItem('m7_auth_token') ||
+                   localStorage.getItem('m7_client_token');
+
+      const os = api.itActivos.detectOs();
+      const response = await fetch(`${API_URL}/it-activos/script?os=${os}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Error al descargar el script de inventario');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = os === 'windows' ? 'inventario-agente.ps1' : 'inventario-agente.sh';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    },
+    getInstallCommand: (): Promise<{ success: boolean; data: { command: string; expiresInMinutes: number } }> => {
+      const os = api.itActivos.detectOs();
+      return fetchJson(`${API_URL}/it-activos/script/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ os }),
+      });
+    },
+    downloadActaPdf: async (id: string, serial: string) => {
+      const token = localStorage.getItem('token') ||
+                   localStorage.getItem('m7_token') ||
+                   localStorage.getItem('m7_auth_token') ||
+                   localStorage.getItem('m7_client_token');
+
+      const response = await fetch(`${API_URL}/it-activos/${id}/acta-pdf`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error('Error al generar el acta PDF');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Acta_Inventario_${serial}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    },
+  },
+
   // GH Inventario Físico
   getInventariosFisicos: () => fetchJson(`${API_URL}/gh-inventario-fisico`),
   getInventarioFisicoById: (id: number | string) => fetchJson(`${API_URL}/gh-inventario-fisico/${id}`),

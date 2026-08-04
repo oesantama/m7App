@@ -10,7 +10,7 @@ export const login = async (req: Request, res: Response) => {
     const identifier = email?.trim().toLowerCase();
 
     const result = await pool.query(
-      `SELECT id, email, password, name, role_id, client_ids, document_number, two_factor_enabled, two_factor_secret, permissions as user_level_permissions
+      `SELECT id, email, password, name, role_id, client_ids, document_number, status_id, two_factor_enabled, two_factor_secret, permissions as user_level_permissions
        FROM users
        WHERE (LOWER(TRIM(email)) = $1 OR LOWER(TRIM(document_number)) = $1 OR LOWER(TRIM(phone)) = $1)`,
       [identifier]
@@ -20,6 +20,11 @@ export const login = async (req: Request, res: Response) => {
 
     if (!user) {
         return res.status(401).json({ success: false, error: 'Usuario no registrado o identificador incorrecto' });
+    }
+
+    const statusUpper = String(user.status_id || '').trim().toUpperCase();
+    if (statusUpper === 'EST-02' || statusUpper === 'INACTIVO' || statusUpper === 'DESACTIVADO' || (user.status_id && statusUpper !== 'EST-01' && statusUpper !== 'ACTIVO')) {
+        return res.status(403).json({ success: false, error: 'Usuario inactivo. No tiene permitido iniciar sesión. Contacte al administrador.' });
     }
 
     const match = await bcrypt.compare(password, user.password);

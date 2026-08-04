@@ -150,7 +150,9 @@ app.use('/api', (req, res, next) => {
     '/dogama/email-config/callback',
     '/validation/pdf',
     '/public/hv',
-    '/cybersecurity/track'
+    '/cybersecurity/track',
+    '/it-activos/upload-json',
+    '/it-activos/script/dl/'
   ];
   
   if (publicPaths.some(p => p === '/' ? req.path === '/' : req.path.startsWith(p))) {

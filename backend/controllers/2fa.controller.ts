@@ -63,7 +63,7 @@ export const twoFactorController = {
 
     try {
       const result = await pool.query(
-        'SELECT two_factor_secret, name, email, role_id FROM users WHERE id = $1',
+        'SELECT two_factor_secret, name, email, role_id, status_id FROM users WHERE id = $1',
         [userId]
       );
 
@@ -71,6 +71,11 @@ export const twoFactorController = {
 
       if (!user || !user.two_factor_secret) {
         return res.status(400).json({ success: false, error: 'Configuración de 2FA no encontrada' });
+      }
+
+      const statusUpper = String(user.status_id || '').trim().toUpperCase();
+      if (statusUpper === 'EST-02' || statusUpper === 'INACTIVO' || statusUpper === 'DESACTIVADO' || (user.status_id && statusUpper !== 'EST-01' && statusUpper !== 'ACTIVO')) {
+        return res.status(403).json({ success: false, error: 'Usuario inactivo. No tiene permitido iniciar sesión. Contacte al administrador.' });
       }
 
       const verified = speakeasy.totp.verify({

@@ -272,6 +272,42 @@ const healSchema = async (client: any) => {
     console.error('[M7-DB] Error al crear flota_tdm_manifiestos:', err);
   }
 
+  // Validador de Documentos — fuentes de consulta (listas de control/sanciones) y registros de validación
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS validation_sources (
+        id VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(200) NOT NULL,
+        url VARCHAR(500) NOT NULL,
+        entity_type VARCHAR(20) NOT NULL DEFAULT 'tercero',
+        file_name VARCHAR(100) NOT NULL,
+        is_active BOOLEAN DEFAULT true,
+        description TEXT,
+        requires_doc_type BOOLEAN DEFAULT false,
+        doc_type_options JSONB DEFAULT '[]'::jsonb,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS validation_records (
+        id SERIAL PRIMARY KEY,
+        entity_type VARCHAR(20) NOT NULL,
+        entity_id VARCHAR(100) NOT NULL,
+        entity_name VARCHAR(300),
+        source_id VARCHAR(50) REFERENCES validation_sources(id),
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        drive_path TEXT,
+        drive_link TEXT,
+        result_summary TEXT,
+        validated_at TIMESTAMP DEFAULT NOW(),
+        validated_by VARCHAR(200)
+      )
+    `);
+  } catch (err) {
+    console.error('[M7-DB] Error al crear validation_sources/validation_records:', err);
+  }
+
   // GH: Inventario Físico — sesiones de toma de inventario y conciliación
   try {
     await client.query(`

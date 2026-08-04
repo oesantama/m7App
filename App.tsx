@@ -100,6 +100,7 @@ const ValidadorDocumentos = lazyWithRetry(() => import('./components/RRHH/Valida
 const HojasDeVidaMain = lazyWithRetry(() => import('./components/HojasDeVida/HojasDeVidaMain'));
 const PublicDocForm = lazyWithRetry(() => import('./components/HojasDeVida/PublicDocForm'));
 const BascModule = lazyWithRetry(() => import('./components/BASC/BascModule'));
+const InventarioActivosTI = lazyWithRetry(() => import('./components/InventarioActivosTI'));
 
 // Import Admin Module
 const AdminDBManager = lazyWithRetry(() => import('./pages/AdminDBManager'));
@@ -1139,6 +1140,12 @@ const App: React.FC = () => {
         return (
           <React.Suspense fallback={<div className="p-10 text-center text-slate-400 text-sm">Cargando Módulo BASC...</div>}>
             <BascModule activePageId={activePageId} setActivePageId={setActivePageId} />
+          </React.Suspense>
+        );
+      case 'it-inventarios-activos':
+        return (
+          <React.Suspense fallback={<div className="p-10 text-center text-slate-400 text-sm">Cargando Inventarios Activos...</div>}>
+            <InventarioActivosTI />
           </React.Suspense>
         );
       default:

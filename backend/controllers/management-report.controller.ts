@@ -133,7 +133,7 @@ export const uploadReports = async (req: Request, res: Response) => {
 
       const clientUpper = clientName.toUpperCase();
       const isAjover = clientUpper.includes('AJOVER') || clientDoc.includes('860013771');
-      const isTdm = clientUpper.includes('TDM') || clientDoc.includes('890901352');
+      const isTdm = clientUpper.includes('TDM') || clientDoc.includes('890904488');
 
       if (isAjover) {
         if (rawOrigin.includes('CALI')) {
@@ -148,6 +148,8 @@ export const uploadReports = async (req: Request, res: Response) => {
           clientName = 'AJOVER CALI DIANA LOBATON';
         } else if (rawOrigin.includes('GIRARDOTA')) {
           clientName = 'TDM (PREBEL)';
+        } else {
+          clientName = 'Validar TDM';
         }
       }
 
