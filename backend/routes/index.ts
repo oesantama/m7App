@@ -72,6 +72,7 @@ import validationRoutes from './validation.routes.js';
 import hojasVidaRoutes, { hvPublicRouter } from './hojas-vida.routes.js';
 import bascRoutes from './basc.routes.js';
 import itActivosRoutes from './it-activos.routes.js';
+import ghPerfilesCargoRoutes, { publicRouter as ghPerfilesCargoPublicRoutes } from './gh-perfiles-cargo.routes.js';
 
 const router = Router();
 
@@ -147,6 +148,8 @@ router.use('/hv', hojasVidaRoutes);
 router.use('/public/hv', hvPublicRouter);
 router.use('/basc', bascRoutes);
 router.use('/it-activos', itActivosRoutes);
+router.use('/gh-perfiles-cargo-publico', ghPerfilesCargoPublicRoutes);
+router.use('/gh-perfiles-cargo', ghPerfilesCargoRoutes);
 router.use('/cybersecurity', cybersecurityRoutes);
 
 // Endpoint seguro: devuelve la API key de Gemini del backend al frontend autenticado

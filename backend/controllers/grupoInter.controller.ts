@@ -682,14 +682,36 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             const cleanTextUpper = text.toUpperCase();
             const cleanTextAlpha = cleanTextUpper.replace(/[^A-Z0-9]/g, '');
 
-            const digitSequences = text.match(/\d{4,12}/g) || [];
+            // 1. Coincidencia directa de secuencias de dígitos
+            const digitSequences = text.match(/\d{3,12}/g) || [];
             for (const seq of digitSequences) {
                 const pid = idMap.get(seq) || idMap.get(seq.replace(/^0+/, ''));
                 if (pid) pageMatches.add(pid);
             }
 
+            // 2. Coincidencia con sanitización de confusiones comunes de OCR en impresión tenue/borrosa
+            // (ej. O/o -> 0, I/l/| -> 1, S/s -> 5, B -> 8, G -> 6) y unión de espacios intermedios en números
+            const sanitizedText = cleanTextUpper
+                .replace(/\b([A-Z]*)([0-9OILSBG|\s-]{3,15})([A-Z]*)\b/gi, (match) => {
+                    return match
+                        .replace(/[O]/gi, '0')
+                        .replace(/[IL|]/gi, '1')
+                        .replace(/[S]/gi, '5')
+                        .replace(/[B]/gi, '8')
+                        .replace(/[G]/gi, '6')
+                        .replace(/[\s-]/g, '');
+                });
+
+            const sanitizedDigits = sanitizedText.match(/\d{3,12}/g) || [];
+            for (const seq of sanitizedDigits) {
+                const pid = idMap.get(seq) || idMap.get(seq.replace(/^0+/, ''));
+                if (pid) pageMatches.add(pid);
+            }
+
+            // 3. Coincidencia por clave en idMap (subcadena alfanumérica)
+            const sanitizedAlpha = sanitizedText.replace(/[^A-Z0-9]/g, '');
             for (const [key, pid] of idMap.entries()) {
-                if (key.length >= 4 && cleanTextAlpha.includes(key)) {
+                if (key.length >= 3 && (cleanTextAlpha.includes(key) || sanitizedAlpha.includes(key))) {
                     pageMatches.add(pid);
                 }
             }
@@ -752,25 +774,26 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
             if (foundMatchesInPage.length === 0 && idMap.size > 0 && !aiDisabledGlobally) {
                 sendProgress({ type: 'log', message: `🤖 ${workerLabel} Pág ${pageIndex + 1}: Sin texto plano local. Ejecutando OCR de IA (Lectura omnidireccional 0°/90°/180°)...` });
                 
-                const samplePids = Array.from(new Set(idMap.values())).slice(0, 100);
+                const samplePids = Array.from(new Set(idMap.values()));
                 const sampleDocNumbers = samplePids.map(id => {
                     const fullDoc = docNameMap.get(id) || '';
                     const digits = fullDoc.replace(/\D/g, '');
-                    return digits.length >= 4 ? digits : fullDoc;
+                    return digits.length >= 3 ? digits : fullDoc;
                 }).filter(Boolean);
 
                 const prompt = `Actúa como un motor OCR de logística de ultra-precisión. 
-                ATENCIÓN CRÍTICA: La página de la factura o acta puede estar ROTADA (a 90° de lado, 180° boca abajo o 270°). Lee visualmente en TODAS LAS ORIENTACIONES.
+                ATENCIÓN CRÍTICA: La página de la factura o documento de despacho puede estar ROTADA (0°, 90°, 180° o 270°) o tener IMPRESIÓN TENUE CON POCA TINTA. Inspecciona visualmente toda la página en busca de números de despacho/factura.
                 
-                Busca EXCLUSIVAMENTE si aparece alguna de estas secuencias NUMÉRICAS de factura (ignora completamente letras o prefijos como FEV, FV, FI, FP, TI, FGENI):
+                Busca EXCLUSIVAMENTE si aparece alguna de estas secuencias NUMÉRICAS de factura (ignora completamente letras o prefijos como PLFE, FEV, FV, FI, FP, TI, FGENI):
                 [${sampleDocNumbers.join(', ')}]
                 
                 REGLAS ESTRUCTURALES:
                 1. Inspecciona la página completa en cualquier dirección o rotación.
-                2. Extrae cualquier número de 4 a 10 dígitos que veas en la página.
-                3. Si el número extraído coincide con alguna secuencia de la lista, inclúyelo en el arreglo "matches".
-                4. Responde ÚNICAMENTE con un JSON estricto: {"matches": ["100313226"]}
-                5. Si no hay coincidencias, responde: {"matches": []}`;
+                2. Extrae cualquier número de 3 a 10 dígitos que veas en la página.
+                3. Si la impresión es tenue, compensa posibles borrones de tinta (ej: 0/O, 1/l/I, 5/S).
+                4. Si el número extraído o corregido coincide con alguna secuencia de la lista, inclúyelo en el arreglo "matches".
+                5. Responde ÚNICAMENTE con un JSON estricto: {"matches": ["100046251"]}
+                6. Si no hay coincidencias, responde: {"matches": []}`;
 
                 try {
                     const b64 = await getPageBase64();

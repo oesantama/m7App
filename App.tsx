@@ -101,6 +101,8 @@ const HojasDeVidaMain = lazyWithRetry(() => import('./components/HojasDeVida/Hoj
 const PublicDocForm = lazyWithRetry(() => import('./components/HojasDeVida/PublicDocForm'));
 const BascModule = lazyWithRetry(() => import('./components/BASC/BascModule'));
 const InventarioActivosTI = lazyWithRetry(() => import('./components/InventarioActivosTI'));
+const PerfilesCargo = lazyWithRetry(() => import('./components/GestionHumana/PerfilesCargo'));
+const PerfilCargoPublicSign = lazyWithRetry(() => import('./components/PerfilCargoPublicSign'));
 
 // Import Admin Module
 const AdminDBManager = lazyWithRetry(() => import('./pages/AdminDBManager'));
@@ -579,6 +581,17 @@ const App: React.FC = () => {
     return (
       <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"/></div>}>
         <ReturnApprovalPage batchCode={raBatchCode} token={raToken} />
+      </React.Suspense>
+    );
+  }
+
+  // /public/perfil-cargo/:token — sin auth, firma de un solo destinatario del FO-SG-008
+  const pcMatch = window.location.pathname.match(/^\/public\/perfil-cargo\/([^/]+)$/);
+  if (pcMatch) {
+    const [, pcToken] = pcMatch;
+    return (
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"/></div>}>
+        <PerfilCargoPublicSign token={pcToken} />
       </React.Suspense>
     );
   }
@@ -1146,6 +1159,12 @@ const App: React.FC = () => {
         return (
           <React.Suspense fallback={<div className="p-10 text-center text-slate-400 text-sm">Cargando Inventarios Activos...</div>}>
             <InventarioActivosTI />
+          </React.Suspense>
+        );
+      case 'gestion-humana-perfiles-cargo':
+        return (
+          <React.Suspense fallback={<div className="p-10 text-center text-slate-400 text-sm">Cargando Perfiles de Cargo...</div>}>
+            <PerfilesCargo user={user!} />
           </React.Suspense>
         );
       default:

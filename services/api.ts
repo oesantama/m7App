@@ -913,6 +913,51 @@ export const api = {
     },
   },
 
+  // Perfiles y Funciones del Cargo (FO-SG-008)
+  ghPerfilesCargo: {
+    uploadExcel: async (file: File) => {
+      const token = localStorage.getItem('token') || localStorage.getItem('m7_token') ||
+                   localStorage.getItem('m7_auth_token') || localStorage.getItem('m7_client_token');
+      const formData = new FormData();
+      formData.append('archivo', file);
+      const response = await fetch(`${API_URL}/gh-perfiles-cargo/upload`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData,
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Error al cargar el Excel');
+      return data;
+    },
+    list: () => fetchJson(`${API_URL}/gh-perfiles-cargo`),
+    mapear: (perfilId: number, cargo_id: number) => fetchJson(`${API_URL}/gh-perfiles-cargo/${perfilId}/mapear`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cargo_id }),
+    }),
+    tracking: (perfilId?: number) => fetchJson(`${API_URL}/gh-perfiles-cargo/tracking${perfilId ? `?perfil_id=${perfilId}` : ''}`),
+    misPendientes: () => fetchJson(`${API_URL}/gh-perfiles-cargo/mis-pendientes`),
+    generarToken: (firmaId: number) => fetchJson(`${API_URL}/gh-perfiles-cargo/firmas/${firmaId}/generar-token`, { method: 'POST' }),
+    firmar: (firmaId: number, firma_b64: string) => fetchJson(`${API_URL}/gh-perfiles-cargo/firmas/${firmaId}/firmar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firma_b64 }),
+    }),
+    verPdf: (perfilId: number) => `${API_URL}/gh-perfiles-cargo/${perfilId}/pdf`,
+    // Público (sin JWT) — usado por la página de firma con token
+    publico: {
+      verificar: (token: string, cedulaFinal: string) =>
+        fetchPublic(`${API_URL}/gh-perfiles-cargo-publico/${token}?cedula_final=${encodeURIComponent(cedulaFinal)}`),
+      documentoUrl: (token: string, cedulaFinal: string) =>
+        `${API_URL}/gh-perfiles-cargo-publico/${token}/documento?cedula_final=${encodeURIComponent(cedulaFinal)}`,
+      firmar: (token: string, cedula_final: string, firma_b64: string) =>
+        fetchPublic(`${API_URL}/gh-perfiles-cargo-publico/${token}/firmar`, {
+          method: 'POST',
+          body: JSON.stringify({ cedula_final, firma_b64 }),
+        }),
+    },
+  },
+
   // GH Inventario Físico
   getInventariosFisicos: () => fetchJson(`${API_URL}/gh-inventario-fisico`),
   getInventarioFisicoById: (id: number | string) => fetchJson(`${API_URL}/gh-inventario-fisico/${id}`),

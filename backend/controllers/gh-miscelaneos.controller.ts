@@ -95,6 +95,9 @@ export const saveGhMiscelaneo = async (req: Request, res: Response) => {
     res.json({ success: true });
   } catch (err: any) {
     console.error(`[GH-MISC] Error SAVE ${table}:`, err);
+    if (err.code === '23505') {
+      return res.status(409).json({ error: `Ya existe un registro con el nombre "${nombre}" en esta categoría. Edita el registro existente en vez de duplicarlo.` });
+    }
     res.status(500).json({ error: 'Error al guardar registro' });
   }
 };

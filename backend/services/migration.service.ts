@@ -308,6 +308,52 @@ const healSchema = async (client: any) => {
     console.error('[M7-DB] Error al crear validation_sources/validation_records:', err);
   }
 
+  // GH: Perfiles y Funciones del Cargo — carga, versionado y firma digital
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gh_perfiles_cargo (
+        id SERIAL PRIMARY KEY,
+        hoja_excel VARCHAR(255) NOT NULL,
+        cargo_id INTEGER REFERENCES gh_cargos(id) ON DELETE SET NULL,
+        cargo_nombre VARCHAR(255),
+        version INTEGER NOT NULL DEFAULT 1,
+        vigente BOOLEAN NOT NULL DEFAULT true,
+        contenido_json JSONB NOT NULL,
+        content_hash VARCHAR(64),
+        pdf_referencia_path TEXT,
+        creado_por VARCHAR(255),
+        creado_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_perfiles_cargo_vigente ON gh_perfiles_cargo (cargo_id, vigente)`);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gh_perfiles_cargo_firmas (
+        id SERIAL PRIMARY KEY,
+        perfil_id INTEGER NOT NULL REFERENCES gh_perfiles_cargo(id) ON DELETE CASCADE,
+        perfil_version INTEGER NOT NULL,
+        personal_id INTEGER REFERENCES gh_personal(id) ON DELETE SET NULL,
+        cedula VARCHAR(50) NOT NULL,
+        nombre VARCHAR(255) NOT NULL,
+        estado VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente','firmado')),
+        token VARCHAR(64) UNIQUE,
+        token_expira_at TIMESTAMP WITH TIME ZONE,
+        firma_b64 TEXT,
+        firmado_ip VARCHAR(64),
+        firmado_user_agent TEXT,
+        firmado_at TIMESTAMP WITH TIME ZONE,
+        drive_path TEXT,
+        drive_link TEXT,
+        creado_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(perfil_id, personal_id)
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_perfiles_firmas_personal ON gh_perfiles_cargo_firmas (personal_id, estado)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_perfiles_firmas_token ON gh_perfiles_cargo_firmas (token)`);
+  } catch (err) {
+    console.error('[M7-DB] Error al crear gh_perfiles_cargo/gh_perfiles_cargo_firmas:', err);
+  }
+
   // GH: Inventario Físico — sesiones de toma de inventario y conciliación
   try {
     await client.query(`

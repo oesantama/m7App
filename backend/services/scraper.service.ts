@@ -319,14 +319,24 @@ export const scrapeTransportandoReports = async (
 
             log(`Fechas y opciones ingresadas. Solicitando generación del informe al servidor de Transportando...`);
 
-            // Clic nativo en "Obtener informe" u "Obtener informes"
-            const buttons = await page.$$('button.el-button, button');
+            // Clic nativo en "Obtener informe" u "Obtener informes" — con reintentos porque
+            // el portal de Transportando a veces tarda un poco más en montar el botón (carga
+            // lenta del lado de ellos); un solo intento fijo hace que falle intermitentemente.
             let targetButtonHandle: any = null;
-            for (const btn of buttons) {
-                const text = await page.evaluate(el => el.textContent, btn);
-                if (text && (text.includes('Obtener informe') || text.includes('Obtener informes'))) {
-                    targetButtonHandle = btn;
-                    break;
+            const MAX_INTENTOS_BOTON = 5;
+            for (let intento = 1; intento <= MAX_INTENTOS_BOTON; intento++) {
+                const buttons = await page.$$('button.el-button, button');
+                for (const btn of buttons) {
+                    const text = await page.evaluate(el => el.textContent, btn);
+                    if (text && (text.includes('Obtener informe') || text.includes('Obtener informes'))) {
+                        targetButtonHandle = btn;
+                        break;
+                    }
+                }
+                if (targetButtonHandle) break;
+                if (intento < MAX_INTENTOS_BOTON) {
+                    log(`Botón "Obtener informe" no encontrado todavía (intento ${intento}/${MAX_INTENTOS_BOTON}), esperando 2s más...`);
+                    await new Promise(r => setTimeout(r, 2000));
                 }
             }
 
@@ -336,7 +346,7 @@ export const scrapeTransportandoReports = async (
                 await page.evaluate(el => (el as HTMLElement).click(), targetButtonHandle);
                 log(`Se hizo clic exitosamente en el botón "Obtener informe".`);
             } else {
-                log(`ERROR: No se encontró el botón "Obtener informe" en la página.`);
+                log(`ERROR: No se encontró el botón "Obtener informe" en la página después de ${MAX_INTENTOS_BOTON} intentos.`);
             }
 
             let downloadedFilePath: string | null = null;

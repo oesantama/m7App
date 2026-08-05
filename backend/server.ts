@@ -152,7 +152,8 @@ app.use('/api', (req, res, next) => {
     '/public/hv',
     '/cybersecurity/track',
     '/it-activos/upload-json',
-    '/it-activos/script/dl/'
+    '/it-activos/script/dl/',
+    '/gh-perfiles-cargo-publico'
   ];
   
   if (publicPaths.some(p => p === '/' ? req.path === '/' : req.path.startsWith(p))) {
