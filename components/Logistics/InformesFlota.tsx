@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import * as XLSX from 'xlsx';
 import { DataTable } from '../shared/DataTable';
 import {
   ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, Sector,
@@ -349,6 +350,278 @@ const InteractiveBarCard = ({
   );
 };
 
+const generateDateRangeList = (fromDate: string, toDate: string): string[] => {
+  if (!fromDate || !toDate) return [];
+  const list: string[] = [];
+  let curr = new Date(fromDate + 'T00:00:00');
+  const end = new Date(toDate + 'T00:00:00');
+  while (curr <= end) {
+    const y = curr.getFullYear();
+    const m = String(curr.getMonth() + 1).padStart(2, '0');
+    const d = String(curr.getDate()).padStart(2, '0');
+    list.push(`${y}-${m}-${d}`);
+    curr.setDate(curr.getDate() + 1);
+  }
+  return list;
+};
+
+const formatDayLabel = (dateStr: string) => {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+  const dayName = days[dt.getDay()];
+  const dd = String(d).padStart(2, '0');
+  const mm = String(m).padStart(2, '0');
+  return `${dayName} ${dd}/${mm}`;
+};
+
+const DailyDiscriminadoCard = ({
+  rawRows,
+  from,
+  to
+}: {
+  rawRows: any[];
+  from: string;
+  to: string;
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [operatorFilter, setOperatorFilter] = useState<'ALL' | 'M7' | 'TDM'>('ALL');
+
+  const dates = useMemo(() => generateDateRangeList(from, to), [from, to]);
+
+  const aggregatedData = useMemo(() => {
+    const map = new Map<string, { client_name: string; operator: string; dailyMap: Record<string, number>; total: number }>();
+
+    rawRows.forEach(r => {
+      const key = `${r.client_name}|||${r.operator}`;
+      if (!map.has(key)) {
+        map.set(key, { client_name: r.client_name, operator: r.operator, dailyMap: {}, total: 0 });
+      }
+      const item = map.get(key)!;
+      const qty = Number(r.quantity || 0);
+      if (r.operation_date) {
+        item.dailyMap[r.operation_date] = (item.dailyMap[r.operation_date] || 0) + qty;
+      }
+      item.total += qty;
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  }, [rawRows]);
+
+  const filteredRows = useMemo(() => {
+    return aggregatedData.filter(r => {
+      const matchSearch = r.client_name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchOp = operatorFilter === 'ALL' || r.operator === operatorFilter;
+      return matchSearch && matchOp;
+    });
+  }, [aggregatedData, searchTerm, operatorFilter]);
+
+  const dateTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    dates.forEach(d => { totals[d] = 0; });
+    let grandTotal = 0;
+
+    filteredRows.forEach(r => {
+      dates.forEach(d => {
+        const val = r.dailyMap[d] || 0;
+        totals[d] += val;
+      });
+      grandTotal += r.total;
+    });
+
+    return { totals, grandTotal };
+  }, [filteredRows, dates]);
+
+  const handleExportExcel = () => {
+    if (filteredRows.length === 0) {
+      toast.error('No hay datos para exportar');
+      return;
+    }
+
+    const headers = [
+      'Cliente',
+      'Operador',
+      ...dates.map(d => `${d} (${formatDayLabel(d)})`),
+      'Total Viajes'
+    ];
+
+    const dataRows = filteredRows.map(r => {
+      const rowArr: any[] = [r.client_name, r.operator];
+      dates.forEach(d => {
+        rowArr.push(r.dailyMap[d] || 0);
+      });
+      rowArr.push(r.total);
+      return rowArr;
+    });
+
+    const totalRow: any[] = ['TOTALES', ''];
+    dates.forEach(d => {
+      totalRow.push(dateTotals.totals[d] || 0);
+    });
+    totalRow.push(dateTotals.grandTotal);
+
+    dataRows.push(totalRow);
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+
+    const wscols = [
+      { wch: 35 },
+      { wch: 12 },
+      ...dates.map(() => ({ wch: 15 })),
+      { wch: 15 }
+    ];
+    ws['!cols'] = wscols;
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Discriminado_Dia_A_Dia');
+    XLSX.writeFile(wb, `flota_discriminado_dia_a_dia_${from}_a_${to}.xlsx`);
+    toast.success('Informe exportado a Excel exitosamente');
+  };
+
+  return (
+    <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 mb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">📅</span>
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">
+              Discriminado Día a Día por Cliente
+            </h3>
+            <span className="px-3 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-[10px] font-black border border-indigo-100">
+              {filteredRows.length} clientes
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Distribución diaria de operaciones del {from} al {to}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex bg-slate-100 p-1 rounded-xl">
+            {[
+              { id: 'ALL', label: 'Todos' },
+              { id: 'M7', label: 'Milla 7' },
+              { id: 'TDM', label: 'TDM' },
+            ].map(op => (
+              <button
+                key={op.id}
+                onClick={() => setOperatorFilter(op.id as any)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
+                  operatorFilter === op.id
+                    ? 'bg-white text-indigo-600 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                {op.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Buscar cliente..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-indigo-500 w-48 sm:w-64 transition-all"
+            />
+            <span className="absolute left-3 top-2.5 text-slate-400 text-xs">🔍</span>
+          </div>
+
+          <button
+            onClick={handleExportExcel}
+            className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-sm flex items-center gap-1.5"
+          >
+            <span>📥</span> Exportar Excel
+          </button>
+        </div>
+      </div>
+
+      {filteredRows.length === 0 ? (
+        <EmptyChart label="Sin registros para el filtro seleccionado" />
+      ) : (
+        <div className="overflow-x-auto rounded-2xl border border-slate-200">
+          <table className="w-full text-xs text-left border-collapse min-w-[700px]">
+            <thead>
+              <tr className="bg-slate-800 text-white font-black text-[10px] uppercase tracking-wider">
+                <th className="p-3 sticky left-0 bg-slate-800 z-10 w-10 text-center">#</th>
+                <th className="p-3 sticky left-10 bg-slate-800 z-10 min-w-[220px]">Cliente</th>
+                <th className="p-3 text-center w-24">Operador</th>
+                {dates.map(d => (
+                  <th key={d} className="p-3 text-center min-w-[95px] border-l border-slate-700">
+                    <span className="block text-[11px] font-black">{formatDayLabel(d)}</span>
+                    <span className="block text-[9px] font-normal text-slate-400">{d}</span>
+                  </th>
+                ))}
+                <th className="p-3 text-center bg-slate-900 border-l border-slate-700 min-w-[100px] text-amber-400">
+                  Total
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+              {filteredRows.map((r, idx) => (
+                <tr key={`${r.client_name}-${r.operator}`} className="hover:bg-indigo-50/40 transition-colors group">
+                  <td className="p-3 text-center text-slate-400 font-mono text-[10px] sticky left-0 bg-white group-hover:bg-indigo-50/40">
+                    {idx + 1}
+                  </td>
+                  <td className="p-3 font-bold text-slate-900 sticky left-10 bg-white group-hover:bg-indigo-50/40">
+                    {r.client_name}
+                  </td>
+                  <td className="p-3 text-center">
+                    <span
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                        r.operator === 'M7'
+                          ? 'bg-indigo-100 text-indigo-700'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {r.operator}
+                    </span>
+                  </td>
+                  {dates.map(d => {
+                    const count = r.dailyMap[d] || 0;
+                    return (
+                      <td
+                        key={d}
+                        className={`p-3 text-center border-l border-slate-100 ${
+                          count > 0 ? 'font-black text-indigo-900 bg-indigo-50/20' : 'text-slate-300 font-normal'
+                        }`}
+                      >
+                        {count > 0 ? count.toLocaleString('es-CO') : '-'}
+                      </td>
+                    );
+                  })}
+                  <td className="p-3 text-center font-black text-slate-900 bg-slate-50 border-l border-slate-200">
+                    {r.total.toLocaleString('es-CO')}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="bg-slate-900 text-white font-black text-xs border-t-2 border-slate-800">
+                <td className="p-3.5 text-center sticky left-0 bg-slate-900 z-10" colSpan={2}>
+                  TOTALES POR DÍA
+                </td>
+                <td className="p-3.5 text-center">
+                  <span className="text-slate-400 text-[10px]">({filteredRows.length})</span>
+                </td>
+                {dates.map(d => (
+                  <td key={d} className="p-3.5 text-center border-l border-slate-800 text-amber-300">
+                    {(dateTotals.totals[d] || 0).toLocaleString('es-CO')}
+                  </td>
+                ))}
+                <td className="p-3.5 text-center bg-amber-500 text-slate-950 font-black border-l border-slate-800 text-sm">
+                  {dateTotals.grandTotal.toLocaleString('es-CO')}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function InformesFlota({ user: _user }: Props) {
   const today = new Date().toISOString().slice(0, 10);
   const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
@@ -506,6 +779,11 @@ export default function InformesFlota({ user: _user }: Props) {
             </div>
           )}
         </div>
+      )}
+
+      {/* Tabla Discriminado Día a Día por Cliente */}
+      {searched && (
+        <DailyDiscriminadoCard rawRows={rawData} from={from} to={to} />
       )}
 
       {/* Gráficas interactivas — ancho completo */}

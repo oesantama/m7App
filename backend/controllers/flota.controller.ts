@@ -14,7 +14,8 @@ export const getFlotaReport = async (req: Request, res: Response) => {
                     TRIM(client_name) AS client_name,
                     1 AS quantity,
                     'M7' AS operator,
-                    COALESCE(UPPER(TRIM(city)), 'SIN CIUDAD') AS city
+                    COALESCE(UPPER(TRIM(city)), 'SIN CIUDAD') AS city,
+                    TO_CHAR(manifest_date::date, 'YYYY-MM-DD') AS operation_date
                 FROM management_orders
                 WHERE manifest_date::date BETWEEN $1 AND $2
                   AND manifest_status NOT IN ('ANULADO', 'CANCELADO', 'ANULADA')
@@ -25,7 +26,8 @@ export const getFlotaReport = async (req: Request, res: Response) => {
                     CONCAT('TDM ', TRIM(c.name)) AS client_name,
                     1 AS quantity,
                     'TDM' AS operator,
-                    COALESCE(UPPER(TRIM(ftm.ciudad_destino)), 'SIN CIUDAD') AS city
+                    COALESCE(UPPER(TRIM(ftm.ciudad_destino)), 'SIN CIUDAD') AS city,
+                    TO_CHAR(ftm.fecha_operacion::date, 'YYYY-MM-DD') AS operation_date
                 FROM flota_tdm_manifiestos ftm
                 LEFT JOIN clients c ON ftm.client_id = c.id
                 WHERE ftm.fecha_operacion BETWEEN $1 AND $2
@@ -39,9 +41,10 @@ export const getFlotaReport = async (req: Request, res: Response) => {
                 client_name,
                 operator,
                 city,
+                operation_date,
                 SUM(quantity)::int AS quantity
             FROM combined
-            GROUP BY client_name, operator, city
+            GROUP BY client_name, operator, city, operation_date
             ORDER BY operator, quantity DESC`,
             [from, to]
         );
