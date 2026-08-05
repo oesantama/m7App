@@ -272,6 +272,24 @@ const healSchema = async (client: any) => {
     console.error('[M7-DB] Error al crear flota_tdm_manifiestos:', err);
   }
 
+  // WhatsApp — eventos crudos de webhook de Evolution API (estado real de entrega: enviado/entregado/leído)
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS whatsapp_delivery_events (
+        id SERIAL PRIMARY KEY,
+        instance_name TEXT,
+        external_message_id TEXT,
+        event_type TEXT,
+        status TEXT,
+        raw_payload JSONB,
+        received_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_wa_delivery_events_msgid ON whatsapp_delivery_events (external_message_id)`);
+  } catch (err) {
+    console.error('[M7-DB] Error al crear whatsapp_delivery_events:', err);
+  }
+
   // Validador de Documentos — fuentes de consulta (listas de control/sanciones) y registros de validación
   try {
     await client.query(`

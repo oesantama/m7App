@@ -80,6 +80,14 @@ class WhatsAppCronRunner {
 
     for (const phone of phones) {
       try {
+        // Revalidar la conexión antes de CADA envío, no solo una vez al inicio del lote —
+        // en listas largas la sesión puede caerse a mitad de camino sin que nos enteremos.
+        const stillOpen = await evolutionService.isInstanceOpen(INSTANCE);
+        if (!stillOpen) {
+          console.error(`[WA-CRON] La instancia "${INSTANCE}" se desconectó a mitad del envío. Restantes omitidos desde ${phone}.`);
+          break;
+        }
+
         if (pdfAttachment) {
           await evolutionService.sendMediaDirect(
             INSTANCE,
@@ -92,7 +100,7 @@ class WhatsAppCronRunner {
           await evolutionService.sendMessageDirect(INSTANCE, phone, message);
         }
         sent++;
-        await sleep(3000); // rate limit: 1 msg / 3s
+        await sleep(5000); // rate limit: 1 msg / 5s — margen más amplio para evitar throttling de WhatsApp
       } catch (err: any) {
         console.error(`[WA-CRON] Error enviando a ${phone}:`, err.message);
       }

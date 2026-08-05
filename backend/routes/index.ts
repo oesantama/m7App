@@ -73,6 +73,7 @@ import hojasVidaRoutes, { hvPublicRouter } from './hojas-vida.routes.js';
 import bascRoutes from './basc.routes.js';
 import itActivosRoutes from './it-activos.routes.js';
 import ghPerfilesCargoRoutes, { publicRouter as ghPerfilesCargoPublicRoutes } from './gh-perfiles-cargo.routes.js';
+import whatsappWebhookRoutes from './whatsapp-webhook.routes.js';
 
 const router = Router();
 
@@ -150,6 +151,7 @@ router.use('/basc', bascRoutes);
 router.use('/it-activos', itActivosRoutes);
 router.use('/gh-perfiles-cargo-publico', ghPerfilesCargoPublicRoutes);
 router.use('/gh-perfiles-cargo', ghPerfilesCargoRoutes);
+router.use('/whatsapp/webhook', whatsappWebhookRoutes);
 router.use('/cybersecurity', cybersecurityRoutes);
 
 // Endpoint seguro: devuelve la API key de Gemini del backend al frontend autenticado

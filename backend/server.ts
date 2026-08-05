@@ -153,7 +153,8 @@ app.use('/api', (req, res, next) => {
     '/cybersecurity/track',
     '/it-activos/upload-json',
     '/it-activos/script/dl/',
-    '/gh-perfiles-cargo-publico'
+    '/gh-perfiles-cargo-publico',
+    '/whatsapp/webhook'
   ];
   
   if (publicPaths.some(p => p === '/' ? req.path === '/' : req.path.startsWith(p))) {

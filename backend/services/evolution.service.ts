@@ -1,12 +1,16 @@
 
 import axios from 'axios';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 import pool from '../config/database.js';
 
 dotenv.config();
 
 const EVO_URL = process.env.EVOLUTION_API_URL || 'http://evolution:8080';
 const EVO_KEY = process.env.EVOLUTION_API_KEY || 'B3B896F8-9862-4467-9C17-A038848C1726';
+// URL interna (misma red docker/podman) por la que Evolution debe llamarnos de vuelta con el webhook —
+// distinta de APP_URL, que es la URL pública orientada al usuario.
+const INTERNAL_BACKEND_URL = process.env.INTERNAL_BACKEND_URL || 'http://m7app-backend:8080';
 
 type QrStatus = 'DISCONNECTED' | 'CONNECTING' | 'SCAN_QR' | 'CONNECTED' | 'ERROR';
 
@@ -23,6 +27,7 @@ export class EvolutionService {
     private qrCache: Map<string, QrCache> = new Map();
     private refreshLocks: Map<string, Promise<void>> = new Map();
     private readonly QR_TTL_MS = 50_000;
+    private webhookRegisteredCache: Set<string> = new Set();
 
     private getHeaders() {
         return { 'apikey': EVO_KEY, 'Content-Type': 'application/json' };
@@ -210,6 +215,7 @@ export class EvolutionService {
             }, { headers: this.getHeaders(), timeout: 10000 });
 
             console.log(`[EVO] Created ${sessionName}, hash:`, createRes.data?.hash);
+            this.registerWebhook(sessionName); // no bloqueante — se registra en background
 
             // Verificar si el QR ya vino en el create response
             const immediateQr = createRes.data?.qrcode?.base64 || createRes.data?.qrcode?.code;
@@ -263,6 +269,12 @@ export class EvolutionService {
         if (state.state !== 'open') {
             throw new Error(`La instancia de WhatsApp "${instanceName}" no está conectada (estado: ${state.state}). Escanea el QR en Conexión WhatsApp.`);
         }
+        // Oportunista: instancias creadas antes de tener webhook no lo registran solas —
+        // lo reintentamos aquí una vez por proceso, en background, sin bloquear el envío.
+        if (!this.webhookRegisteredCache.has(instanceName)) {
+            this.webhookRegisteredCache.add(instanceName);
+            this.registerWebhook(instanceName);
+        }
     }
 
     /**
@@ -271,11 +283,18 @@ export class EvolutionService {
     async sendMessageDirect(instanceName: string, number: string, text: string) {
         const cleanNumber = number.replace(/\D/g, '');
         const finalNumber = cleanNumber.length === 10 ? '57' + cleanNumber : cleanNumber;
-        const url = `${EVO_URL}/message/sendText/${instanceName}`;
-        // Evolution API v2: campo "text" directo, no "textMessage.text"
-        const payload = { number: finalNumber, text, delay: 1200 };
-        const response = await axios.post(url, payload, { headers: this.getHeaders() });
-        return response.data;
+        try {
+            const url = `${EVO_URL}/message/sendText/${instanceName}`;
+            // Evolution API v2: campo "text" directo, no "textMessage.text"
+            const payload = { number: finalNumber, text, delay: 1200 };
+            const response = await axios.post(url, payload, { headers: this.getHeaders() });
+            await this.logMessage(instanceName, finalNumber, text, 'SENT', 'OUTBOUND', response.data?.key?.id);
+            return response.data;
+        } catch (error: any) {
+            console.error(`[EVO-FAIL] ${instanceName} -> ${finalNumber}:`, error.message);
+            await this.logMessage(instanceName, finalNumber, text, 'FAILED', 'OUTBOUND', null, error.message);
+            throw error;
+        }
     }
 
     /**
@@ -290,10 +309,49 @@ export class EvolutionService {
         else if (base64.includes('audio/')) mediatype = 'audio';
         // Quitar prefijo data URL si existe
         const rawBase64 = base64.includes(';base64,') ? base64.split(';base64,')[1] : base64;
-        const url = `${EVO_URL}/message/sendMedia/${instanceName}`;
-        const payload = { number: finalNumber, mediatype, caption: caption || fileName, media: rawBase64, fileName, delay: 1200 };
-        const response = await axios.post(url, payload, { headers: this.getHeaders() });
-        return response.data;
+        const bodyLabel = `[MEDIA: ${fileName}] ${caption || ''}`;
+        try {
+            const url = `${EVO_URL}/message/sendMedia/${instanceName}`;
+            const payload = { number: finalNumber, mediatype, caption: caption || fileName, media: rawBase64, fileName, delay: 1200 };
+            const response = await axios.post(url, payload, { headers: this.getHeaders() });
+            await this.logMessage(instanceName, finalNumber, bodyLabel, 'SENT', 'OUTBOUND', response.data?.key?.id);
+            return response.data;
+        } catch (error: any) {
+            console.error(`[EVO-MEDIA-FAIL] ${instanceName} -> ${finalNumber}:`, error.message);
+            await this.logMessage(instanceName, finalNumber, bodyLabel, 'FAILED', 'OUTBOUND', null, error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * Verifica si una instancia está conectada ahora mismo (wrapper público de checkInstanceState).
+     * Se usa para revisar la conexión antes de CADA envío en lotes largos, no solo una vez al inicio.
+     */
+    async isInstanceOpen(instanceName: string): Promise<boolean> {
+        const state = await this.checkInstanceState(instanceName);
+        return state?.state === 'open';
+    }
+
+    /**
+     * Registra en Evolution API la URL de webhook para recibir actualizaciones de estado de
+     * entrega (enviado/entregado/leído) de esta instancia. Best-effort: si falla, se loguea
+     * pero no interrumpe la creación/uso de la instancia — el envío sigue funcionando igual,
+     * solo perdemos la visibilidad de estado de entrega.
+     */
+    async registerWebhook(instanceName: string): Promise<void> {
+        try {
+            const webhookUrl = `${INTERNAL_BACKEND_URL}/api/whatsapp/webhook/${instanceName}`;
+            await axios.post(`${EVO_URL}/webhook/set/${instanceName}`, {
+                webhook: {
+                    url: webhookUrl,
+                    enabled: true,
+                    events: ['MESSAGES_UPDATE', 'SEND_MESSAGE'],
+                }
+            }, { headers: this.getHeaders(), timeout: 8000 });
+            console.log(`[EVO] Webhook registrado para ${instanceName} -> ${webhookUrl}`);
+        } catch (error: any) {
+            console.error(`[EVO] No se pudo registrar el webhook para ${instanceName}:`, error.response?.data || error.message);
+        }
     }
 
     /**
@@ -485,10 +543,12 @@ export class EvolutionService {
         externalId: string | null = null, error: string | null = null
     ) {
         try {
+            // "id" no tiene DEFAULT en la tabla — sin esto el INSERT fallaba silenciosamente
+            // (violación de NOT NULL) y whatsapp_logs quedaba siempre vacía.
             await pool.query(
-                `INSERT INTO whatsapp_logs (user_id, phone_number, message_body, status, direction, external_message_id, error_message)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                [userId, phone, body, status, direction, externalId, error]
+                `INSERT INTO whatsapp_logs (id, user_id, phone_number, message_body, status, direction, external_message_id, error_message)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                [crypto.randomUUID(), userId, phone, body, status, direction, externalId, error]
             );
         } catch (dbError) {
             console.error('[EVO-LOG-ERR]', dbError);

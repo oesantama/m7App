@@ -716,6 +716,28 @@ export const processPDF = async (req: any, res: Response): Promise<void> => {
                 }
             }
 
+            // 4. Mantenimiento Tolerante a Errores OCR (Fuzzy Matching / Distancia Hamming <= 1)
+            // Si el OCR local leyó 1 dígito levemente alterado (ej. 110046251 por 100046251 o 1738 por 1739)
+            if (pageMatches.size === 0) {
+                const allExtractedDigits = Array.from(new Set([...digitSequences, ...sanitizedDigits])).filter(s => s.length >= 4);
+                for (const seq of allExtractedDigits) {
+                    for (const [key, pid] of idMap.entries()) {
+                        if (/^\d+$/.test(key) && key.length === seq.length && key.length >= 4) {
+                            let diffs = 0;
+                            for (let i = 0; i < key.length; i++) {
+                                if (key[i] !== seq[i]) diffs++;
+                                if (diffs > 1) break;
+                            }
+                            if (diffs === 1) {
+                                pageMatches.add(pid);
+                                break;
+                            }
+                        }
+                    }
+                    if (pageMatches.size > 0) break;
+                }
+            }
+
             return Array.from(pageMatches);
         };
 
