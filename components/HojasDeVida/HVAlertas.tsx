@@ -24,7 +24,7 @@ const HVAlertas: React.FC = () => {
     const [alertas, setAlertas] = useState<AlertaDoc[]>([]);
     const [loading, setLoading] = useState(true);
     const [dias, setDias] = useState(90);
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('m7_token') || localStorage.getItem('token');
 
     useEffect(() => { cargar(); }, [dias]);
 

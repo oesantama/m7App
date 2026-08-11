@@ -36,6 +36,7 @@ import {
     subirDocumentoPublico,
     actualizarFechaVencimiento,
     submitFormularioPublico,
+    sincronizarConFlota,
 } from '../controllers/hojas-vida.controller.js';
 
 const router = Router();
@@ -57,6 +58,7 @@ router.get('/solicitudes/:id', getSolicitud);
 router.patch('/solicitudes/:id/estado', cambiarEstadoSolicitud);
 router.post('/solicitudes/:id/reenviar-link', reenviarLink);
 router.post('/solicitudes/:id/doc-fisica', registrarDocFisica);
+router.post('/solicitudes/:id/sincronizar-flota', sincronizarConFlota);
 
 // Documentos (revisión interna)
 router.patch('/documentos/:docId/aprobar', aprobarDocumento);

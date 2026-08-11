@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import SignatureCanvas from 'react-signature-canvas';
 import { toast } from 'sonner';
 
 const API = `${import.meta.env.VITE_API_URL || '/api'}/public/hv`;
@@ -54,6 +55,8 @@ interface SolicitudPublica {
     estado: string;
     datos_json: Record<string, any>;
     token_expira_at: string;
+    habeas_data_aceptado?: boolean;
+    firma_digital_b64?: string | null;
 }
 
 // ─── PASOS ────────────────────────────────────────────────────────────────────
@@ -87,6 +90,10 @@ const PublicDocForm: React.FC = () => {
     const [campoErrors, setCampoErrors] = useState<Set<string>>(new Set());
     const [docErrors, setDocErrors] = useState<Record<number, 'falta_documento' | 'falta_fecha'>>({});
 
+    // Consentimiento Legal y Firma Digital
+    const [habeasDataAceptado, setHabeasDataAceptado] = useState(false);
+    const sigCanvasRef = useRef<SignatureCanvas>(null);
+
     // Auto-guardado de datos del formulario
     const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -113,6 +120,9 @@ const PublicDocForm: React.FC = () => {
             setTiposDocs(data.documentos_requeridos);
             setDocsSubidos(data.documentos_subidos || []);
             setAccesoId(data.acceso_id);
+            if (data.solicitud?.habeas_data_aceptado) {
+                setHabeasDataAceptado(true);
+            }
             // Pre-llenar con datos ya conocidos de la solicitud, luego sobrescribir con guardados
             const prefill: Record<string, string> = {};
             if (data.solicitud.nombre_entidad) prefill['nombre_completo'] = data.solicitud.nombre_entidad;
@@ -245,12 +255,32 @@ const PublicDocForm: React.FC = () => {
     };
 
     const handleSubmit = async () => {
+        if (!habeasDataAceptado) {
+            toast.error('Debe autorizar el tratamiento de datos personales (Habeas Data) para continuar.');
+            return;
+        }
+
+        let firmaData = '';
+        if (sigCanvasRef.current && !sigCanvasRef.current.isEmpty()) {
+            const canvas = sigCanvasRef.current.getCanvas();
+            firmaData = canvas.toDataURL('image/png');
+        }
+
+        if (!firmaData && !solicitud?.firma_digital_b64) {
+            toast.error('Por favor estampe su firma manuscrita digital antes de enviar.');
+            return;
+        }
+
         setSubmitting(true);
         try {
             const res = await fetch(`${API}/${token}/submit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ acceso_id: accesoId }),
+                body: JSON.stringify({
+                    acceso_id: accesoId,
+                    habeas_data_aceptado: true,
+                    firma_digital_b64: firmaData || solicitud?.firma_digital_b64
+                }),
             });
             const data = await res.json();
             if (!res.ok) { toast.error(data.error || 'Error al enviar'); return; }
@@ -398,9 +428,43 @@ const PublicDocForm: React.FC = () => {
                                 </div>
                             </div>
                         )}
+
+                        {/* Cláusula Habeas Data */}
+                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-5 shadow-sm">
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="text-base">⚖️</span>
+                                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                                    Autorización de Tratamiento de Datos y Consulta de Antecedentes
+                                </h3>
+                            </div>
+                            <p className="text-xs text-slate-600 leading-relaxed mb-3">
+                                En cumplimiento de la Ley 1581 de 2012 y estándares BASC / C-TPAT, autorizo expresamente a <strong>MILLA 7 S.A.S.</strong> a recolectar, almacenar, verificar y consultar mis datos personales, antecedentes judiciales, disciplinarios, fiscales y de tránsito (SIMIT, RUNT, Policía, Procuraduría, Contraloría, OFAC) para fines de vinculación y seguridad en la cadena de suministro.
+                            </p>
+                            <label className="flex items-start gap-2.5 cursor-pointer bg-white p-3 rounded-lg border border-slate-200 hover:border-blue-400 transition-colors">
+                                <input
+                                    type="checkbox"
+                                    checked={habeasDataAceptado}
+                                    onChange={e => setHabeasDataAceptado(e.target.checked)}
+                                    className="mt-0.5 w-4 h-4 rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                />
+                                <span className="text-xs font-medium text-slate-800">
+                                    He leído, comprendo y <strong>autorizo el tratamiento de mis datos personales</strong> y consulta en listas de control.
+                                </span>
+                            </label>
+                        </div>
+
                         <button
-                            onClick={() => setPaso(1)}
-                            className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold text-lg"
+                            onClick={() => {
+                                if (!habeasDataAceptado) {
+                                    toast.error('Debe aceptar la autorización de tratamiento de datos personales para continuar.');
+                                    return;
+                                }
+                                setPaso(1);
+                            }}
+                            disabled={!habeasDataAceptado}
+                            className={`w-full py-4 rounded-xl font-semibold text-lg transition-colors ${
+                                habeasDataAceptado ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            }`}
                         >
                             Comenzar →
                         </button>
@@ -513,6 +577,46 @@ const PublicDocForm: React.FC = () => {
                             </div>
                         </div>
 
+                        {/* Resumen Habeas Data */}
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 mb-4 flex items-center gap-2.5 text-xs text-emerald-800 font-medium">
+                            <span className="text-base">✓</span>
+                            <span>Autorización Habeas Data y consulta en listas de control aceptada</span>
+                        </div>
+
+                        {/* Firma Digital Manuscrita */}
+                        <div className="bg-white border rounded-xl p-4 mb-6 shadow-sm">
+                            <div className="flex justify-between items-center mb-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-base">✍️</span>
+                                    <h3 className="font-semibold text-gray-800 text-sm">Firma Digital del Aspirante / Titular</h3>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => sigCanvasRef.current?.clear()}
+                                    className="text-xs text-red-600 hover:text-red-800 font-medium px-2 py-1 bg-red-50 hover:bg-red-100 rounded-lg border border-red-200 transition-colors"
+                                >
+                                    Limpiar firma
+                                </button>
+                            </div>
+                            <p className="text-xs text-gray-500 mb-3">
+                                Dibuje su firma con el dedo (móvil) o con el ratón (computador) en el recuadro inferior.
+                            </p>
+                            <div className="border-2 border-dashed border-gray-300 rounded-xl overflow-hidden bg-slate-50 touch-none flex justify-center">
+                                <SignatureCanvas
+                                    ref={sigCanvasRef}
+                                    penColor="#0f172a"
+                                    canvasProps={{
+                                        width: 380,
+                                        height: 150,
+                                        className: 'sigCanvas max-w-full bg-white cursor-crosshair'
+                                    }}
+                                />
+                            </div>
+                            <p className="text-[11px] text-gray-400 text-center mt-2">
+                                🔒 Esta firma digital certifica la veracidad de la información y los documentos aportados.
+                            </p>
+                        </div>
+
                         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
                             <p className="text-sm text-yellow-800">
                                 Al enviar, su información será revisada por el equipo de Milla 7 S.A.S.
@@ -523,7 +627,7 @@ const PublicDocForm: React.FC = () => {
                         <button
                             onClick={handleSubmit}
                             disabled={submitting}
-                            className="w-full bg-green-600 text-white py-4 rounded-xl font-semibold text-lg disabled:opacity-60"
+                            className="w-full bg-green-600 text-white py-4 rounded-xl font-semibold text-lg disabled:opacity-60 hover:bg-green-700 transition-colors shadow-sm"
                         >
                             {submitting ? (
                                 <span className="flex items-center justify-center gap-2">

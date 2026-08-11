@@ -75,7 +75,7 @@ const HVDashboard: React.FC<Props> = ({ onAbrirSolicitud }) => {
     const [data, setData] = useState<DashboardData | null>(null);
     const [loading, setLoading] = useState(true);
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('m7_token') || localStorage.getItem('token');
 
     useEffect(() => { cargar(); }, []);
 

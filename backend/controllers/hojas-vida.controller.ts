@@ -628,14 +628,17 @@ export const eliminarFormatoPlantilla = async (req: Request, res: Response) => {
     }
 };
 
-// ─── SERVIR ARCHIVOS LOCALES ─────────────────────────────────────────────────
+// ─── SERVIR ARCHIVOS LOCALES (Con Protección Path Traversal) ──────────────────
 
 export const serveLocalFile = async (req: Request, res: Response) => {
     const filePath = (req.query['p'] as string) || '';
-    const localPath = path.join(LOCAL_BASE, decodeURIComponent(filePath));
-    if (!fs.existsSync(localPath)) return res.status(404).json({ error: 'Archivo no encontrado' });
+    const safePath = path.resolve(LOCAL_BASE, decodeURIComponent(filePath).replace(/^[/\\]+/, ''));
+    if (!safePath.startsWith(path.resolve(LOCAL_BASE))) {
+        return res.status(403).json({ error: 'Acceso no permitido' });
+    }
+    if (!fs.existsSync(safePath)) return res.status(404).json({ error: 'Archivo no encontrado' });
     res.setHeader('Content-Type', 'application/pdf');
-    fs.createReadStream(localPath).pipe(res);
+    fs.createReadStream(safePath).pipe(res);
 };
 
 export const serveFormatoPlantilla = async (req: Request, res: Response) => {
@@ -656,10 +659,13 @@ export const serveFormatoPlantilla = async (req: Request, res: Response) => {
         res.setHeader('Content-Type', 'application/pdf');
 
         if (formato_plantilla_path.startsWith('local:')) {
-            const relativePath = formato_plantilla_path.replace('local:', '');
-            const localPath = path.join(LOCAL_BASE, relativePath);
-            if (!fs.existsSync(localPath)) return res.status(404).json({ error: 'Archivo no encontrado' });
-            fs.createReadStream(localPath).pipe(res);
+            const relativePath = formato_plantilla_path.replace('local:', '').replace(/^[/\\]+/, '');
+            const safePath = path.resolve(LOCAL_BASE, relativePath);
+            if (!safePath.startsWith(path.resolve(LOCAL_BASE))) {
+                return res.status(403).json({ error: 'Acceso no permitido' });
+            }
+            if (!fs.existsSync(safePath)) return res.status(404).json({ error: 'Archivo no encontrado' });
+            fs.createReadStream(safePath).pipe(res);
         } else {
             const { rcloneCat } = await import('../services/hv-drive.service.js');
             rcloneCat(formato_plantilla_path).pipe(res);
@@ -752,6 +758,8 @@ export const getPublicSolicitud = async (req: Request, res: Response) => {
                 estado: sol.estado,
                 datos_json: sol.datos_json,
                 token_expira_at: sol.token_expira_at,
+                habeas_data_aceptado: sol.habeas_data_aceptado,
+                firma_digital_b64: sol.firma_digital_b64,
             },
             campos_formulario: campos.rows,
             documentos_requeridos: docsReq.rows,
@@ -931,7 +939,8 @@ export const actualizarFechaVencimiento = async (req: Request, res: Response) =>
 
 export const submitFormularioPublico = async (req: Request, res: Response) => {
     const token = req.params['token'] as string;
-    const { acceso_id } = req.body;
+    const { acceso_id, habeas_data_aceptado, firma_digital_b64 } = req.body;
+    const ip = getIp(req);
 
     try {
         const { rows } = await pool.query(
@@ -943,8 +952,21 @@ export const submitFormularioPublico = async (req: Request, res: Response) => {
         }
 
         const sol = rows[0];
-        await cambiarEstado(sol.id, 'pendiente_aprobacion', null, 'Formulario público', getIp(req),
-            'Formulario enviado por el proveedor/conductor');
+
+        // Actualizar datos legales y firma
+        await pool.query(
+            `UPDATE hv_solicitudes SET
+             habeas_data_aceptado = $1,
+             habeas_data_ip = $2,
+             habeas_data_timestamp = NOW(),
+             firma_digital_b64 = COALESCE($3, firma_digital_b64),
+             updated_at = NOW()
+             WHERE id = $4`,
+            [Boolean(habeas_data_aceptado), ip, firma_digital_b64 || null, sol.id]
+        );
+
+        await cambiarEstado(sol.id, 'pendiente_aprobacion', null, 'Formulario público', ip,
+            'Formulario enviado por el aspirante/proveedor (Consentimiento y Firma registrados)');
 
         if (acceso_id) {
             await pool.query(
@@ -953,10 +975,183 @@ export const submitFormularioPublico = async (req: Request, res: Response) => {
         }
 
         await registrarAuditoria(sol.id, 'submit', 'solicitud', sol.id,
-            null, 'Formulario público', getIp(req));
+            null, 'Formulario público', ip, null, {
+                habeas_data_aceptado: Boolean(habeas_data_aceptado),
+                firma_adjunta: Boolean(firma_digital_b64)
+            });
 
         res.json({ success: true, message: 'Información enviada correctamente. Un funcionario revisará sus documentos.' });
     } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
+// ─── SINCRONIZACIÓN CON FLOTA / PERSONAL ─────────────────────────────────────
+
+export const sincronizarConFlota = async (req: Request, res: Response) => {
+    const user = (req as any).user;
+    const id = req.params['id'] as string;
+
+    try {
+        const { rows } = await pool.query('SELECT * FROM hv_solicitudes WHERE id=$1', [id]);
+        if (!rows.length) return res.status(404).json({ error: 'Solicitud no encontrada' });
+        const sol = rows[0];
+
+        const docsRes = await pool.query(
+            'SELECT * FROM hv_documentos WHERE solicitud_id=$1',
+            [id]
+        );
+        const docs = docsRes.rows;
+        const datos = sol.datos_json || {};
+
+        if (sol.tipo_entidad === 'vehiculo') {
+            const plate = (sol.entidad_id || datos.placa || datos.numero_placa || sol.nombre_entidad || '').toUpperCase().trim();
+            if (!plate) return res.status(400).json({ error: 'No se identificó la placa del vehículo' });
+
+            const soatDoc = docs.find((d: any) => /soat/i.test(d.nombre_doc) || /soat/i.test(d.nombre_archivo));
+            const technoDoc = docs.find((d: any) => /tecnomecanica|revision|tecnico/i.test(d.nombre_doc) || /tecnomecanica|rtm/i.test(d.nombre_archivo));
+
+            const soatExpiry = soatDoc?.fecha_vencimiento || datos.soat_vencimiento || null;
+            const technoExpiry = technoDoc?.fecha_vencimiento || datos.tecnomecanica_vencimiento || null;
+            const soatPdf = soatDoc?.drive_link || null;
+            const technoPdf = technoDoc?.drive_link || null;
+
+            const existingVeh = await pool.query('SELECT id FROM vehicles WHERE plate=$1', [plate]);
+            if (existingVeh.rows.length > 0) {
+                await pool.query(
+                    `UPDATE vehicles SET
+                     brand = COALESCE($1, brand),
+                     owner = COALESCE($2, owner),
+                     model_year = COALESCE($3, model_year),
+                     color = COALESCE($4, color),
+                     vehicle_type = COALESCE($5, vehicle_type),
+                     soat_expiry = COALESCE($6, soat_expiry),
+                     techno_expiry = COALESCE($7, techno_expiry),
+                     soat_pdf = COALESCE($8, soat_pdf),
+                     techno_pdf = COALESCE($9, techno_pdf),
+                     status_id = 'EST-01',
+                     updated_by = $10,
+                     updated_at = NOW()
+                     WHERE plate = $11`,
+                    [
+                        datos.marca || null,
+                        datos.propietario || sol.nombre_entidad || null,
+                        datos.modelo || datos.año || null,
+                        datos.color || null,
+                        datos.tipo_vehiculo || datos.clase_vehiculo || 'Camión',
+                        soatExpiry,
+                        technoExpiry,
+                        soatPdf,
+                        technoPdf,
+                        user.name || 'Admin',
+                        plate
+                    ]
+                );
+            } else {
+                const vehId = `VEH-${plate}`;
+                await pool.query(
+                    `INSERT INTO vehicles
+                     (id, plate, brand, owner, model_year, color, vehicle_type, soat_expiry, techno_expiry, soat_pdf, techno_pdf, status_id, created_by, updated_by)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'EST-01', $12, $12)`,
+                    [
+                        vehId,
+                        plate,
+                        datos.marca || 'Genérica',
+                        datos.propietario || sol.nombre_entidad || 'Milla 7 S.A.S.',
+                        datos.modelo || datos.año || new Date().getFullYear().toString(),
+                        datos.color || 'Blanco',
+                        datos.tipo_vehiculo || 'Camión',
+                        soatExpiry || new Date(),
+                        technoExpiry || new Date(),
+                        soatPdf,
+                        technoPdf,
+                        user.name || 'Admin'
+                    ]
+                );
+            }
+        } else {
+            // Tercero: Conductor / Propietario / Tenedor
+            const docNum = (sol.entidad_id || datos.cedula || datos.documento_numero || datos.numero_documento || '').trim();
+            const fullName = (sol.nombre_entidad || datos.nombre_completo || `${datos.nombres || ''} ${datos.apellidos || ''}`).trim();
+            const phone = (datos.celular || datos.telefono || '').trim();
+            const email = (datos.correo || datos.email || '').trim();
+
+            const licDoc = docs.find((d: any) => /licencia|pase/i.test(d.nombre_doc) || /licencia/i.test(d.nombre_archivo));
+            const licExpiry = licDoc?.fecha_vencimiento || datos.licencia_vencimiento || null;
+            const licPdf = licDoc?.drive_link || null;
+
+            // 1. Sincronizar en drivers
+            const existingDriver = await pool.query('SELECT id FROM drivers WHERE document_number=$1', [docNum]);
+            if (existingDriver.rows.length > 0) {
+                await pool.query(
+                    `UPDATE drivers SET
+                     name = COALESCE($1, name),
+                     phone = COALESCE($2, phone),
+                     license_expiry = COALESCE($3, license_expiry),
+                     license_pdf = COALESCE($4, license_pdf),
+                     status_id = 'EST-01',
+                     updated_by = $5,
+                     updated_at = NOW()
+                     WHERE document_number = $6`,
+                    [fullName, phone, licExpiry, licPdf, user.name || 'Admin', docNum]
+                );
+            } else {
+                const drvId = `DRV-${docNum || Date.now()}`;
+                await pool.query(
+                    `INSERT INTO drivers
+                     (id, name, document_type, document_number, phone, license_expiry, license_pdf, status_id, created_by, updated_by)
+                     VALUES ($1, $2, 'CC', $3, $4, $5, $6, 'EST-01', $7, $7)`,
+                    [drvId, fullName, docNum, phone, licExpiry || new Date(), licPdf, user.name || 'Admin']
+                );
+            }
+
+            // 2. Sincronizar en gh_personal
+            if (docNum && fullName) {
+                await pool.query(
+                    `INSERT INTO gh_personal
+                     (nombre, cedula, cargo, eps, afp, celular_personal, correo_personal, estado)
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, 'ACTIVO')
+                     ON CONFLICT (cedula) DO UPDATE SET
+                     nombre = EXCLUDED.nombre,
+                     cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+                     eps = COALESCE(EXCLUDED.eps, gh_personal.eps),
+                     afp = COALESCE(EXCLUDED.afp, gh_personal.afp),
+                     celular_personal = COALESCE(EXCLUDED.celular_personal, gh_personal.celular_personal),
+                     correo_personal = COALESCE(EXCLUDED.correo_personal, gh_personal.correo_personal),
+                     estado = 'ACTIVO'`,
+                    [
+                        fullName,
+                        docNum,
+                        datos.cargo || 'Conductor',
+                        datos.eps || null,
+                        datos.afp || null,
+                        phone || null,
+                        email || null
+                    ]
+                );
+            }
+        }
+
+        // Marcar solicitud como sincronizada
+        await pool.query(
+            `UPDATE hv_solicitudes SET
+             sincronizado_flota = TRUE,
+             sincronizado_flota_at = NOW(),
+             sincronizado_por = $1,
+             updated_at = NOW()
+             WHERE id = $2`,
+            [user.name || 'Admin', id]
+        );
+
+        await registrarAuditoria(id, 'sync_flota', 'solicitud', id, user.id, user.name, getIp(req),
+            null, { sincronizado_flota: true, tipo: sol.tipo_entidad });
+
+        res.json({
+            success: true,
+            message: `Sincronización con ${sol.tipo_entidad === 'vehiculo' ? 'Flota de Vehículos' : 'Conductores y Gestión Humana'} completada con éxito`
+        });
+    } catch (e: any) {
+        console.error('[HV-SYNC] Error sincronizando con flota:', e);
         res.status(500).json({ error: e.message });
     }
 };

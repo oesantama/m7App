@@ -96,6 +96,13 @@ const loginLimiter = rateLimit({
   message: { error: 'Demasiados intentos de acceso desde esta IP. Intente en 15 minutos.' }
 });
 
+// Limitador de Peticiones Públicas para Hojas de Vida (Protección DoS)
+const hvPublicLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: process.env.NODE_ENV === 'production' ? 40 : 500,
+  message: { error: 'Demasiadas peticiones al portal de documentación. Por favor espere un momento.' }
+});
+
 // Middleware de Logs M7
 app.use((req, res, next) => {
   const start = Date.now();
@@ -108,6 +115,7 @@ app.use((req, res, next) => {
 
 // Montaje de API Modular
 app.use('/api/auth/login', loginLimiter); 
+app.use('/api/public/hv', hvPublicLimiter); 
 
 // REMOVIDO: /health-sec exponía claves API sin autenticación — ver audit Sprint 1
 

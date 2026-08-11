@@ -322,8 +322,20 @@ const healSchema = async (client: any) => {
         validated_by VARCHAR(200)
       )
     `);
+
+    // Hojas de Vida (DMS) — Asegurar columnas legales y de sincronización
+    await client.query(`
+      ALTER TABLE hv_solicitudes 
+      ADD COLUMN IF NOT EXISTS habeas_data_aceptado BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS habeas_data_ip VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS habeas_data_timestamp TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS firma_digital_b64 TEXT,
+      ADD COLUMN IF NOT EXISTS sincronizado_flota BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS sincronizado_flota_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS sincronizado_por VARCHAR(100);
+    `);
   } catch (err) {
-    console.error('[M7-DB] Error al crear validation_sources/validation_records:', err);
+    console.error('[M7-DB] Error al crear validation_sources/validation_records/hv_solicitudes:', err);
   }
 
   // GH: Perfiles y Funciones del Cargo — carga, versionado y firma digital
@@ -2008,6 +2020,35 @@ export const restoreSystem = async () => {
       CREATE INDEX IF NOT EXISTS idx_alertas_whatsapp_status
         ON alertas_whatsapp (status_id);
     `);
+
+    // Destinatarios por alerta como tabla propia (antes era un TEXT[] plano sin estado por
+    // número) — permite habilitar/deshabilitar un número sin eliminarlo de la lista.
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS alertas_whatsapp_destinatarios (
+        id SERIAL PRIMARY KEY,
+        alerta_id TEXT NOT NULL REFERENCES alertas_whatsapp(id) ON DELETE CASCADE,
+        phone_number TEXT NOT NULL,
+        enabled BOOLEAN NOT NULL DEFAULT true,
+        email TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        UNIQUE(alerta_id, phone_number)
+      );
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_alertas_wa_dest_alerta
+        ON alertas_whatsapp_destinatarios (alerta_id);
+    `);
+    // Migración de datos: cada número que ya vivía en el arreglo phone_numbers pasa a ser
+    // una fila propia, habilitada por defecto. Idempotente por el UNIQUE(alerta_id, phone_number).
+    await client.query(`
+      INSERT INTO alertas_whatsapp_destinatarios (alerta_id, phone_number, enabled)
+      SELECT id, unnest(phone_numbers), true
+      FROM alertas_whatsapp
+      WHERE phone_numbers IS NOT NULL AND array_length(phone_numbers, 1) > 0
+      ON CONFLICT (alerta_id, phone_number) DO NOTHING;
+    `);
+
     // Página en el menú — Configuración Maestros
     await client.query(`
       INSERT INTO pages (id, name, route, parent_id, module_id, status_id)

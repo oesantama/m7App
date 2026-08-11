@@ -72,7 +72,7 @@ const HVSolicitudes: React.FC<Props> = ({ onRevisar }) => {
     const [estado, setEstado] = useState('');
     const [tipoEntidad, setTipoEntidad] = useState('');
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('m7_token') || localStorage.getItem('token');
 
     useEffect(() => { cargarCatalogos(); }, []);
     useEffect(() => { cargar(); }, [page, estado, tipoEntidad]);

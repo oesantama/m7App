@@ -4,6 +4,7 @@ import { evolutionService } from './evolution.service.js';
 import { generateFlotaReportPdf } from './flota-wa-report.service.js';
 import { generateCierreFactReport } from './cierre-fact-report.service.js';
 import { generateSobrecostoReport } from './sobrecosto-report.service.js';
+import { sendEmail } from './notification.service.js';
 
 // Nombre de instancia fijo se resuelve dinámicamente al momento de enviar
 const INSTANCE_OVERRIDE = process.env.WA_ALERTS_INSTANCE || '';
@@ -12,7 +13,6 @@ interface AlertaWA {
   id: string;
   name: string;
   message_template: string;
-  phone_numbers: string[];
   cron_expression: string;
   tipo_evento: string;
   adjunto_tipo: string;
@@ -37,10 +37,31 @@ async function sleep(ms: number) {
   return new Promise(r => setTimeout(r, ms));
 }
 
+function buildEmailHtml(alerta: AlertaWA, message: string, caption?: string): string {
+  const bodyHtml = message.replace(/\n/g, '<br/>');
+  const captionHtml = caption ? `<p style="color:#0d3b3b;font-weight:700;">${caption.replace(/[*_]/g, '').replace(/\n/g, '<br/>')}</p>` : '';
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#1a2a2a;">
+      <div style="background:#0d3b3b;color:#fff;padding:16px 20px;border-radius:8px 8px 0 0;">
+        <h2 style="margin:0;font-size:16px;">OrbitM7 — ${alerta.name}</h2>
+      </div>
+      <div style="border:1px solid #e8f0f0;border-top:none;padding:20px;border-radius:0 0 8px 8px;">
+        <p>${bodyHtml}</p>
+        ${captionHtml}
+        <p style="font-size:11px;color:#80a0a0;margin-top:20px;">Este correo es una copia de respaldo del mensaje automático enviado por WhatsApp — Milla 7 S.A.S.</p>
+      </div>
+    </div>`;
+}
+
 class WhatsAppCronRunner {
   async sendAlerta(alerta: AlertaWA, isTest = false): Promise<number> {
-    const phones = alerta.phone_numbers || [];
-    if (phones.length === 0) return 0;
+    // Solo destinatarios habilitados — un número deshabilitado queda en la lista pero no recibe nada.
+    const destRes = await pool.query(
+      'SELECT phone_number, email FROM alertas_whatsapp_destinatarios WHERE alerta_id = $1 AND enabled = true',
+      [alerta.id]
+    );
+    const destinatarios: { phone_number: string; email: string | null }[] = destRes.rows;
+    if (destinatarios.length === 0) return 0;
 
     // Resolver instancia: env override → primera user_* conectada
     const INSTANCE = INSTANCE_OVERRIDE || await evolutionService.findFirstConnectedInstance() || '';
@@ -78,7 +99,8 @@ class WhatsAppCronRunner {
 
     let sent = 0;
 
-    for (const phone of phones) {
+    for (const dest of destinatarios) {
+      const phone = dest.phone_number;
       try {
         // Revalidar la conexión antes de CADA envío, no solo una vez al inicio del lote —
         // en listas largas la sesión puede caerse a mitad de camino sin que nos enteremos.
@@ -104,6 +126,20 @@ class WhatsAppCronRunner {
       } catch (err: any) {
         console.error(`[WA-CRON] Error enviando a ${phone}:`, err.message);
       }
+
+      // Correo en paralelo, siempre que el destinatario tenga uno configurado — no bloqueante
+      // y no depende de si el WhatsApp de arriba tuvo éxito o no.
+      if (dest.email) {
+        const rawBase64 = pdfAttachment?.base64.includes(';base64,')
+          ? pdfAttachment.base64.split(';base64,')[1]
+          : pdfAttachment?.base64;
+        sendEmail(
+          dest.email,
+          `OrbitM7 — ${alerta.name}`,
+          buildEmailHtml(alerta, message, pdfAttachment?.caption),
+          pdfAttachment && rawBase64 ? [{ filename: pdfAttachment.fileName, content: Buffer.from(rawBase64, 'base64') }] : undefined
+        ).catch((err: any) => console.error(`[WA-CRON] Error enviando email a ${dest.email}:`, err.message));
+      }
     }
 
     if (!isTest) {
@@ -113,7 +149,7 @@ class WhatsAppCronRunner {
       ).catch(() => {});
     }
 
-    console.log(`[WA-CRON] Alerta "${alerta.name}" enviada a ${sent}/${phones.length} destinatario(s)`);
+    console.log(`[WA-CRON] Alerta "${alerta.name}" enviada a ${sent}/${destinatarios.length} destinatario(s)`);
     return sent;
   }
 

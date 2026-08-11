@@ -3,15 +3,22 @@ import { toast } from 'sonner';
 import {
   MessageCircle, Plus, Trash2, Edit2, Send, RefreshCw,
   CheckCircle, XCircle, Clock, Phone, FileText, Calendar,
-  ChevronDown, ChevronUp, AlertTriangle, Zap,
+  ChevronDown, ChevronUp, AlertTriangle, Zap, Mail,
 } from 'lucide-react';
 import { api } from '../services/api';
+
+interface Destinatario {
+  id?: number;
+  phone_number: string;
+  enabled: boolean;
+  email?: string | null;
+}
 
 interface AlertaWA {
   id: string;
   name: string;
   description: string;
-  phone_numbers: string[];
+  destinatarios: Destinatario[];
   message_template: string;
   cron_expression: string;
   tipo_evento: string;
@@ -54,7 +61,7 @@ const EMPTY_FORM: Omit<AlertaWA, 'created_at' | 'updated_at' | 'last_run' | 'nex
   id: '',
   name: '',
   description: '',
-  phone_numbers: [],
+  destinatarios: [],
   message_template: '📢 *OrbitM7 — {{alerta}}*\n\nFecha: {{fecha}}\nHora: {{hora}}\n\nEste es un mensaje automático del sistema.',
   cron_expression: '0 8 * * 1-5',
   tipo_evento: 'MANUAL',
@@ -84,6 +91,8 @@ export default function AlertasWhatsapp() {
   const [showForm, setShowForm]     = useState(false);
   const [form, setForm]             = useState({ ...EMPTY_FORM });
   const [phoneInput, setPhoneInput] = useState('');
+  const [editingEmailFor, setEditingEmailFor] = useState<string | null>(null);
+  const [emailInput, setEmailInput] = useState('');
   const [saving, setSaving]         = useState(false);
   const [testingId, setTestingId]   = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -121,7 +130,7 @@ export default function AlertasWhatsapp() {
   function openEdit(a: AlertaWA) {
     setForm({
       id: a.id, name: a.name, description: a.description,
-      phone_numbers: [...(a.phone_numbers || [])],
+      destinatarios: (a.destinatarios || []).map(d => ({ ...d })),
       message_template: a.message_template,
       cron_expression: a.cron_expression,
       tipo_evento: a.tipo_evento,
@@ -154,13 +163,38 @@ export default function AlertasWhatsapp() {
   function addPhone() {
     const clean = phoneInput.replace(/\D/g, '');
     if (clean.length < 10) { toast.error('Número inválido — mínimo 10 dígitos'); return; }
-    if (form.phone_numbers.includes(clean)) { toast.error('Número ya agregado'); return; }
-    setForm(f => ({ ...f, phone_numbers: [...f.phone_numbers, clean] }));
+    if (form.destinatarios.some(d => d.phone_number === clean)) { toast.error('Número ya agregado'); return; }
+    setForm(f => ({ ...f, destinatarios: [...f.destinatarios, { phone_number: clean, enabled: true }] }));
     setPhoneInput('');
   }
 
   function removePhone(p: string) {
-    setForm(f => ({ ...f, phone_numbers: f.phone_numbers.filter(x => x !== p) }));
+    setForm(f => ({ ...f, destinatarios: f.destinatarios.filter(d => d.phone_number !== p) }));
+  }
+
+  function toggleEnabled(p: string) {
+    setForm(f => ({
+      ...f,
+      destinatarios: f.destinatarios.map(d => d.phone_number === p ? { ...d, enabled: !d.enabled } : d)
+    }));
+  }
+
+  function openEmailEditor(d: Destinatario) {
+    setEditingEmailFor(d.phone_number);
+    setEmailInput(d.email || '');
+  }
+
+  function saveEmail(p: string) {
+    const clean = emailInput.trim();
+    if (clean && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+      toast.error('Correo inválido');
+      return;
+    }
+    setForm(f => ({
+      ...f,
+      destinatarios: f.destinatarios.map(d => d.phone_number === p ? { ...d, email: clean || null } : d)
+    }));
+    setEditingEmailFor(null);
   }
 
   function insertVar(v: string) {
@@ -169,13 +203,13 @@ export default function AlertasWhatsapp() {
 
   async function handleSave() {
     if (!form.name.trim()) { toast.error('El nombre es requerido'); return; }
-    if (form.phone_numbers.length === 0) { toast.error('Agregue al menos un número destinatario'); return; }
+    if (form.destinatarios.length === 0) { toast.error('Agregue al menos un número destinatario'); return; }
     if (!form.message_template.trim()) { toast.error('El mensaje es requerido'); return; }
     setSaving(true);
     try {
       const res = await api.saveAlertaWhatsapp({
         ...form,
-        phoneNumbers: form.phone_numbers,
+        destinatarios: form.destinatarios,
         messageTemplate: form.message_template,
         cronExpression: form.cron_expression,
         tipoEvento: form.tipo_evento,
@@ -391,13 +425,52 @@ export default function AlertasWhatsapp() {
                   + Agregar
                 </button>
               </div>
-              {form.phone_numbers.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {form.phone_numbers.map(p => (
-                    <span key={p} className="flex items-center gap-1 bg-green-50 border border-green-200 text-green-700 px-2 py-1 rounded-full text-[10px] font-bold">
-                      <Phone size={9} /> {p}
-                      <button onClick={() => removePhone(p)} className="text-green-400 hover:text-red-500 ml-0.5">×</button>
-                    </span>
+              {form.destinatarios.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  {form.destinatarios.map(d => (
+                    <div key={d.phone_number} className="flex items-center gap-1.5 flex-wrap">
+                      <span
+                        className={`flex items-center gap-1.5 border px-2 py-1 rounded-full text-[10px] font-bold transition-all ${
+                          d.enabled
+                            ? 'bg-green-50 border-green-200 text-green-700'
+                            : 'bg-slate-100 border-slate-200 text-slate-400'
+                        }`}>
+                        <Phone size={9} /> {d.phone_number}
+                        <button
+                          onClick={() => toggleEnabled(d.phone_number)}
+                          title={d.enabled ? 'Deshabilitar' : 'Habilitar'}
+                          className={`w-7 h-3.5 rounded-full relative transition-colors ${d.enabled ? 'bg-green-400' : 'bg-slate-300'}`}
+                        >
+                          <span className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white shadow transition-all ${d.enabled ? 'left-3.5' : 'left-0.5'}`} />
+                        </button>
+                        <button onClick={() => removePhone(d.phone_number)} className="text-green-400 hover:text-red-500 ml-0.5">×</button>
+                      </span>
+
+                      {editingEmailFor === d.phone_number ? (
+                        <div className="flex items-center gap-1">
+                          <input
+                            value={emailInput}
+                            onChange={e => setEmailInput(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), saveEmail(d.phone_number))}
+                            placeholder="correo@ejemplo.com"
+                            autoFocus
+                            className="border border-blue-200 rounded-lg px-2 py-1 text-[10px] focus:outline-none focus:ring-2 focus:ring-blue-300 w-48" />
+                          <button onClick={() => saveEmail(d.phone_number)} className="text-blue-500 hover:text-blue-700 text-[10px] font-black">OK</button>
+                          <button onClick={() => setEditingEmailFor(null)} className="text-slate-400 hover:text-slate-600 text-[10px]">✕</button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => openEmailEditor(d)}
+                          title={d.email ? 'Editar correo de respaldo' : 'Agregar correo de respaldo'}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold border transition-all ${
+                            d.email
+                              ? 'bg-blue-50 border-blue-200 text-blue-600'
+                              : 'bg-white border-dashed border-slate-200 text-slate-400 hover:border-blue-300 hover:text-blue-500'
+                          }`}>
+                          <Mail size={9} /> {d.email || 'Agregar correo'}
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}
@@ -533,7 +606,10 @@ export default function AlertasWhatsapp() {
                       </div>
                       <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                         <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                          <Phone size={9} /> {a.phone_numbers?.length || 0} destinatario(s)
+                          <Phone size={9} /> {(a.destinatarios || []).filter(d => d.enabled).length} activo(s)
+                          {(a.destinatarios || []).some(d => !d.enabled) && (
+                            <span className="text-slate-300"> · {(a.destinatarios || []).filter(d => !d.enabled).length} deshabilitado(s)</span>
+                          )}
                         </span>
                         <span className="text-[10px] text-slate-400 flex items-center gap-1 font-mono">
                           <Clock size={9} /> {cronLabel(a.cron_expression)}
@@ -581,8 +657,11 @@ export default function AlertasWhatsapp() {
                       <div>
                         <p className="font-black text-slate-400 uppercase mb-1">Destinatarios</p>
                         <div className="flex flex-wrap gap-1">
-                          {(a.phone_numbers || []).map(p => (
-                            <span key={p} className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-mono">{p}</span>
+                          {(a.destinatarios || []).map(d => (
+                            <span key={d.phone_number}
+                              className={`px-1.5 py-0.5 rounded font-mono ${d.enabled ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-400 line-through'}`}>
+                              {d.phone_number}
+                            </span>
                           ))}
                         </div>
                       </div>

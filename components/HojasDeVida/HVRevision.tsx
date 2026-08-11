@@ -47,6 +47,13 @@ interface SolicitudDetalle {
     primera_apertura_at?: string;
     doc_fisica_estado?: string;
     doc_fisica_obs?: string;
+    habeas_data_aceptado?: boolean;
+    habeas_data_ip?: string;
+    habeas_data_timestamp?: string;
+    firma_digital_b64?: string | null;
+    sincronizado_flota?: boolean;
+    sincronizado_flota_at?: string;
+    sincronizado_por?: string;
     documentos: Documento[];
     historial: EstadoHistorial[];
 }
@@ -91,13 +98,14 @@ const HVRevision: React.FC<Props> = ({ solicitudId, onVolver }) => {
     const [sol, setSol] = useState<SolicitudDetalle | null>(null);
     const [loading, setLoading] = useState(false);
     const [guardando, setGuardando] = useState(false);
+    const [sincronizando, setSincronizando] = useState(false);
     const [docRechazando, setDocRechazando] = useState<number | null>(null);
     const [obsRechazo, setObsRechazo] = useState('');
     const [cambioEstado, setCambioEstado] = useState('');
     const [obsEstado, setObsEstado] = useState('');
     const [showCambioEstado, setShowCambioEstado] = useState(false);
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('m7_token') || localStorage.getItem('token');
 
     useEffect(() => {
         if (solicitudId) cargar();
@@ -170,6 +178,25 @@ const HVRevision: React.FC<Props> = ({ solicitudId, onVolver }) => {
             toast.error(e.message);
         } finally {
             setGuardando(false);
+        }
+    };
+
+    const sincronizarFlota = async () => {
+        if (!solicitudId) return;
+        setSincronizando(true);
+        try {
+            const res = await fetch(`${API}/solicitudes/${solicitudId}/sincronizar-flota`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            toast.success(data.message || 'Sincronizado con éxito');
+            cargar();
+        } catch (e: any) {
+            toast.error('Error al sincronizar: ' + e.message);
+        } finally {
+            setSincronizando(false);
         }
     };
 
@@ -255,6 +282,73 @@ const HVRevision: React.FC<Props> = ({ solicitudId, onVolver }) => {
                     </div>
                 </div>
             )}
+
+            {/* Cumplimiento Legal Habeas Data y Firma Digital */}
+            <div className="bg-white border rounded-xl p-4 shadow-sm">
+                <div className="flex justify-between items-start mb-3">
+                    <h3 className="font-semibold text-gray-800 text-sm flex items-center gap-2">
+                        <span>🛡️</span>
+                        <span>Evidencia Legal y Firma (BASC / Ley 1581)</span>
+                    </h3>
+                    {sol.sincronizado_flota ? (
+                        <span className="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2.5 py-1 rounded-full flex items-center gap-1">
+                            <span>✓</span> Sincronizado con Flota / Personal
+                        </span>
+                    ) : sol.estado === 'aprobada' || sol.estado === 'completa' ? (
+                        <button
+                            onClick={sincronizarFlota}
+                            disabled={sincronizando}
+                            className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-lg shadow-sm transition-colors flex items-center gap-1.5 disabled:opacity-60"
+                        >
+                            <span>🚀</span>
+                            <span>{sincronizando ? 'Sincronizando...' : 'Sincronizar con Flota / Personal'}</span>
+                        </button>
+                    ) : null}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Habeas Data Status */}
+                    <div className="bg-slate-50 border rounded-lg p-3 text-xs space-y-1.5">
+                        <div className="flex items-center justify-between">
+                            <span className="font-semibold text-slate-700">Autorización Habeas Data:</span>
+                            <span className={`px-2 py-0.5 rounded-full font-bold ${
+                                sol.habeas_data_aceptado ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                            }`}>
+                                {sol.habeas_data_aceptado ? '✓ Aceptada' : 'Pendiente'}
+                            </span>
+                        </div>
+                        {sol.habeas_data_timestamp && (
+                            <p className="text-slate-500">
+                                <strong>Fecha:</strong> {new Date(sol.habeas_data_timestamp).toLocaleString('es-CO')}
+                            </p>
+                        )}
+                        {sol.habeas_data_ip && (
+                            <p className="text-slate-500 font-mono">
+                                <strong>IP Registro:</strong> {sol.habeas_data_ip}
+                            </p>
+                        )}
+                        {sol.sincronizado_flota && sol.sincronizado_flota_at && (
+                            <p className="text-emerald-700 font-medium pt-1 border-t border-slate-200">
+                                Sincronizado el {new Date(sol.sincronizado_flota_at).toLocaleString('es-CO')} por {sol.sincronizado_por}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Firma Digital Preview */}
+                    <div className="bg-slate-50 border rounded-lg p-3 text-xs flex flex-col items-center justify-center">
+                        <span className="font-semibold text-slate-700 mb-1.5 self-start">Firma Manuscrita Digitalizada:</span>
+                        {sol.firma_digital_b64 ? (
+                            <div className="bg-white border rounded p-1 shadow-inner w-full flex justify-center">
+                                <img src={sol.firma_digital_b64} alt="Firma Digital" className="h-16 object-contain" />
+                            </div>
+                        ) : (
+                            <div className="text-gray-400 italic py-3 text-center">
+                                Sin firma digital registrada aún
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
 
             {/* Documentos */}
             <div className="bg-white border rounded-xl p-4">

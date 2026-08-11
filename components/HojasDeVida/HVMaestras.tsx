@@ -86,7 +86,7 @@ const HVMaestras: React.FC = () => {
     const [terceros, setTerceros]     = useState<TipoTercero[]>([]);
     const [campos, setCampos]         = useState<CampoFormulario[]>([]);
     const [loading, setLoading]       = useState(true);
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('m7_token') || localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
     useEffect(() => { cargar(); }, []);
