@@ -19,23 +19,37 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export const sendEmail = async (to: string | string[], subject: string, html: string, attachments?: any[]) => {
+export interface EmailOptions {
+  fromName?: string;
+  fromEmail?: string;
+  headers?: Record<string, string>;
+}
+
+export const sendEmail = async (
+  to: string | string[],
+  subject: string,
+  html: string,
+  attachments?: any[],
+  options?: EmailOptions
+) => {
   if (process.env.EMAIL_ENABLED !== 'true') {
     console.log('[M7-EMAIL] Envío desactivado en .env');
     return;
   }
 
   const toList = Array.isArray(to) ? to : [to];
+  const senderDisplayName = options?.fromName || 'Milla Siete (M7)';
 
   // 1. Intentar enviar vía Resend (API)
   if (resend) {
     try {
-      const fromEmail = process.env.EMAIL_FROM || `M7 Apps <onboarding@resend.dev>`;
+      const fromEmail = options?.fromEmail || process.env.EMAIL_FROM || `M7 Apps <onboarding@resend.dev>`;
       const { data, error } = await resend.emails.send({
         from: fromEmail,
         to: toList,
         subject,
         html,
+        headers: options?.headers,
         attachments: attachments?.map(a => ({
           filename: a.filename,
           content: a.content.toString('base64'),
@@ -53,10 +67,11 @@ export const sendEmail = async (to: string | string[], subject: string, html: st
   // 2. Fallback a Nodemailer (SMTP)
   try {
     const info = await transporter.sendMail({
-      from: `"Milla Siete (M7)" <${process.env.EMAIL_USER}>`,
+      from: `"${senderDisplayName}" <${process.env.EMAIL_USER}>`,
       to: toList.join(', '),
       subject,
       html,
+      headers: options?.headers,
       attachments: attachments?.map(a => ({
         filename: a.filename,
         content: a.content,

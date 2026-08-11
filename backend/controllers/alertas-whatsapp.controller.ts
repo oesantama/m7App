@@ -31,6 +31,7 @@ interface DestinatarioInput {
   id?: number;
   phone_number: string;
   enabled: boolean;
+  email: string | null;
 }
 
 export const saveAlertaWhatsapp = async (req: Request, res: Response) => {
@@ -46,7 +47,12 @@ export const saveAlertaWhatsapp = async (req: Request, res: Response) => {
 
     const destinatarios: DestinatarioInput[] = Array.isArray(a.destinatarios)
       ? a.destinatarios
-          .map((d: any) => ({ id: d.id, phone_number: String(d.phone_number || '').replace(/\D/g, ''), enabled: !!d.enabled }))
+          .map((d: any) => ({
+            id: d.id,
+            phone_number: String(d.phone_number || '').replace(/\D/g, ''),
+            enabled: !!d.enabled,
+            email: d.email ? String(d.email).trim() : null,
+          }))
           .filter((d: DestinatarioInput) => d.phone_number.length >= 10)
       : [];
 
@@ -103,15 +109,15 @@ export const saveAlertaWhatsapp = async (req: Request, res: Response) => {
     for (const d of destinatarios) {
       if (d.id) {
         await client.query(
-          `UPDATE alertas_whatsapp_destinatarios SET phone_number = $1, enabled = $2, updated_at = NOW() WHERE id = $3`,
-          [d.phone_number, d.enabled, d.id]
+          `UPDATE alertas_whatsapp_destinatarios SET phone_number = $1, enabled = $2, email = $3, updated_at = NOW() WHERE id = $4`,
+          [d.phone_number, d.enabled, d.email, d.id]
         );
       } else {
         await client.query(
-          `INSERT INTO alertas_whatsapp_destinatarios (alerta_id, phone_number, enabled)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (alerta_id, phone_number) DO UPDATE SET enabled = $3, updated_at = NOW()`,
-          [a.id, d.phone_number, d.enabled]
+          `INSERT INTO alertas_whatsapp_destinatarios (alerta_id, phone_number, enabled, email)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT (alerta_id, phone_number) DO UPDATE SET enabled = $3, email = $4, updated_at = NOW()`,
+          [a.id, d.phone_number, d.enabled, d.email]
         );
       }
     }

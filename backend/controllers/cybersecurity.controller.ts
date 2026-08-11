@@ -4,41 +4,141 @@ import pool from '../config/database.js';
 
 // --- INITIALIZE DB TABLES ---
 const initializeCyberDb = async () => {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS cyber_phishing_campaigns (
-      id SERIAL PRIMARY KEY,
-      title VARCHAR(255) NOT NULL,
-      sender_name VARCHAR(100),
-      sender_email VARCHAR(100),
-      subject VARCHAR(255),
-      body_html TEXT,
-      target_group VARCHAR(100),
-      status VARCHAR(50) DEFAULT 'DRAFT',
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      sent_at TIMESTAMP
-    );
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cyber_phishing_campaigns (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        sender_name VARCHAR(255),
+        sender_email VARCHAR(255),
+        subject VARCHAR(500),
+        body_html TEXT,
+        target_group TEXT,
+        status VARCHAR(50) DEFAULT 'DRAFT',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        sent_at TIMESTAMP
+      );
 
-    CREATE TABLE IF NOT EXISTS cyber_phishing_events (
-      id SERIAL PRIMARY KEY,
-      campaign_id INTEGER REFERENCES cyber_phishing_campaigns(id),
-      user_email VARCHAR(100),
-      event_type VARCHAR(50), -- 'OPEN', 'CLICK', 'REPORTED'
-      ip_address VARCHAR(100),
-      user_agent TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
+      CREATE TABLE IF NOT EXISTS cyber_phishing_events (
+        id SERIAL PRIMARY KEY,
+        campaign_id INTEGER REFERENCES cyber_phishing_campaigns(id),
+        user_email VARCHAR(255),
+        event_type VARCHAR(50), -- 'OPEN', 'CLICK', 'REPORTED'
+        ip_address VARCHAR(100),
+        user_agent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
 
-    CREATE TABLE IF NOT EXISTS cyber_training_plans (
-      id SERIAL PRIMARY KEY,
-      title VARCHAR(255) NOT NULL,
-      description TEXT,
-      file_url VARCHAR(500),
-      required_for_role VARCHAR(100),
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
+      CREATE TABLE IF NOT EXISTS cyber_training_plans (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        description TEXT,
+        file_url VARCHAR(500),
+        required_for_role VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      -- Migraciones retrocompatibles (garantizar TEXT para 50+ correos)
+      ALTER TABLE cyber_phishing_campaigns ALTER COLUMN target_group TYPE TEXT;
+      ALTER TABLE cyber_phishing_campaigns ALTER COLUMN subject TYPE VARCHAR(500);
+      ALTER TABLE cyber_phishing_campaigns ALTER COLUMN sender_name TYPE VARCHAR(255);
+      ALTER TABLE cyber_phishing_campaigns ALTER COLUMN sender_email TYPE VARCHAR(255);
+      ALTER TABLE cyber_phishing_events ALTER COLUMN user_email TYPE VARCHAR(255);
+    `);
+  } catch (err: any) {
+    console.error('[CYBER-DB-INIT]', err.message);
+  }
 };
 initializeCyberDb().catch(console.error);
+
+// Helper: Extraer, desduplicar y sanitizar lista de correos
+export function extractValidEmails(input: string): string[] {
+  if (!input || input.trim().toUpperCase() === 'TODOS') return [];
+  const raw = input.split(/[,;\n\r\t]+/).map(s => s.trim().toLowerCase());
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  const unique = Array.from(new Set(raw.filter(e => emailRegex.test(e))));
+  return unique;
+}
+
+// Helper: Construir plantilla HTML profesional y amigable con filtros Anti-Spam
+function buildCleanEmailHtml(bodyContent: string, trackingUrl: string, title: string): string {
+  let innerHtml = bodyContent || '';
+  const buttonHtml = `
+    <!--[if mso]>
+    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${trackingUrl}" style="height:44px;v-text-anchor:middle;width:240px;" arcsize="18%" stroke="f" fillcolor="#dc2626">
+      <w:anchorlock/>
+      <center style="color:#ffffff;font-family:sans-serif;font-size:14px;font-weight:bold;">Confirmar / Verificar Identidad</center>
+    </v:roundrect>
+    <![endif]-->
+    <a href="${trackingUrl}" target="_blank" rel="noopener noreferrer" style="background-color:#dc2626;color:#ffffff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;font-family:Arial,Helvetica,sans-serif;font-size:14px;display:inline-block;margin:16px 0;letter-spacing:0.3px;">
+      Confirmar / Verificar Identidad &rarr;
+    </a>
+  `;
+
+  if (!/<[a-z][\s\S]*>/i.test(innerHtml)) {
+    innerHtml = innerHtml.replace(/\n/g, '<br />');
+  }
+
+  if (innerHtml.includes('{{LINK_BOTON}}')) {
+    innerHtml = innerHtml.replace(/\{\{LINK_BOTON\}\}/g, buttonHtml);
+  } else {
+    innerHtml = `${innerHtml}<br><br><p style="text-align:center;">${buttonHtml}</p>`;
+  }
+
+  return `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>${title}</title>
+  <style>
+    body { margin: 0; padding: 0; background-color: #f4f6f8; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    table { border-collapse: collapse; }
+    img { border: 0; outline: none; text-decoration: none; }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f6f8;">
+  <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color:#f4f6f8;padding:24px 12px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" border="0" cellpadding="0" cellspacing="0" style="max-width:600px;background-color:#ffffff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.06);border:1px solid #e2e8f0;">
+          <!-- Header Institucional -->
+          <tr>
+            <td style="padding:20px 28px;background-color:#0f172a;border-bottom:3px solid #dc2626;">
+              <table role="presentation" width="100%" border="0">
+                <tr>
+                  <td style="color:#ffffff;font-size:16px;font-weight:bold;letter-spacing:0.5px;">
+                    🛡️ MILLA 7 &bull; SEGURIDAD DE LA INFORMACIÓN
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding:28px 28px 20px 28px;color:#334155;font-size:14px;line-height:1.6;">
+              ${innerHtml}
+            </td>
+          </tr>
+          <!-- Footer Institucional -->
+          <tr>
+            <td style="padding:16px 28px;background-color:#f8fafc;border-top:1px solid #e2e8f0;font-size:11px;color:#94a3b8;line-height:1.5;">
+              <p style="margin:0;">Este es un mensaje institucional y confidencial de concientización y seguridad de Milla 7 S.A.S. Cumplimiento estándar BASC V6-2022 / SG-SST.</p>
+              <p style="margin:4px 0 0 0;">Si recibió este correo por error, por favor notifíquelo a <a href="mailto:seguridad@millasiete.com" style="color:#64748b;text-decoration:underline;">seguridad@millasiete.com</a>.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+}
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // --- PHISHING CAMPAIGNS ---
 export const getCampaigns = async (req: Request, res: Response) => {
@@ -112,42 +212,67 @@ export const sendCampaign = async (req: Request, res: Response) => {
     const campaign = campaignRes.rows[0];
     let recipients: string[] = [];
 
-    if (campaign.target_group && campaign.target_group !== 'TODOS') {
-      recipients = campaign.target_group.split(',').map((e: string) => e.trim()).filter((e: string) => e.includes('@'));
+    if (campaign.target_group && campaign.target_group.trim().toUpperCase() !== 'TODOS') {
+      recipients = extractValidEmails(campaign.target_group);
     }
 
     if (recipients.length === 0) {
-      const usersRes = await pool.query('SELECT email FROM users WHERE status_id = \'EST-01\'');
-      recipients = usersRes.rows.map((u: any) => u.email).filter(Boolean);
+      const usersRes = await pool.query("SELECT email FROM users WHERE status_id = 'EST-01'");
+      recipients = Array.from(new Set(usersRes.rows.map((u: any) => u.email?.trim().toLowerCase()).filter((e: string) => e && e.includes('@'))));
     }
 
+    if (recipients.length === 0) {
+      return res.status(400).json({ success: false, error: 'No se encontraron destinatarios válidos para la campaña.' });
+    }
+
+    // Actualizar estado a 'SENDING'
+    await pool.query("UPDATE cyber_phishing_campaigns SET status = 'SENDING', sent_at = CURRENT_TIMESTAMP WHERE id = $1", [id]);
+
     const results: Array<{ email: string; success: boolean; messageId?: string; error?: string }> = [];
+    const baseUrl = process.env.VITE_API_URL || 'https://orbitm7.m7apps.com';
 
-    for (const email of recipients) {
-      const baseUrl = process.env.VITE_API_URL || 'https://orbitm7.m7apps.com';
+    // Envío controlado por lotes (Batching & Pacing anti-spam)
+    const BATCH_SIZE = 5;
+    const PAUSE_BETWEEN_EMAILS_MS = 600; // 600ms entre correos
+    const PAUSE_BETWEEN_BATCHES_MS = 2500; // 2.5s cada 5 correos
+
+    for (let i = 0; i < recipients.length; i++) {
+      const email = recipients[i];
       const trackingUrl = `${baseUrl}/api/cybersecurity/track/${campaign.id}/${encodeURIComponent(email)}/CLICK`;
-
-      let finalHtml = campaign.body_html || '';
-      const buttonHtml = `<a href="${trackingUrl}" style="background-color: #dc2626; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; font-family: sans-serif; display: inline-block; margin: 16px 0; shadow: 0 4px 6px rgba(0,0,0,0.1);">Confirmar / Verificar Identidad</a>`;
-
-      // Si el contenido no tiene etiquetas HTML de bloque, formatear los saltos de línea \n
-      if (!/<[a-z][\s\S]*>/i.test(finalHtml)) {
-        finalHtml = finalHtml.replace(/\n/g, '<br />');
-      }
-
-      if (finalHtml.includes('{{LINK_BOTON}}')) {
-        finalHtml = finalHtml.replace(/\{\{LINK_BOTON\}\}/g, buttonHtml);
-      } else {
-        finalHtml = `${finalHtml}<br><br><p>${buttonHtml}</p>`;
-      }
+      const finalHtml = buildCleanEmailHtml(campaign.body_html || '', trackingUrl, campaign.title || 'Seguridad Milla 7');
 
       try {
-        const sendRes = await sendEmail(email, campaign.subject, finalHtml);
-        console.log(`[CYBER-EMAIL-SUCCESS] Correo enviado a ${email}: MessageID=${sendRes?.messageId}`);
+        const sendRes = await sendEmail(
+          email,
+          campaign.subject,
+          finalHtml,
+          undefined,
+          {
+            fromName: campaign.sender_name || 'Milla Siete Seguridad TI',
+            headers: {
+              'X-Priority': '3',
+              'X-Campaign-ID': String(campaign.id),
+              'X-Mailer': 'OrbitM7-CyberEngine',
+              'Precedence': 'bulk',
+              'List-Unsubscribe': '<mailto:seguridad@millasiete.com?subject=unsubscribe>'
+            }
+          }
+        );
+        console.log(`[CYBER-EMAIL-SUCCESS] (${i + 1}/${recipients.length}) Correo enviado a ${email}: MessageID=${sendRes?.messageId}`);
         results.push({ email, success: true, messageId: sendRes?.messageId });
       } catch (mailErr: any) {
-        console.error(`[CYBER-EMAIL-ERROR] Error enviando a ${email}:`, mailErr.message);
+        console.error(`[CYBER-EMAIL-ERROR] (${i + 1}/${recipients.length}) Error enviando a ${email}:`, mailErr.message);
         results.push({ email, success: false, error: mailErr.message });
+      }
+
+      // Control de flujo anti-spam entre envíos
+      if (i < recipients.length - 1) {
+        if ((i + 1) % BATCH_SIZE === 0) {
+          console.log(`[CYBER-EMAIL-PACING] Pausa de ${PAUSE_BETWEEN_BATCHES_MS}ms tras lote de ${BATCH_SIZE} correos...`);
+          await sleep(PAUSE_BETWEEN_BATCHES_MS);
+        } else {
+          await sleep(PAUSE_BETWEEN_EMAILS_MS);
+        }
       }
     }
 
@@ -159,15 +284,20 @@ export const sendCampaign = async (req: Request, res: Response) => {
     if (failedCount > 0 && successCount === 0) {
       return res.status(500).json({
         success: false,
-        error: `Error al enviar correo: ${results[0]?.error || 'Error desconocido'}`
+        error: `Error al enviar correos: ${results[0]?.error || 'Error en servidor de correo'}`
       });
     }
 
     res.json({
       success: true,
       message: failedCount > 0
-        ? `Enviado a ${successCount} destinatario(s), pero fallaron ${failedCount}. Detalle: ${results.find(r => !r.success)?.error}`
-        : `Campaña distribuida exitosamente a ${successCount} destinatario(s).`,
+        ? `Envío controlado completado: ${successCount} entregados con éxito, ${failedCount} fallaron.`
+        : `Campaña distribuida exitosamente y de forma controlada a ${successCount} destinatario(s) sin alertas de spam.`,
+      stats: {
+        total: recipients.length,
+        delivered: successCount,
+        failed: failedCount
+      },
       results
     });
   } catch (err: any) {

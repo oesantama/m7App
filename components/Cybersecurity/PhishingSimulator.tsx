@@ -127,13 +127,27 @@ export const PhishingSimulator: React.FC<PhishingSimulatorProps> = ({ currentUse
   const [sendingCampaignId, setSendingCampaignId] = useState<number | null>(null);
 
   const handleSendCampaign = async (campaignId: number) => {
+    const camp = campaigns.find(c => c.id === campaignId);
+    const countDesc = camp?.target_group && camp.target_group !== 'TODOS'
+      ? `${camp.target_group.split(/[,;\n\r\t]+/).filter((e: string) => e.includes('@')).length} correos configurados`
+      : 'todos los colaboradores activos';
+
+    if (!confirm(`¿Deseas iniciar el envío controlado de esta jornada a ${countDesc}?\n\n🛡️ Se aplicará control de flujo anti-spam con pausas inteligentes por lotes para garantizar la entrega sin bloqueos.`)) {
+      return;
+    }
+
     setSendingCampaignId(campaignId);
+    toast.info('Iniciando Envío Controlado', {
+      description: 'Entregando correos por lotes con intervalos anti-spam para proteger la reputación del dominio...',
+      duration: 4000
+    });
+
     try {
       const data = await api.sendCyberCampaign(campaignId);
       if (data && data.success) {
         toast.success('Envío Exitoso', {
           description: data.message || 'Jornada enviada correctamente.',
-          duration: 5000
+          duration: 6000
         });
         loadCampaigns();
         if (selectedCampaignId === campaignId) {
@@ -369,17 +383,43 @@ export const PhishingSimulator: React.FC<PhishingSimulatorProps> = ({ currentUse
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Correos Destinatarios (Separados por coma)</label>
-              <input
-                type="text"
+              <div className="flex justify-between items-center mb-1">
+                <label className="block text-xs font-bold text-slate-400 uppercase">
+                  Correos Destinatarios (Separados por coma, punto y coma o salto de línea)
+                </label>
+                {(() => {
+                  if (!targetGroup || targetGroup.trim().toUpperCase() === 'TODOS') {
+                    return (
+                      <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full">
+                        👥 Envío a Todos los Usuarios Activos
+                      </span>
+                    );
+                  }
+                  const raw = targetGroup.split(/[,;\n\r\t]+/).map(s => s.trim().toLowerCase());
+                  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+                  const validCount = Array.from(new Set(raw.filter(e => emailRegex.test(e)))).length;
+                  return (
+                    <span className="text-[11px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-0.5 rounded-full">
+                      ✉️ {validCount} {validCount === 1 ? 'correo válido' : 'correos válidos detectados'}
+                    </span>
+                  );
+                })()}
+              </div>
+
+              <textarea
+                rows={3}
                 value={targetGroup}
                 onChange={(e) => setTargetGroup(e.target.value)}
-                placeholder="ejemplo@millasiete.com, usuario2@millasiete.com (o deja TODOS)"
-                className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-mono text-amber-300"
+                placeholder="Pega aquí los correos: correo1@millasiete.com, correo2@millasiete.com... (o escribe TODOS)"
+                className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-mono text-amber-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none resize-y"
               />
-              <span className="text-[11px] text-slate-500 mt-1 block">
-                Puedes agregar o quitar correos electrónicos en cualquier momento.
-              </span>
+              
+              <div className="flex items-center gap-1.5 mt-1 text-[11px] text-emerald-400/90 bg-emerald-950/30 border border-emerald-800/40 p-2 rounded-lg">
+                <Icons.Shield className="w-3.5 h-3.5 flex-shrink-0 text-emerald-400" />
+                <span>
+                  <strong>Control Anti-Spam Activo:</strong> Soporte ilimitado de correos con entrega por lotes y pausas inteligentes (pacing) para evitar que los servidores de correo lo clasifiquen como spam.
+                </span>
+              </div>
             </div>
 
             <div>
@@ -406,11 +446,11 @@ export const PhishingSimulator: React.FC<PhishingSimulatorProps> = ({ currentUse
               </div>
 
               <textarea
-                rows={10}
+                rows={8}
                 value={bodyHtml}
                 onChange={(e) => setBodyHtml(e.target.value)}
                 placeholder="Escribe el cuerpo del mensaje..."
-                className="w-full bg-slate-950 border border-slate-800 text-white p-4 rounded-xl text-xs font-mono leading-relaxed resize-y min-h-[220px]"
+                className="w-full bg-slate-950 border border-slate-800 text-white p-4 rounded-xl text-xs font-mono leading-relaxed resize-y min-h-[180px]"
               />
               <span className="text-[11px] text-slate-500 mt-1 block">
                 Usa <code>&#123;&#123;LINK_BOTON&#125;&#125;</code> para posicionar el enlace de seguimiento donde desees en tu texto.

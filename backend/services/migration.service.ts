@@ -334,8 +334,28 @@ const healSchema = async (client: any) => {
       ADD COLUMN IF NOT EXISTS sincronizado_flota_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS sincronizado_por VARCHAR(100);
     `);
+
+    // Ciberseguridad BASC: Ampliar campos de campañas de concientización para soportar 50+ correos
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS cyber_phishing_campaigns (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        sender_name VARCHAR(255),
+        sender_email VARCHAR(255),
+        subject VARCHAR(500),
+        body_html TEXT,
+        target_group TEXT,
+        status VARCHAR(50) DEFAULT 'DRAFT',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        sent_at TIMESTAMP
+      );
+      ALTER TABLE cyber_phishing_campaigns ALTER COLUMN target_group TYPE TEXT;
+      ALTER TABLE cyber_phishing_campaigns ALTER COLUMN subject TYPE VARCHAR(500);
+      ALTER TABLE cyber_phishing_campaigns ALTER COLUMN sender_name TYPE VARCHAR(255);
+      ALTER TABLE cyber_phishing_campaigns ALTER COLUMN sender_email TYPE VARCHAR(255);
+    `);
   } catch (err) {
-    console.error('[M7-DB] Error al crear validation_sources/validation_records/hv_solicitudes:', err);
+    console.error('[M7-DB] Error al crear validation_sources/validation_records/hv_solicitudes/cyber:', err);
   }
 
   // GH: Perfiles y Funciones del Cargo — carga, versionado y firma digital
