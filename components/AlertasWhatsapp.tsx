@@ -611,6 +611,11 @@ export default function AlertasWhatsapp() {
                             <span className="text-slate-300"> · {(a.destinatarios || []).filter(d => !d.enabled).length} deshabilitado(s)</span>
                           )}
                         </span>
+                        {(a.destinatarios || []).some(d => d.email) && (
+                          <span className="text-[10px] text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1 font-bold">
+                            <Mail size={9} /> {(a.destinatarios || []).filter(d => d.email).length} con correo
+                          </span>
+                        )}
                         <span className="text-[10px] text-slate-400 flex items-center gap-1 font-mono">
                           <Clock size={9} /> {cronLabel(a.cron_expression)}
                         </span>
@@ -653,20 +658,42 @@ export default function AlertasWhatsapp() {
                     {a.description && (
                       <p className="text-[11px] text-slate-500">{a.description}</p>
                     )}
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-[10px]">
-                      <div>
-                        <p className="font-black text-slate-400 uppercase mb-1">Destinatarios</p>
-                        <div className="flex flex-wrap gap-1">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 text-[10px]">
+                      {/* Destinatarios con WhatsApp y Correo */}
+                      <div className="md:col-span-5 space-y-1">
+                        <p className="font-black text-slate-400 uppercase flex items-center gap-1">
+                          <Phone size={10} className="text-slate-400" />
+                          <span>Destinatarios ({a.destinatarios?.length || 0})</span>
+                        </p>
+                        <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1">
                           {(a.destinatarios || []).map(d => (
-                            <span key={d.phone_number}
-                              className={`px-1.5 py-0.5 rounded font-mono ${d.enabled ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-400 line-through'}`}>
-                              {d.phone_number}
-                            </span>
+                            <div
+                              key={d.phone_number}
+                              className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[10px] transition-all ${
+                                d.enabled
+                                  ? 'bg-white border-slate-200 text-slate-700 shadow-2xs'
+                                  : 'bg-slate-100 border-slate-200 text-slate-400 opacity-60'
+                              }`}
+                            >
+                              <span className={`font-mono font-bold flex items-center gap-1 ${d.enabled ? 'text-green-700' : 'text-slate-400 line-through'}`}>
+                                <Phone size={9} /> {d.phone_number}
+                              </span>
+                              {d.email ? (
+                                <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-700 px-2 py-0.5 rounded text-[9px] font-semibold truncate max-w-[210px]" title={d.email}>
+                                  <Mail size={9} className="text-blue-500 flex-shrink-0" />
+                                  <span className="truncate">{d.email}</span>
+                                </span>
+                              ) : (
+                                <span className="text-slate-300 text-[9px] italic">Sin correo</span>
+                              )}
+                            </div>
                           ))}
                         </div>
                       </div>
-                      <div>
-                        <p className="font-black text-slate-400 uppercase mb-1">Clientes / Bodegas</p>
+
+                      {/* Clientes / Bodegas */}
+                      <div className="md:col-span-3 space-y-1">
+                        <p className="font-black text-slate-400 uppercase">Clientes / Bodegas</p>
                         <div className="flex flex-wrap gap-1">
                           {TIPOS_CON_CLIENTE.includes(a.tipo_evento) ? (
                             a.client_id ? (
@@ -686,17 +713,24 @@ export default function AlertasWhatsapp() {
                           )}
                         </div>
                       </div>
-                      <div>
-                        <p className="font-black text-slate-400 uppercase mb-1">Cron</p>
-                        <code className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-600">{a.cron_expression}</code>
+
+                      {/* Cron */}
+                      <div className="md:col-span-2 space-y-1">
+                        <p className="font-black text-slate-400 uppercase">Cron</p>
+                        <code className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-mono text-slate-600 inline-block">{a.cron_expression}</code>
+                        <p className="text-[9px] text-slate-400 mt-0.5">{cronLabel(a.cron_expression)}</p>
                       </div>
-                      <div>
-                        <p className="font-black text-slate-400 uppercase mb-1">Último envío</p>
-                        <p className="text-slate-600">{fmtDate(a.last_run)}</p>
-                      </div>
-                      <div>
-                        <p className="font-black text-slate-400 uppercase mb-1">Creado</p>
-                        <p className="text-slate-600">{fmtDate(a.created_at)}</p>
+
+                      {/* Último envío y Creado */}
+                      <div className="md:col-span-2 space-y-1">
+                        <div>
+                          <p className="font-black text-slate-400 uppercase">Último envío</p>
+                          <p className="text-slate-600 font-medium">{fmtDate(a.last_run)}</p>
+                        </div>
+                        <div className="pt-1">
+                          <p className="font-black text-slate-400 uppercase">Creado</p>
+                          <p className="text-slate-500">{fmtDate(a.created_at)}</p>
+                        </div>
                       </div>
                     </div>
                     <div>
