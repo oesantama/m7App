@@ -1835,6 +1835,7 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
           OR v.plate    = r.vehicle_id
         LEFT JOIN drivers drv
           ON drv.id::text = r.driver_id::text
+        WHERE ri.invoice_id IN (SELECT compound_id FROM base UNION SELECT inv_key FROM base)
         ORDER BY ri.invoice_id, ri.created_at DESC
       ),
       -- Búsqueda de placa/conductor por despacho: dispatch_assignments → assignments → vehicles
@@ -1849,6 +1850,7 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
           ON asgn.driver_id::text = da.driver_id::text
         LEFT JOIN vehicles v2   ON v2.id::text  = asgn.vehicle_id::text
         LEFT JOIN drivers  drv2 ON drv2.id::text = da.driver_id::text
+        WHERE da.invoice_id IN (SELECT compound_id FROM base UNION SELECT inv_key FROM base)
         ORDER BY da.invoice_id, da.created_at DESC
       )
       SELECT DISTINCT
@@ -1904,7 +1906,10 @@ export const getMastersuiteReport = async (req: Request, res: Response) => {
 
     res.json(result.rows);
   } catch (err: any) {
-    console.error('[M7-MASTERSUITE-ERR]', err.message);
+    console.error('[M7-MASTERSUITE-ERR]', err.code, err.message);
+    if (err.code === '57014') {
+      return res.status(504).json({ error: 'La consulta tardó demasiado. Intenta con un filtro más específico.' });
+    }
     res.status(500).json({ error: 'Error al generar informe Mastersuite' });
   }
 };

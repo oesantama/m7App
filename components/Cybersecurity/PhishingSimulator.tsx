@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Icons } from '../../constants';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
+import ConfirmModal from '../shared/ConfirmModal';
 
 interface PhishingSimulatorProps {
   currentUser?: {
@@ -29,6 +30,19 @@ export const PhishingSimulator: React.FC<PhishingSimulatorProps> = ({ currentUse
   const [subject, setSubject] = useState('[Milla Siete TI] Comunicación Oficial: Verificación de Seguridad');
   const [bodyHtml, setBodyHtml] = useState('<p>Estimado colaborador,</p><p>En cumplimiento con el estándar de ciberseguridad BASC V6-2022, le solicitamos realizar la verificación de concientización preventiva.</p><p>Por favor haga clic en el siguiente enlace para completar la actividad:</p>');
   const [targetGroup, setTargetGroup] = useState('TODOS');
+
+  // Confirmation Modals State
+  const [confirmSendCampaign, setConfirmSendCampaign] = useState<{
+    id: number;
+    title: string;
+    countDesc: string;
+    targetCount: number | 'all';
+  } | null>(null);
+
+  const [confirmDeleteCampaign, setConfirmDeleteCampaign] = useState<{
+    id: number;
+    title: string;
+  } | null>(null);
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -107,8 +121,19 @@ export const PhishingSimulator: React.FC<PhishingSimulatorProps> = ({ currentUse
     }
   };
 
-  const handleDeleteCampaign = async (campaignId: number) => {
-    if (!confirm('¿Estás seguro de eliminar esta jornada y sus registros?')) return;
+  const promptDeleteCampaign = (campaignId: number) => {
+    const camp = campaigns.find(c => c.id === campaignId);
+    setConfirmDeleteCampaign({
+      id: campaignId,
+      title: camp?.title || 'esta jornada'
+    });
+  };
+
+  const executeDeleteCampaign = async () => {
+    if (!confirmDeleteCampaign) return;
+    const campaignId = confirmDeleteCampaign.id;
+    setConfirmDeleteCampaign(null);
+
     try {
       const data = await api.deleteCyberCampaign(campaignId);
       if (data && data.success) {
@@ -126,15 +151,28 @@ export const PhishingSimulator: React.FC<PhishingSimulatorProps> = ({ currentUse
 
   const [sendingCampaignId, setSendingCampaignId] = useState<number | null>(null);
 
-  const handleSendCampaign = async (campaignId: number) => {
+  const promptSendCampaign = (campaignId: number) => {
     const camp = campaigns.find(c => c.id === campaignId);
     const countDesc = camp?.target_group && camp.target_group !== 'TODOS'
       ? `${camp.target_group.split(/[,;\n\r\t]+/).filter((e: string) => e.includes('@')).length} correos configurados`
       : 'todos los colaboradores activos';
 
-    if (!confirm(`¿Deseas iniciar el envío controlado de esta jornada a ${countDesc}?\n\n🛡️ Se aplicará control de flujo anti-spam con pausas inteligentes por lotes para garantizar la entrega sin bloqueos.`)) {
-      return;
-    }
+    const targetCount = camp?.target_group && camp.target_group !== 'TODOS'
+      ? camp.target_group.split(/[,;\n\r\t]+/).filter((e: string) => e.includes('@')).length
+      : ('all' as const);
+
+    setConfirmSendCampaign({
+      id: campaignId,
+      title: camp?.title || 'Jornada Preventiva',
+      countDesc,
+      targetCount
+    });
+  };
+
+  const executeSendCampaign = async () => {
+    if (!confirmSendCampaign) return;
+    const campaignId = confirmSendCampaign.id;
+    setConfirmSendCampaign(null);
 
     setSendingCampaignId(campaignId);
     toast.info('Iniciando Envío Controlado', {
@@ -239,7 +277,7 @@ export const PhishingSimulator: React.FC<PhishingSimulatorProps> = ({ currentUse
                       </button>
 
                       <button
-                        onClick={() => handleSendCampaign(c.id)}
+                        onClick={() => promptSendCampaign(c.id)}
                         disabled={sendingCampaignId === c.id}
                         title="Enviar / Re-enviar correos"
                         className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow-sm transition-all"
@@ -269,7 +307,7 @@ export const PhishingSimulator: React.FC<PhishingSimulatorProps> = ({ currentUse
                       </button>
 
                       <button
-                        onClick={() => handleDeleteCampaign(c.id)}
+                        onClick={() => promptDeleteCampaign(c.id)}
                         title="Eliminar jornada"
                         className="p-2 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded-lg text-xs"
                       >
@@ -468,6 +506,67 @@ export const PhishingSimulator: React.FC<PhishingSimulatorProps> = ({ currentUse
           </div>
         </div>
       )}
+
+      {/* MODAL DE CONFIRMACIÓN DE ENVÍO CONTROLADO */}
+      <ConfirmModal
+        isOpen={!!confirmSendCampaign}
+        onClose={() => setConfirmSendCampaign(null)}
+        onConfirm={executeSendCampaign}
+        title="¿Iniciar Envío Controlado?"
+        variant="emerald"
+        icon="mail"
+        badge={{
+          text: confirmSendCampaign?.targetCount === 'all' 
+            ? '👥 Destinatarios: Todos los Colaboradores' 
+            : `✉️ ${confirmSendCampaign?.targetCount} Correos Configurados`,
+          variant: confirmSendCampaign?.targetCount === 'all' ? 'blue' : 'emerald'
+        }}
+        message={
+          <div className="space-y-2 text-slate-300 text-sm">
+            <p>
+              ¿Deseas iniciar el envío controlado de la jornada{' '}
+              <strong className="text-white">"{confirmSendCampaign?.title}"</strong> a{' '}
+              <span className="text-emerald-400 font-bold">{confirmSendCampaign?.countDesc}</span>?
+            </p>
+          </div>
+        }
+        infoBox={{
+          icon: 'shield',
+          title: 'Control Anti-Spam Activo',
+          text: 'Se aplicará control de flujo anti-spam con pausas inteligentes por lotes para garantizar la entrega sin bloqueos ni afectación de reputación de dominio.',
+          variant: 'emerald'
+        }}
+        confirmText="Aceptar e Iniciar"
+        cancelText="Cancelar"
+      />
+
+      {/* MODAL DE CONFIRMACIÓN DE ELIMINACIÓN */}
+      <ConfirmModal
+        isOpen={!!confirmDeleteCampaign}
+        onClose={() => setConfirmDeleteCampaign(null)}
+        onConfirm={executeDeleteCampaign}
+        title="¿Eliminar Jornada?"
+        variant="danger"
+        icon="trash"
+        badge={{
+          text: 'Acción Permanente',
+          variant: 'rose'
+        }}
+        message={
+          <p className="text-slate-300 text-sm">
+            ¿Estás seguro de que deseas eliminar permanentemente la jornada{' '}
+            <strong className="text-white">"{confirmDeleteCampaign?.title}"</strong> y todos sus registros de trazabilidad?
+          </p>
+        }
+        infoBox={{
+          icon: 'alert',
+          title: 'Atención',
+          text: 'Esta acción borrará irreversiblemente todos los registros de interacción, clics y logs de auditoría asociados a esta campaña.',
+          variant: 'rose'
+        }}
+        confirmText="Sí, Eliminar"
+        cancelText="Cancelar"
+      />
     </div>
   );
 };
