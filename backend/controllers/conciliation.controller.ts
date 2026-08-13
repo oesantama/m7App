@@ -14,27 +14,37 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
         const { clientId, plate, from, to, docId } = req.query;
 
         const conditions: string[] = [];
+        const preConditions: string[] = [];
         const params: any[] = [];
         let p = 1;
 
         if (!docId) {
             conditions.push(`dl.plan_type ILIKE '%plan r%'`);
+            preConditions.push(`dl.plan_type ILIKE '%plan r%'`);
             // Filtrar solo documentos con facturas pendientes (HAVING sin GROUP BY no es válido en PG)
             conditions.push(`(COALESCE(inv.total_invoices, 0) - COALESCE(ic_agg.conciliadas, 0) > 0 OR COALESCE(rs_agg.pending_surcharges, 0) > 0)`);
         } else {
-            conditions.push(`dl.external_doc_id = $${p++}`);
+            conditions.push(`dl.external_doc_id = $${p}`);
+            preConditions.push(`dl.external_doc_id = $${p++}`);
             params.push(docId);
         }
 
-        if (clientId) { conditions.push(`dl.client_id = $${p++}`); params.push(clientId); }
-        if (plate)    { conditions.push(`dl.vehicle_plate ILIKE $${p++}`); params.push(`%${plate}%`); }
-        if (from)     { conditions.push(`dl.created_at >= $${p++}`); params.push(from); }
-        if (to)       { conditions.push(`dl.created_at <= $${p++}`); params.push(to); }
+        if (clientId) { conditions.push(`dl.client_id = $${p}`); preConditions.push(`dl.client_id = $${p++}`); params.push(clientId); }
+        if (plate)    { conditions.push(`dl.vehicle_plate ILIKE $${p}`); preConditions.push(`dl.vehicle_plate ILIKE $${p++}`); params.push(`%${plate}%`); }
+        if (from)     { conditions.push(`dl.created_at >= $${p}`); preConditions.push(`dl.created_at >= $${p++}`); params.push(from); }
+        if (to)       { conditions.push(`dl.created_at <= $${p}`); preConditions.push(`dl.created_at <= $${p++}`); params.push(to); }
 
         const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+        // Pre-filtro sin las condiciones que dependen de los agregados (inv/ic/rs) —
+        // acota cond_agg a solo los documentos candidatos en vez de escanear toda
+        // dispatch_assignments (mismo patrón de bug corregido en mastersuite-report).
+        const preWhere = preConditions.length ? `WHERE ${preConditions.join(' AND ')}` : '';
 
         const result = await pool.query(`
-            WITH inv_agg AS (
+            WITH candidate_docs AS (
+                SELECT dl.id FROM documents_l dl ${preWhere}
+            ),
+            inv_agg AS (
                 SELECT document_id,
                     COUNT(DISTINCT invoice) AS total_invoices
                 FROM document_items
@@ -75,6 +85,7 @@ export const getPendingConciliations = async (req: Request, res: Response) => {
                 SELECT DISTINCT ON (da.invoice_id) da.invoice_id AS doc_id, da.driver_id, u.name AS conductor_name
                 FROM dispatch_assignments da
                 LEFT JOIN users u ON u.id = da.driver_id
+                WHERE da.invoice_id IN (SELECT id FROM candidate_docs)
                 ORDER BY da.invoice_id, da.id DESC
             )
             SELECT
@@ -120,18 +131,25 @@ export const getPendingPlanNormal = async (req: Request, res: Response) => {
         const conditions: string[] = [
             `(dl.plan_type IS NULL OR dl.plan_type NOT ILIKE '%plan r%')`,
         ];
+        const preConditions: string[] = [
+            `(dl.plan_type IS NULL OR dl.plan_type NOT ILIKE '%plan r%')`,
+        ];
         const params: any[] = [];
         let p = 1;
 
-        if (clientId) { conditions.push(`dl.client_id = $${p++}`); params.push(clientId); }
-        if (from)     { conditions.push(`dl.created_at >= $${p++}`); params.push(from); }
-        if (to)       { conditions.push(`dl.created_at <= $${p++}`); params.push(to); }
+        if (clientId) { conditions.push(`dl.client_id = $${p}`); preConditions.push(`dl.client_id = $${p++}`); params.push(clientId); }
+        if (from)     { conditions.push(`dl.created_at >= $${p}`); preConditions.push(`dl.created_at >= $${p++}`); params.push(from); }
+        if (to)       { conditions.push(`dl.created_at <= $${p}`); preConditions.push(`dl.created_at <= $${p++}`); params.push(to); }
         conditions.push(`(COALESCE(inv.total_invoices, 0) > 0 AND COALESCE(inv.total_invoices, 0) - COALESCE(ic.conciliadas, 0) > 0)`);
 
         const where = `WHERE ${conditions.join(' AND ')}`;
+        const preWhere = `WHERE ${preConditions.join(' AND ')}`;
 
         const result = await pool.query(`
-            WITH inv_agg AS (
+            WITH candidate_docs AS (
+                SELECT dl.id FROM documents_l dl ${preWhere}
+            ),
+            inv_agg AS (
                 SELECT document_id, COUNT(DISTINCT invoice) AS total_invoices
                 FROM document_items
                 WHERE invoice IS NOT NULL AND invoice <> ''
@@ -146,6 +164,7 @@ export const getPendingPlanNormal = async (req: Request, res: Response) => {
                 SELECT DISTINCT ON (da.invoice_id) da.invoice_id AS doc_id, da.driver_id, u.name AS conductor_name
                 FROM dispatch_assignments da
                 LEFT JOIN users u ON u.id = da.driver_id
+                WHERE da.invoice_id IN (SELECT id FROM candidate_docs)
                 ORDER BY da.invoice_id, da.id DESC
             )
             SELECT
@@ -933,10 +952,12 @@ export const getConciliationHistory = async (req: Request, res: Response) => {
             FROM invoice_conciliations ic
             JOIN documents_l dl ON dl.id = ic.document_id
             LEFT JOIN users u ON u.id = ic.conciliado_por
-            LEFT JOIN (
-                SELECT DISTINCT ON (document_id, invoice) document_id, invoice, customer_name, city
-                FROM document_items WHERE invoice IS NOT NULL
-            ) di ON di.document_id = ic.document_id AND di.invoice = ic.invoice_number
+            LEFT JOIN LATERAL (
+                SELECT customer_name, city
+                FROM document_items di2
+                WHERE di2.document_id = ic.document_id AND di2.invoice = ic.invoice_number
+                LIMIT 1
+            ) di ON true
             WHERE ${where}
             ORDER BY ic.created_at DESC
             LIMIT 500
@@ -1657,10 +1678,12 @@ export const getPlateMovementHistory = async (req: Request, res: Response) => {
             FROM invoice_conciliations ic
             JOIN documents_l dl ON dl.id = ic.document_id
             LEFT JOIN users u ON u.id = ic.conciliado_por
-            LEFT JOIN (
-                SELECT DISTINCT ON (document_id, invoice) document_id, invoice, customer_name, city
-                FROM document_items WHERE invoice IS NOT NULL
-            ) di ON di.document_id = ic.document_id AND di.invoice = ic.invoice_number
+            LEFT JOIN LATERAL (
+                SELECT customer_name, city
+                FROM document_items di2
+                WHERE di2.document_id = ic.document_id AND di2.invoice = ic.invoice_number
+                LIMIT 1
+            ) di ON true
             WHERE ic.vehicle_plate ILIKE $1
         `, [plate]);
 
@@ -1685,10 +1708,12 @@ export const getPlateMovementHistory = async (req: Request, res: Response) => {
             FROM invoice_conciliation_reversal_logs rl
             JOIN documents_l dl ON dl.id = rl.document_id
             LEFT JOIN users u ON u.id = rl.reversed_by
-            LEFT JOIN (
-                SELECT DISTINCT ON (document_id, invoice) document_id, invoice, customer_name, city
-                FROM document_items WHERE invoice IS NOT NULL
-            ) di ON di.document_id = rl.document_id AND di.invoice = rl.invoice_number
+            LEFT JOIN LATERAL (
+                SELECT customer_name, city
+                FROM document_items di2
+                WHERE di2.document_id = rl.document_id AND di2.invoice = rl.invoice_number
+                LIMIT 1
+            ) di ON true
             WHERE rl.vehicle_plate ILIKE $1
         `, [plate]);
 

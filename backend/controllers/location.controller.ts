@@ -40,6 +40,7 @@ export const getLatestVehicleLocations = async (req: Request, res: Response) => 
                 v.plate
             FROM vehicle_locations vl
             LEFT JOIN vehicles v ON vl.vehicle_id = v.id
+            WHERE vl.updated_at > NOW() - INTERVAL '48 hours'
             ORDER BY vehicle_id, updated_at DESC
         `;
 

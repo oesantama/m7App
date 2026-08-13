@@ -26,13 +26,14 @@ export const getFleetHealth = async (req: Request, res: Response) => {
     try {
         // Obtener la última telemetría de cada vehículo
         const result = await pool.query(`
-            SELECT DISTINCT ON (vehicle_plate) 
-                vehicle_plate, 
-                timestamp, 
-                dtc_codes, 
-                fuel_level, 
-                battery_voltage 
+            SELECT DISTINCT ON (vehicle_plate)
+                vehicle_plate,
+                timestamp,
+                dtc_codes,
+                fuel_level,
+                battery_voltage
             FROM vehicle_telemetry
+            WHERE timestamp > NOW() - INTERVAL '48 hours'
             ORDER BY vehicle_plate, timestamp DESC
         `);
         
