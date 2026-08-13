@@ -2260,7 +2260,8 @@ export const uploadCumplido = async (req: Request, res: Response) => {
             if (!isSpreadsheet) {
                 if (ext === '.pdf') {
                     await new Promise<void>((resolve) => {
-                        const compressCmd = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${compressedPath}" "${tmpPath}"`;
+                        // Preservar alta resolución y nitidez (150 DPI / JPEG calidad 85) en fotos, firmas y textos de cumplidos
+                        const compressCmd = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook -dDownsampleColorImages=true -dColorImageResolution=150 -dColorImageDownsampleThreshold=1.2 -dDownsampleGrayImages=true -dGrayImageResolution=150 -dGrayImageDownsampleThreshold=1.2 -dDownsampleMonoImages=true -dMonoImageResolution=300 -dMonoImageDownsampleThreshold=1.2 -dAutoFilterColorImages=false -dColorImageFilter=/DCTEncode -dJPEGQ=85 -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${compressedPath}" "${tmpPath}"`;
                         exec(compressCmd, (err) => {
                             if (err) console.error(`[CUMPLIDOS] Error comprimiendo PDF ${file.originalname}:`, err);
                             resolve();
@@ -2268,7 +2269,7 @@ export const uploadCumplido = async (req: Request, res: Response) => {
                     });
                 } else {
                     await new Promise<void>((resolve) => {
-                        const compressCmd = `convert "${tmpPath}" -resize "2048x2048>" -quality 82 -strip "${compressedPath}"`;
+                        const compressCmd = `convert "${tmpPath}" -resize "2560x2560>" -quality 85 -strip "${compressedPath}"`;
                         exec(compressCmd, (err) => {
                             if (err) console.error(`[CUMPLIDOS] Error comprimiendo imagen ${file.originalname}:`, err);
                             resolve();
@@ -2277,7 +2278,19 @@ export const uploadCumplido = async (req: Request, res: Response) => {
                 }
             }
 
-            const finalFile = fs.existsSync(compressedPath) ? compressedPath : tmpPath;
+            let finalFile = tmpPath;
+            if (fs.existsSync(compressedPath)) {
+                try {
+                    const origSize = fs.statSync(tmpPath).size;
+                    const compSize = fs.statSync(compressedPath).size;
+                    // Solo usar el archivo comprimido si es válido y realmente redujo el peso sin degradación
+                    if (compSize > 0 && compSize < origSize) {
+                        finalFile = compressedPath;
+                    }
+                } catch {
+                    finalFile = tmpPath;
+                }
+            }
 
             // Subir a Google Drive mediante rclone copyto
             await new Promise<void>((resolve, reject) => {
@@ -2552,9 +2565,9 @@ export const appendCumplido = async (req: Request, res: Response) => {
             });
         });
 
-        // Fusionar con Ghostscript: existente primero, nuevo al final
+        // Fusionar con Ghostscript manteniendo nitidez alta (/ebook a 150 DPI y JPEG 85)
         await new Promise<void>((resolve, reject) => {
-            const cmd = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${mergedPdf}" "${existingPdf}" "${appendPdf}"`;
+            const cmd = `gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook -dDownsampleColorImages=true -dColorImageResolution=150 -dColorImageDownsampleThreshold=1.2 -dDownsampleGrayImages=true -dGrayImageResolution=150 -dGrayImageDownsampleThreshold=1.2 -dDownsampleMonoImages=true -dMonoImageResolution=300 -dMonoImageDownsampleThreshold=1.2 -dAutoFilterColorImages=false -dColorImageFilter=/DCTEncode -dJPEGQ=85 -dNOPAUSE -dQUIET -dBATCH -sOutputFile="${mergedPdf}" "${existingPdf}" "${appendPdf}"`;
             exec(cmd, (err, _o, stderr) => {
                 if (err) { console.error('[APPEND] Fusión:', stderr); reject(new Error('Error al fusionar los PDFs')); }
                 else resolve();
