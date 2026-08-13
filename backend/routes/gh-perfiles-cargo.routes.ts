@@ -5,6 +5,7 @@ import {
     listPerfiles,
     mapearCargo,
     descargarPdfReferencia,
+    descargarPdfFirmado,
     tracking,
     misPendientes,
     firmarAutenticado,
@@ -25,6 +26,7 @@ router.get('/mis-pendientes', misPendientes);
 router.get('/tracking', tracking);
 router.post('/:id/mapear', mapearCargo);
 router.get('/:id/pdf', descargarPdfReferencia);
+router.get('/firmas/:firmaId/pdf-firmado', descargarPdfFirmado);
 router.post('/firmas/:firmaId/firmar', firmarAutenticado);
 router.post('/firmas/:firmaId/generar-token', generarToken);
 

@@ -1583,6 +1583,7 @@ export const restoreSystem = async () => {
       ('PAG-54', 'CONSULTAS INVENTARIO', 'gestion-humana-consultas-inventario', 'MOD-09', 'MOD-09', 'EST-01'),
       ('PAG-55', 'MASTER INVENTARIO', 'gestion-humana-master-inventario', 'MOD-09', 'MOD-09', 'EST-01'),
       ('PAG-56', 'INVENTARIO FÍSICO', 'gestion-humana-inventario-fisico', 'MOD-09', 'MOD-09', 'EST-01'),
+      ('PAG-57', 'PERFILES DE CARGO', 'gestion-humana-perfiles-cargo', 'MOD-09', 'MOD-09', 'EST-01'),
 
       -- Configuración Maestros extra (MOD-01)
       ('PAG-42', 'CIUDADES', 'cfg-ciudades', 'MOD-01', 'MOD-01', 'EST-01'),

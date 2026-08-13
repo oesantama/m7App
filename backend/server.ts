@@ -44,6 +44,9 @@ app.set('trust proxy', 1);
 // Middlewares de Seguridad Crítica (Hallazgos QA)
 app.use(helmet({
   contentSecurityPolicy: false, // Permitir iframes y scripts en el manual si es necesario
+  frameguard: false, // Permitir que los PDFs y firmas se rendericen en iframes internos
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  crossOriginEmbedderPolicy: false,
 }));
 
 // CORS restrictivo: solo dominios conocidos en producción

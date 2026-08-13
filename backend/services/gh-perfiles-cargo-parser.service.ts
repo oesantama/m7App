@@ -2,10 +2,9 @@
  * gh-perfiles-cargo-parser.service.ts
  *
  * Convierte el Excel "FO-SG-008 Formato Perfiles y Funciones del Cargo" (una
- * pestaña por cargo) en JSON estructurado. Las 30 pestañas comparten la misma
- * estructura de encabezados romanos (I..V) y bloque de certificado — se
- * detectan por texto, no por posición de fila, porque el número de filas
- * varía entre pestañas.
+ * pestaña por cargo) en JSON estructurado. Las pestañas comparten la estructura
+ * de encabezados romanos (I..V) y bloque de certificado — se detectan por
+ * coincidencia flexible de texto para soportar variaciones en el formato.
  */
 import * as XLSX from 'xlsx';
 import crypto from 'crypto';
@@ -42,62 +41,105 @@ export interface PerfilCargoParseado {
 type Row = any[];
 
 const norm = (v: any): string => String(v ?? '').replace(/\s+/g, ' ').trim();
-const normLabel = (v: any): string => norm(v).toLowerCase().replace(/:$/, '');
+const normLabel = (v: any): string => norm(v).toLowerCase().replace(/[:.]/g, '');
 
 function findRowIndex(rows: Row[], matcher: (label: string) => boolean, from = 0): number {
-  for (let i = from; i < rows.length; i++) {
-    if (matcher(normLabel(rows[i][0]))) return i;
+  const start = Math.max(0, from);
+  for (let i = start; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !Array.isArray(row)) continue;
+    for (let c = 0; c < Math.min(row.length, 6); c++) {
+      const cell = normLabel(row[c]);
+      if (cell && matcher(cell)) return i;
+    }
   }
   return -1;
 }
 
 function findFieldValue(rows: Row[], label: string): string {
-  const idx = findRowIndex(rows, l => l.startsWith(label));
-  return idx >= 0 ? norm(rows[idx][1]) : '';
+  const target = label.toLowerCase();
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !Array.isArray(row)) continue;
+    for (let c = 0; c < row.length; c++) {
+      const cell = normLabel(row[c]);
+      if (cell && (cell.startsWith(target) || cell.includes(target))) {
+        // Buscar valor en celdas a la derecha de la misma fila
+        for (let v = c + 1; v < row.length; v++) {
+          const val = norm(row[v]);
+          if (val && !normLabel(val).startsWith(target)) return val;
+        }
+        // O en la fila siguiente en caso de celdas combinadas verticalmente
+        if (rows[i + 1] && Array.isArray(rows[i + 1])) {
+          for (let v = c; v < rows[i + 1].length; v++) {
+            const val = norm(rows[i + 1][v]);
+            if (val) return val;
+          }
+        }
+      }
+    }
+  }
+  return '';
 }
 
 function parseSheet(ws: XLSX.WorkSheet, hoja: string): PerfilCargoParseado {
   const rows: Row[] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+  if (!rows || rows.length === 0) {
+    throw new Error(`Pestaña ${hoja} está vacía`);
+  }
 
-  const iOrganigrama = findRowIndex(rows, l => l === 'i. organigrama');
-  const iCompetencias = findRowIndex(rows, l => l === 'ii. competencias');
-  const iComunicaciones = findRowIndex(rows, l => l === 'iii. comunicaciones');
-  const iResponsabilidad = findRowIndex(rows, l => l === 'iv. responsabilidad con');
-  const iFlujograma = findRowIndex(rows, l => l === 'v. flujograma de procesos');
-  const iCertificado = findRowIndex(rows, l => l.startsWith('certificado de aceptación'));
+  const iOrganigrama = findRowIndex(rows, l => l.includes('organigrama'));
+  const iCompetencias = findRowIndex(rows, l => l.includes('competencia'));
+  const iComunicaciones = findRowIndex(rows, l => l.includes('comunicaci'));
+  const iResponsabilidad = findRowIndex(rows, l => l.includes('responsabilidad'));
+  const iFlujograma = findRowIndex(rows, l => l.includes('flujograma') || (l.includes('proceso') && l.includes('actividad')));
+  const iCertificado = findRowIndex(rows, l => l.includes('certificado') || l.includes('aceptaci'));
 
   // ── Bloque superior ──────────────────────────────────────────────────
-  const cargo = findFieldValue(rows, 'nombre del cargo');
-  const fecha_actualizacion = findFieldValue(rows, 'fecha de actualización');
-  const dependencia = findFieldValue(rows, 'dependencia');
-  const jefe_inmediato = findFieldValue(rows, 'jefe inmediato');
-  const idxCritico = findRowIndex(rows, l => l.startsWith('cargo critico'));
-  const cargo_critico = idxCritico >= 0
-    ? [norm(rows[idxCritico][1]), norm(rows[idxCritico][4])].filter(Boolean).join(' · ')
-    : '';
+  const cargo = findFieldValue(rows, 'nombre del cargo') || findFieldValue(rows, 'cargo') || hoja;
+  const fecha_actualizacion = findFieldValue(rows, 'fecha de actualizaci') || findFieldValue(rows, 'fecha');
+  const dependencia = findFieldValue(rows, 'dependencia') || findFieldValue(rows, 'área') || findFieldValue(rows, 'area');
+  const jefe_inmediato = findFieldValue(rows, 'jefe inmediato') || findFieldValue(rows, 'jefe');
+  
+  const idxCritico = findRowIndex(rows, l => l.includes('cargo critico') || l.includes('cargo crítico'));
+  let cargo_critico = '';
+  if (idxCritico >= 0 && rows[idxCritico]) {
+    const r = rows[idxCritico];
+    cargo_critico = [norm(r[1]), norm(r[2]), norm(r[3]), norm(r[4])].filter(Boolean).join(' · ');
+  }
 
   // ── I. Organigrama ───────────────────────────────────────────────────
   const personas_a_cargo = findFieldValue(rows, 'personas a cargo');
-  const idxCondiciones = findRowIndex(rows, l => l.startsWith('condiciones') && l.includes('salario'));
-  const condiciones_salario = idxCondiciones >= 0 ? norm(rows[idxCondiciones][1]) : '';
-  const proposito_cargo = findFieldValue(rows, 'propósito del cargo');
-  const porque_responde = findFieldValue(rows, 'porque responde');
+  const idxCondiciones = findRowIndex(rows, l => l.includes('condiciones') || l.includes('salario'));
+  const condiciones_salario = idxCondiciones >= 0 && rows[idxCondiciones] ? norm(rows[idxCondiciones][1] || rows[idxCondiciones][2]) : '';
+  const proposito_cargo = findFieldValue(rows, 'propósito del cargo') || findFieldValue(rows, 'proposito');
+  const porque_responde = findFieldValue(rows, 'porque responde') || findFieldValue(rows, 'por que responde');
 
   // ── II. Competencias ─────────────────────────────────────────────────
-  const idxCompHead1 = findRowIndex(rows, l => l === 'formación académica', iCompetencias);
-  const idxCompHead2 = findRowIndex(rows, l => l === 'conocimientos específicos', iCompetencias);
+  const idxCompHead1 = findRowIndex(rows, l => l.includes('formación') || l.includes('formacion') || l.includes('académica') || l.includes('academica'), iCompetencias);
+  const idxCompHead2 = findRowIndex(rows, l => l.includes('conocimientos') || l.includes('específicos') || l.includes('especificos'), iCompetencias);
+  
+  const getCellSafely = (rowIdx: number, colIndices: number[]): string => {
+    if (rowIdx < 0 || rowIdx >= rows.length || !rows[rowIdx]) return '';
+    for (const c of colIndices) {
+      const val = norm(rows[rowIdx][c]);
+      if (val) return val;
+    }
+    return '';
+  };
+
   const competencias = {
-    formacion_academica: idxCompHead1 >= 0 ? norm(rows[idxCompHead1 + 1]?.[0]) : '',
-    experiencia: idxCompHead1 >= 0 ? norm(rows[idxCompHead1 + 1]?.[4]) : '',
-    conocimientos_especificos: idxCompHead2 >= 0 ? norm(rows[idxCompHead2 + 1]?.[0]) : '',
-    competencias_organizacionales: idxCompHead2 >= 0 ? norm(rows[idxCompHead2 + 1]?.[4]) : '',
+    formacion_academica: idxCompHead1 >= 0 ? getCellSafely(idxCompHead1 + 1, [0, 1, 2]) : '',
+    experiencia: idxCompHead1 >= 0 ? getCellSafely(idxCompHead1 + 1, [4, 5, 3, 2]) : '',
+    conocimientos_especificos: idxCompHead2 >= 0 ? getCellSafely(idxCompHead2 + 1, [0, 1, 2]) : '',
+    competencias_organizacionales: idxCompHead2 >= 0 ? getCellSafely(idxCompHead2 + 1, [4, 5, 3, 2]) : '',
   };
 
   // ── III. Comunicaciones ──────────────────────────────────────────────
-  const idxComHead = findRowIndex(rows, l => l === 'internas', iComunicaciones);
+  const idxComHead = findRowIndex(rows, l => l.includes('internas') || l.includes('externas'), iComunicaciones);
   const comunicaciones = {
-    internas: idxComHead >= 0 ? norm(rows[idxComHead + 1]?.[0]) : '',
-    externas: idxComHead >= 0 ? norm(rows[idxComHead + 1]?.[4]) : '',
+    internas: idxComHead >= 0 ? getCellSafely(idxComHead + 1, [0, 1, 2]) : '',
+    externas: idxComHead >= 0 ? getCellSafely(idxComHead + 1, [4, 5, 3, 2]) : '',
   };
 
   // ── IV. Responsabilidad con (pares genéricos, orden preservado) ─────
@@ -105,8 +147,9 @@ function parseSheet(ws: XLSX.WorkSheet, hoja: string): PerfilCargoParseado {
   if (iResponsabilidad >= 0) {
     const end = iFlujograma >= 0 ? iFlujograma : (iCertificado >= 0 ? iCertificado : rows.length);
     for (let i = iResponsabilidad + 1; i < end; i++) {
-      const left = norm(rows[i]?.[0]);
-      const right = norm(rows[i]?.[4]);
+      if (!rows[i] || !Array.isArray(rows[i])) continue;
+      const left = norm(rows[i][0] || rows[i][1]);
+      const right = norm(rows[i][4] || rows[i][3] || rows[i][5]);
       if (left || right) responsabilidad_con.push({ left, right });
     }
   }
@@ -118,11 +161,12 @@ function parseSheet(ws: XLSX.WorkSheet, hoja: string): PerfilCargoParseado {
     let lastProceso = '';
     let lastFuncion = '';
     for (let i = iFlujograma + 1; i < end; i++) {
-      const c0 = norm(rows[i]?.[0]);
-      const c1 = norm(rows[i]?.[1]);
-      const c2 = norm(rows[i]?.[2]);
-      if (normLabel(c0).startsWith('proceso')) continue; // fila de encabezado de tabla
-      if (!c1 && !c2) continue; // fila de título de sección, sin datos de tabla
+      if (!rows[i] || !Array.isArray(rows[i])) continue;
+      const c0 = norm(rows[i][0]);
+      const c1 = norm(rows[i][1]);
+      const c2 = norm(rows[i][2] || rows[i][3]);
+      if (normLabel(c0).includes('proceso') && normLabel(c1).includes('funci')) continue; // fila de encabezado
+      if (!c1 && !c2 && !c0) continue; // fila vacía
       if (c0) lastProceso = c0;
       if (c1) lastFuncion = c1;
       if (c2) flujograma.push({ proceso: lastProceso, funcion: lastFuncion, actividad: c2 });
@@ -130,8 +174,8 @@ function parseSheet(ws: XLSX.WorkSheet, hoja: string): PerfilCargoParseado {
   }
 
   // ── Elaborado por / Aprobado por ─────────────────────────────────────
-  const elaborado_por = findFieldValue(rows, 'elaborado por');
-  const aprobado_por = findFieldValue(rows, 'aprobado por');
+  const elaborado_por = findFieldValue(rows, 'elaborado por') || findFieldValue(rows, 'elaborado');
+  const aprobado_por = findFieldValue(rows, 'aprobado por') || findFieldValue(rows, 'aprobado');
 
   const contenido: PerfilCargoContenido = {
     cargo, fecha_actualizacion, dependencia, jefe_inmediato, cargo_critico,
@@ -146,7 +190,20 @@ function parseSheet(ws: XLSX.WorkSheet, hoja: string): PerfilCargoParseado {
 
 export function parseWorkbook(buffer: Buffer): PerfilCargoParseado[] {
   const wb = XLSX.read(buffer, { type: 'buffer' });
-  return wb.SheetNames
-    .map(name => parseSheet(wb.Sheets[name], name.trim()))
-    .filter(p => !!p.contenido.cargo);
+  const results: PerfilCargoParseado[] = [];
+
+  for (const name of wb.SheetNames) {
+    const cleanName = name.trim();
+    if (!cleanName) continue;
+    try {
+      const sheet = wb.Sheets[name];
+      if (!sheet) continue;
+      const parsed = parseSheet(sheet, cleanName);
+      if (parsed) results.push(parsed);
+    } catch (err: any) {
+      console.warn(`[FO-SG-008] Advertencia al procesar pestaña "${cleanName}": ${err.message}`);
+    }
+  }
+
+  return results;
 }

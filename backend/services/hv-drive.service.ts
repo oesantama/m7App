@@ -34,6 +34,9 @@ export function buildDrivePath(
     if (tipoEntidad === 'vehiculo') {
         return `Placas/${id}/${nombreArchivo}`;
     }
+    if (tipoTercero === 'PerfilesCargo' || tipoTercero === 'perfiles_cargo') {
+        return `PERFILES DE CARGO MILLA 7/${nombreArchivo}`;
+    }
     const TIPO_CARPETA: Record<string, string> = {
         conductor: 'Conductores',
         conductor_propietario: 'Conductores Propietarios',
@@ -136,4 +139,26 @@ export async function uploadDocument(
         return uploadBufferToDrive(buffer, drivePath);
     }
     return saveLocalFallback(buffer, drivePath);
+}
+
+export async function uploadPerfilCargoDocument(
+    buffer: Buffer,
+    cedula: string,
+    nombre: string,
+    cargo: string,
+    version: number
+): Promise<{ drivePath: string; driveLink: string; nombreArchivo: string }> {
+    const cleanCedula = sanitizeFolderName(cedula);
+    const cleanNombre = sanitizeFolderName(nombre).toUpperCase();
+    const cleanCargo = sanitizeFolderName(cargo).toUpperCase();
+    const nombreArchivo = `${cleanCedula} - ${cleanNombre} - ${cleanCargo} - v${version}.pdf`;
+    const drivePath = `PERFILES DE CARGO MILLA 7/${nombreArchivo}`;
+
+    const available = await rcloneAvailable();
+    if (available) {
+        const res = await uploadBufferToDrive(buffer, drivePath);
+        return { ...res, nombreArchivo };
+    }
+    const res = await saveLocalFallback(buffer, drivePath);
+    return { ...res, nombreArchivo };
 }

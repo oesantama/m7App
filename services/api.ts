@@ -3,21 +3,26 @@
 const isDev = import.meta.env.DEV;
 export const API_URL = import.meta.env.VITE_API_URL || (isDev ? 'http://localhost:8080/api' : '/api');
 
+export const getStoredToken = (): string => {
+  const sessionStr = localStorage.getItem('m7_user_session');
+  let token = localStorage.getItem('token') || 
+              localStorage.getItem('m7_token') || 
+              localStorage.getItem('m7_auth_token') || 
+              localStorage.getItem('m7_client_token');
+  
+  if (!token && sessionStr) {
+    try {
+      const session = JSON.parse(sessionStr);
+      token = session.token || session.accessToken || session.auth_token;
+    } catch (e) {}
+  }
+  return token || '';
+};
+
 export const fetchJson = async (url: string, options?: any) => {
   const executeFetch = async (retryCount = 0): Promise<any> => {
     // Búsqueda exhaustiva del token en múltiples llaves
-    const sessionStr = localStorage.getItem('m7_user_session');
-    let token = localStorage.getItem('token') || 
-                localStorage.getItem('m7_token') || 
-                localStorage.getItem('m7_auth_token') || 
-                localStorage.getItem('m7_client_token');
-    
-    if (!token && sessionStr) {
-      try {
-        const session = JSON.parse(sessionStr);
-        token = session.token || session.accessToken || session.auth_token;
-      } catch (e) {}
-    }
+    const token = getStoredToken();
 
     if (!token && import.meta.env.DEV) {
       console.error('[API-TOKEN-DIAGNOSTIC] ❌ Token no encontrado. Contenido de localStorage:');
@@ -916,8 +921,7 @@ export const api = {
   // Perfiles y Funciones del Cargo (FO-SG-008)
   ghPerfilesCargo: {
     uploadExcel: async (file: File) => {
-      const token = localStorage.getItem('token') || localStorage.getItem('m7_token') ||
-                   localStorage.getItem('m7_auth_token') || localStorage.getItem('m7_client_token');
+      const token = getStoredToken();
       const formData = new FormData();
       formData.append('archivo', file);
       const response = await fetch(`${API_URL}/gh-perfiles-cargo/upload`, {
@@ -943,7 +947,14 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ firma_b64 }),
     }),
-    verPdf: (perfilId: number) => `${API_URL}/gh-perfiles-cargo/${perfilId}/pdf`,
+    verPdf: (perfilId: number, customToken?: string) => {
+      const token = customToken || getStoredToken();
+      return `${API_URL}/gh-perfiles-cargo/${perfilId}/pdf${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    },
+    verPdfFirmado: (firmaId: number, customToken?: string) => {
+      const token = customToken || getStoredToken();
+      return `${API_URL}/gh-perfiles-cargo/firmas/${firmaId}/pdf-firmado${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+    },
     // Público (sin JWT) — usado por la página de firma con token
     publico: {
       verificar: (token: string, cedulaFinal: string) =>

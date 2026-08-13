@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import pool from '../config/database.js';
 import { parseWorkbook } from '../services/gh-perfiles-cargo-parser.service.js';
 import { generatePerfilCargoPdf, generatePerfilCargoFirmadoPdf } from '../services/gh-perfiles-cargo-pdf.service.js';
-import { uploadDocument } from '../services/hv-drive.service.js';
+import { uploadDocument, uploadPerfilCargoDocument } from '../services/hv-drive.service.js';
 
 interface AuthRequest extends Request {
     user?: any;
@@ -134,14 +134,19 @@ export const descargarPdfReferencia = async (req: Request, res: Response) => {
         const result = await pool.query('SELECT * FROM gh_perfiles_cargo WHERE id = $1', [id]);
         if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Perfil no encontrado' });
         const perfil = result.rows[0];
-        const filePath = path.join(process.cwd(), perfil.pdf_referencia_path);
-        if (!fs.existsSync(filePath)) return res.status(404).json({ success: false, error: 'PDF no disponible' });
+        
+        if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
+        const pdf = await generatePerfilCargoPdf(perfil.contenido_json, perfil.version || 1);
+        const fileName = `${slug(perfil.hoja_excel)}-v${perfil.version || 1}.pdf`;
+        const filePath = path.join(PDF_DIR, fileName);
+        fs.writeFileSync(filePath, pdf);
+        
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `inline; filename="${perfil.hoja_excel}.pdf"`);
-        fs.createReadStream(filePath).pipe(res);
+        res.send(pdf);
     } catch (error: any) {
         console.error('Error descargarPdfReferencia:', error);
-        res.status(500).json({ success: false, error: 'Error del servidor' });
+        res.status(500).json({ success: false, error: 'Error al obtener el PDF del perfil' });
     }
 };
 
@@ -166,19 +171,77 @@ export const tracking = async (req: Request, res: Response) => {
     }
 };
 
+// ─── GET /gh-perfiles-cargo/firmas/:firmaId/pdf-firmado (descarga PDF firmado) ───
+export const descargarPdfFirmado = async (req: Request, res: Response) => {
+    const { firmaId } = req.params;
+    try {
+        const result = await pool.query(`
+            SELECT f.*, pc.hoja_excel, pc.version, pc.contenido_json, pc.cargo_nombre
+            FROM gh_perfiles_cargo_firmas f
+            JOIN gh_perfiles_cargo pc ON pc.id = f.perfil_id
+            WHERE f.id = $1
+        `, [firmaId]);
+        if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'Firma no encontrada' });
+        const row = result.rows[0];
+        if (row.estado !== 'firmado') return res.status(400).json({ success: false, error: 'El documento aún no ha sido firmado' });
+
+        const cargoNombre = (row.cargo_nombre || row.hoja_excel || 'CARGO').trim().toUpperCase();
+        const versionNum = row.perfil_version || row.version || 1;
+        const nombreArchivo = `${row.cedula} - ${row.nombre.toUpperCase()} - ${cargoNombre} - v${versionNum}.pdf`;
+
+        // 1. Si tenemos la firma en base64, renderizar con el nuevo formato oficial FO-SG-008
+        if (row.firma_b64) {
+            const pdf = await generatePerfilCargoFirmadoPdf(row.contenido_json, versionNum, {
+                nombre: row.nombre,
+                cedula: row.cedula,
+                firma_b64: row.firma_b64,
+                firmado_at: row.firmado_at || new Date(),
+                ip: row.ip_firma || undefined,
+            });
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `inline; filename="${nombreArchivo}"`);
+            return res.send(pdf);
+        }
+
+        // 2. Si no hay b64, servir archivo local si existe
+        if (row.drive_path) {
+            const cleanPath = row.drive_path.replace(/^local:/, '');
+            const localPath = path.join(process.cwd(), 'backend', 'docs', 'hojas-vida', cleanPath);
+            if (fs.existsSync(localPath)) {
+                res.setHeader('Content-Type', 'application/pdf');
+                res.setHeader('Content-Disposition', `inline; filename="${nombreArchivo}"`);
+                return fs.createReadStream(localPath).pipe(res);
+            }
+        }
+
+        res.status(404).json({ success: false, error: 'Archivo firmado no disponible' });
+    } catch (error: any) {
+        console.error('Error descargarPdfFirmado:', error);
+        res.status(500).json({ success: false, error: 'Error al obtener el PDF firmado' });
+    }
+};
+
 // ─── GET /gh-perfiles-cargo/mis-pendientes (usuario autenticado) ────────────
 export const misPendientes = async (req: AuthRequest, res: Response) => {
-    const cedula = req.user?.document_number;
-    if (!cedula) return res.json({ success: true, data: [] });
+    const cedula = (req.user?.document_number || '').trim();
+    const email = (req.user?.email || '').trim().toLowerCase();
+    const name = (req.user?.name || '').trim().toLowerCase();
 
     try {
         const result = await pool.query(`
-            SELECT f.id, f.estado, f.firmado_at, pc.id AS perfil_id, pc.hoja_excel, pc.cargo_nombre, pc.version
+            SELECT f.id, f.estado, f.firmado_at, f.drive_link, pc.id AS perfil_id, pc.hoja_excel, pc.cargo_nombre, pc.version
             FROM gh_perfiles_cargo_firmas f
             JOIN gh_perfiles_cargo pc ON pc.id = f.perfil_id
-            WHERE TRIM(f.cedula) = TRIM($1)
+            WHERE (TRIM(f.cedula) = $1 AND $1 <> '')
+               OR f.personal_id IN (
+                   SELECT id FROM gh_personal 
+                   WHERE (TRIM(cedula) = $1 AND $1 <> '')
+                      OR (LOWER(TRIM(correo_corporativo)) = $2 AND $2 <> '')
+                      OR (LOWER(TRIM(correo_personal)) = $2 AND $2 <> '')
+                      OR (LOWER(TRIM(nombre)) = $3 AND $3 <> '')
+               )
             ORDER BY f.estado ASC, f.creado_at DESC
-        `, [cedula]);
+        `, [cedula, email, name]);
         res.json({ success: true, data: result.rows });
     } catch (error: any) {
         console.error('Error misPendientes:', error);
@@ -195,7 +258,10 @@ async function ejecutarFirma(firmaId: number, firma_b64: string, ip: string, use
     const perfilRes = await pool.query('SELECT * FROM gh_perfiles_cargo WHERE id = $1', [firma.perfil_id]);
     const perfil = perfilRes.rows[0];
 
-    const pdfBuffer = await generatePerfilCargoFirmadoPdf(perfil.contenido_json, firma.perfil_version, {
+    const versionNum = Number(firma.perfil_version || perfil.version || 1);
+    const cargoNombre = (perfil.cargo_nombre || perfil.hoja_excel || 'CARGO').trim();
+
+    const pdfBuffer = await generatePerfilCargoFirmadoPdf(perfil.contenido_json, versionNum, {
         nombre: firma.nombre,
         cedula: firma.cedula,
         firma_b64,
@@ -203,9 +269,13 @@ async function ejecutarFirma(firmaId: number, firma_b64: string, ip: string, use
         ip,
     });
 
-    const nombreArchivo = `${slug(perfil.cargo_nombre || perfil.hoja_excel)}-v${firma.perfil_version}-firmado.pdf`;
-    const identificador = `${firma.cedula} ${firma.nombre}`;
-    const { drivePath, driveLink } = await uploadDocument(pdfBuffer, 'tercero', 'PerfilesCargo', identificador, nombreArchivo);
+    const { drivePath, driveLink } = await uploadPerfilCargoDocument(
+        pdfBuffer,
+        firma.cedula,
+        firma.nombre,
+        cargoNombre,
+        versionNum
+    );
 
     await pool.query(
         `UPDATE gh_perfiles_cargo_firmas
@@ -296,7 +366,7 @@ export const publicoDocumento = async (req: Request, res: Response) => {
     const cedulaFinal = String(req.query.cedula_final || '');
     try {
         const result = await pool.query(`
-            SELECT f.cedula, f.token_expira_at, f.estado, pc.pdf_referencia_path
+            SELECT f.cedula, f.token_expira_at, f.estado, pc.id as perfil_id, pc.hoja_excel, pc.version, pc.contenido_json, pc.pdf_referencia_path
             FROM gh_perfiles_cargo_firmas f
             JOIN gh_perfiles_cargo pc ON pc.id = f.perfil_id
             WHERE f.token = $1
@@ -306,13 +376,25 @@ export const publicoDocumento = async (req: Request, res: Response) => {
         if (row.estado === 'firmado' || new Date(row.token_expira_at) < new Date() || last4(row.cedula) !== cedulaFinal.trim()) {
             return res.status(401).send('Acceso no autorizado');
         }
-        const filePath = path.join(process.cwd(), row.pdf_referencia_path);
-        if (!fs.existsSync(filePath)) return res.status(404).send('PDF no disponible');
+        
+        let filePath = row.pdf_referencia_path ? path.join(process.cwd(), row.pdf_referencia_path) : '';
+        if (!filePath || !fs.existsSync(filePath)) {
+            if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
+            const pdf = await generatePerfilCargoPdf(row.contenido_json, row.version || 1);
+            const fileName = `${slug(row.hoja_excel)}-v${row.version || 1}.pdf`;
+            filePath = path.join(PDF_DIR, fileName);
+            fs.writeFileSync(filePath, pdf);
+            await pool.query('UPDATE gh_perfiles_cargo SET pdf_referencia_path = $1 WHERE id = $2', [
+                `backend/docs/pdf/perfiles-cargo/${fileName}`,
+                row.perfil_id
+            ]);
+        }
         res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${row.hoja_excel}.pdf"`);
         fs.createReadStream(filePath).pipe(res);
     } catch (error: any) {
         console.error('Error publicoDocumento:', error);
-        res.status(500).send('Error del servidor');
+        res.status(500).send('Error al obtener el documento');
     }
 };
 
