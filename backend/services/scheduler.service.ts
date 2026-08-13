@@ -3,6 +3,7 @@ import pool from '../config/database.js';
 import { syncDriveCumplidos } from './drive-gemini.service.js';
 import { scrapeTransportandoReports } from './scraper.service.js';
 import { whatsappCronRunner } from './whatsapp-cron.service.js';
+import { runDailyHealthReport } from './health-report.service.js';
 
 /**
  * Retrocede N días hábiles (lunes-viernes) desde una fecha dada.
@@ -419,6 +420,21 @@ export const initScheduler = () => {
     }, { timezone: 'America/Bogota' });
 
     console.log('[M7-SCHEDULER] Keep-alive programado: cada 10 minutos (ping BD + monitor memoria)');
+
+    // Informe Diario de Salud: envía diagnóstico de infraestructura (pool BD, memoria,
+    // queries lentas, tamaño de tablas críticas) al correo del director de TI.
+    // Solo diagnostica y sugiere — nunca modifica código ni despliega automáticamente.
+    cron.schedule('0 6 * * *', async () => {
+        console.log('[M7-SCHEDULER] Ejecutando Informe Diario de Salud...');
+        await executeWithCronLog('Informe_Diario_Salud', async () => {
+            const logs = await runDailyHealthReport();
+            console.log('[M7-SCHEDULER] Logs Informe Diario de Salud:', logs.join(' | '));
+            return logs;
+        });
+    }, {
+        timezone: 'America/Bogota'
+    });
+    console.log('[M7-SCHEDULER] Tarea "Informe Diario de Salud" programada: Diariamente 06:00 AM');
 };
 
 // --- CRON MANUAL EXPORTS FOR ADMIN PANEL ---
