@@ -37,6 +37,13 @@ interface TrackingRow {
   drive_link?: string;
 }
 
+interface UploadSummary {
+  total_procesadas?: number;
+  creados: string[];
+  actualizados: string[];
+  sin_cambios: string[];
+}
+
 const PerfilesCargo: React.FC<{ user: User }> = ({ user }) => {
   const [tab, setTab] = useState<'mis-documentos' | 'administracion'>('mis-documentos');
 
@@ -199,7 +206,7 @@ const MisDocumentos: React.FC<{ user: User }> = ({ user }) => {
 };
 
 // ─────────────────────────────────────────────────────────────────────────
-// Modal de lectura + firma (reutilizable)
+// Modal de lectura + firma
 // ─────────────────────────────────────────────────────────────────────────
 export const FirmaModal: React.FC<{
   titulo: string;
@@ -280,6 +287,9 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
   const [cargos, setCargos] = useState<{ id: number; nombre: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadFileName, setUploadFileName] = useState('');
+  const [uploadSummary, setUploadSummary] = useState<UploadSummary | null>(null);
+
   const [tracking, setTracking] = useState<TrackingRow[]>([]);
   const [linkGenerado, setLinkGenerado] = useState<{ perfil: string; nombre: string; link: string } | null>(null);
 
@@ -311,13 +321,13 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
 
   const handleUpload = async (file: File) => {
     setUploading(true);
+    setUploadFileName(file.name);
     try {
       const res = await api.ghPerfilesCargo.uploadExcel(file);
-      const { creados, actualizados, sin_cambios } = res.data;
-      toast.success(`${creados.length} creados, ${actualizados.length} nuevas versiones, ${sin_cambios.length} sin cambios`);
+      setUploadSummary(res.data);
       load();
     } catch (err: any) {
-      toast.error(err.message || 'Error al cargar el Excel');
+      toast.error(err.message || 'Error al procesar el Excel');
     } finally {
       setUploading(false);
     }
@@ -412,12 +422,144 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
           </div>
           <label className="inline-flex items-center justify-center gap-2 h-11 px-6 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all cursor-pointer shadow-md active:scale-95 shrink-0">
             <Icons.Upload className="w-4 h-4" />
-            {uploading ? 'Procesando archivo...' : 'Seleccionar archivo .xlsx'}
+            Seleccionar archivo .xlsx
             <input type="file" accept=".xlsx,.xls" className="hidden" disabled={uploading}
               onChange={e => e.target.files?.[0] && handleUpload(e.target.files[0])} />
           </label>
         </div>
       </div>
+
+      {/* MODAL DE PROCESAMIENTO / LOADING */}
+      {uploading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+              <div className="w-20 h-20 border-4 border-emerald-500/20 border-t-emerald-600 rounded-full animate-spin" />
+              <Icons.FileText className="w-8 h-8 text-emerald-600 absolute" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Procesando Libro Excel</h3>
+              <p className="text-xs text-slate-500 font-semibold mt-1">Archivo: <b className="text-slate-800">{uploadFileName}</b></p>
+            </div>
+            <div className="bg-slate-50 rounded-2xl p-4 text-left text-xs text-slate-600 space-y-2 border border-slate-100">
+              <div className="flex items-center gap-2 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Leyendo pestañas y organigramas...</span>
+              </div>
+              <div className="flex items-center gap-2 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Extrayendo competencias y flujogramas...</span>
+              </div>
+              <div className="flex items-center gap-2 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>Calculando versiones y verificando cambios...</span>
+              </div>
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Por favor no cierres esta ventana</p>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE RESULTADOS / DIAGNÓSTICO DE CARGA */}
+      {uploadSummary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 md:p-8 max-w-2xl w-full shadow-2xl space-y-6 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-600">Diagnóstico de Procesamiento</p>
+                <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Resultado de Carga del Excel</h3>
+              </div>
+              <button
+                onClick={() => setUploadSummary(null)}
+                className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors text-slate-500"
+              >
+                <Icons.X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Tarjetas resumen */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-center">
+                <p className="text-[10px] font-black text-emerald-700 uppercase tracking-wider">Nuevos Creados</p>
+                <p className="text-2xl font-black text-emerald-700 mt-1">{uploadSummary.creados.length}</p>
+                <p className="text-[9px] text-emerald-600 font-semibold mt-0.5">Versión 1</p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4 text-center">
+                <p className="text-[10px] font-black text-blue-700 uppercase tracking-wider">Actualizados</p>
+                <p className="text-2xl font-black text-blue-700 mt-1">{uploadSummary.actualizados.length}</p>
+                <p className="text-[9px] text-blue-600 font-semibold mt-0.5">Nueva versión</p>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center">
+                <p className="text-[10px] font-black text-slate-600 uppercase tracking-wider">Sin Cambios</p>
+                <p className="text-2xl font-black text-slate-700 mt-1">{uploadSummary.sin_cambios.length}</p>
+                <p className="text-[9px] text-slate-400 font-semibold mt-0.5">Misma versión</p>
+              </div>
+            </div>
+
+            {/* Listado detallado deslizable */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs">
+              {uploadSummary.creados.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="font-black text-emerald-800 uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    Perfiles Creados ({uploadSummary.creados.length}):
+                  </p>
+                  <div className="bg-emerald-50/50 rounded-xl p-3 border border-emerald-100 flex flex-wrap gap-1.5">
+                    {uploadSummary.creados.map((c, i) => (
+                      <span key={i} className="px-2.5 py-1 bg-white border border-emerald-200 rounded-lg text-[10px] font-bold text-emerald-800 uppercase shadow-2xs">
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {uploadSummary.actualizados.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="font-black text-blue-800 uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    Perfiles Actualizados con Nueva Versión ({uploadSummary.actualizados.length}):
+                  </p>
+                  <div className="bg-blue-50/50 rounded-xl p-3 border border-blue-100 flex flex-wrap gap-1.5">
+                    {uploadSummary.actualizados.map((c, i) => (
+                      <span key={i} className="px-2.5 py-1 bg-white border border-blue-200 rounded-lg text-[10px] font-bold text-blue-800 uppercase shadow-2xs">
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {uploadSummary.sin_cambios.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="font-black text-slate-600 uppercase text-[10px] tracking-wider flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-slate-400" />
+                    Perfiles Sin Cambios ({uploadSummary.sin_cambios.length}):
+                  </p>
+                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-200 flex flex-wrap gap-1.5">
+                    {uploadSummary.sin_cambios.map((c, i) => (
+                      <span key={i} className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-semibold text-slate-600 uppercase">
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setUploadSummary(null)}
+                className="h-11 px-8 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all shadow-md active:scale-95"
+              >
+                Aceptar y Ver Perfiles
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabla 1: Perfiles Cargados */}
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">

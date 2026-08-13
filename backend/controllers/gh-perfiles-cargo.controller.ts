@@ -25,7 +25,12 @@ export const uploadExcel = async (req: AuthRequest, res: Response) => {
     try {
         const perfiles = parseWorkbook(req.file.buffer);
         const actor = req.user?.email || 'desconocido';
-        const resumen = { creados: [] as string[], actualizados: [] as string[], sin_cambios: [] as string[] };
+        const resumen = {
+            total_procesadas: perfiles.length,
+            creados: [] as string[],
+            actualizados: [] as string[],
+            sin_cambios: [] as string[],
+        };
 
         for (const p of perfiles) {
             const existing = await pool.query(

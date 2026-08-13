@@ -14,10 +14,109 @@ interface MasterModuleProps {
   user: User;
 }
 
+// Descripción breve de qué hace cada página, para la matriz de permisos.
+// Clave = route de la página en la tabla `pages`.
+const PAGE_DESCRIPTIONS: Record<string, string> = {
+  // Administración
+  'cybersecurity': 'Monitoreo de accesos, alertas y auditoría de seguridad del sistema.',
+  'admin-db': 'Consulta y edición directa de tablas de la base de datos (uso técnico).',
+  // Centro de Formación
+  'capacitaciones': 'Programación y seguimiento de cursos y talleres para el personal.',
+  'training-ops': 'Registro de asistencia y avance de las capacitaciones activas.',
+  'noticias-avisos': 'Publicación de noticias y avisos internos para todo el personal.',
+  // Configuración Maestros
+  'aprobar-firma': 'Aprobación de firmas digitales pendientes de validación.',
+  'inventory/items': 'Catálogo maestro de artículos: SKU, unidades y categorías.',
+  'masterCategorias': 'Categorías usadas para clasificar los artículos del inventario.',
+  'cfg-ciudades': 'Listado maestro de ciudades usadas en direcciones y rutas.',
+  'masterClientes': 'Clientes corporativos registrados en el sistema.',
+  'masterEstados': 'Estados globales (activo, pendiente, etc.) usados en todos los módulos.',
+  'firmas': 'Firmas digitales registradas de conductores y responsables.',
+  'masterMarcas': 'Marcas comerciales asociadas a vehículos y artículos.',
+  'masterNotificaciones': 'Correos y canales configurados para recibir alertas del sistema.',
+  'prov-clientes': 'Relación entre proveedores y los clientes que atienden.',
+  'masterTipoDocumento': 'Tipos de documento de identidad disponibles (CC, NIT, etc.).',
+  'masterTipoNotificacion': 'Grupos de alerta que agrupan a los destinatarios de notificaciones.',
+  'masterTiposVehiculo': 'Tipos de vehículo disponibles para la flota.',
+  'masterUnidadMedida': 'Unidades de medida usadas en artículos e inventario (UND, KG, etc.).',
+  // Gerencia
+  'informes-flota': 'Informes ejecutivos sobre el desempeño y uso de la flota.',
+  'informes-gerenciales': 'Reportes gerenciales consolidados de operación logística.',
+  // Gestión Ajover
+  'auditoria-factura': 'Auditoría de facturas frente a lo entregado y conciliado.',
+  'conciliacion': 'Conciliación de facturas: pagos, devoluciones y sobrecostos.',
+  'consulta-facturas': 'Trazabilidad de facturas: origen, destino y estado de entrega.',
+  'consulta-inventario': 'Consulta del inventario disponible por cliente/bodega.',
+  'dashboard-ajover': 'Panel de indicadores operativos del cliente Ajover.',
+  'despacho': 'Asignación de conductor/vehículo y control del despacho logístico.',
+  'devoluciones-bodega': 'Registro de devoluciones de mercancía a bodega.',
+  'documentos': 'Gestión de documentos de carga (Documentos L) y sus ítems.',
+  'informe-mastersuite': 'Cruce de información con el sistema externo Mastersuite.',
+  'rutas': 'Planificador de rutas de reparto (optimización de entregas).',
+  'recibido': 'Registro de recibido de material contra el documento de carga.',
+  'recibido-manual': 'Registro manual de recibido cuando no aplica el flujo automático.',
+  'salida-proveedor': 'Registro de salida de mercancía hacia proveedores.',
+  // Gestión BASC
+  'basc/auditor-ai': 'Auditoría asistida por IA de los hallazgos y evidencias BASC.',
+  'basc/dashboard': 'Panel de indicadores del programa de cumplimiento BASC.',
+  'basc/drive-sync': 'Sincronización de evidencias y documentos BASC con Google Drive.',
+  'basc/reportes': 'Generación de reportes de cumplimiento y auditoría BASC.',
+  // Gestión Documentos Drive
+  'cumplidos': 'Documentos de cumplido subidos y sincronizados con Google Drive.',
+  'informe-dashboard-drive': 'Panel de seguimiento de subida de documentos a Drive.',
+  'operaciones-flota-manual': 'Registro manual de operaciones de flota no automatizadas.',
+  // Gestión Grupo Inter
+  'grupo-inter-ops': 'Operación logística del Grupo Inter (registro y seguimiento).',
+  // Gestión Humana
+  'gestion-humana-asignacion-devolucion': 'Asignación y devolución de dotación/equipos al personal.',
+  'gestion-humana-consultas-inventario': 'Consulta del inventario de dotación y equipos por empleado.',
+  'gestion-humana-entregas-salidas': 'Registro de entregas y salidas de dotación al personal.',
+  'gestion-humana-inventario-fisico': 'Toma de inventario físico de dotación y equipos.',
+  'gestion-humana-master-inventario': 'Maestro de artículos de dotación gestionados por Gestión Humana.',
+  'gestion-humana-miscelaneos': 'Trámites varios de Gestión Humana no cubiertos en otras páginas.',
+  'gestion-humana-perfiles-cargo': 'Perfiles de cargo: funciones, requisitos y competencias por rol.',
+  'gestion-humana-personal': 'Ficha y datos del personal vinculado a la empresa.',
+  'gestion-humana-visitas': 'Registro de visitas e ingresos de terceros a las instalaciones.',
+  // Gestión TI
+  'it-inventarios-activos': 'Inventario de equipos de cómputo (PC/laptops) asignados al personal.',
+  // Gestión Transporte
+  'vinculo': 'Asignación de conductores a vehículos de la flota.',
+  'formatos-transportes': 'Formatos y plantillas operativas para el área de transporte.',
+  'flotas': 'Gestión de la flota: vehículos, documentos y vigencias.',
+  // Hojas de Vida
+  'hojas-vida': 'Hojas de vida del personal y su documentación asociada.',
+  'validador-documentos': 'Validación de vigencia de documentos legales del personal/flota.',
+  // M7 Intelligence
+  'executive-dashboard': 'Dashboard ejecutivo con indicadores clave (BI) de toda la operación.',
+  'gamification': 'Reconocimientos e indicadores de desempeño gamificados del equipo.',
+  'chatbot': 'Asistente conversacional (IA) de soporte a los usuarios.',
+  'helpdesk': 'Mesa de ayuda: manuales de usuario generados automáticamente.',
+  // Operación Jhon Uribe
+  'citas-despacho-carga': 'Programación de citas, despacho y carga para esta operación.',
+  'maestras-dogama': 'Datos maestros usados por la operación Dogama.',
+  // Operación Éxito
+  'fletes-conciliacion': 'Conciliación de fletes por intermediación para Operación Éxito.',
+  'validacion-conciliaciones': 'Validación de conciliaciones antes de su cierre definitivo.',
+  // Seguridad & Acceso
+  'alertas-whatsapp': 'Configuración de alertas automáticas enviadas por WhatsApp.',
+  'whatsapp-status': 'Estado de la conexión del sistema con WhatsApp (Evolution API).',
+  'modules': 'Módulos del sistema que agrupan las páginas del menú.',
+  'masterPermisosRol': 'Matriz de permisos por rol (qué puede ver/hacer cada rol).',
+  'masterPermisosUsuario': 'Matriz de permisos individual, sobrescribe los del rol del usuario.',
+  'pages': 'Páginas web del sistema y el módulo/ruta al que pertenecen.',
+  'roles': 'Roles operativos disponibles para asignar a los usuarios.',
+  'users': 'Usuarios del sistema: datos, rol y estado de acceso.',
+};
+
+const getPageDescription = (route?: string, moduleName?: string): string =>
+  (route && PAGE_DESCRIPTIONS[route])
+    || (moduleName ? `Página de gestión del módulo ${moduleName}.` : 'Sin descripción disponible.');
+
 const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit }) => {
   const { allMasterData, setAllMasterData, updateMasterCategory } = useAppStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [permissionSearch, setPermissionSearch] = useState(''); // NEW STATE
+  const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
   const [userClientSearch, setUserClientSearch] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<MasterRecord | null>(null);
@@ -445,6 +544,259 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     actions.forEach(a => { next[`page_${pageId}_${a}`] = targetState; });
     setFormData(next);
   };
+
+  // Páginas visibles (según el buscador) agrupadas por módulo, para la matriz de permisos.
+  const groupedPermissionPages = useMemo(() => {
+    const groups = new Map<string, { module: any; pages: any[] }>();
+    filteredPages.forEach(p => {
+      const modId = p.parentId || p.module_id || 'SIN-MODULO';
+      if (!groups.has(modId)) {
+        const mod = modules.find(m => m.id === modId);
+        groups.set(modId, { module: mod || { id: modId, name: 'Sin módulo asignado', iconClass: 'HelpCircle' }, pages: [] });
+      }
+      groups.get(modId)!.pages.push(p);
+    });
+    return Array.from(groups.values()).sort((a, b) => (a.module.name || '').localeCompare(b.module.name || ''));
+  }, [filteredPages, modules]);
+
+  const isModuleFullyChecked = (modulePages: any[]) => {
+    const actions = ['view', 'create', 'edit', 'delete', 'active'];
+    return modulePages.length > 0 && modulePages.every(p => actions.every(a => !!formData[`page_${p.id}_${a}`]));
+  };
+
+  const toggleModulePerms = (modulePages: any[]) => {
+    const actions = ['view', 'create', 'edit', 'delete', 'active'];
+    const targetState = !isModuleFullyChecked(modulePages);
+    const next = { ...formData };
+    modulePages.forEach(p => actions.forEach(a => { next[`page_${p.id}_${a}`] = targetState; }));
+    setFormData(next);
+  };
+
+  const toggleModuleCollapse = (modId: string) => {
+    setCollapsedModules(prev => ({ ...prev, [modId]: !prev[modId] }));
+  };
+
+  const expandAllModules = () => setCollapsedModules({});
+
+  const collapseAllModules = () => {
+    const next: Record<string, boolean> = {};
+    groupedPermissionPages.forEach(g => { next[g.module.id] = true; });
+    setCollapsedModules(next);
+  };
+
+  // Tabla de matriz de permisos agrupada por módulo, con descripción por página.
+  // Compartida entre Permisos por Usuario y Permisos por Rol.
+  const renderPermissionsMatrix = (title: string) => (
+    <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden flex flex-col">
+      {/* Header Bar */}
+      <div className="p-5 md:p-6 bg-slate-900 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <h4 className="text-white font-black text-sm md:text-base uppercase tracking-wider">{title}</h4>
+          </div>
+          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+            Configuración de permisos y accesos por módulo y página del sistema OrbitM7
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={expandAllModules}
+            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold text-[9px] uppercase tracking-wider transition-all border border-slate-700 flex items-center gap-1.5 active:scale-95"
+          >
+            <Icons.ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+            Expandir todo
+          </button>
+
+          <button
+            type="button"
+            onClick={collapseAllModules}
+            className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold text-[9px] uppercase tracking-wider transition-all border border-slate-700 flex items-center gap-1.5 active:scale-95"
+          >
+            <Icons.ChevronUp className="w-3.5 h-3.5 text-amber-400" />
+            Colapsar todo
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleAllPerms}
+            className={`${
+              isAllPermsChecked
+                ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+            } px-5 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider shadow-lg transition-all active:scale-95`}
+          >
+            {isAllPermsChecked ? 'Quitar Todo' : 'Seleccionar Todo'}
+          </button>
+        </div>
+      </div>
+
+      {/* Filter / Search Bar */}
+      <div className="px-5 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-4">
+        <div className="relative flex-1">
+          <Icons.Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Buscar páginas o módulos por nombre o ruta..."
+            value={permissionSearch}
+            onChange={(e) => setPermissionSearch(e.target.value)}
+            className="w-full bg-white border border-slate-200 text-slate-800 pl-10 pr-4 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wide focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 transition-all placeholder:text-slate-400 shadow-2xs"
+          />
+        </div>
+        <div className="text-[10px] font-black uppercase text-slate-400 whitespace-nowrap hidden md:block">
+          {groupedPermissionPages.length} módulos · {filteredPages.length} páginas
+        </div>
+      </div>
+
+      {/* Matrix Table */}
+      <div className="overflow-x-auto max-h-[calc(96vh-320px)] custom-scrollbar bg-slate-50/50">
+        <table className="w-full text-left text-xs border-collapse">
+          <thead className="bg-slate-100/95 backdrop-blur text-slate-600 font-black uppercase tracking-wider sticky top-0 z-20 border-b border-slate-200 shadow-2xs">
+            <tr>
+              <th className="p-4 pl-6 bg-slate-100/95">Página / Funcionalidad</th>
+              {['VER (VIEW)', 'CREAR (CREATE)', 'EDITAR (EDIT)', 'BORRAR (DELETE)', 'ACTIVO (ACTIVE)'].map(a => (
+                <th key={a} className="p-4 text-center bg-slate-100/95 text-[10px]">
+                  {a}
+                </th>
+              ))}
+              <th className="p-4 pr-6 text-center bg-slate-100/95 text-[10px]">Fila</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200/80">
+            {groupedPermissionPages.length === 0 && (
+              <tr>
+                <td colSpan={7} className="p-12 text-center text-slate-400 font-bold uppercase text-xs">
+                  No se encontraron páginas con ese filtro de búsqueda.
+                </td>
+              </tr>
+            )}
+            {groupedPermissionPages.map(({ module: mod, pages: modPages }) => {
+              const ModIcon = (Icons as any)[mod.iconClass] || Icons.Package;
+              const moduleChecked = isModuleFullyChecked(modPages);
+              const isCollapsed = !!collapsedModules[mod.id];
+              const activePermsCount = modPages.reduce((acc, p) => {
+                const acts = ['view', 'create', 'edit', 'delete', 'active'];
+                return acc + acts.filter(a => !!formData[`page_${p.id}_${a}`]).length;
+              }, 0);
+              const totalPermsCount = modPages.length * 5;
+
+              return (
+                <React.Fragment key={mod.id}>
+                  {/* Fila Encabezado de Módulo Destacado */}
+                  <tr className="bg-slate-800 text-white sticky z-10">
+                    <td colSpan={7} className="px-5 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div
+                          onClick={() => toggleModuleCollapse(mod.id)}
+                          className="flex items-center gap-3 cursor-pointer select-none group min-w-0"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-white/10 group-hover:bg-emerald-500/20 text-emerald-400 flex items-center justify-center transition-colors">
+                            {isCollapsed ? (
+                              <Icons.ChevronRight className="w-4 h-4" />
+                            ) : (
+                              <Icons.ChevronDown className="w-4 h-4" />
+                            )}
+                          </div>
+
+                          <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center">
+                            <ModIcon className="w-4 h-4" />
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-black text-xs md:text-sm uppercase tracking-wider text-white group-hover:text-emerald-400 transition-colors">
+                              {mod.name}
+                            </span>
+                            <span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-white/10 text-slate-300">
+                              {modPages.length} {modPages.length === 1 ? 'página' : 'páginas'}
+                            </span>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold ${activePermsCount > 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-white/5 text-slate-400'}`}>
+                              {activePermsCount}/{totalPermsCount} permisos activos
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => toggleModulePerms(modPages)}
+                            className={`text-[9px] font-black uppercase tracking-wider px-3.5 py-1.5 rounded-xl transition-all shadow-sm ${
+                              moduleChecked
+                                ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/30'
+                                : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 border border-emerald-500/30'
+                            }`}
+                          >
+                            {moduleChecked ? '✕ Desmarcar módulo' : '✓ Marcar módulo'}
+                          </button>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+
+                  {/* Filas de Páginas Hijas (cuando no está colapsado) */}
+                  {!isCollapsed && modPages.map((p, pageIdx) => (
+                    <tr
+                      key={p.id}
+                      className={`hover:bg-emerald-50/60 transition-colors align-top ${
+                        pageIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'
+                      }`}
+                    >
+                      <td className="p-4 pl-8 max-w-sm">
+                        <div className="flex items-start gap-2.5">
+                          <span className="text-slate-300 select-none mt-0.5">└</span>
+                          <div>
+                            <p className="text-slate-900 font-black text-xs uppercase tracking-tight">
+                              {p.name}
+                            </p>
+                            <p className="text-slate-500 font-semibold normal-case text-[10px] mt-0.5 leading-snug">
+                              {getPageDescription(p.route, mod.name)}
+                            </p>
+                            {p.route && (
+                              <span className="inline-block mt-1 text-[9px] font-mono text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 font-bold">
+                                /{p.route}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+
+                      {['view', 'create', 'edit', 'delete', 'active'].map(a => {
+                        const isChecked = !!formData[`page_${p.id}_${a}`];
+                        return (
+                          <td key={a} className="p-4 text-center align-middle">
+                            <label className="inline-flex items-center justify-center cursor-pointer p-1 rounded-xl hover:bg-slate-200/50 transition-all">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={e => setFormData({ ...formData, [`page_${p.id}_${a}`]: e.target.checked })}
+                                className="w-5 h-5 rounded-lg border-2 border-slate-300 text-emerald-600 focus:ring-emerald-500/20 transition-all cursor-pointer accent-emerald-600"
+                              />
+                            </label>
+                          </td>
+                        );
+                      })}
+
+                      <td className="p-4 pr-6 text-center align-middle">
+                        <button
+                          type="button"
+                          onClick={() => togglePageRow(p.id)}
+                          title="Alternar toda la fila"
+                          className="p-2 rounded-xl bg-slate-100 hover:bg-emerald-600 text-slate-500 hover:text-white transition-all shadow-2xs active:scale-95"
+                        >
+                          <Icons.Check className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </React.Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 
   // --- LÓGICA DE CAMBIO DE ROL (USUARIOS) ---
   const handleRoleChangeIntent = (newRoleId: string) => {
@@ -1480,51 +1832,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                 </div>
              </div>
 
-            <div className="bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl">
-              <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
-                <h4 className="text-white font-black text-xs uppercase tracking-widest leading-none">Matriz M7 de Usuario</h4>
-                <button type="button" onClick={toggleAllPerms} className={`${isAllPermsChecked ? 'bg-red-600' : 'bg-emerald-500'} text-white px-8 py-2 rounded-xl font-black text-[10px] uppercase shadow-lg hover:opacity-80 transition-all`}>
-                  {isAllPermsChecked ? 'QUITAR TODO' : 'SELECCIONAR TODO'}
-                </button>
-              </div>
-              {/* SEARCH INPUT ADDITION */}
-              <div className="px-6 py-3 border-b border-white/5 bg-slate-900/50">
-                  <div className="relative">
-                      <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
-                      <input
-                          type="text"
-                          placeholder="FILTRAR PÁGINAS..."
-                          value={permissionSearch}
-                          onChange={(e) => setPermissionSearch(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 text-white pl-9 pr-4 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider focus:outline-none focus:border-emerald-500 transition-all placeholder:text-slate-600"
-                      />
-                  </div>
-              </div>
-              <div className="overflow-x-auto max-h-[450px] custom-scrollbar">
-                <table className="w-full text-left text-[10px]">
-                  <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest sticky top-0 z-20">
-                    <tr><th className="p-4 bg-slate-900">Página</th>{['VIEW', 'CREATE', 'EDIT', 'DELETE', 'ACTIVE'].map(a => <th key={a} className="p-4 text-center bg-slate-900">{a}</th>)}<th className="p-4 text-center bg-slate-900">Fila</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {filteredPages.map(p => (
-                      <tr key={p.id} className="hover:bg-white/5 transition-all">
-                        <td className="p-4 text-white font-bold uppercase">{p.name}</td>
-                        {['view', 'create', 'edit', 'delete', 'active'].map(a => (
-                          <td key={a} className="p-4 text-center">
-                            <input type="checkbox" checked={!!formData[`page_${p.id}_${a}`]} onChange={e => setFormData({ ...formData, [`page_${p.id}_${a}`]: e.target.checked })} className="w-5 h-5 rounded-lg border-2 border-white/10 bg-transparent checked:bg-emerald-500 checked:border-emerald-500 transition-all cursor-pointer appearance-none flex items-center justify-center after:content-['✓'] after:text-white after:font-black after:hidden checked:after:block" />
-                          </td>
-                        ))}
-                        <td className="p-4 text-center">
-                          <button type="button" onClick={() => togglePageRow(p.id)} className="p-2 rounded-lg bg-white/5 text-slate-400 hover:text-emerald-500 transition-all">
-                            <Icons.Check />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            {renderPermissionsMatrix('Matriz M7 de Usuario')}
             {renderStatusField()}
           </div>
         );
@@ -1539,51 +1847,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                 {availableRoles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </div>
-            <div className="bg-slate-900 rounded-[2.5rem] overflow-hidden shadow-2xl">
-              <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
-                <h4 className="text-white font-black text-xs uppercase tracking-widest leading-none">Matriz M7</h4>
-                <button type="button" onClick={toggleAllPerms} className={`${isAllPermsChecked ? 'bg-red-600' : 'bg-emerald-500'} text-white px-8 py-2 rounded-xl font-black text-[10px] uppercase shadow-lg hover:opacity-80 transition-all`}>
-                  {isAllPermsChecked ? 'QUITAR TODO' : 'SELECCIONAR TODO'}
-                </button>
-              </div>
-              {/* SEARCH INPUT ADDITION */}
-              <div className="px-6 py-3 border-b border-white/5 bg-slate-900/50">
-                  <div className="relative">
-                      <Icons.Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
-                      <input
-                          type="text"
-                          placeholder="FILTRAR PÁGINAS..."
-                          value={permissionSearch}
-                          onChange={(e) => setPermissionSearch(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-800 text-white pl-9 pr-4 py-2 rounded-lg text-[9px] font-bold uppercase tracking-wider focus:outline-none focus:border-emerald-500 transition-all placeholder:text-slate-600"
-                      />
-                  </div>
-              </div>
-              <div className="overflow-x-auto max-h-[450px] custom-scrollbar">
-                <table className="w-full text-left text-[10px]">
-                  <thead className="bg-white/5 text-slate-500 font-black uppercase tracking-widest sticky top-0 z-20">
-                    <tr><th className="p-4 bg-slate-900">Página</th>{['VIEW', 'CREATE', 'EDIT', 'DELETE', 'ACTIVE'].map(a => <th key={a} className="p-4 text-center bg-slate-900">{a}</th>)}<th className="p-4 text-center bg-slate-900">Fila</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {filteredPages.map(p => (
-                      <tr key={p.id} className="hover:bg-white/5 transition-all">
-                        <td className="p-4 text-white font-bold uppercase">{p.name}</td>
-                        {['view', 'create', 'edit', 'delete', 'active'].map(a => (
-                          <td key={a} className="p-4 text-center">
-                            <input type="checkbox" checked={!!formData[`page_${p.id}_${a}`]} onChange={e => setFormData({ ...formData, [`page_${p.id}_${a}`]: e.target.checked })} className="w-5 h-5 rounded-lg border-2 border-white/10 bg-transparent checked:bg-emerald-500 checked:border-emerald-500 transition-all cursor-pointer appearance-none flex items-center justify-center after:content-['✓'] after:text-white after:font-black after:hidden checked:after:block" />
-                          </td>
-                        ))}
-                        <td className="p-4 text-center">
-                          <button type="button" onClick={() => togglePageRow(p.id)} className="p-2 rounded-lg bg-white/5 text-slate-400 hover:text-emerald-500 transition-all">
-                            <Icons.Check />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            {renderPermissionsMatrix('Matriz M7')}
             {renderStatusField()}
           </div>
         );
@@ -2461,48 +2725,63 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
       )}
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-[500] bg-slate-950/98 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in zoom-in-95">
-          <div className="bg-white w-[90vw] h-[90vh] rounded-[4rem] shadow-2xl overflow-hidden flex flex-col border border-white/10">
-            <div className="bg-slate-900 p-5 text-white flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-emerald-500 text-slate-950 rounded-xl flex items-center justify-center shadow-xl"><Icons.Audit /></div>
+        <div className="fixed inset-0 z-[500] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-3 animate-in fade-in">
+          <div className="bg-white w-[98vw] h-[97vh] max-w-[99vw] max-h-[98vh] rounded-[2rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col border border-slate-200">
+            <div className="bg-slate-900 px-6 py-4 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
+              <div className="flex items-center gap-3.5">
+                <div className="w-10 h-10 bg-emerald-500 text-slate-950 rounded-2xl flex items-center justify-center shadow-lg">
+                  <Icons.Audit className="w-5 h-5" />
+                </div>
                 <div>
-                  <h3 className="text-xl font-black uppercase tracking-tighter leading-none">{editingRecord ? 'Auditoría' : 'Nuevo'} {MASTER_LABELS[activeMaster] || activeMaster.replace('master', '')}</h3>
-                  <p className="text-[7px] font-black text-slate-500 uppercase tracking-widest mt-1">Módulo: Configuración Segura M7</p>
+                  <h3 className="text-lg md:text-xl font-black uppercase tracking-tight leading-none text-white">
+                    {editingRecord ? 'Auditoría' : 'Nuevo'} {MASTER_LABELS[activeMaster] || activeMaster.replace('master', '')}
+                  </h3>
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                    Módulo: Configuración Segura M7
+                  </p>
                 </div>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 transition-all text-4xl font-thin">×</button>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="w-10 h-10 rounded-2xl bg-white/10 hover:bg-rose-600 text-white flex items-center justify-center transition-all text-2xl font-light active:scale-95"
+              >
+                ×
+              </button>
             </div>
             <fieldset disabled={isReadOnly} className="contents">
-              <form onSubmit={handleSave} className="p-10 overflow-y-auto flex-1 custom-scrollbar bg-slate-50/20">
-                {error && (
-                  <div className="mb-8 p-6 bg-red-600 text-white rounded-[2rem] font-black text-[10px] uppercase tracking-widest flex items-center gap-4 animate-in shake"><Icons.Alert /> {error}</div>
-                )}
-                {renderFormFields()}
-                <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-4 shrink-0">
-              <button 
-                type="button" 
-                onClick={() => setIsModalOpen(false)} 
-                disabled={isSaving}
-                className="px-10 py-4 bg-white text-slate-500 rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-slate-100 transition-all border-2 border-slate-100 disabled:opacity-50"
-              >
-                Cerrar
-              </button>
-              <button 
-                type="submit" 
-                disabled={isSaving}
-                className="px-12 py-4 bg-slate-900 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-widest hover:bg-emerald-500 shadow-2xl transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isSaving ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span>Guardando...</span>
-                  </>
-                ) : (
-                  editingRecord ? 'Actualizar Registro' : 'Guardar Registro'
-                )}
-              </button>
-            </div>
+              <form onSubmit={handleSave} className="p-4 sm:p-8 overflow-y-auto flex-1 custom-scrollbar bg-slate-50/40 flex flex-col justify-between">
+                <div>
+                  {error && (
+                    <div className="mb-6 p-4 bg-rose-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider flex items-center gap-3 animate-in shake">
+                      <Icons.Alert className="w-5 h-5 shrink-0" /> {error}
+                    </div>
+                  )}
+                  {renderFormFields()}
+                </div>
+                <div className="p-4 sm:p-6 bg-white border-t border-slate-200 flex justify-end gap-3 shrink-0 rounded-2xl mt-6 shadow-sm">
+                  <button 
+                    type="button" 
+                    onClick={() => setIsModalOpen(false)} 
+                    disabled={isSaving}
+                    className="px-8 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-black text-xs uppercase tracking-wider transition-all disabled:opacity-50"
+                  >
+                    Cerrar
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={isSaving}
+                    className="px-10 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-500/20 transition-all active:scale-95 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSaving ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <span>Guardando...</span>
+                      </>
+                    ) : (
+                      editingRecord ? 'Actualizar Registro' : 'Guardar Registro'
+                    )}
+                  </button>
+                </div>
               </form>
             </fieldset>
           </div>
