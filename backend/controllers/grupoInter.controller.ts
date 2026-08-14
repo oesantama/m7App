@@ -3,11 +3,50 @@ import pool from '../config/database.js';
 import * as XLSX from 'xlsx';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
+import { v4 as uuidv4 } from 'uuid';
 import { PDFDocument, degrees } from 'pdf-lib';
 import { pdfParse } from '../utils/pdfParser.js';
 import { AIOrchestrator } from '../services/ai-orchestrator/orchestrator.js';
 import { performLocalPageOCR } from '../utils/ocr.js';
 import Tesseract from 'tesseract.js';
+import { uploadBufferToDrive, saveLocalFallback, rcloneAvailable, rcloneCat, sanitizeFolderName } from '../services/hv-drive.service.js';
+
+// ─── Firma de tokens públicos por documento (soporte y seguimiento) ───────────
+const GI_SIGNING_SECRET = process.env.GRUPO_INTER_SIGNING_SECRET || process.env.JWT_SECRET || 'm7-grupo-inter-fallback-secret';
+const signDocToken = (numeroDocumento: string): string =>
+    crypto.createHmac('sha256', GI_SIGNING_SECRET).update(String(numeroDocumento)).digest('hex');
+// En producción (NODE_ENV=production) usa el dominio real; en local/dev cae al
+// frontend de Vite para que los links generados se puedan probar sin salir a prod.
+// Se puede sobrescribir explícitamente con APP_URL en .env (ej. si Vite corre en otro puerto).
+const APP_URL = process.env.APP_URL || (process.env.NODE_ENV === 'production'
+    ? 'https://orbitm7.m7apps.com'
+    : 'http://localhost:5173');
+
+// Convierte una imagen (jpg/png) a un PDF de una página; si ya es PDF, la deja igual.
+// Los cumplidos subidos por el conductor siempre se guardan como PDF.
+const toPdfBuffer = async (buffer: Buffer, mimetype: string): Promise<Buffer> => {
+    if (mimetype === 'application/pdf') return buffer;
+
+    const pdfDoc = await PDFDocument.create();
+    const image = mimetype === 'image/png' ? await pdfDoc.embedPng(buffer) : await pdfDoc.embedJpg(buffer);
+    const { width, height } = image.scale(1);
+
+    // Ajustar a tamaño carta (612x792 pt) conservando la proporción
+    const maxW = 560, maxH = 740;
+    const ratio = Math.min(maxW / width, maxH / height, 1);
+    const drawW = width * ratio, drawH = height * ratio;
+
+    const page = pdfDoc.addPage([612, 792]);
+    page.drawImage(image, {
+        x: (612 - drawW) / 2,
+        y: (792 - drawH) / 2,
+        width: drawW,
+        height: drawH,
+    });
+
+    return Buffer.from(await pdfDoc.save());
+};
 
 // Función para obtener el pool de API Keys desde el CSV
 const getAPIKeysPool = (): string[] => {
@@ -119,6 +158,27 @@ const ensureSchema = async () => {
             ALTER TABLE grupo_inter_pedidos_items ADD COLUMN IF NOT EXISTS producto TEXT;
         `);
 
+        // Soporte de cumplido en Drive (en vez de base64 en BD) para cargas nuevas
+        await pool.query(`
+            ALTER TABLE grupo_inter_pedidos ADD COLUMN IF NOT EXISTS acta_entrega_drive_path TEXT;
+        `);
+
+        // Links públicos temporales para que el conductor suba el cumplido de una ruta/placa
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS grupo_inter_public_links (
+                id SERIAL PRIMARY KEY,
+                token TEXT UNIQUE NOT NULL,
+                placa TEXT NOT NULL,
+                ruta TEXT,
+                pedido_ids INTEGER[] NOT NULL,
+                created_by TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                revoked BOOLEAN DEFAULT false
+            );
+            CREATE INDEX IF NOT EXISTS idx_grupo_inter_public_links_token ON grupo_inter_public_links(token);
+        `);
+
         schemaChecked = true;
     } catch (e) {
         console.error('[GRUPO-INTER] Error al normalizar esquema:', e);
@@ -133,7 +193,7 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
             return;
         }
 
-        const { placa, fleteTotal, planilla, ruta } = req.body;
+        const { placa, fleteTotal, planilla, ruta, manifiesto } = req.body;
         const fleteTotalNum = parseFloat(fleteTotal) || 0;
 
         // Leer archivo desde disco
@@ -270,11 +330,12 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                         pedidoId = existingRes.rows[0].id;
                         await dbClient.query(`
                         UPDATE grupo_inter_pedidos SET
-                            nit = $2, cliente = $3, direccion = $4, notas_encabezado = $5, 
-                            municipio_destino = $6, empresa = $7, f_ultimo_corte = COALESCE($8, f_ultimo_corte, CURRENT_TIMESTAMP), 
+                            nit = $2, cliente = $3, direccion = $4, notas_encabezado = $5,
+                            municipio_destino = $6, empresa = $7, f_ultimo_corte = COALESCE($8, f_ultimo_corte, CURRENT_TIMESTAMP),
                             clasificacion = $9, placa = $10, valor_flete = $11, numero_planilla = $12,
                             cantidad_total = $13, precio_total = $14, peso_total_prod = $15,
-                            update_by = $16, update_at = CURRENT_TIMESTAMP, ruta = $17
+                            update_by = $16, update_at = CURRENT_TIMESTAMP, ruta = $17,
+                            numero_guia = COALESCE(NULLIF($18, ''), numero_guia)
                         WHERE id = $1;
                     `, [
                         pedidoId,
@@ -293,17 +354,18 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                         idxPrice >= 0 ? parseNum(rowArr[idxPrice]) : 0,
                         idxPeso >= 0 ? parseNum(rowArr[idxPeso]) : 0,
                         username,
-                        ruta || ''
+                        ruta || '',
+                        (manifiesto || '').trim()
                     ]);
                 } else {
                     const insertRes = await dbClient.query(`
                         INSERT INTO grupo_inter_pedidos (
-                            numero_documento, nit, cliente, direccion, notas_encabezado, 
-                            municipio_destino, empresa, f_ultimo_corte, 
-                            clasificacion, placa, valor_flete, numero_planilla, 
+                            numero_documento, nit, cliente, direccion, notas_encabezado,
+                            municipio_destino, empresa, f_ultimo_corte,
+                            clasificacion, placa, valor_flete, numero_planilla,
                             cantidad_total, precio_total, peso_total_prod,
-                            estado, create_by, create_at, fecha_carge, ruta
-                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, CURRENT_TIMESTAMP), $9, $10, $11, $12, $13, $14, $15, 'Pendiente', $16, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $17)
+                            estado, create_by, create_at, fecha_carge, ruta, numero_guia
+                        ) VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, CURRENT_TIMESTAMP), $9, $10, $11, $12, $13, $14, $15, 'Pendiente', $16, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, $17, $18)
                         RETURNING id;
                     `, [
                         doc,
@@ -322,7 +384,8 @@ export const uploadExcel = async (req: any, res: Response): Promise<void> => {
                         idxPrice >= 0 ? parseNum(rowArr[idxPrice]) : 0,
                         idxPeso >= 0 ? parseNum(rowArr[idxPeso]) : 0,
                         username,
-                        ruta || ''
+                        ruta || '',
+                        (manifiesto || '').trim()
                     ]);
                     pedidoId = insertRes.rows[0].id;
 
@@ -979,7 +1042,7 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
         await dbClient.query('BEGIN');
         await dbClient.query(`SET LOCAL statement_timeout = '20000'`);
 
-        const { search, status, client, fechaCorteDesde, fechaCorteHasta, invoice, plate, planilla, dateType } = req.query;
+        const { search, status, client, fechaCorteDesde, fechaCorteHasta, invoice, plate, planilla, manifiesto } = req.query;
         const values: any[] = [];
         let paramIdx = 1;
 
@@ -1017,6 +1080,11 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
             values.push(`%${planilla}%`);
             paramIdx++;
         }
+        if (manifiesto) {
+            whereClauses.push(`p.numero_guia ILIKE $${paramIdx}`);
+            values.push(`%${manifiesto}%`);
+            paramIdx++;
+        }
 
         if (status) {
             whereClauses.push(`p.estado = $${paramIdx}`);
@@ -1029,8 +1097,8 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
             paramIdx++;
         }
 
-        // Selección dinámica de la columna de fecha para búsquedas ultra optimizadas por índice
-        const dateCol = dateType === 'cargue' ? 'p.fecha_carge' : 'p.fecha_entregado';
+        // Fecha factura (f_ultimo_corte) es el único criterio de fecha para la consulta interna
+        const dateCol = 'p.f_ultimo_corte';
 
         // Filtro de fecha combinado con otros inputs (AND)
         if (fechaCorteDesde && fechaCorteHasta) {
@@ -1046,15 +1114,15 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
             whereClauses.push(`${dateCol} < ($${paramIdx}::date + INTERVAL '1 day')`);
             values.push(fechaCorteHasta);
             paramIdx++;
-        } else if (!search && !invoice && !plate && !planilla) {
-            // Rango por defecto: usar fecha_carge (siempre tiene valor) para evitar full scan
-            whereClauses.push(`(p.fecha_carge >= CURRENT_DATE - INTERVAL '30 days')`);
+        } else if (!search && !invoice && !plate && !planilla && !manifiesto) {
+            // Rango por defecto: últimos 30 días por fecha factura, para evitar full scan
+            whereClauses.push(`(${dateCol} >= CURRENT_DATE - INTERVAL '30 days')`);
         }
 
         const whereStr = whereClauses.join(' AND ');
 
-        // Ordenar por la columna filtrada para maximizar el uso del índice
-        const orderCol = dateType === 'cargue' ? 'p.fecha_carge' : 'p.fecha_entregado';
+        // Ordenar por la misma columna de fecha factura para maximizar el uso del índice
+        const orderCol = dateCol;
 
         const query = `
             WITH pedidos_filtrados AS (
@@ -1084,7 +1152,7 @@ export const getOrders = async (req: Request, res: Response): Promise<void> => {
             FROM pedidos_filtrados pf
             LEFT JOIN items_agg      ia ON ia.pid = pf.id
             LEFT JOIN historico_agg  ha ON ha.pid = pf.id
-            ORDER BY ${orderCol === 'p.fecha_carge' ? 'pf.fecha_carge' : 'pf.fecha_entregado'} DESC
+            ORDER BY pf.f_ultimo_corte DESC
         `;
 
         const result = await dbClient.query(query, values);
@@ -1274,32 +1342,72 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
             client.release();
         }
 
-        const mappedOrders = result.rows.map((o: any) => ({
-            id: o.id,
-            estado: o.estado === 'Entregado' ? 'Entregado' : (o.estado || 'En proceso'),
-            nroGuia: o.numero_guia || 'PD-' + o.numero_documento,
-            nroPedido: o.numero_documento,
-            fechaEntregado: o.fecha_entregado ? o.fecha_entregado.toISOString().replace('T', ' ').substring(0, 16) : null,
-            fctUltimoCorte: o.f_ultimo_corte ? (typeof o.f_ultimo_corte === 'string' ? o.f_ultimo_corte.split('T')[0] : o.f_ultimo_corte.toISOString().split('T')[0]) : null,
-            ciudadOrigen: o.ciudad_origen || "MEDELLÍN",
-            latitud: parseFloat(o.latitud) || 6.2442,
-            longitud: parseFloat(o.longitud) || -75.5812,
-            placa: o.placa || 'PENDIENTE',
-            cliente: o.cliente,
-            direccion: o.direccion,
-            municipio_destino: o.municipio_destino || o.ciudad_destino,
-            acta_entrega_b64: o.acta_entrega_b64 || null,
-            valorFlete: Math.round(parseFloat(o.valor_flete) || 0),
-            productos: (o.items_arr || []).length > 0 ? o.items_arr : {
-                peso: parseFloat(o.peso_total_prod) || 0,
-                cantidad: parseInt(o.cantidad_total) || 0,
-                valorDeclarado: parseFloat(o.precio_total) || 0
-            },
-            novedades: o.novedades_arr || [],
-            reajustes: o.reajustes_arr || [],
-            historicos: o.historico_arr || [],
-            Novedades: (o.historico_arr || []).length > 0 ? o.historico_arr : []
-        }));
+        const mappedOrders = result.rows.map((o: any) => {
+            const tieneSoportePropio = !o.acta_entrega_b64 && o.acta_entrega_drive_path;
+            const actaUrl = tieneSoportePropio
+                ? `${APP_URL}/api/grupo-inter/public/soporte/${encodeURIComponent(o.numero_documento)}?token=${signDocToken(o.numero_documento)}`
+                : null;
+            const seguimientoUrl = `${APP_URL}/public/gi-seguimiento/${encodeURIComponent(o.numero_documento)}?token=${signDocToken(o.numero_documento)}`;
+            const historico = o.historico_arr || [];
+
+            return {
+                id: o.id,
+                estado: o.estado === 'Entregado' ? 'Entregado' : (o.estado || 'En proceso'),
+                nroGuia: o.numero_guia || 'PD-' + o.numero_documento,
+                manifiesto: o.numero_guia || null,
+                nroPedido: o.numero_documento,
+                fechaEntregado: o.fecha_entregado ? o.fecha_entregado.toISOString().replace('T', ' ').substring(0, 16) : null,
+                fctUltimoCorte: o.f_ultimo_corte ? (typeof o.f_ultimo_corte === 'string' ? o.f_ultimo_corte.split('T')[0] : o.f_ultimo_corte.toISOString().split('T')[0]) : null,
+                ciudadOrigen: o.ciudad_origen || "MEDELLÍN",
+                latitud: parseFloat(o.latitud) || 6.2442,
+                longitud: parseFloat(o.longitud) || -75.5812,
+                placa: o.placa || 'PENDIENTE',
+                cliente: o.cliente,
+                direccion: o.direccion,
+                municipio_destino: o.municipio_destino || o.ciudad_destino,
+                acta_entrega_b64: o.acta_entrega_b64 || null,
+                // Facturas nuevas: soporte vive en Drive (ruta real: CUMPLIDOS MILLA 7/...), se entrega
+                // vía endpoint firmado en vez de base64 inline.
+                acta_entrega_url: actaUrl,
+                linkSeguimiento: seguimientoUrl,
+                valorFlete: Math.round(parseFloat(o.valor_flete) || 0),
+                productos: (o.items_arr || []).length > 0 ? o.items_arr : {
+                    peso: parseFloat(o.peso_total_prod) || 0,
+                    cantidad: parseInt(o.cantidad_total) || 0,
+                    valorDeclarado: parseFloat(o.precio_total) || 0
+                },
+                novedades: o.novedades_arr || [],
+                reajustes: o.reajustes_arr || [],
+                historicos: historico,
+                Novedades: historico.length > 0 ? historico : [],
+
+                // Detalle completo — igual a lo que se ve en el detalle interno de la factura
+                detalle: {
+                    nit: o.nit || null,
+                    empresa: o.empresa || null,
+                    notasEncabezado: o.notas_encabezado || null,
+                    clasificacion: o.clasificacion || null,
+                    ruta: o.ruta || null,
+                    numeroPlanilla: o.numero_planilla || null,
+                    fechaViaje: o.fecha_viaje ? o.fecha_viaje.toISOString().split('T')[0] : null,
+                    fechaCargue: o.fecha_carge ? o.fecha_carge.toISOString().split('T')[0] : null,
+                    cantidadTotal: parseInt(o.cantidad_total) || 0,
+                    pesoTotal: parseFloat(o.peso_total_prod) || 0,
+                    precioTotal: parseFloat(o.precio_total) || 0,
+                    fleteInicial: Math.round(parseFloat(o.valor_flete) || 0),
+                    fleteTotal: Math.round(
+                        (parseFloat(o.valor_flete) || 0) +
+                        (o.reajustes_arr || []).reduce((acc: number, r: any) => acc + (Number(r.valor) || 0), 0)
+                    ),
+                    tieneSoporte: !!(o.acta_entrega_b64 || o.acta_entrega_drive_path),
+                    actaEntregaUrl: actaUrl
+                },
+
+                // Trazabilidad / histórico completo de la factura (misma info que el link de seguimiento)
+                trazabilidad: historico,
+                linkTrazabilidad: seguimientoUrl
+            };
+        });
 
         res.json({
             ok: true,
@@ -1368,6 +1476,33 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
     }
 };
 
+export const updateManifiesto = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const { manifiesto, usuario } = req.body;
+
+        if (manifiesto === undefined || manifiesto === null) {
+            res.status(400).json({ message: 'El número de manifiesto es requerido' });
+            return;
+        }
+
+        const result = await pool.query(
+            "UPDATE grupo_inter_pedidos SET numero_guia = $1, update_at = CURRENT_TIMESTAMP, update_by = $2 WHERE id = $3 RETURNING id",
+            [String(manifiesto).trim(), usuario || 'System', id]
+        );
+
+        if (result.rowCount === 0) {
+            res.status(404).json({ message: 'Pedido no encontrado' });
+            return;
+        }
+
+        res.json({ message: 'Manifiesto actualizado correctamente' });
+    } catch (error) {
+        console.error('[GRUPO-INTER] Error al actualizar manifiesto:', error);
+        res.status(500).json({ message: 'Error al actualizar el manifiesto' });
+    }
+};
+
 export const getOrderDetails = async (req: Request, res: Response): Promise<void> => {
     try {
         const { id } = req.params;
@@ -1433,7 +1568,7 @@ export const addReajuste = async (req: Request, res: Response): Promise<void> =>
         const { pedido_id, valor, notas, usuario } = req.body;
         const pedidoRes = await pool.query("SELECT numero_documento FROM grupo_inter_pedidos WHERE id = $1", [pedido_id]);
         const doc = pedidoRes.rows[0]?.numero_documento || 'N/A';
-        
+
         await pool.query(
             "INSERT INTO grupo_inter_reajustes (pedido_id, numero_documento, valor, notas, usuario) VALUES ($1, $2, $3, $4, $5)",
             [pedido_id, doc, valor, notas, usuario || 'System']
@@ -1441,5 +1576,395 @@ export const addReajuste = async (req: Request, res: Response): Promise<void> =>
         res.json({ message: 'Reajuste registrado con éxito' });
     } catch (error) {
         res.status(500).json({ message: 'Error al registrar reajuste' });
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LINK PÚBLICO DE CONDUCTOR — sube el cumplido (foto) de cada factura de su
+// ruta/placa sin necesidad de usuario, con un link temporal (máx. 7 días).
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ─── GET /grupo-inter/rutas-placa?placa=XXX (interno, auth) ──────────────────
+// Lista las rutas distintas con pedidos pendientes para una placa, para que el
+// usuario elija cuál ruta va a cubrir el link antes de generarlo.
+export const getRutasPorPlaca = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { placa } = req.query;
+        if (!placa) {
+            res.status(400).json({ message: 'La placa es requerida' });
+            return;
+        }
+
+        const result = await pool.query(`
+            SELECT
+                COALESCE(NULLIF(ruta, ''), 'SIN RUTA ASIGNADA') AS ruta,
+                COUNT(*)::int AS total_pedidos,
+                COUNT(*) FILTER (WHERE estado != 'Entregado')::int AS pendientes,
+                MIN(f_ultimo_corte) AS fecha_desde,
+                MAX(f_ultimo_corte) AS fecha_hasta
+            FROM grupo_inter_pedidos
+            WHERE placa ILIKE $1
+            GROUP BY COALESCE(NULLIF(ruta, ''), 'SIN RUTA ASIGNADA')
+            ORDER BY pendientes DESC, total_pedidos DESC
+        `, [placa]);
+
+        res.json(result.rows);
+    } catch (error: any) {
+        console.error('[GRUPO-INTER] Error al obtener rutas por placa:', error);
+        res.status(500).json({ message: 'Error al obtener rutas de la placa' });
+    }
+};
+
+// ─── POST /grupo-inter/public-link (interno, auth) ────────────────────────────
+// Genera un link público temporal para que el conductor de una ruta/placa suba
+// el cumplido de cada factura. Máximo 7 días (168 horas) de vigencia.
+export const createPublicLink = async (req: Request, res: Response): Promise<void> => {
+    try {
+        await ensureSchema();
+        const { placa, ruta, horas, usuario } = req.body;
+
+        if (!placa) {
+            res.status(400).json({ message: 'La placa es requerida' });
+            return;
+        }
+
+        const horasNum = Math.min(Math.max(parseFloat(horas) || 24, 1), 168); // tope duro de 7 días
+        const rutaFilter = ruta && ruta !== 'SIN RUTA ASIGNADA' ? ruta : null;
+
+        const pedidosRes = await pool.query(`
+            SELECT id FROM grupo_inter_pedidos
+            WHERE placa ILIKE $1
+              AND (
+                ($2::text IS NULL AND COALESCE(NULLIF(ruta, ''), '') = '')
+                OR ruta = $2
+              )
+        `, [placa, rutaFilter]);
+
+        if (pedidosRes.rowCount === 0) {
+            res.status(404).json({ message: 'No se encontraron facturas para esa placa/ruta' });
+            return;
+        }
+
+        const pedidoIds = pedidosRes.rows.map((r: any) => r.id);
+        const token = uuidv4().replace(/-/g, '');
+        const expiresAt = new Date(Date.now() + horasNum * 60 * 60 * 1000);
+
+        await pool.query(`
+            INSERT INTO grupo_inter_public_links (token, placa, ruta, pedido_ids, created_by, expires_at)
+            VALUES ($1, $2, $3, $4, $5, $6)
+        `, [token, placa, rutaFilter, pedidoIds, usuario || 'System', expiresAt]);
+
+        const url = `${APP_URL}/public/gi-cumplido/${token}`;
+
+        res.json({
+            success: true,
+            token,
+            url,
+            expiresAt,
+            totalPedidos: pedidoIds.length
+        });
+    } catch (error: any) {
+        console.error('[GRUPO-INTER] Error al crear link público:', error);
+        res.status(500).json({ message: 'Error al crear el link público' });
+    }
+};
+
+// ─── GET /grupo-inter/public/cumplido/:token (sin auth) ───────────────────────
+export const getPublicCumplido = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { token } = req.params;
+
+        const linkRes = await pool.query(
+            "SELECT * FROM grupo_inter_public_links WHERE token = $1",
+            [token]
+        );
+        if (linkRes.rowCount === 0) {
+            res.status(404).json({ ok: false, mensaje: 'Enlace inválido o no encontrado' });
+            return;
+        }
+        const link = linkRes.rows[0];
+
+        if (link.revoked) {
+            res.status(410).json({ ok: false, mensaje: 'Este enlace fue revocado' });
+            return;
+        }
+        if (new Date(link.expires_at) < new Date()) {
+            res.status(410).json({ ok: false, mensaje: 'Este enlace ha vencido. Solicite uno nuevo.' });
+            return;
+        }
+
+        const pedidosRes = await pool.query(`
+            SELECT id, numero_documento, cliente, direccion, municipio_destino, estado, f_ultimo_corte,
+                   (acta_entrega_b64 IS NOT NULL OR acta_entrega_drive_path IS NOT NULL) AS tiene_soporte
+            FROM grupo_inter_pedidos
+            WHERE id = ANY($1::int[])
+            ORDER BY numero_documento
+        `, [link.pedido_ids]);
+
+        res.json({
+            ok: true,
+            placa: link.placa,
+            ruta: link.ruta,
+            expiresAt: link.expires_at,
+            pedidos: pedidosRes.rows
+        });
+    } catch (error: any) {
+        console.error('[GRUPO-INTER] Error al obtener link público:', error);
+        res.status(500).json({ ok: false, mensaje: 'Error al cargar el enlace' });
+    }
+};
+
+// ─── POST /grupo-inter/public/cumplido/:token/:pedidoId (sin auth) ────────────
+// El conductor sube la foto del cumplido de una factura específica de su ruta.
+export const uploadPublicCumplido = async (req: any, res: Response): Promise<void> => {
+    try {
+        const { token, pedidoId } = req.params;
+        const { observacion } = req.body;
+        // 'false' explícito = no se pudo entregar; cualquier otro valor (o ausente) = sí se entregó
+        const entregado = req.body.entregado !== 'false';
+
+        const linkRes = await pool.query(
+            "SELECT * FROM grupo_inter_public_links WHERE token = $1",
+            [token]
+        );
+        if (linkRes.rowCount === 0) {
+            res.status(404).json({ ok: false, mensaje: 'Enlace inválido' });
+            return;
+        }
+        const link = linkRes.rows[0];
+
+        if (link.revoked || new Date(link.expires_at) < new Date()) {
+            res.status(410).json({ ok: false, mensaje: 'Este enlace ha vencido o fue revocado' });
+            return;
+        }
+
+        const pid = parseInt(pedidoId, 10);
+        if (!link.pedido_ids.includes(pid)) {
+            res.status(403).json({ ok: false, mensaje: 'Esta factura no pertenece a este enlace' });
+            return;
+        }
+
+        // La foto siempre es obligatoria, tanto si se entregó como si no (evidencia del estado real).
+        if (!req.file || !req.file.path) {
+            res.status(400).json({ ok: false, mensaje: 'Debe adjuntar una foto del cumplido' });
+            return;
+        }
+        if (!entregado && !observacion?.trim()) {
+            res.status(400).json({ ok: false, mensaje: 'Debe indicar el motivo por el cual no se entregó' });
+            return;
+        }
+
+        const pedidoRes = await pool.query("SELECT numero_documento, f_ultimo_corte FROM grupo_inter_pedidos WHERE id = $1", [pid]);
+        if (pedidoRes.rowCount === 0) {
+            res.status(404).json({ ok: false, mensaje: 'Factura no encontrada' });
+            return;
+        }
+        const numeroDocumento = pedidoRes.rows[0].numero_documento;
+
+        // Estructura real en Drive: CUMPLIDOS MILLA 7/AÑO/GRUPO INTERLLANTAS/MES/DIA {dd}/CONDUCTOR/{factura}_{placa}.pdf
+        // (misma organización que ya usa Milla 7 para los cumplidos, separado de los que sube el
+        // administrativo para no cruzarlos). Usa la fecha factura; si no hay, cae a la fecha de hoy.
+        const MESES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE'];
+        const fechaBase = pedidoRes.rows[0].f_ultimo_corte ? new Date(pedidoRes.rows[0].f_ultimo_corte) : new Date();
+        const anio = fechaBase.getFullYear();
+        const mes = MESES[fechaBase.getMonth()];
+        const dia = String(fechaBase.getDate()).padStart(2, '0');
+
+        const rawBuffer = fs.readFileSync(req.file.path);
+        const buffer = await toPdfBuffer(rawBuffer, req.file.mimetype || 'application/octet-stream');
+        const fileName = `${sanitizeFolderName(numeroDocumento)}_${sanitizeFolderName(link.placa)}.pdf`;
+        const drivePath = `CUMPLIDOS MILLA 7/${anio}/GRUPO INTERLLANTAS/${mes}/DIA ${dia}/CONDUCTOR/${fileName}`;
+
+        let drivePathSaved: string;
+        const available = await rcloneAvailable();
+        if (available) {
+            try {
+                const result = await uploadBufferToDrive(buffer, drivePath);
+                drivePathSaved = result.drivePath;
+            } catch (driveErr: any) {
+                // Drive configurado pero falló en tiempo real (remote caído/mal config) —
+                // no perder el cumplido del conductor, guardarlo localmente como respaldo.
+                console.error('[GRUPO-INTER] Falló subida a Drive, usando respaldo local:', driveErr.message);
+                const result = await saveLocalFallback(buffer, drivePath);
+                drivePathSaved = result.drivePath;
+            }
+        } else {
+            const result = await saveLocalFallback(buffer, drivePath);
+            drivePathSaved = result.drivePath;
+        }
+
+        const nuevoEstado = entregado ? 'Entregado' : 'No Entregado';
+
+        await pool.query(`
+            UPDATE grupo_inter_pedidos
+            SET estado = $1,
+                fecha_entregado = CASE WHEN $2 THEN CURRENT_TIMESTAMP ELSE fecha_entregado END,
+                acta_entrega_drive_path = COALESCE($3, acta_entrega_drive_path),
+                update_at = CURRENT_TIMESTAMP,
+                update_by = $4
+            WHERE id = $5
+        `, [nuevoEstado, entregado, drivePathSaved, `Conductor (link público — placa ${link.placa})`, pid]);
+
+        await pool.query(`
+            INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario)
+            VALUES ($1, $2, $3, $4)
+        `, [pid, nuevoEstado, observacion || (entregado ? 'Cumplido subido por el conductor vía link público' : 'No entregado — reportado por el conductor'), `Conductor (${link.placa})`]);
+
+        if (observacion) {
+            await pool.query(`
+                INSERT INTO grupo_inter_novedades (pedido_id, tipo, observacion, usuario)
+                VALUES ($1, $2, $3, $4)
+            `, [pid, entregado ? 'NOVEDAD' : 'NO_ENTREGADO', observacion, `Conductor (${link.placa})`]);
+        }
+
+        res.json({ ok: true, mensaje: entregado ? 'Cumplido registrado con éxito' : 'Novedad de no entrega registrada' });
+    } catch (error: any) {
+        console.error('[GRUPO-INTER] Error al subir cumplido público:', error);
+        res.status(500).json({ ok: false, mensaje: 'Error al subir el cumplido' });
+    } finally {
+        if (req.file && req.file.path) {
+            fs.unlink(req.file.path, () => {});
+        }
+    }
+};
+
+// ─── GET /grupo-inter/public/soporte/:numeroDocumento?token=... (sin auth) ────
+// Entrega el soporte (PDF/foto) de una factura de forma segura: token firmado
+// (HMAC) específico para ese documento — no reutilizable en otro documento.
+// Sirve el archivo de soporte (base64 en BD o Drive/local) sobre una respuesta Express ya abierta.
+// Compartido entre el endpoint público (con token firmado) y el interno (con JWT).
+const streamSoporte = async (res: Response, row: { acta_entrega_b64: string | null; acta_entrega_drive_path: string | null }): Promise<void> => {
+    if (row.acta_entrega_b64) {
+        const buffer = Buffer.from(row.acta_entrega_b64, 'base64');
+        res.setHeader('Content-Type', 'application/pdf');
+        res.send(buffer);
+        return;
+    }
+
+    if (row.acta_entrega_drive_path) {
+        if (row.acta_entrega_drive_path.startsWith('local:')) {
+            const localPath = path.join(process.cwd(), 'backend', 'docs', 'hojas-vida', row.acta_entrega_drive_path.replace('local:', ''));
+            if (!fs.existsSync(localPath)) {
+                res.status(404).json({ ok: false, mensaje: 'Archivo no encontrado' });
+                return;
+            }
+            fs.createReadStream(localPath).pipe(res);
+            return;
+        }
+        const ext = path.extname(row.acta_entrega_drive_path).toLowerCase();
+        res.setHeader('Content-Type', ext === '.pdf' ? 'application/pdf' : 'image/jpeg');
+        const stream = rcloneCat(row.acta_entrega_drive_path);
+        stream.pipe(res);
+        stream.on('error', () => { if (!res.headersSent) res.status(500).end(); });
+        return;
+    }
+
+    res.status(404).json({ ok: false, mensaje: 'Este documento no tiene soporte cargado' });
+};
+
+export const getPublicSoporte = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const numeroDocumento = String(req.params.numeroDocumento || '');
+        const token = String(req.query.token || '');
+
+        if (!token || token !== signDocToken(numeroDocumento)) {
+            res.status(401).json({ ok: false, mensaje: 'Token inválido para este documento' });
+            return;
+        }
+
+        const result = await pool.query(
+            "SELECT acta_entrega_b64, acta_entrega_drive_path FROM grupo_inter_pedidos WHERE numero_documento = $1",
+            [numeroDocumento]
+        );
+        if (result.rowCount === 0) {
+            res.status(404).json({ ok: false, mensaje: 'Documento no encontrado' });
+            return;
+        }
+        await streamSoporte(res, result.rows[0]);
+    } catch (error: any) {
+        console.error('[GRUPO-INTER] Error al servir soporte público:', error);
+        res.status(500).json({ ok: false, mensaje: 'Error al obtener el soporte' });
+    }
+};
+
+// ─── GET /grupo-inter/soporte/:id (interno, auth vía JWT) ─────────────────────
+// Igual que getPublicSoporte pero para la vista interna (por id de pedido, no token firmado).
+export const getSoporteInterno = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const result = await pool.query(
+            "SELECT acta_entrega_b64, acta_entrega_drive_path FROM grupo_inter_pedidos WHERE id = $1",
+            [id]
+        );
+        if (result.rowCount === 0) {
+            res.status(404).json({ ok: false, mensaje: 'Documento no encontrado' });
+            return;
+        }
+        await streamSoporte(res, result.rows[0]);
+    } catch (error: any) {
+        console.error('[GRUPO-INTER] Error al servir soporte interno:', error);
+        res.status(500).json({ ok: false, mensaje: 'Error al obtener el soporte' });
+    }
+};
+
+// ─── GET /grupo-inter/public/seguimiento/:numeroDocumento?token=... (sin auth) ─
+// Consulta pública de solo lectura: estado + histórico de una factura.
+export const getPublicSeguimiento = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const numeroDocumento = String(req.params.numeroDocumento || '');
+        const token = String(req.query.token || '');
+
+        if (!token || token !== signDocToken(numeroDocumento)) {
+            res.status(401).json({ ok: false, mensaje: 'Token inválido para este documento' });
+            return;
+        }
+
+        // Solo campos operativos — esta consulta la ve el cliente final, nunca precios,
+        // flete/comisiones, NIT, empresa ni notas de encabezado (pueden traer datos internos).
+        const pedidoRes = await pool.query(`
+            SELECT id, numero_documento, cliente, direccion, municipio_destino, estado, placa, ruta,
+                   f_ultimo_corte, fecha_carge, fecha_viaje, fecha_entregado, numero_guia, numero_planilla,
+                   clasificacion, cantidad_total, peso_total_prod,
+                   (acta_entrega_b64 IS NOT NULL OR acta_entrega_drive_path IS NOT NULL) AS tiene_soporte
+            FROM grupo_inter_pedidos
+            WHERE numero_documento = $1
+        `, [numeroDocumento]);
+
+        if (pedidoRes.rowCount === 0) {
+            res.status(404).json({ ok: false, mensaje: 'Documento no encontrado' });
+            return;
+        }
+
+        const pedido = pedidoRes.rows[0];
+
+        const [historicoRes, itemsRes, novedadesRes] = await Promise.all([
+            pool.query(
+                "SELECT estado, observacion, fecha, usuario FROM grupo_inter_pedidos_historico WHERE pedido_id = $1 ORDER BY fecha DESC",
+                [pedido.id]
+            ),
+            // Sin precio ni valor_declarado — solo cantidades y descripción del producto
+            pool.query(
+                "SELECT producto, tipo_articulo, cantidad, peso FROM grupo_inter_pedidos_items WHERE pedido_id = $1",
+                [pedido.id]
+            ),
+            pool.query(
+                "SELECT observacion, fecha, usuario FROM grupo_inter_novedades WHERE pedido_id = $1 ORDER BY fecha DESC",
+                [pedido.id]
+            )
+        ]);
+
+        delete pedido.id; // no exponer el id interno en la respuesta pública
+
+        res.json({
+            ok: true,
+            pedido,
+            soporteUrl: pedido.tiene_soporte ? `${APP_URL}/api/grupo-inter/public/soporte/${encodeURIComponent(numeroDocumento)}?token=${signDocToken(numeroDocumento)}` : null,
+            items: itemsRes.rows,
+            historico: historicoRes.rows,
+            novedades: novedadesRes.rows
+        });
+    } catch (error: any) {
+        console.error('[GRUPO-INTER] Error al obtener seguimiento público:', error);
+        res.status(500).json({ ok: false, mensaje: 'Error al obtener el seguimiento' });
     }
 };

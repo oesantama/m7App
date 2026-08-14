@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { PerfilCargoContenido } from './gh-perfiles-cargo-parser.service.js';
+import { LOGO_MILLA_SIETE_B64 } from './logo-milla-siete.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -17,19 +18,21 @@ export interface FirmaData {
 function getLogoBase64(): string {
   try {
     const candidates = [
-      path.resolve(process.cwd(), 'backend/controllers/logo_b64.txt'),
-      path.resolve(__dirname, '../controllers/logo_b64.txt'),
+      path.resolve(process.cwd(), 'public/logo-encuesta.png'),
+      path.resolve(process.cwd(), 'public/logo-m7.png'),
+      path.resolve(__dirname, '../../public/logo-encuesta.png'),
+      path.resolve(__dirname, '../../public/logo-m7.png'),
     ];
     for (const p of candidates) {
       if (fs.existsSync(p)) {
-        const b64 = fs.readFileSync(p, 'utf-8').trim();
+        const b64 = fs.readFileSync(p).toString('base64');
         if (b64) return `data:image/png;base64,${b64}`;
       }
     }
   } catch {}
   
-  // Fallback directo con el logo corporativo oficial de Milla Siete Grupo Logístico
-  return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUoAAADZCAYAAABGrHlcAAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRAD/AP8A/6C9p5MAAAAJcEhZcwAAIdUAACHVAQSctJ0AACjaSURBVHja7d15mJxVlT/w7zn3rarespMFMGwqwSigtixGsCTppbYOKEmQRUcWFVcQ9SejDhnUAUHHBdwAHcYFRhJASFdVd7qTYAsEHCaKgGERMSBLQsjeSS9V957fH92BTtJLvdXVXd2p83mePEnees99771Vdepd7wWUUkoppZRSSimllFJKKaWUUkoppZRSSimllFJKKaWUUkoppZRSSimllFJKKaWUUkoppZRSSimllFJKKaWUUkoppZRSSimllFJKKaWUUkoppZRSSimllFJKKaWUUkoppZRSSimllFJKKaWUUkoppZRSSimllFJKKaWUUkoppZRSSimllFJKKaWUUkoppZRSSimllFJKKaWUUkoppZRSSimllFJKKaWUUkoppZRSSimllFJKKaWUUkoppZRSSimllFJKKaWUUkqNgP8P5a8TqDaaOGkAAAAldEVYdGRhdGU6Y3JlYXRlADIwMjYtMDQtMjRUMTY6NTY6MTcrMDA6MDDfpjFuAAAAJXRFWHRkYXRlOm1vZGlmeQAyMDI2LTA0LTI0VDE2OjU2OjE3KzAwOjAwrvuJ0gAAACh0RVh0ZGF0ZTp0aW1lc3RhbXAAMjAyNi0wNC0yNlQyMjowNTo1NyswMDowMNy825gAAAAASUVORK5CYII=';
+  // Constante embebida oficial de Milla Siete Grupo Logístico
+  return LOGO_MILLA_SIETE_B64;
 }
 
 function fmtFecha(d: string | Date | undefined): string {
@@ -55,6 +58,10 @@ function formatCurrencyCOP(val: string | number | undefined): string {
   if (!str) return '—';
   if (str.startsWith('$')) return str;
 
+  // Si contiene solo texto (ej. "Reservado", "A convenir", "No aplica") sin números
+  const digitsOnly = str.replace(/[^\d]/g, '');
+  if (!digitsOnly) return str;
+
   const clean = str.replace(/[^\d.,]/g, '');
   const num = parseFloat(clean.replace(/\./g, '').replace(',', '.'));
   if (!isNaN(num) && num > 0) {
@@ -68,20 +75,26 @@ function formatCurrencyCOP(val: string | number | undefined): string {
 }
 
 function formatBulletText(text: string): string {
-  if (!text) return '';
-  const lines = text.split(/\r?\n|•/).map(l => l.trim()).filter(Boolean);
-  if (lines.length === 0) return '';
-  if (lines.length === 1 && !text.includes('•')) {
-    return nl2br(text);
+  if (!text) return '—';
+  const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  
+  // Dividir por saltos de línea O por caracteres de viñeta ('•', '\u2022', '\t')
+  const rawParts = clean.split(/(?:\r?\n|[•\u2022])+/);
+  const items = rawParts
+    .map(l => l.replace(/^[•\u2022\-\*\t\s]+/, '').trim())
+    .filter(Boolean);
+
+  if (items.length > 1 || (items.length === 1 && (clean.includes('•') || clean.includes('\u2022')))) {
+    return `<ul class="bullet-list">${items.map(it => `<li>${it}</li>`).join('')}</ul>`;
   }
-  return `<ul class="bullet-list">${lines.map(l => `<li>${l}</li>`).join('')}</ul>`;
+
+  return nl2br(clean);
 }
 
 function renderResponsabilidadRows(respItems: { left: string; right: string }[]): string {
   if (!respItems || respItems.length === 0) return '';
 
   let html = '';
-  let inCheckGrid = false;
   const checkRows: { left: string; right: string }[] = [];
 
   for (const item of respItems) {
@@ -113,8 +126,8 @@ function renderResponsabilidadRows(respItems: { left: string; right: string }[])
       checkRows.length = 0;
     }
 
-    const isHeaderL = l && l.length < 80 && !/[.,;]$/.test(l) && !l.includes('•');
-    const isHeaderR = r && r.length < 80 && !/[.,;]$/.test(r) && !r.includes('•');
+    const isHeaderL = l && l.length < 80 && !/[.,;]$/.test(l) && !l.includes('•') && !l.includes('\u2022') && !l.toLowerCase().includes('procurar') && !l.toLowerCase().includes('conocer');
+    const isHeaderR = r && r.length < 80 && !/[.,;]$/.test(r) && !r.includes('•') && !r.includes('\u2022') && !r.toLowerCase().includes('procurar') && !r.toLowerCase().includes('conocer');
 
     if (isHeaderL && isHeaderR) {
       html += `
@@ -241,34 +254,39 @@ function buildHtml(c: PerfilCargoContenido, version: number, logoSrc: string, fi
   }
   .hdr-sig {
     font-size: 8.5pt;
-    font-weight: bold;
+    font-weight: 900 !important;
     text-transform: uppercase;
     letter-spacing: 0.01em;
+    color: #000000;
   }
   .hdr-docname {
     font-size: 10.5pt;
-    font-weight: 900;
+    font-weight: 900 !important;
     text-transform: uppercase;
     margin-top: 3px;
     letter-spacing: 0.02em;
+    color: #000000;
   }
   .hdr-meta-cell {
     width: 24%;
     text-align: left;
-    font-size: 7.5pt;
-    line-height: 1.4;
+    font-size: 8pt;
+    line-height: 1.45;
     padding: 4px 8px;
     vertical-align: middle;
+    font-weight: 900 !important;
+    color: #000000;
   }
   .hdr-meta-line {
-    font-size: 7.5pt;
-    font-weight: bold;
+    font-size: 8pt;
+    font-weight: 900 !important;
+    color: #000000;
   }
 
   /* ── Celdas de Datos y Etiquetas ── */
   .lbl {
     background-color: #f2f2f2;
-    font-weight: bold;
+    font-weight: 800 !important;
     font-size: 8pt;
     color: #000000;
   }
@@ -280,7 +298,7 @@ function buildHtml(c: PerfilCargoContenido, version: number, logoSrc: string, fi
   .val-bold {
     background-color: #ffffff;
     font-size: 8.5pt;
-    font-weight: bold;
+    font-weight: 800 !important;
     color: #000000;
   }
   .val-top {
@@ -294,22 +312,24 @@ function buildHtml(c: PerfilCargoContenido, version: number, logoSrc: string, fi
   .sec-title {
     background-color: #cfe2f3 !important;
     font-size: 8.5pt !important;
-    font-weight: bold !important;
+    font-weight: 900 !important;
     text-align: center !important;
     text-transform: uppercase !important;
-    padding: 3.5px 6px !important;
+    padding: 4px 6px !important;
     letter-spacing: 0.02em;
     border: 1px solid #000000 !important;
+    color: #000000 !important;
   }
 
   /* ── Sub-encabezados de Columnas (Color Gris #e2e8f0 / #f2f2f2) ── */
   .subsec-title {
     background-color: #f2f2f2 !important;
     font-size: 8pt !important;
-    font-weight: bold !important;
+    font-weight: 800 !important;
     text-align: center !important;
-    padding: 3px 6px !important;
+    padding: 3.5px 6px !important;
     border: 1px solid #000000 !important;
+    color: #000000 !important;
   }
 
   /* ── Listas con Viñetas ── */
@@ -319,17 +339,24 @@ function buildHtml(c: PerfilCargoContenido, version: number, logoSrc: string, fi
     list-style-type: disc;
   }
   ul.bullet-list li {
-    margin-bottom: 2px;
-    font-size: 8pt;
-    line-height: 1.25;
+    margin-bottom: 2.5px;
+    font-size: 7.8pt;
+    line-height: 1.35;
+    color: #000000;
+    text-align: justify;
+  }
+  ul.bullet-list li:last-child {
+    margin-bottom: 0;
   }
 
   /* ── Responsabilidad Grid ── */
   .resp-check-left, .resp-check-right {
     font-size: 8pt;
+    font-weight: bold !important;
     background: #ffffff;
-    padding: 3px 6px;
+    padding: 4px 6px;
     border: 1px solid #000000;
+    color: #000000;
   }
 
   /* ── Flujograma de Procesos ── */
@@ -423,13 +450,13 @@ function buildHtml(c: PerfilCargoContenido, version: number, logoSrc: string, fi
         ${logoSrc ? `<img src="${logoSrc}" class="hdr-logo-img" alt="Milla 7" />` : '<b>MILLA 7</b>'}
       </td>
       <td class="hdr-title-cell">
-        <div class="hdr-sig">SISTEMA INTEGRADO DE GESTIÓN BASC - PESV - SGA - SG-SST</div>
-        <div class="hdr-docname">PERFIL Y FUNCIONES DEL CARGO</div>
+        <div class="hdr-sig"><b>${c.sistema_gestion || 'SISTEMA INTEGRADO DE GESTIÓN BASC - PESV - SGA - SG-SST'}</b></div>
+        <div class="hdr-docname"><b>${c.titulo_documento || 'PERFIL Y FUNCIONES DEL CARGO'}</b></div>
       </td>
       <td class="hdr-meta-cell">
-        <div class="hdr-meta-line">CÓDIGO: FO-SG-008</div>
-        <div class="hdr-meta-line">VERSIÓN: ${version || 2}</div>
-        <div class="hdr-meta-line">FECHA: ${c.fecha_actualizacion || '03/09/2025'}</div>
+        <div class="hdr-meta-line"><b>CÓDIGO: ${c.codigo_formato || 'FO-SG-008'}</b></div>
+        <div class="hdr-meta-line"><b>VERSIÓN: ${c.version_formato || version || 2}</b></div>
+        <div class="hdr-meta-line"><b>FECHA: ${c.fecha_formato || '03/09/2025'}</b></div>
       </td>
     </tr>
   </table>
@@ -442,15 +469,15 @@ function buildHtml(c: PerfilCargoContenido, version: number, logoSrc: string, fi
     </tr>
     <tr>
       <td class="lbl">Nombre del Cargo:</td>
-      <td class="val-bold uppercase" colspan="3">${c.cargo || '—'}</td>
+      <td class="val-bold uppercase" colspan="3">${(c.cargo || '—').toUpperCase()}</td>
     </tr>
     <tr>
       <td class="lbl">Dependencia:</td>
-      <td class="val" colspan="3">${c.dependencia || '—'}</td>
+      <td class="val uppercase" colspan="3">${(c.dependencia || '—').toUpperCase()}</td>
     </tr>
     <tr>
       <td class="lbl">Jefe Inmediato:</td>
-      <td class="val uppercase" colspan="3">${c.jefe_inmediato || '—'}</td>
+      <td class="val uppercase" colspan="3">${(c.jefe_inmediato || '—').toUpperCase()}</td>
     </tr>
     <tr>
       <td class="lbl">Cargo crítico</td>

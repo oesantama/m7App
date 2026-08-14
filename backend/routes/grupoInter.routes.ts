@@ -13,9 +13,15 @@ const storage = multer.diskStorage({
   }
 });
 
-const upload = multer({ 
+const upload = multer({
   storage,
   limits: { fileSize: 200 * 1024 * 1024 } // Límite de 200MB por archivo
+});
+
+// Multer con límite reducido para el upload público del conductor (evita abuso, es sin auth)
+const uploadPublicPhoto = multer({
+  storage,
+  limits: { fileSize: 15 * 1024 * 1024 } // 15MB — suficiente para una foto de cumplido
 });
 
 // Rutas de Gestión Grupo Inter
@@ -24,6 +30,7 @@ router.post('/upload-manifest-excel', upload.single('file'), grupoInterControlle
 router.post('/process-pdf', upload.single('file'), grupoInterController.processPDF);
 router.get('/orders', grupoInterController.getOrders);
 router.put('/status/:id', grupoInterController.updateStatus);
+router.put('/manifiesto/:id', grupoInterController.updateManifiesto);
 router.get('/details/:id', grupoInterController.getOrderDetails);
 
 // Novedades y Reajustes
@@ -34,5 +41,16 @@ router.post('/reajustes', grupoInterController.addReajuste);
 
 // API Pública (WebService para Clientes Externos)
 router.get('/public/list', grupoInterController.getOrdersPublicListSecure);
+router.get('/public/soporte/:numeroDocumento', grupoInterController.getPublicSoporte);
+router.get('/public/seguimiento/:numeroDocumento', grupoInterController.getPublicSeguimiento);
+
+// Link público de conductor (sin auth) — sube el cumplido de su ruta/placa
+router.get('/public/cumplido/:token', grupoInterController.getPublicCumplido);
+router.post('/public/cumplido/:token/:pedidoId', uploadPublicPhoto.single('foto'), grupoInterController.uploadPublicCumplido);
+
+// Generación del link público (interno, requiere auth vía middleware global)
+router.get('/rutas-placa', grupoInterController.getRutasPorPlaca);
+router.post('/public-link', grupoInterController.createPublicLink);
+router.get('/soporte/:id', grupoInterController.getSoporteInterno);
 
 export default router;

@@ -103,6 +103,8 @@ const BascModule = lazyWithRetry(() => import('./components/BASC/BascModule'));
 const InventarioActivosTI = lazyWithRetry(() => import('./components/InventarioActivosTI'));
 const PerfilesCargo = lazyWithRetry(() => import('./components/GestionHumana/PerfilesCargo'));
 const PerfilCargoPublicSign = lazyWithRetry(() => import('./components/PerfilCargoPublicSign'));
+const GrupoInterCumplidoPage = lazyWithRetry(() => import('./components/GrupoInterCumplidoPage'));
+const GrupoInterSeguimientoPage = lazyWithRetry(() => import('./components/GrupoInterSeguimientoPage'));
 
 // Import Admin Module
 const AdminDBManager = lazyWithRetry(() => import('./pages/AdminDBManager'));
@@ -418,11 +420,11 @@ const App: React.FC = () => {
       }
 
       const userData = authRes.user;
-      // ... (rest of the logic remains the same)
 
-      // Simulo el resto para no repetir todo el bloque si es idéntico, 
-      // pero necesito asegurar que retorno {success: true} al final.
-      // (Volveré a pegar el bloque completo para evitar errores de contexto incompleto)
+      // Guardar el token ANTES de cualquier otra petición — api.ts lo lee de
+      // localStorage en cada fetch, así que si getUserPermissions se llama primero
+      // sale sin Authorization, recibe 401, y esa falla en cascada deja el menú vacío.
+      localStorage.setItem('token', authRes.token);
 
       // 2. Cargar permisos del usuario
       const userPermissions = await api.getUserPermissions(userData.id).catch(() => null);
@@ -592,6 +594,29 @@ const App: React.FC = () => {
     return (
       <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"/></div>}>
         <PerfilCargoPublicSign token={pcToken} />
+      </React.Suspense>
+    );
+  }
+
+  // /public/gi-cumplido/:token — sin auth, el conductor sube el cumplido de su ruta/placa
+  const giCumplidoMatch = window.location.pathname.match(/^\/public\/gi-cumplido\/([^/]+)$/);
+  if (giCumplidoMatch) {
+    const [, giToken] = giCumplidoMatch;
+    return (
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"/></div>}>
+        <GrupoInterCumplidoPage token={giToken} />
+      </React.Suspense>
+    );
+  }
+
+  // /public/gi-seguimiento/:numeroDocumento?token=... — sin auth, consulta de solo lectura
+  const giSeguimientoMatch = window.location.pathname.match(/^\/public\/gi-seguimiento\/([^/]+)$/);
+  if (giSeguimientoMatch) {
+    const [, giDoc] = giSeguimientoMatch;
+    const giToken2 = new URLSearchParams(window.location.search).get('token') || '';
+    return (
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"/></div>}>
+        <GrupoInterSeguimientoPage numeroDocumento={decodeURIComponent(giDoc)} token={giToken2} />
       </React.Suspense>
     );
   }

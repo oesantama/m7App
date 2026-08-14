@@ -10,6 +10,11 @@ import * as XLSX from 'xlsx';
 import crypto from 'crypto';
 
 export interface PerfilCargoContenido {
+  codigo_formato?: string;
+  version_formato?: string;
+  fecha_formato?: string;
+  sistema_gestion?: string;
+  titulo_documento?: string;
   cargo: string;
   fecha_actualizacion: string;
   dependencia: string;
@@ -40,8 +45,9 @@ export interface PerfilCargoParseado {
 
 type Row = any[];
 
-const norm = (v: any): string => String(v ?? '').replace(/\s+/g, ' ').trim();
-const normLabel = (v: any): string => norm(v).toLowerCase().replace(/[:.]/g, '');
+const norm = (v: any): string => String(v ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+const normSingleLine = (v: any): string => String(v ?? '').replace(/\s+/g, ' ').trim();
+const normLabel = (v: any): string => normSingleLine(v).toLowerCase().replace(/[:.]/g, '');
 
 function findRowIndex(rows: Row[], matcher: (label: string) => boolean, from = 0): number {
   const start = Math.max(0, from);
@@ -88,12 +94,42 @@ function parseSheet(ws: XLSX.WorkSheet, hoja: string): PerfilCargoParseado {
     throw new Error(`Pestaña ${hoja} está vacía`);
   }
 
-  const iOrganigrama = findRowIndex(rows, l => l.includes('organigrama'));
-  const iCompetencias = findRowIndex(rows, l => l.includes('competencia'));
-  const iComunicaciones = findRowIndex(rows, l => l.includes('comunicaci'));
-  const iResponsabilidad = findRowIndex(rows, l => l.includes('responsabilidad'));
-  const iFlujograma = findRowIndex(rows, l => l.includes('flujograma') || (l.includes('proceso') && l.includes('actividad')));
-  const iCertificado = findRowIndex(rows, l => l.includes('certificado') || l.includes('aceptaci'));
+  // ── Encabezado Institucional (Celdas B1 y H1/G1/I1) ───────────────────
+  let headerCell = '';
+  let titleCell = '';
+  if (rows[0] && Array.isArray(rows[0])) {
+    for (let c = 0; c < rows[0].length; c++) {
+      const cellVal = norm(rows[0][c]);
+      if (!cellVal) continue;
+      const lower = cellVal.toLowerCase();
+      if (lower.includes('sistema integrado') || lower.includes('perfil y funciones')) {
+        titleCell = cellVal;
+      } else if (lower.includes('código') || lower.includes('codigo') || lower.includes('versión') || lower.includes('version')) {
+        headerCell = cellVal;
+      }
+    }
+  }
+  if (!headerCell && (ws['H1'] || ws['G1'] || ws['I1'])) {
+    headerCell = norm((ws['H1'] || ws['G1'] || ws['I1']).v);
+  }
+  if (!titleCell && (ws['B1'] || ws['C1'] || ws['D1'])) {
+    titleCell = norm((ws['B1'] || ws['C1'] || ws['D1']).v);
+  }
+
+  const codigo_formato = (headerCell.match(/c[oó]digo\s*:\s*([^\n\r]+)/i) || [])[1]?.trim() || 'FO-SG-008';
+  const version_formato = (headerCell.match(/versi[oó]n\s*:\s*([^\n\r]+)/i) || [])[1]?.trim() || '2';
+  const fecha_formato = (headerCell.match(/fecha\s*:\s*([^\n\r]+)/i) || [])[1]?.trim() || '03/09/2025';
+
+  const titleLines = titleCell.split(/\n\s*\n|\n/).map(s => s.trim()).filter(Boolean);
+  const sistema_gestion = titleLines[0] || 'SISTEMA INTEGRADO DE GESTIÓN BASC - PESV - SGA - SG-SST';
+  const titulo_documento = titleLines[1] || 'PERFIL Y FUNCIONES DEL CARGO';
+
+  const iOrganigrama = findRowIndex(rows, l => l.includes('organigrama') && l.length < 40);
+  const iCompetencias = findRowIndex(rows, l => l.includes('competencia') && l.length < 40, iOrganigrama > 0 ? iOrganigrama + 1 : 0);
+  const iComunicaciones = findRowIndex(rows, l => l.includes('comunicaci') && l.length < 40, iCompetencias > 0 ? iCompetencias + 1 : 0);
+  const iResponsabilidad = findRowIndex(rows, l => l.includes('responsabilidad') && l.length < 40, iComunicaciones > 0 ? iComunicaciones + 1 : 0);
+  const iFlujograma = findRowIndex(rows, l => (l.includes('flujograma') || l.includes('proceso')) && l.length < 40, iResponsabilidad > 0 ? iResponsabilidad + 1 : 0);
+  const iCertificado = findRowIndex(rows, l => l.startsWith('certificado') || l.includes('certificado de aceptaci'), iFlujograma > 0 ? iFlujograma + 1 : 0);
 
   // ── Bloque superior ──────────────────────────────────────────────────
   const cargo = findFieldValue(rows, 'nombre del cargo') || findFieldValue(rows, 'cargo') || hoja;
@@ -105,7 +141,7 @@ function parseSheet(ws: XLSX.WorkSheet, hoja: string): PerfilCargoParseado {
   let cargo_critico = '';
   if (idxCritico >= 0 && rows[idxCritico]) {
     const r = rows[idxCritico];
-    cargo_critico = [norm(r[1]), norm(r[2]), norm(r[3]), norm(r[4])].filter(Boolean).join(' · ');
+    cargo_critico = [normSingleLine(r[1]), normSingleLine(r[2]), normSingleLine(r[3]), normSingleLine(r[4])].filter(Boolean).join(' · ');
   }
 
   // ── I. Organigrama ───────────────────────────────────────────────────
@@ -165,7 +201,9 @@ function parseSheet(ws: XLSX.WorkSheet, hoja: string): PerfilCargoParseado {
       const c0 = norm(rows[i][0]);
       const c1 = norm(rows[i][1]);
       const c2 = norm(rows[i][2] || rows[i][3]);
-      if (normLabel(c0).includes('proceso') && normLabel(c1).includes('funci')) continue; // fila de encabezado
+      if (normLabel(c0).includes('proceso') && (normLabel(c1).includes('funci') || !c1)) continue; // fila de encabezado
+      if (normLabel(c2).includes('actividad') || normLabel(c2).includes('ruta cr')) continue; // fila de encabezado
+      if (normLabel(c0) === normLabel(cargo) && !c1 && !c2) continue; // nombre del cargo repetido
       if (!c1 && !c2 && !c0) continue; // fila vacía
       if (c0) lastProceso = c0;
       if (c1) lastFuncion = c1;
@@ -178,10 +216,26 @@ function parseSheet(ws: XLSX.WorkSheet, hoja: string): PerfilCargoParseado {
   const aprobado_por = findFieldValue(rows, 'aprobado por') || findFieldValue(rows, 'aprobado');
 
   const contenido: PerfilCargoContenido = {
-    cargo, fecha_actualizacion, dependencia, jefe_inmediato, cargo_critico,
-    personas_a_cargo, condiciones_salario, proposito_cargo, porque_responde,
-    competencias, comunicaciones, responsabilidad_con, flujograma,
-    elaborado_por, aprobado_por,
+    codigo_formato,
+    version_formato,
+    fecha_formato,
+    sistema_gestion,
+    titulo_documento,
+    cargo,
+    fecha_actualizacion,
+    dependencia,
+    jefe_inmediato,
+    cargo_critico,
+    personas_a_cargo,
+    condiciones_salario,
+    proposito_cargo,
+    porque_responde,
+    competencias,
+    comunicaciones,
+    responsabilidad_con,
+    flujograma,
+    elaborado_por,
+    aprobado_por,
   };
 
   const contentHash = crypto.createHash('sha256').update(JSON.stringify(contenido)).digest('hex');

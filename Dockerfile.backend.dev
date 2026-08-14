@@ -10,6 +10,7 @@ WORKDIR /app
 RUN apk add --no-cache \
       ca-certificates \
       tzdata \
+      rclone \
       poppler-utils \
       chromium \
       nss \

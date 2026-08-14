@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Upload, FileSpreadsheet, FileText, Search, Eye, 
-  MapPin, Package, Truck, Clock, CheckCircle, 
+import {
+  Upload, FileSpreadsheet, FileText, Search, Eye,
+  MapPin, Package, Truck, Clock, CheckCircle,
   AlertCircle, ChevronRight, Download, Filter, User,
-  Trash, X
+  Trash, X, Pencil
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { api } from '../services/api';
+import { api, API_URL, getStoredToken } from '../services/api';
 import { useAppStore } from '../stores/useAppStore';
 import { DataTable, ColumnDef } from './shared/DataTable';
 
@@ -77,6 +77,8 @@ const GrupoInterView: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [editingManifiesto, setEditingManifiesto] = useState(false);
+  const [manifiestoDraft, setManifiestoDraft] = useState('');
   const [orderDetails, setOrderDetails] = useState<{items: any[], history: any[], novedades?: any[], reajustes?: any[]} | null>(null);
   const [productSearch, setProductSearch] = useState('');
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -91,11 +93,22 @@ const GrupoInterView: React.FC = () => {
   const [manifestFile, setManifestFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pdfPlanilla, setPdfPlanilla] = useState('');
-  const [uploadExtra, setUploadExtra] = useState({ placa: '', fleteTotal: '', planilla: '', ruta: '', formato: 'antiguo' });
+  const [uploadExtra, setUploadExtra] = useState({ placa: '', fleteTotal: '', planilla: '', ruta: '', manifiesto: '', formato: 'antiguo' });
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showManifestPreview, setShowManifestPreview] = useState(false);
   const [showGuideModal, setShowGuideModal] = useState<'operacion' | 'manifiesto' | null>(null);
+
+  // Link público de conductor (cumplido de ruta/placa sin usuario)
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [soporteLoadingAction, setSoporteLoadingAction] = useState<'ver' | 'descargar' | null>(null);
+  const [linkStep, setLinkStep] = useState<'placa' | 'ruta' | 'result'>('placa');
+  const [linkPlaca, setLinkPlaca] = useState('');
+  const [linkRutas, setLinkRutas] = useState<Array<{ ruta: string; total_pedidos: number; pendientes: number; fecha_desde: string | null; fecha_hasta: string | null }>>([]);
+  const [linkSelectedRuta, setLinkSelectedRuta] = useState<string | null>(null);
+  const [linkHoras, setLinkHoras] = useState(24);
+  const [linkLoading, setLinkLoading] = useState(false);
+  const [linkResult, setLinkResult] = useState<{ url: string; expiresAt: string; totalPedidos: number } | null>(null);
 
   // Columnas dinámicas para el DataTable de previsualización — el Excel cargado define sus propias columnas
   const previewColumns: ColumnDef<any>[] = React.useMemo(() => {
@@ -134,7 +147,7 @@ const GrupoInterView: React.FC = () => {
     placa?: string;
     planilla?: string;
     factura?: string;
-    dateType: 'entrega' | 'cargue';
+    manifiesto?: string;
   }>({
     status: '',
     client: '',
@@ -143,7 +156,7 @@ const GrupoInterView: React.FC = () => {
     placa: '',
     planilla: '',
     factura: '',
-    dateType: 'cargue'
+    manifiesto: ''
   });
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
@@ -187,8 +200,8 @@ const GrupoInterView: React.FC = () => {
       if (filters.factura) params.invoice = filters.factura;
       if (filters.placa) params.plate = filters.placa;
       if (filters.planilla) params.planilla = filters.planilla;
-      if (filters.dateType) params.dateType = filters.dateType;
-      
+      if (filters.manifiesto) params.manifiesto = filters.manifiesto;
+
       const data = await api.getGrupoInterOrders(params);
       
       // [M7-OPTIMIZE] Solo actualizamos el estado si la respuesta es válida
@@ -439,7 +452,7 @@ const GrupoInterView: React.FC = () => {
       placa: '',
       planilla: '',
       factura: '',
-      dateType: 'cargue'
+      manifiesto: ''
     });
     setSearchTerm('');
     setCurrentPage(1);
@@ -447,7 +460,7 @@ const GrupoInterView: React.FC = () => {
     
     // Obtener órdenes de forma fresca e inmediata con filtros limpios
     setTimeout(() => {
-      api.getGrupoInterOrders({ dateType: 'cargue' }).then(data => {
+      api.getGrupoInterOrders({}).then(data => {
         if (data) {
           setOrders(data);
         }
@@ -494,7 +507,8 @@ const GrupoInterView: React.FC = () => {
   const openDetail = async (order: Order) => {
     setSelectedOrder(order);
     setShowDetailModal(true);
-    setOrderDetails(null); 
+    setOrderDetails(null);
+    setEditingManifiesto(false);
     setProductSearch('');
     setCurrentPageItems(1);
     setCurrentPageHistorico(1);
@@ -525,6 +539,107 @@ const GrupoInterView: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Trae el PDF de soporte (Drive o respaldo local) del endpoint interno autenticado
+  // y lo abre como blob: URL — no se puede usar un <a href> directo porque ese endpoint
+  // requiere el token JWT en el header Authorization.
+  const handleViewSoporte = async (pedidoId: number, numeroDocumento: string, action: 'ver' | 'descargar') => {
+    setSoporteLoadingAction(action);
+    try {
+      const token = getStoredToken();
+      const res = await fetch(`${API_URL}/grupo-inter/soporte/${pedidoId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) { toast.error('No se pudo cargar el soporte de entrega'); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      if (action === 'ver') {
+        setPdfPreviewUrl(url);
+        setShowPdfModal(true);
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Acta_Entrega_${numeroDocumento}.pdf`;
+        a.click();
+      }
+    } catch {
+      toast.error('Error al obtener el soporte de entrega');
+    } finally {
+      setSoporteLoadingAction(null);
+    }
+  };
+
+  const handleSaveManifiesto = async () => {
+    if (!selectedOrder) return;
+    try {
+      await api.updateGrupoInterManifiesto(selectedOrder.id, {
+        manifiesto: manifiestoDraft.trim(),
+        usuario: user?.name || 'System'
+      });
+      toast.success('Manifiesto actualizado');
+      setSelectedOrder({ ...selectedOrder, numero_guia: manifiestoDraft.trim() });
+      setOrders(prev => prev.map(o => o.id === selectedOrder.id ? { ...o, numero_guia: manifiestoDraft.trim() } : o));
+      setEditingManifiesto(false);
+    } catch (error: any) {
+      toast.error(error.message || 'Error al actualizar el manifiesto');
+    }
+  };
+
+  const resetLinkModal = () => {
+    setShowLinkModal(false);
+    setLinkStep('placa');
+    setLinkPlaca('');
+    setLinkRutas([]);
+    setLinkSelectedRuta(null);
+    setLinkHoras(24);
+    setLinkResult(null);
+  };
+
+  const handleSearchRutas = async () => {
+    if (!linkPlaca.trim()) { toast.error('Ingresa la placa del vehículo'); return; }
+    setLinkLoading(true);
+    try {
+      const rutas = await api.getGrupoInterRutasPorPlaca(linkPlaca.trim());
+      if (!rutas || rutas.length === 0) {
+        toast.error('No se encontraron facturas para esa placa');
+        return;
+      }
+      setLinkRutas(rutas);
+      // Si solo hay una ruta, la selecciona automáticamente y salta directo a la duración
+      setLinkSelectedRuta(rutas.length === 1 ? rutas[0].ruta : null);
+      setLinkStep('ruta');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al buscar rutas de la placa');
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
+  const handleGenerateLink = async () => {
+    if (!linkSelectedRuta) { toast.error('Selecciona la ruta que va a cubrir el link'); return; }
+    setLinkLoading(true);
+    try {
+      const res = await api.createGrupoInterPublicLink({
+        placa: linkPlaca.trim(),
+        ruta: linkSelectedRuta === 'SIN RUTA ASIGNADA' ? null : linkSelectedRuta,
+        horas: linkHoras,
+        usuario: user?.name || 'Admin'
+      });
+      setLinkResult({ url: res.url, expiresAt: res.expiresAt, totalPedidos: res.totalPedidos });
+      setLinkStep('result');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al generar el link');
+    } finally {
+      setLinkLoading(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (!linkResult) return;
+    navigator.clipboard.writeText(linkResult.url)
+      .then(() => toast.success('Link copiado — pégalo en WhatsApp para el conductor'))
+      .catch(() => toast.error('No se pudo copiar. Selecciona y copia manualmente.'));
   };
 
   const handleAddNovedad = async () => {
@@ -602,6 +717,7 @@ const GrupoInterView: React.FC = () => {
   let visibleOrders = orders.filter(o => {
     if (filters.placa && !(o.placa || '').toLowerCase().includes(filters.placa.toLowerCase().trim())) return false;
     if (filters.planilla && !(o.numero_planilla || '').toLowerCase().includes(filters.planilla.toLowerCase().trim())) return false;
+    if (filters.manifiesto && !(o.numero_guia || '').toLowerCase().includes(filters.manifiesto.toLowerCase().trim())) return false;
     if (filters.factura) {
       const fac = filters.factura.toLowerCase().trim();
       const matchFac = (o.no_factura_m7 || '').toLowerCase().includes(fac);
@@ -907,39 +1023,14 @@ const GrupoInterView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Date Type Selector (Toggle Switch) */}
-                  <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
-                    <button
-                      type="button"
-                      onClick={() => setFilters({ ...filters, dateType: 'entrega' })}
-                      className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-tight transition-all ${
-                        filters.dateType === 'entrega'
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      Fecha de Entrega
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFilters({ ...filters, dateType: 'cargue' })}
-                      className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-tight transition-all ${
-                        filters.dateType === 'cargue'
-                          ? 'bg-blue-600 text-white shadow-sm'
-                          : 'text-slate-500 hover:text-slate-800'
-                      }`}
-                    >
-                      Fecha de Cargue
-                    </button>
-                  </div>
                 </div>
 
                 {/* Main Filter Inputs Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
                   {/* Date Range Selector */}
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <Clock size={12} className="text-blue-500" /> Rango de Consulta
+                      <Clock size={12} className="text-blue-500" /> Fecha Factura
                     </label>
                     <div className="flex items-center bg-white p-1.5 rounded-2xl border border-slate-200 focus-within:ring-2 focus-within:ring-blue-500/20 transition-all shadow-sm">
                       <input
@@ -1020,6 +1111,27 @@ const GrupoInterView: React.FC = () => {
                       />
                     </div>
                   </div>
+
+                  {/* Manifiesto Input */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Package size={12} className="text-blue-500" /> Manifiesto
+                    </label>
+                    <div className="relative group">
+                      <Package className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" size={14} />
+                      <input
+                        type="text"
+                        placeholder="Ej. 45123"
+                        className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm uppercase focus:bg-white"
+                        value={filters.manifiesto || ''}
+                        onChange={(e) => {
+                          setFilters({ ...filters, manifiesto: e.target.value });
+                          setCurrentPage(1);
+                        }}
+                        onKeyDown={(e) => e.key === 'Enter' && fetchOrders(searchTerm)}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Sub-toolbar: Global Search, Buttons, Clean & Export */}
@@ -1088,6 +1200,16 @@ const GrupoInterView: React.FC = () => {
                     >
                       <FileSpreadsheet size={16} />
                       Exportar
+                    </button>
+
+                    {/* Link Conductor */}
+                    <button
+                      onClick={() => { resetLinkModal(); setShowLinkModal(true); }}
+                      className="px-4 py-3.5 bg-slate-900 text-white rounded-2xl text-[10px] font-black flex items-center justify-center gap-2 hover:bg-slate-800 transition-all uppercase tracking-widest"
+                      title="Generar link para que el conductor suba el cumplido"
+                    >
+                      <Truck size={16} />
+                      Link Conductor
                     </button>
 
                     {/* Results Count Badge */}
@@ -1278,9 +1400,9 @@ const GrupoInterView: React.FC = () => {
                   </div>
                 </div>
                   <div className="flex items-center gap-2">
-                    {(selectedOrder as any).acta_entrega_b64 && (
+                    {(selectedOrder as any).acta_entrega_b64 ? (
                       <>
-                        <button 
+                        <button
                           onClick={() => {
                             let b64 = (selectedOrder as any).acta_entrega_b64;
                             if (!b64.startsWith('data:application/pdf;base64,')) {
@@ -1293,7 +1415,7 @@ const GrupoInterView: React.FC = () => {
                         >
                           <Eye size={14} /> Ver Acta
                         </button>
-                        <button 
+                        <button
                           onClick={() => {
                             let b64 = (selectedOrder as any).acta_entrega_b64;
                             // Asegurar prefijo para que el navegador lo identifique correctamente
@@ -1310,7 +1432,24 @@ const GrupoInterView: React.FC = () => {
                           <Download size={14} /> Descargar
                         </button>
                       </>
-                    )}
+                    ) : (selectedOrder as any).acta_entrega_drive_path ? (
+                      <>
+                        <button
+                          onClick={() => handleViewSoporte(selectedOrder.id, selectedOrder.numero_documento, 'ver')}
+                          disabled={soporteLoadingAction !== null}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-[10px] font-black uppercase tracking-tight hover:bg-blue-100 transition shadow-sm disabled:opacity-50"
+                        >
+                          <Eye size={14} /> {soporteLoadingAction === 'ver' ? 'Cargando...' : 'Ver Cumplido'}
+                        </button>
+                        <button
+                          onClick={() => handleViewSoporte(selectedOrder.id, selectedOrder.numero_documento, 'descargar')}
+                          disabled={soporteLoadingAction !== null}
+                          className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-tight hover:bg-emerald-100 transition shadow-sm disabled:opacity-50"
+                        >
+                          <Download size={14} /> {soporteLoadingAction === 'descargar' ? 'Cargando...' : 'Descargar'}
+                        </button>
+                      </>
+                    ) : null}
                     <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={24} /></button>
                   </div>
              </div>
@@ -1328,8 +1467,44 @@ const GrupoInterView: React.FC = () => {
                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Logística Operativa</h4>
                       <DetailItem icon={<Truck size={14}/>} label="Placa" value={selectedOrder.placa || '-'} />
                       <DetailItem icon={<Clock size={14}/>} label="Fecha Viaje" value={selectedOrder.fecha_viaje ? new Date(selectedOrder.fecha_viaje).toLocaleDateString() : '-'} />
-                      <DetailItem icon={<Clock size={14}/>} label="Último Corte" value={selectedOrder.f_ultimo_corte ? new Date(selectedOrder.f_ultimo_corte).toLocaleDateString() : '-'} />
+                      <DetailItem icon={<Clock size={14}/>} label="Fecha Factura" value={selectedOrder.f_ultimo_corte ? new Date(selectedOrder.f_ultimo_corte).toLocaleDateString() : '-'} />
+                      <DetailItem icon={<CheckCircle size={14}/>} label="Fecha de Entrega" value={selectedOrder.fecha_entregado ? new Date(selectedOrder.fecha_entregado).toLocaleString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'} />
                       <DetailItem icon={<Filter size={14}/>} label="Clasificación" value={selectedOrder.clasificacion || '-'} />
+                      <div className="flex items-start gap-3">
+                        <div className="mt-1 text-blue-500"><Package size={14}/></div>
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">Manifiesto</span>
+                          {editingManifiesto ? (
+                            <div className="flex items-center gap-2 mt-1">
+                              <input
+                                type="text"
+                                autoFocus
+                                className="flex-1 min-w-0 px-2 py-1 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500/20"
+                                value={manifiestoDraft}
+                                onChange={(e) => setManifiestoDraft(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSaveManifiesto()}
+                              />
+                              <button onClick={handleSaveManifiesto} className="text-emerald-600 hover:text-emerald-700 shrink-0" title="Guardar">
+                                <CheckCircle size={16} />
+                              </button>
+                              <button onClick={() => setEditingManifiesto(false)} className="text-slate-400 hover:text-rose-500 shrink-0" title="Cancelar">
+                                <X size={16} />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900 leading-tight">{selectedOrder.numero_guia || '-'}</span>
+                              <button
+                                onClick={() => { setManifiestoDraft(selectedOrder.numero_guia || ''); setEditingManifiesto(true); }}
+                                className="text-slate-300 hover:text-blue-500 transition-colors"
+                                title="Editar manifiesto"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                    </div>
                    <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 flex flex-col gap-4">
                       <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Totales Valorizados</h4>
@@ -1552,7 +1727,7 @@ const GrupoInterView: React.FC = () => {
                     />
                  </div>
 
-                 <div className="p-4 md:p-6 bg-white border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 px-4 md:px-8">
+                 <div className="p-4 md:p-6 bg-white border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6 px-4 md:px-8">
                     <div className="flex flex-col gap-2">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Placa Vehículo *</label>
                        <input 
@@ -1585,12 +1760,22 @@ const GrupoInterView: React.FC = () => {
                     </div>
                     <div className="flex flex-col gap-2">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Número de Planilla</label>
-                       <input 
-                         type="text" 
-                         placeholder="Opcional..." 
+                       <input
+                         type="text"
+                         placeholder="Opcional..."
                          className="p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none"
                          value={uploadExtra.planilla}
                          onChange={(e) => setUploadExtra(prev => ({ ...prev, planilla: e.target.value }))}
+                       />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Número de Manifiesto</label>
+                       <input
+                         type="text"
+                         placeholder="Opcional (si no lo subes por Excel 2)..."
+                         className="p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500 outline-none"
+                         value={uploadExtra.manifiesto}
+                         onChange={(e) => setUploadExtra(prev => ({ ...prev, manifiesto: e.target.value }))}
                        />
                     </div>
                  </div>
@@ -1781,6 +1966,152 @@ const GrupoInterView: React.FC = () => {
                  />
               </div>
            </div>
+        </div>
+      )}
+
+      {/* Modal: Generar Link Conductor */}
+      {showLinkModal && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-slate-900 text-white rounded-xl">
+                  <Truck size={18} />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-slate-800 uppercase tracking-tight">Link para el Conductor</h3>
+                  <p className="text-[10px] text-slate-400 font-bold">Sube el cumplido de su ruta sin necesidad de usuario</p>
+                </div>
+              </div>
+              <button onClick={resetLinkModal} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={20}/></button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {linkStep === 'placa' && (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Placa del Vehículo</label>
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Ej. LZN785"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold uppercase outline-none focus:ring-2 focus:ring-slate-900/10"
+                      value={linkPlaca}
+                      onChange={(e) => setLinkPlaca(e.target.value.toUpperCase())}
+                      onKeyDown={(e) => e.key === 'Enter' && handleSearchRutas()}
+                    />
+                  </div>
+                  <button
+                    onClick={handleSearchRutas}
+                    disabled={linkLoading}
+                    className="w-full py-3.5 bg-slate-900 text-white rounded-xl font-black text-[11px] uppercase tracking-widest hover:bg-slate-800 transition-all disabled:opacity-50"
+                  >
+                    {linkLoading ? 'Buscando...' : 'Buscar Rutas de esta Placa'}
+                  </button>
+                </>
+              )}
+
+              {linkStep === 'ruta' && (
+                <>
+                  {linkRutas.length > 1 && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        Esta placa tiene {linkRutas.length} rutas — elige cuál cubre el link
+                      </label>
+                      <div className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar">
+                        {linkRutas.map((r) => (
+                          <button
+                            key={r.ruta}
+                            onClick={() => setLinkSelectedRuta(r.ruta)}
+                            className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
+                              linkSelectedRuta === r.ruta ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-300'
+                            }`}
+                          >
+                            <p className="font-black text-slate-800 text-sm">{r.ruta}</p>
+                            <p className="text-[10px] text-slate-500 font-bold mt-0.5">
+                              {r.pendientes} pendientes de {r.total_pedidos} facturas
+                            </p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {linkRutas.length === 1 && (
+                    <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                      <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Ruta detectada</p>
+                      <p className="font-black text-slate-800 text-sm">{linkRutas[0].ruta}</p>
+                      <p className="text-[10px] text-slate-500 font-bold mt-0.5">{linkRutas[0].pendientes} pendientes de {linkRutas[0].total_pedidos} facturas</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Duración del Link (máx. 7 días)</label>
+                    <div className="flex flex-wrap gap-2">
+                      {[4, 8, 24, 72, 168].map(h => (
+                        <button
+                          key={h}
+                          onClick={() => setLinkHoras(h)}
+                          className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${
+                            linkHoras === h ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                        >
+                          {h < 24 ? `${h}h` : `${h / 24}d`}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setLinkStep('placa')}
+                      className="flex-1 py-3 border border-slate-200 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50"
+                    >
+                      Atrás
+                    </button>
+                    <button
+                      onClick={handleGenerateLink}
+                      disabled={linkLoading || !linkSelectedRuta}
+                      className="flex-1 py-3 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50"
+                    >
+                      {linkLoading ? 'Generando...' : 'Generar Link'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {linkStep === 'result' && linkResult && (
+                <>
+                  <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
+                    <p className="text-2xl mb-1">✅</p>
+                    <p className="font-black text-emerald-700 text-sm">Link generado con éxito</p>
+                    <p className="text-[10px] text-slate-500 mt-1">{linkResult.totalPedidos} facturas · vence el {new Date(linkResult.expiresAt).toLocaleString('es-CO', { day: '2-digit', month: 'long', hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-3">
+                    <input
+                      type="text"
+                      readOnly
+                      value={linkResult.url}
+                      className="flex-1 bg-transparent text-xs font-mono text-slate-600 outline-none truncate"
+                      onFocus={(e) => e.target.select()}
+                    />
+                    <button
+                      onClick={handleCopyLink}
+                      className="shrink-0 px-4 py-2 bg-slate-900 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all"
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                  <button
+                    onClick={resetLinkModal}
+                    className="w-full py-3 border border-slate-200 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50"
+                  >
+                    Cerrar
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

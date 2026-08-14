@@ -1720,24 +1720,31 @@ export const api = {
     }),
   
   // --- GRUPO INTER ---
-  getGrupoInterOrders: (params: { search?: string, status?: string, client?: string } = {}) => {
+  getGrupoInterOrders: (params: { search?: string, status?: string, client?: string, manifiesto?: string } = {}) => {
     const qs = new URLSearchParams(params as any).toString();
     return fetchJson(`${API_URL}/grupo-inter/orders${qs ? `?${qs}` : ''}`);
   },
-  uploadGrupoInterExcel: (file: File, username: string, extra: { placa: string, fleteTotal: string, planilla?: string }) => {
+  uploadGrupoInterExcel: (file: File, username: string, extra: { placa: string, fleteTotal: string, planilla?: string, ruta?: string, manifiesto?: string }) => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('username', username);
     formData.append('placa', extra.placa);
     formData.append('fleteTotal', extra.fleteTotal);
     if (extra.planilla) formData.append('planilla', extra.planilla);
-    
+    if (extra.ruta) formData.append('ruta', extra.ruta);
+    if (extra.manifiesto) formData.append('manifiesto', extra.manifiesto);
+
     return fetchJson(`${API_URL}/grupo-inter/upload-excel`, {
       method: 'POST',
       body: formData,
-      headers: {} 
+      headers: {}
     });
   },
+  updateGrupoInterManifiesto: (id: string | number, data: { manifiesto: string, usuario: string }) => fetchJson(`${API_URL}/grupo-inter/manifiesto/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
 
   // Novedades y Reajustes
   getGrupoInterNovedades: (pedidoId: string) => fetchJson(`${API_URL}/grupo-inter/novedades/${pedidoId}`),
@@ -1763,6 +1770,12 @@ export const api = {
   },
   updateGrupoInterStatus: (id: string, data: { estado: string, observacion?: string, usuario: string }) => fetchJson(`${API_URL}/grupo-inter/status/${id}`, {
     method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
+  getGrupoInterRutasPorPlaca: (placa: string) => fetchJson(`${API_URL}/grupo-inter/rutas-placa?placa=${encodeURIComponent(placa)}`),
+  createGrupoInterPublicLink: (data: { placa: string, ruta?: string | null, horas: number, usuario: string }) => fetchJson(`${API_URL}/grupo-inter/public-link`, {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }),

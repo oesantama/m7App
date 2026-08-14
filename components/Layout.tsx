@@ -31,7 +31,7 @@ const Layout: React.FC<LayoutProps> = ({
 }) => {
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isHelpMode, setIsHelpMode] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(window.innerWidth >= 768 && window.innerWidth < 1024);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [profileData, setProfileData] = useState({ name: user.name, email: user.email, phone: user.phone || '', avatar: user.avatar || AVATAR_GALLERY[0] });
@@ -50,11 +50,6 @@ const Layout: React.FC<LayoutProps> = ({
 
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth >= 768 && window.innerWidth < 1024) {
-        setIsCollapsed(true);
-      } else if (window.innerWidth >= 1024) {
-        // Optional: Auto expand on large screens if desired, or keep user preference
-      }
       if (window.innerWidth >= 768) setIsMobileMenuOpen(false);
     };
     window.addEventListener('resize', handleResize);
@@ -144,6 +139,18 @@ const Layout: React.FC<LayoutProps> = ({
       };
     })
     .filter(group => group.items.length > 0);
+
+  // Auto-desplegar el grupo del módulo correspondiente a la página actual
+  useEffect(() => {
+    if (menuGroups.length > 0) {
+      const activeGroup = menuGroups.find(g => 
+        g.items.some(item => (activePageId && item.id === activePageId) || (activeTab && item.module === activeTab))
+      );
+      if (activeGroup && expandedGroup !== activeGroup.id) {
+        setExpandedGroup(activeGroup.id);
+      }
+    }
+  }, [activePageId, activeTab, menuGroups.length]);
 
   /* Módulo de Administración ahora manejado dinámicamente vía DB */
 
