@@ -13,6 +13,9 @@ import {
     publicoVerificar,
     publicoDocumento,
     publicoFirmar,
+    buscarPersonalDisponible,
+    agregarPersona,
+    eliminarPendiente,
 } from '../controllers/gh-perfiles-cargo.controller.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
@@ -29,6 +32,9 @@ router.get('/:id/pdf', descargarPdfReferencia);
 router.get('/firmas/:firmaId/pdf-firmado', descargarPdfFirmado);
 router.post('/firmas/:firmaId/firmar', firmarAutenticado);
 router.post('/firmas/:firmaId/generar-token', generarToken);
+router.delete('/firmas/:firmaId', eliminarPendiente);
+router.get('/:id/personal-disponible', buscarPersonalDisponible);
+router.post('/:id/personal', agregarPersona);
 
 // Público — sin JWT, protegido por token de un solo uso + últimos 4 dígitos de cédula
 export const publicRouter = Router();

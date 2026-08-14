@@ -941,6 +941,14 @@ export const api = {
     }),
     tracking: (perfilId?: number) => fetchJson(`${API_URL}/gh-perfiles-cargo/tracking${perfilId ? `?perfil_id=${perfilId}` : ''}`),
     misPendientes: () => fetchJson(`${API_URL}/gh-perfiles-cargo/mis-pendientes`),
+    buscarPersonalDisponible: (perfilId: number, q: string) =>
+      fetchJson(`${API_URL}/gh-perfiles-cargo/${perfilId}/personal-disponible${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+    agregarPersona: (perfilId: number, personal_id: number) => fetchJson(`${API_URL}/gh-perfiles-cargo/${perfilId}/personal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ personal_id }),
+    }),
+    eliminarPendiente: (firmaId: number) => fetchJson(`${API_URL}/gh-perfiles-cargo/firmas/${firmaId}`, { method: 'DELETE' }),
     generarToken: (firmaId: number) => fetchJson(`${API_URL}/gh-perfiles-cargo/firmas/${firmaId}/generar-token`, { method: 'POST' }),
     firmar: (firmaId: number, firma_b64: string) => fetchJson(`${API_URL}/gh-perfiles-cargo/firmas/${firmaId}/firmar`, {
       method: 'POST',

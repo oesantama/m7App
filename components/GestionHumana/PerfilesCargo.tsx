@@ -293,6 +293,14 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
   const [tracking, setTracking] = useState<TrackingRow[]>([]);
   const [linkGenerado, setLinkGenerado] = useState<{ perfil: string; nombre: string; link: string } | null>(null);
 
+  // Agregar persona manualmente a un perfil
+  const [addPersonaModal, setAddPersonaModal] = useState<Perfil | null>(null);
+  const [personaQuery, setPersonaQuery] = useState('');
+  const [personaResults, setPersonaResults] = useState<{ id: number; nombre: string; cedula: string; cargo: string }[]>([]);
+  const [searchingPersona, setSearchingPersona] = useState(false);
+  const [addingPersonaId, setAddingPersonaId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
   // Filtros de búsqueda
   const [searchPerfil, setSearchPerfil] = useState('');
   const [filterVinculado, setFilterVinculado] = useState<'all' | 'vinculados' | 'sin_vincular'>('all');
@@ -352,6 +360,55 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
       toast.success('Link copiado al portapapeles (válido 7 días, un solo uso)');
     } catch (err: any) {
       toast.error(err.message || 'Error al generar el link');
+    }
+  };
+
+  const handleEliminarPendiente = async (firmaId: number, nombre: string) => {
+    if (!window.confirm(`¿Eliminar el pendiente de firma de "${nombre}"? Solo se puede eliminar mientras esté pendiente. Esta acción no se puede deshacer.`)) return;
+    setDeletingId(firmaId);
+    try {
+      await api.ghPerfilesCargo.eliminarPendiente(firmaId);
+      toast.success('Pendiente eliminado');
+      load();
+    } catch (err: any) {
+      toast.error(err.message || 'Error al eliminar el pendiente');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const buscarPersonaDisponible = useCallback(async (perfilId: number, q: string) => {
+    setSearchingPersona(true);
+    try {
+      const res = await api.ghPerfilesCargo.buscarPersonalDisponible(perfilId, q);
+      setPersonaResults(res.data || []);
+    } catch (err: any) {
+      toast.error(err.message || 'Error al buscar personal');
+    } finally {
+      setSearchingPersona(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!addPersonaModal) return;
+    const t = setTimeout(() => buscarPersonaDisponible(addPersonaModal.id, personaQuery), 300);
+    return () => clearTimeout(t);
+  }, [addPersonaModal, personaQuery, buscarPersonaDisponible]);
+
+  const handleAgregarPersona = async (personalId: number) => {
+    if (!addPersonaModal) return;
+    setAddingPersonaId(personalId);
+    try {
+      await api.ghPerfilesCargo.agregarPersona(addPersonaModal.id, personalId);
+      toast.success('Persona agregada como pendiente por firmar');
+      setAddPersonaModal(null);
+      setPersonaQuery('');
+      setPersonaResults([]);
+      load();
+    } catch (err: any) {
+      toast.error(err.message || 'Error al agregar la persona');
+    } finally {
+      setAddingPersonaId(null);
     }
   };
 
@@ -634,8 +691,15 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
                     </select>
                   </td>
                   <td className="px-6 py-4 text-xs font-black text-slate-400">v{p.version}</td>
-                  <td className="px-6 py-4 text-xs text-slate-600 font-semibold">
+                  <td className="px-6 py-4 text-xs text-slate-600 font-semibold whitespace-nowrap">
                     <span className="text-emerald-600 font-black">{p.firmados} firmados</span> · <span className="text-amber-600 font-black">{p.pendientes} pendientes</span>
+                    <button
+                      onClick={() => { setAddPersonaModal(p); setPersonaQuery(''); setPersonaResults([]); }}
+                      className="ml-3 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700"
+                      title="Agregar persona manualmente a este perfil"
+                    >
+                      <Icons.UserPlus className="w-3.5 h-3.5" /> Agregar persona
+                    </button>
                   </td>
                   <td className="px-6 py-4 text-right">
                     <a
@@ -748,13 +812,23 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
                         Ver PDF Firmado
                       </a>
                     ) : (
-                      <button
-                        onClick={() => handleGenerarLink(r)}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all shadow-sm active:scale-95"
-                      >
-                        <Icons.Share className="w-3.5 h-3.5" />
-                        Generar link público
-                      </button>
+                      <div className="inline-flex items-center gap-2">
+                        <button
+                          onClick={() => handleGenerarLink(r)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all shadow-sm active:scale-95"
+                        >
+                          <Icons.Share className="w-3.5 h-3.5" />
+                          Generar link público
+                        </button>
+                        <button
+                          onClick={() => handleEliminarPendiente(r.id, r.nombre)}
+                          disabled={deletingId === r.id}
+                          title="Eliminar este pendiente (persona mal asociada al cargo)"
+                          className="inline-flex items-center justify-center w-8 h-8 rounded-xl text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                        >
+                          <Icons.Trash className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -768,6 +842,74 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
           </table>
         </div>
       </div>
+
+      {/* Modal: agregar persona manualmente a un perfil */}
+      {addPersonaModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-tight text-slate-900">Agregar Persona al Perfil</h3>
+                <p className="text-xs text-slate-400 font-semibold mt-0.5">
+                  {addPersonaModal.cargo_nombre || addPersonaModal.hoja_excel}
+                </p>
+              </div>
+              <button
+                onClick={() => { setAddPersonaModal(null); setPersonaQuery(''); setPersonaResults([]); }}
+                className="text-slate-400 hover:text-slate-700 transition-colors"
+              >
+                <Icons.X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 pb-3">
+              <div className="relative">
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Buscar por nombre o cédula..."
+                  value={personaQuery}
+                  onChange={e => setPersonaQuery(e.target.value)}
+                  className="h-11 w-full pl-9 pr-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-emerald-500 focus:bg-white transition-all"
+                />
+                <Icons.Search className="w-4 h-4 text-slate-400 absolute left-3 top-3.5 pointer-events-none" />
+              </div>
+              <p className="text-[10px] text-slate-400 font-semibold mt-2">
+                Solo se muestra personal activo que aún no tiene firma registrada para este perfil.
+              </p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-2">
+              {searchingPersona && (
+                <div className="py-8 text-center">
+                  <div className="w-6 h-6 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                </div>
+              )}
+              {!searchingPersona && personaResults.length === 0 && (
+                <p className="text-center text-[10px] font-black uppercase text-slate-400 tracking-widest py-8">
+                  Sin resultados
+                </p>
+              )}
+              {!searchingPersona && personaResults.map(p => (
+                <div key={p.id} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/30 transition-all">
+                  <div className="min-w-0">
+                    <p className="text-xs font-black text-slate-800 uppercase truncate">{p.nombre}</p>
+                    <p className="text-[11px] text-slate-400 font-semibold">CC {p.cedula} · {p.cargo || 'Sin cargo registrado'}</p>
+                  </div>
+                  <button
+                    onClick={() => handleAgregarPersona(p.id)}
+                    disabled={addingPersonaId === p.id}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest text-white bg-emerald-600 hover:bg-emerald-700 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                  >
+                    <Icons.Plus className="w-3.5 h-3.5" />
+                    {addingPersonaId === p.id ? 'Agregando...' : 'Agregar'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

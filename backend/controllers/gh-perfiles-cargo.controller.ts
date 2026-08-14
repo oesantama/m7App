@@ -132,6 +132,86 @@ export const mapearCargo = async (req: AuthRequest, res: Response) => {
     }
 };
 
+// ─── GET /gh-perfiles-cargo/:id/personal-disponible?q= (autocomplete para agregar manualmente) ───
+// Solo personal activo (EST-01) que aún no tiene una firma registrada para este perfil.
+export const buscarPersonalDisponible = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const q = String(req.query.q || '').trim();
+    try {
+        const params: any[] = [id];
+        let filtro = '';
+        if (q) {
+            params.push(`%${q}%`);
+            filtro = 'AND (p.nombre ILIKE $2 OR p.cedula ILIKE $2)';
+        }
+        const result = await pool.query(`
+            SELECT p.id, p.nombre, p.cedula, p.cargo
+            FROM gh_personal p
+            WHERE p.estado = 'EST-01'
+              AND NOT EXISTS (SELECT 1 FROM gh_perfiles_cargo_firmas f WHERE f.perfil_id = $1 AND f.personal_id = p.id)
+              ${filtro}
+            ORDER BY p.nombre ASC
+            LIMIT 20
+        `, params);
+        res.json({ success: true, data: result.rows });
+    } catch (error: any) {
+        console.error('Error buscarPersonalDisponible:', error);
+        res.status(500).json({ success: false, error: 'Error del servidor' });
+    }
+};
+
+// ─── POST /gh-perfiles-cargo/:id/personal (agrega manualmente una persona a un perfil) ───
+// Complementa el matching automático de mapearCargo — para corregir casos donde el cargo
+// registrado en Personal no coincidía (o coincidía mal) al momento de vincular el perfil.
+export const agregarPersona = async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const { personal_id } = req.body;
+    if (!personal_id) return res.status(400).json({ success: false, error: 'personal_id es obligatorio' });
+
+    try {
+        const perfilRes = await pool.query('SELECT * FROM gh_perfiles_cargo WHERE id = $1', [id]);
+        if (perfilRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Perfil no encontrado' });
+        const perfil = perfilRes.rows[0];
+
+        const personaRes = await pool.query(`SELECT id, nombre, cedula FROM gh_personal WHERE id = $1 AND estado = 'EST-01'`, [personal_id]);
+        if (personaRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Persona no encontrada o inactiva en la tabla de Personal' });
+        const persona = personaRes.rows[0];
+
+        const r = await pool.query(
+            `INSERT INTO gh_perfiles_cargo_firmas (perfil_id, perfil_version, personal_id, cedula, nombre, estado)
+             VALUES ($1, $2, $3, $4, $5, 'pendiente')
+             ON CONFLICT (perfil_id, personal_id) DO NOTHING RETURNING id`,
+            [perfil.id, perfil.version, persona.id, persona.cedula, persona.nombre]
+        );
+        if (r.rows.length === 0) return res.status(409).json({ success: false, error: 'Esta persona ya tiene una firma registrada para este perfil' });
+
+        res.json({ success: true, data: { id: r.rows[0].id, nombre: persona.nombre, cedula: persona.cedula } });
+    } catch (error: any) {
+        console.error('Error agregarPersona:', error);
+        res.status(500).json({ success: false, error: 'Error del servidor' });
+    }
+};
+
+// ─── DELETE /gh-perfiles-cargo/firmas/:firmaId (elimina un pendiente mal generado) ───
+// Solo permite eliminar mientras esté 'pendiente' — una firma ya realizada es un registro
+// histórico/legal y nunca se borra.
+export const eliminarPendiente = async (req: AuthRequest, res: Response) => {
+    const { firmaId } = req.params;
+    try {
+        const result = await pool.query(
+            `DELETE FROM gh_perfiles_cargo_firmas WHERE id = $1 AND estado = 'pendiente' RETURNING id`,
+            [firmaId]
+        );
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'No se encontró el pendiente, o el documento ya fue firmado y no se puede eliminar' });
+        }
+        res.json({ success: true });
+    } catch (error: any) {
+        console.error('Error eliminarPendiente:', error);
+        res.status(500).json({ success: false, error: 'Error del servidor' });
+    }
+};
+
 // ─── GET /gh-perfiles-cargo/:id/pdf (descarga PDF de referencia, autenticado) ───
 export const descargarPdfReferencia = async (req: Request, res: Response) => {
     const { id } = req.params;
