@@ -231,14 +231,29 @@
         <h2>3. Estructura de Respuesta (JSON)</h2>
         <p>
           Los datos se retornan en un objeto JSON estructurado para facilitar la integración directa con sus sistemas de información.
+          La respuesta siempre incluye <code>ok</code>, <code>consulta</code> (eco de los filtros aplicados), <code>resumen</code>
+          (conteos) y el listado en <code>pedidos</code>.
         </p>
         <pre>
 {
-  "count": 1,
-  "orders": [
+  "ok": true,
+  "consulta": {
+    "tipo": "por_rango_fecha",
+    "fechaDesde": "2026-03-01",
+    "fechaHasta": "2026-03-07",
+    "diasConsultados": 6
+  },
+  "resumen": {
+    "totalRegistros": 1,
+    "entregados": 1,
+    "enProceso": 0
+  },
+  "pedidos": [
     {
+      "id": 4821,
       "estado": "Entregado",
       "nroGuia": "123456789",
+      "manifiesto": "123456789",
       "nroPedido": "FI10000212",
       "fechaEntregado": "2026-02-13 14:52",
       "fctUltimoCorte": "2026-02-13",
@@ -246,8 +261,12 @@
       "latitud": 6.2442,
       "longitud": -75.5812,
       "placa": "XYZ-123",
-      "ciudadDestino": "Bogotá",
-      "acta_entrega_b64": "JVBERi0xLjQKJ...",
+      "cliente": "MERQUELLANTAS",
+      "direccion": "VIA PARQUE LA FLORIDA KM 1",
+      "municipio_destino": "Bogotá",
+      "acta_entrega_b64": null,
+      "acta_entrega_url": "https://orbitm7.m7apps.com/api/grupo-inter/public/soporte/FI10000212?token=e018e135b6f338dc...",
+      "linkSeguimiento": "https://orbitm7.m7apps.com/public/gi-seguimiento/FI10000212?token=e018e135b6f338dc...",
       "valorFlete": 45000,
       "productos": [
         { "producto": "CEMENTO GRIS", "cantidad": 10, "peso": 500 }
@@ -260,10 +279,77 @@
       ],
       "historicos": [
         { "estado": "En tránsito", "fecha": "2026-02-10T08:00:00" }
-      ]
+      ],
+      "detalle": {
+        "nit": "900123456-7",
+        "empresa": "MERQUELLANTAS S.A.S.",
+        "notasEncabezado": null,
+        "clasificacion": "CLIENTE CORPORATIVOS",
+        "ruta": "MEDELLÍN - BOGOTÁ",
+        "numeroPlanilla": "PL-88213",
+        "fechaViaje": "2026-02-12",
+        "fechaCargue": "2026-02-12",
+        "cantidadTotal": 10,
+        "pesoTotal": 500,
+        "precioTotal": 6000000,
+        "fleteInicial": 45000,
+        "fleteTotal": 50000,
+        "tieneSoporte": true,
+        "actaEntregaUrl": "https://orbitm7.m7apps.com/api/grupo-inter/public/soporte/FI10000212?token=e018e135b6f338dc..."
+      },
+      "trazabilidad": [
+        { "estado": "En tránsito", "fecha": "2026-02-10T08:00:00" }
+      ],
+      "linkTrazabilidad": "https://orbitm7.m7apps.com/public/gi-seguimiento/FI10000212?token=e018e135b6f338dc..."
     }
   ]
 }</pre>
+
+        <div class="card">
+          <p><strong>Campos nuevos / a tener en cuenta:</strong></p>
+          <ul>
+            <li><code>manifiesto</code>: número de manifiesto asociado al despacho (editable manualmente en el detalle interno). Puede venir <code>null</code> si aún no se ha registrado.</li>
+            <li><code>acta_entrega_b64</code> vs <code>acta_entrega_url</code>: son <strong>excluyentes</strong>. Los soportes cargados por el área administrativa (flujo antiguo) siguen viniendo como PDF en base64 en <code>acta_entrega_b64</code>. Los soportes subidos por el conductor desde el link público (flujo nuevo) NO traen base64 — en su lugar viven en Google Drive y se exponen como un enlace firmado y con vencimiento en <code>acta_entrega_url</code>, listo para abrir/descargar directamente (ya incluye su propio token, no requiere el token maestro).</li>
+            <li><code>linkSeguimiento</code> / <code>linkTrazabilidad</code>: enlace público (para el cliente final) a la página de seguimiento de la factura. No requiere sesión ni el token maestro — ya viene firmado. Muestra estado, datos logísticos, productos y trazabilidad, <strong>sin valores comerciales</strong> (no incluye precios, fletes, NIT ni empresa).</li>
+            <li><code>detalle</code>: objeto con la misma información que ve el usuario interno en el detalle de la factura (incluye valores comerciales: <code>precioTotal</code>, <code>fleteInicial</code>, <code>fleteTotal</code>). Uso exclusivo para integraciones internas/administrativas — no debe exponerse al cliente final.</li>
+            <li><code>trazabilidad</code>: alias de <code>historicos</code>, incluido dentro de la respuesta para mayor claridad semántica al consumir la API.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section>
+        <h2>4. Soporte de Entrega y Seguimiento por Factura</h2>
+        <p>
+          Además de la consulta general, existen dos endpoints públicos de solo lectura, ya referenciados
+          directamente dentro de cada pedido (no requieren armar la URL manualmente):
+        </p>
+
+        <div class="card" style="border-left-color: var(--accent)">
+          <p><strong>Soporte de entrega (PDF)</strong> — <code>acta_entrega_url</code> / <code>detalle.actaEntregaUrl</code></p>
+          <p style="margin-top: 0.5rem"><strong>Endpoint:</strong></p>
+          <div class="endpoint-container">
+            GET /api/grupo-inter/public/soporte/:numeroDocumento?token=&lt;token_firmado&gt;
+          </div>
+          <p style="margin-top: 0.75rem">
+            Descarga o visualiza directamente el PDF de la entrega (foto del conductor convertida a PDF, o el
+            documento cargado por el área administrativa). El <code>token</code> es un HMAC único por factura,
+            distinto del token maestro, y ya viene incluido en el link — solo se debe seguir la URL tal cual se recibe.
+          </p>
+        </div>
+
+        <div class="card" style="border-left-color: #3b82f6">
+          <p><strong>Seguimiento público de la factura (para el cliente final)</strong> — <code>linkSeguimiento</code></p>
+          <p style="margin-top: 0.5rem"><strong>Endpoint:</strong></p>
+          <div class="endpoint-container">
+            GET /api/grupo-inter/public/seguimiento/:numeroDocumento?token=&lt;token_firmado&gt;
+          </div>
+          <p style="margin-top: 0.75rem">
+            Devuelve estado, datos de cliente/destino, datos logísticos (placa, ruta, fechas, clasificación,
+            manifiesto), productos y trazabilidad de la factura — <strong>sin ningún dato comercial</strong>
+            (no incluye precio total, flete, NIT ni razón social). Pensado para compartirse directamente con el
+            cliente final vía la página <code>/public/gi-seguimiento/:numeroDocumento</code>.
+          </p>
+        </div>
       </section>
 
       <footer>
