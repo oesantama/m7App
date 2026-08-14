@@ -181,14 +181,31 @@ const GrupoInterCumplidoPage: React.FC<{ token: string }> = ({ token }) => {
                                                     </button>
                                                 </div>
 
-                                                <input
-                                                    type="file"
-                                                    accept="image/*,application/pdf"
-                                                    capture="environment"
-                                                    onChange={(e) => setFileByPedido(prev => ({ ...prev, [p.id]: e.target.files?.[0] || null }))}
-                                                    className={`w-full text-xs file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-[10px] file:font-black file:uppercase file:text-white ${entregado ? 'file:bg-emerald-500' : 'file:bg-slate-400'}`}
-                                                />
-                                                <p className="text-[9px] text-slate-400 -mt-2">La foto es obligatoria en ambos casos.</p>
+                                                <div className="flex gap-2">
+                                                    <label className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white cursor-pointer transition-all ${entregado ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-slate-400 hover:bg-slate-500'}`}>
+                                                        📷 Tomar Foto
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*"
+                                                            capture="environment"
+                                                            onChange={(e) => setFileByPedido(prev => ({ ...prev, [p.id]: e.target.files?.[0] || null }))}
+                                                            className="hidden"
+                                                        />
+                                                    </label>
+                                                    <label className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 border border-slate-200 cursor-pointer hover:bg-slate-50 transition-all">
+                                                        📁 Elegir Archivo
+                                                        <input
+                                                            type="file"
+                                                            accept="image/*,application/pdf"
+                                                            onChange={(e) => setFileByPedido(prev => ({ ...prev, [p.id]: e.target.files?.[0] || null }))}
+                                                            className="hidden"
+                                                        />
+                                                    </label>
+                                                </div>
+                                                {fileByPedido[p.id] && (
+                                                    <p className="text-[10px] text-emerald-700 font-bold truncate">✓ {fileByPedido[p.id]!.name}</p>
+                                                )}
+                                                <p className="text-[9px] text-slate-400">La foto es obligatoria en ambos casos.</p>
 
                                                 <textarea
                                                     value={observacion}

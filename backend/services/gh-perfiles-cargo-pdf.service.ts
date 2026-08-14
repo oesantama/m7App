@@ -173,18 +173,39 @@ function renderResponsabilidadRows(respItems: { left: string; right: string }[])
 function buildHtml(c: PerfilCargoContenido, version: number, logoSrc: string, firma?: FirmaData): string {
   const isCritical = (c.cargo_critico || '').toLowerCase().includes('si') || (c.cargo_critico || '').toLowerCase().includes('x');
 
-  // Flujograma grouping / rendering
-  const flujogramaHtml = c.flujograma.map((f, i) => {
-    const procesoPart = f.proceso ? `<div class="fj-proc-title">${f.proceso}</div>` : '';
-    const funcionPart = f.funcion ? `<div class="fj-func-title">${f.funcion}</div>` : '';
-    const leftContent = `${procesoPart}${funcionPart}` || '—';
-    return `
-      <tr>
-        <td class="fj-col-left">${leftContent}</td>
-        <td class="fj-col-right">${f.actividad || '—'}</td>
-      </tr>
-    `;
-  }).join('');
+  // Flujograma: 3 columnas con celdas agrupadas (rowspan) igual que el Excel fuente —
+  // Macroproceso y Proceso solo se imprimen en la primera fila de su grupo consecutivo.
+  const flujogramaHtml = (() => {
+    const rows = c.flujograma;
+    let html = '';
+    let i = 0;
+    while (i < rows.length) {
+      let procesoSpan = 1;
+      while (i + procesoSpan < rows.length && rows[i + procesoSpan].proceso === rows[i].proceso) procesoSpan++;
+      const procesoEnd = i + procesoSpan;
+
+      let j = i;
+      while (j < procesoEnd) {
+        let funcionSpan = 1;
+        while (j + funcionSpan < procesoEnd && rows[j + funcionSpan].funcion === rows[j].funcion) funcionSpan++;
+
+        for (let k = j; k < j + funcionSpan; k++) {
+          html += '<tr>';
+          if (j === i && k === j) {
+            html += `<td class="fj-col-macro" rowspan="${procesoSpan}">${rows[i].proceso || '—'}</td>`;
+          }
+          if (k === j) {
+            html += `<td class="fj-col-proc" rowspan="${funcionSpan}">${rows[j].funcion || '—'}</td>`;
+          }
+          html += `<td class="fj-col-actividad">${rows[k].actividad || '—'}</td>`;
+          html += '</tr>';
+        }
+        j += funcionSpan;
+      }
+      i = procesoEnd;
+    }
+    return html;
+  })();
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -359,32 +380,34 @@ function buildHtml(c: PerfilCargoContenido, version: number, logoSrc: string, fi
     color: #000000;
   }
 
-  /* ── Flujograma de Procesos ── */
-  .fj-col-left {
-    width: 32%;
+  /* ── Flujograma de Procesos (celdas agrupadas, igual que el Excel fuente) ── */
+  .fj-col-macro {
+    width: 20%;
     font-size: 8pt;
-    vertical-align: top;
-    background: #ffffff;
-    padding: 4px 6px;
-    border: 1px solid #000000;
-  }
-  .fj-col-right {
-    width: 68%;
-    font-size: 8pt;
-    vertical-align: top;
-    background: #ffffff;
-    padding: 4px 6px;
-    border: 1px solid #000000;
-  }
-  .fj-proc-title {
     font-weight: bold;
-    margin-bottom: 2px;
+    vertical-align: middle;
+    background: #ffffff;
+    padding: 4px 6px;
+    border: 1px solid #000000;
     color: #000000;
   }
-  .fj-func-title {
-    font-weight: 600;
-    color: #333333;
+  .fj-col-proc {
+    width: 20%;
     font-size: 7.5pt;
+    font-weight: 600;
+    vertical-align: middle;
+    background: #ffffff;
+    padding: 4px 6px;
+    border: 1px solid #000000;
+    color: #333333;
+  }
+  .fj-col-actividad {
+    width: 60%;
+    font-size: 8pt;
+    vertical-align: top;
+    background: #ffffff;
+    padding: 4px 6px;
+    border: 1px solid #000000;
   }
 
   /* ── Certificado de Aceptación y Firma ── */
@@ -563,16 +586,16 @@ function buildHtml(c: PerfilCargoContenido, version: number, logoSrc: string, fi
   <!-- 7. V. Flujograma de Procesos -->
   <table class="excel-table" style="border-top: none;">
     <tr>
-      <th class="sec-title" colspan="2">V. FLUJOGRAMA DE PROCESOS</th>
+      <th class="sec-title" colspan="3">V. FLUJOGRAMA DE PROCESOS</th>
     </tr>
     <tr>
-      <th class="subsec-title uppercase" colspan="2">${c.cargo || 'CARGO'}</th>
+      <th class="subsec-title uppercase" colspan="3">${c.cargo || 'CARGO'}</th>
     </tr>
     <tr>
-      <th class="subsec-title" style="width: 32%;">Proceso (Funciones)</th>
-      <th class="subsec-title" style="width: 68%;">Ruta crítica (Actividades críticas)</th>
+      <th class="subsec-title" colspan="2">Proceso (Funciones)</th>
+      <th class="subsec-title" style="width: 60%;">Ruta crítica (Actividades críticas)</th>
     </tr>
-    ${flujogramaHtml || '<tr><td colspan="2" class="val" style="text-align:center;">Ver manual de funciones institucional</td></tr>'}
+    ${flujogramaHtml || '<tr><td colspan="3" class="val" style="text-align:center;">Ver manual de funciones institucional</td></tr>'}
   </table>
 
   <!-- 8. Certificado de Aceptación y Recibido + Firma -->
