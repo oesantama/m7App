@@ -175,8 +175,20 @@ function buildHtml(c: PerfilCargoContenido, version: number, logoSrc: string, fi
 
   // Flujograma: 3 columnas con celdas agrupadas (rowspan) igual que el Excel fuente —
   // Macroproceso y Proceso solo se imprimen en la primera fila de su grupo consecutivo.
+  //
+  // Blindaje: algunos perfiles cargados antes de un ajuste al parser quedaron con la
+  // fila de encabezado ("Proceso (Funciones)" / "Ruta crítica...") guardada como si
+  // fuera una fila de datos más. Se filtra aquí en el render para que se autocorrija
+  // sin necesidad de volver a subir el Excel ni tocar la base de datos.
+  const isHeaderLikeText = (v: string) => {
+    const t = String(v || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[():.]/g, '').trim();
+    return t === 'proceso' || t === 'proceso funciones' || t === 'funciones' ||
+           t.includes('ruta critica') || t.includes('actividades criticas');
+  };
   const flujogramaHtml = (() => {
-    const rows = c.flujograma;
+    const rows = c.flujograma.filter(f =>
+      !isHeaderLikeText(f.proceso) && !isHeaderLikeText(f.funcion) && !isHeaderLikeText(f.actividad)
+    );
     let html = '';
     let i = 0;
     while (i < rows.length) {
