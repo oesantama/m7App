@@ -22,6 +22,14 @@ const signDocToken = (numeroDocumento: string): string =>
 const APP_URL = process.env.APP_URL || (process.env.NODE_ENV === 'production'
     ? 'https://orbitm7.m7apps.com'
     : 'http://localhost:5173');
+// Base para links que apuntan directamente al backend (endpoints /api/...), NO al frontend.
+// En producción, Traefik expone frontend y backend bajo el mismo dominio, por lo que APP_URL sirve.
+// En local, frontend (Vite, :5174) y backend (:8081) corren en puertos distintos, así que hace falta
+// una base propia — de lo contrario los links de soporte terminan apuntando al puerto del frontend
+// y el navegador recibe un 500 del propio Vite en vez de la respuesta del backend.
+const PUBLIC_API_URL = process.env.PUBLIC_API_URL || (process.env.NODE_ENV === 'production'
+    ? APP_URL
+    : 'http://localhost:8081');
 
 // Convierte una imagen (jpg/png) a un PDF de una página; si ya es PDF, la deja igual.
 // Los cumplidos subidos por el conductor siempre se guardan como PDF.
@@ -1345,7 +1353,7 @@ export const getOrdersPublicListSecure = async (req: Request, res: Response): Pr
         const mappedOrders = result.rows.map((o: any) => {
             const tieneSoportePropio = !o.acta_entrega_b64 && o.acta_entrega_drive_path;
             const actaUrl = tieneSoportePropio
-                ? `${APP_URL}/api/grupo-inter/public/soporte/${encodeURIComponent(o.numero_documento)}?token=${signDocToken(o.numero_documento)}`
+                ? `${PUBLIC_API_URL}/api/grupo-inter/public/soporte/${encodeURIComponent(o.numero_documento)}?token=${signDocToken(o.numero_documento)}`
                 : null;
             const seguimientoUrl = `${APP_URL}/public/gi-seguimiento/${encodeURIComponent(o.numero_documento)}?token=${signDocToken(o.numero_documento)}`;
             const historico = o.historico_arr || [];
@@ -1958,7 +1966,7 @@ export const getPublicSeguimiento = async (req: Request, res: Response): Promise
         res.json({
             ok: true,
             pedido,
-            soporteUrl: pedido.tiene_soporte ? `${APP_URL}/api/grupo-inter/public/soporte/${encodeURIComponent(numeroDocumento)}?token=${signDocToken(numeroDocumento)}` : null,
+            soporteUrl: pedido.tiene_soporte ? `${PUBLIC_API_URL}/api/grupo-inter/public/soporte/${encodeURIComponent(numeroDocumento)}?token=${signDocToken(numeroDocumento)}` : null,
             items: itemsRes.rows,
             historico: historicoRes.rows,
             novedades: novedadesRes.rows
