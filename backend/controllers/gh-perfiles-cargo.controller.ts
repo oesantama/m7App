@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import pool from '../config/database.js';
 import { parseWorkbook } from '../services/gh-perfiles-cargo-parser.service.js';
 import { generatePerfilCargoPdf, generatePerfilCargoFirmadoPdf } from '../services/gh-perfiles-cargo-pdf.service.js';
-import { uploadDocument, uploadPerfilCargoDocument } from '../services/hv-drive.service.js';
+import { uploadDocument, uploadPerfilCargoDocument, deleteFileFromStorage } from '../services/hv-drive.service.js';
 
 interface AuthRequest extends Request {
     user?: any;
@@ -98,7 +98,7 @@ export const mapearCargo = async (req: AuthRequest, res: Response) => {
     if (!cargo_id) return res.status(400).json({ success: false, error: 'cargo_id es obligatorio' });
 
     try {
-        const cargoRes = await pool.query('SELECT nombre FROM gh_cargos WHERE id = $1', [cargo_id]);
+        const cargoRes = await pool.query('SELECT id, nombre FROM gh_cargos WHERE id = $1', [cargo_id]);
         if (cargoRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Cargo no encontrado' });
         const cargoNombre = cargoRes.rows[0].nombre;
 
@@ -109,11 +109,39 @@ export const mapearCargo = async (req: AuthRequest, res: Response) => {
         if (perfilRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Perfil no encontrado' });
         const perfil = perfilRes.rows[0];
 
-        // Genera pendientes automáticamente para el personal activo cuyo cargo coincide
+        // Búsqueda robusta de personal activo con normalización de acentos/tildes en PostgreSQL
         const personal = await pool.query(
-            `SELECT id, nombre, cedula FROM gh_personal WHERE estado = 'EST-01' AND TRIM(LOWER(cargo)) = TRIM(LOWER($1))`,
-            [cargoNombre]
+            `SELECT id, nombre, cedula 
+             FROM gh_personal 
+             WHERE estado = 'EST-01' 
+               AND (
+                 translate(TRIM(LOWER(cargo)), 'áéíóúñÁÉÍÓÚÑäëïöüÄËÏÖÜ', 'aeiounAEIOUNaeiouAEIOU') = 
+                 translate(TRIM(LOWER($1)), 'áéíóúñÁÉÍÓÚÑäëïöüÄËÏÖÜ', 'aeiounAEIOUNaeiouAEIOU')
+                 OR translate(TRIM(LOWER(cargo)), 'áéíóúñÁÉÍÓÚÑäëïöüÄËÏÖÜ', 'aeiounAEIOUNaeiouAEIOU') IN (
+                   SELECT translate(TRIM(LOWER(nombre)), 'áéíóúñÁÉÍÓÚÑäëïöüÄËÏÖÜ', 'aeiounAEIOUNaeiouAEIOU') 
+                   FROM gh_cargos WHERE id = $2
+                 )
+               )`,
+            [cargoNombre, cargo_id]
         );
+
+        const matchingIds = personal.rows.map(p => p.id);
+
+        // Limpiar pendientes antiguos de personas que ya no pertenecen al cargo mapeado
+        if (matchingIds.length > 0) {
+            await pool.query(
+                `DELETE FROM gh_perfiles_cargo_firmas 
+                 WHERE perfil_id = $1 AND estado = 'pendiente' AND personal_id NOT IN (SELECT unnest($2::int[]))`,
+                [perfil.id, matchingIds]
+            );
+        } else {
+            await pool.query(
+                `DELETE FROM gh_perfiles_cargo_firmas 
+                 WHERE perfil_id = $1 AND estado = 'pendiente'`,
+                [perfil.id]
+            );
+        }
+
         let generados = 0;
         for (const persona of personal.rows) {
             const r = await pool.query(
@@ -192,23 +220,74 @@ export const agregarPersona = async (req: AuthRequest, res: Response) => {
     }
 };
 
-// ─── DELETE /gh-perfiles-cargo/firmas/:firmaId (elimina un pendiente mal generado) ───
-// Solo permite eliminar mientras esté 'pendiente' — una firma ya realizada es un registro
-// histórico/legal y nunca se borra.
+// ─── DELETE /gh-perfiles-cargo/firmas/:firmaId (elimina una solicitud o firma realizada) ───
+// Permite eliminar tanto si está 'pendiente' como si está 'firmado'.
+// Si está firmado y posee drive_path, elimina el archivo físico de Google Drive / Local
+// y guarda la trazabilidad auditora inmutable en gh_perfiles_cargo_firmas_historico.
 export const eliminarPendiente = async (req: AuthRequest, res: Response) => {
     const { firmaId } = req.params;
+    const motivo = req.body?.motivo || req.query?.motivo || 'Eliminación manual por administración';
+    const actor = req.user?.email || req.user?.name || 'Administración GH';
+
     try {
-        const result = await pool.query(
-            `DELETE FROM gh_perfiles_cargo_firmas WHERE id = $1 AND estado = 'pendiente' RETURNING id`,
+        const checkRes = await pool.query(
+            `SELECT f.*, pc.hoja_excel, pc.cargo_nombre
+             FROM gh_perfiles_cargo_firmas f
+             JOIN gh_perfiles_cargo pc ON pc.id = f.perfil_id
+             WHERE f.id = $1`,
             [firmaId]
         );
-        if (result.rows.length === 0) {
-            return res.status(404).json({ success: false, error: 'No se encontró el pendiente, o el documento ya fue firmado y no se puede eliminar' });
+
+        if (checkRes.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Registro de firma no encontrado' });
         }
-        res.json({ success: true });
+
+        const firma = checkRes.rows[0];
+
+        // 1. Si está firmado y tiene un archivo en Drive o local, eliminarlo del almacenamiento
+        if (firma.drive_path) {
+            try {
+                await deleteFileFromStorage(firma.drive_path);
+            } catch (storageErr: any) {
+                console.error('[PERFILES-CARGO] Error al eliminar archivo en Drive/Local:', storageErr.message);
+            }
+        }
+
+        // 2. Registrar en la tabla de auditoría e histórico
+        await pool.query(
+            `INSERT INTO gh_perfiles_cargo_firmas_historico 
+             (firma_id, perfil_id, perfil_version, personal_id, cedula, nombre, cargo_nombre, hoja_excel, estado_previo, firmado_at, drive_path_eliminado, drive_link_eliminado, eliminado_por, motivo)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+            [
+                firma.id,
+                firma.perfil_id,
+                firma.perfil_version,
+                firma.personal_id,
+                firma.cedula,
+                firma.nombre,
+                firma.cargo_nombre,
+                firma.hoja_excel,
+                firma.estado,
+                firma.firmado_at,
+                firma.drive_path,
+                firma.drive_link,
+                actor,
+                motivo
+            ]
+        );
+
+        // 3. Eliminar el registro de gh_perfiles_cargo_firmas
+        await pool.query(`DELETE FROM gh_perfiles_cargo_firmas WHERE id = $1`, [firmaId]);
+
+        res.json({
+            success: true,
+            message: firma.estado === 'firmado'
+                ? 'Firma eliminada exitosamente. Se removió el PDF de Drive y se guardó la traza histórica.'
+                : 'Pendiente de firma eliminado exitosamente.'
+        });
     } catch (error: any) {
         console.error('Error eliminarPendiente:', error);
-        res.status(500).json({ success: false, error: 'Error del servidor' });
+        res.status(500).json({ success: false, error: 'Error del servidor al eliminar la firma' });
     }
 };
 

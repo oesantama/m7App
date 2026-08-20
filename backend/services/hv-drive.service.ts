@@ -84,6 +84,33 @@ export function rcloneDelete(remotePath: string): Promise<void> {
     });
 }
 
+/**
+ * Elimina un archivo de almacenamiento (Google Drive vía rclone o local fallback)
+ */
+export async function deleteFileFromStorage(drivePath: string): Promise<void> {
+    if (!drivePath) return;
+    if (drivePath.startsWith('local:')) {
+        const relativePath = drivePath.replace('local:', '');
+        const localPath = path.join(LOCAL_BASE, relativePath);
+        if (fs.existsSync(localPath)) {
+            try {
+                fs.unlinkSync(localPath);
+            } catch (err: any) {
+                console.error('[HV-DRIVE] Error al eliminar archivo local fallback:', err.message);
+            }
+        }
+    } else {
+        const available = await rcloneAvailable();
+        if (available) {
+            try {
+                await rcloneDelete(drivePath);
+            } catch (err: any) {
+                console.error('[HV-DRIVE] Error al eliminar archivo de Drive:', err.message);
+            }
+        }
+    }
+}
+
 export function rcloneCat(remotePath: string): NodeJS.ReadableStream {
     return spawn('rclone', ['cat', `${RCLONE_REMOTE}:${remotePath}`]).stdout!;
 }

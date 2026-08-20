@@ -948,7 +948,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ personal_id }),
     }),
-    eliminarPendiente: (firmaId: number) => fetchJson(`${API_URL}/gh-perfiles-cargo/firmas/${firmaId}`, { method: 'DELETE' }),
+    eliminarPendiente: (firmaId: number, motivo?: string) => fetchJson(`${API_URL}/gh-perfiles-cargo/firmas/${firmaId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo })
+    }),
     generarToken: (firmaId: number) => fetchJson(`${API_URL}/gh-perfiles-cargo/firmas/${firmaId}/generar-token`, { method: 'POST' }),
     firmar: (firmaId: number, firma_b64: string) => fetchJson(`${API_URL}/gh-perfiles-cargo/firmas/${firmaId}/firmar`, {
       method: 'POST',
@@ -1788,6 +1792,11 @@ export const api = {
     body: JSON.stringify(data)
   }),
   getGrupoInterDetails: (id: string) => fetchJson(`${API_URL}/grupo-inter/details/${id}?_t=${Date.now()}`),
+  deleteGrupoInterCumplido: (id: string | number, data: { motivo: string, usuario?: string }) => fetchJson(`${API_URL}/grupo-inter/cumplido/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  }),
   processGrupoInterPDF: async (file: File, planilla: string, onProgress: (data: any) => void) => {
     const formData = new FormData();
     formData.append('file', file);

@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { api, API_URL, getStoredToken } from '../services/api';
 import { useAppStore } from '../stores/useAppStore';
 import { DataTable, ColumnDef } from './shared/DataTable';
+import { hasPermission } from '../utils/permissions';
 
 interface Order {
   id: number;
@@ -45,6 +46,9 @@ interface Order {
   update_at?: string;
   valor_flete?: number;
   no_factura_m7?: string;
+  acta_entrega_b64?: string | null;
+  acta_entrega_drive_path?: string | null;
+  tiene_soporte?: boolean;
 }
 
 const DetailItem: React.FC<{ icon: React.ReactNode; label: string; value: string; light?: boolean }> = ({ icon, label, value, light }) => (
@@ -138,6 +142,48 @@ const GrupoInterView: React.FC = () => {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState("");
  
   const { user } = useAppStore();
+
+  // Eliminación de cumplidos adjuntos (con permiso de borrado o superadmin)
+  const [showDeleteCumplidoModal, setShowDeleteCumplidoModal] = useState(false);
+  const [deleteMotivo, setDeleteMotivo] = useState('');
+  const [isDeletingCumplido, setIsDeletingCumplido] = useState(false);
+
+  const canDeleteCumplido = hasPermission(user, 'GRUPO_INTER_OPS', 'delete') || 
+                            hasPermission(user, 'PAG-31', 'delete') || 
+                            user?.roleId === 'ROL-01' || 
+                            (user as any)?.role_id === 'ROL-01' || 
+                            user?.email === 'directorti@millasiete.com';
+
+  const handleDeleteCumplido = async () => {
+    if (!selectedOrder) return;
+    if (!deleteMotivo.trim()) {
+      toast.error('Debe ingresar un motivo para la eliminación del cumplido');
+      return;
+    }
+    try {
+      setIsDeletingCumplido(true);
+      const res = await api.deleteGrupoInterCumplido(selectedOrder.id, {
+        motivo: deleteMotivo.trim(),
+        usuario: user?.email || user?.nombre || 'Usuario Autenticado'
+      });
+
+      if (res.ok) {
+        toast.success(res.mensaje || 'Cumplido eliminado con éxito');
+        setShowDeleteCumplidoModal(false);
+        setShowDetailModal(false);
+        setSelectedOrder(null);
+        setDeleteMotivo('');
+        fetchOrders();
+      } else {
+        toast.error(res.mensaje || 'Error al eliminar el cumplido');
+      }
+    } catch (error: any) {
+      console.error('Error al eliminar cumplido:', error);
+      toast.error(error.message || 'Error al eliminar el cumplido');
+    } finally {
+      setIsDeletingCumplido(false);
+    }
+  };
  
   const [filters, setFilters] = useState<{
     status: string;
@@ -1340,6 +1386,19 @@ const GrupoInterView: React.FC = () => {
                               >
                                 <Clock size={18} />
                             </button>
+                            {canDeleteCumplido && (order.acta_entrega_b64 || order.acta_entrega_drive_path || order.tiene_soporte) && (
+                              <button
+                                onClick={() => {
+                                  setSelectedOrder(order);
+                                  setDeleteMotivo('');
+                                  setShowDeleteCumplidoModal(true);
+                                }}
+                                className="p-2.5 bg-rose-600 text-white rounded-xl hover:bg-rose-700 transition-all shadow-lg shadow-rose-200"
+                                title="Eliminar Cumplido Adjunto"
+                              >
+                                <Trash size={18} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1450,6 +1509,17 @@ const GrupoInterView: React.FC = () => {
                         </button>
                       </>
                     ) : null}
+                    {((selectedOrder as any).acta_entrega_b64 || (selectedOrder as any).acta_entrega_drive_path || selectedOrder.tiene_soporte) && canDeleteCumplido && (
+                      <button
+                        onClick={() => {
+                          setDeleteMotivo('');
+                          setShowDeleteCumplidoModal(true);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-rose-50 text-rose-600 rounded-xl text-[10px] font-black uppercase tracking-tight hover:bg-rose-100 transition shadow-sm"
+                      >
+                        <Trash size={14} /> Eliminar Cumplido
+                      </button>
+                    )}
                     <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><X size={24} /></button>
                   </div>
              </div>
@@ -1966,6 +2036,73 @@ const GrupoInterView: React.FC = () => {
                  />
               </div>
            </div>
+        </div>
+      )}
+
+       {/* Modal Confirmación Eliminación de Cumplido */}
+      {showDeleteCumplidoModal && selectedOrder && (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !isDeletingCumplido && setShowDeleteCumplidoModal(false)}></div>
+          <div className="relative bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col p-6 md:p-8 animate-in fade-in zoom-in duration-200">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="p-3.5 bg-rose-100 text-rose-600 rounded-2xl">
+                <Trash size={26} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">Eliminar Cumplido Adjunto</h3>
+                <p className="text-xs text-slate-500 font-medium">Factura: <span className="font-bold text-slate-800">{selectedOrder.numero_documento}</span></p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-4 mb-5 text-xs text-amber-900 leading-relaxed">
+              <p className="font-bold mb-1 flex items-center gap-1.5 text-amber-900">
+                <AlertCircle size={15} className="text-amber-600" /> ¡Atención!
+              </p>
+              Esta acción eliminará el archivo adjunto tanto de la **base de datos** como de **Google Drive / Almacenamiento local**, reestablecerá el estado a <span className="font-bold">Pendiente</span> y registrará una traza en el histórico. El conductor podrá volver a subir la foto mediante su enlace.
+            </div>
+
+            <div className="flex flex-col gap-2 mb-6">
+              <label className="text-xs font-black text-slate-700 uppercase tracking-wider">
+                Motivo de Eliminación <span className="text-rose-500">*</span>
+              </label>
+              <textarea
+                rows={3}
+                value={deleteMotivo}
+                onChange={(e) => setDeleteMotivo(e.target.value)}
+                placeholder="Ej: Foto ilegible cargada por conductor erróneamente en esta guía..."
+                className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs outline-none focus:ring-2 focus:ring-rose-500 focus:bg-white transition-all resize-none text-slate-800"
+                disabled={isDeletingCumplido}
+              />
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowDeleteCumplidoModal(false)}
+                disabled={isDeletingCumplido}
+                className="px-5 py-3 bg-slate-100 text-slate-700 rounded-2xl text-xs font-bold hover:bg-slate-200 transition disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteCumplido}
+                disabled={isDeletingCumplido || !deleteMotivo.trim()}
+                className="px-5 py-3 bg-rose-600 text-white rounded-2xl text-xs font-bold hover:bg-rose-700 transition shadow-lg shadow-rose-200 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isDeletingCumplido ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Eliminando...
+                  </>
+                ) : (
+                  <>
+                    <Trash size={16} /> Confirmar Eliminación
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

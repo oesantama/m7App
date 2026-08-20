@@ -10,7 +10,7 @@ import { pdfParse } from '../utils/pdfParser.js';
 import { AIOrchestrator } from '../services/ai-orchestrator/orchestrator.js';
 import { performLocalPageOCR } from '../utils/ocr.js';
 import Tesseract from 'tesseract.js';
-import { uploadBufferToDrive, saveLocalFallback, rcloneAvailable, rcloneCat, sanitizeFolderName } from '../services/hv-drive.service.js';
+import { uploadBufferToDrive, saveLocalFallback, rcloneAvailable, rcloneCat, sanitizeFolderName, deleteFileFromStorage } from '../services/hv-drive.service.js';
 
 // ─── Firma de tokens públicos por documento (soporte y seguimiento) ───────────
 const GI_SIGNING_SECRET = process.env.GRUPO_INTER_SIGNING_SECRET || process.env.JWT_SECRET || 'm7-grupo-inter-fallback-secret';
@@ -1976,3 +1976,81 @@ export const getPublicSeguimiento = async (req: Request, res: Response): Promise
         res.status(500).json({ ok: false, mensaje: 'Error al obtener el seguimiento' });
     }
 };
+
+// ─── DELETE /grupo-inter/cumplido/:id ────────────
+// Elimina el cumplido adjunto (en DB base64 y/o Google Drive / local fallback),
+// resetea el estado a 'Pendiente' para rehabilitar la subida (ej. en link conductor),
+// y registra el movimiento en el histórico de la orden.
+export const deleteCumplido = async (req: Request | any, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const { motivo } = req.body;
+        const currentUser = req.user?.email || req.user?.nombre || req.body.usuario || 'Usuario Autenticado';
+
+        if (!motivo || !motivo.trim()) {
+            res.status(400).json({ ok: false, mensaje: 'Debe especificar el motivo de la eliminación' });
+            return;
+        }
+
+        const idNum = parseInt(id, 10);
+        if (isNaN(idNum)) {
+            res.status(400).json({ ok: false, mensaje: 'ID de pedido inválido' });
+            return;
+        }
+
+        // Consultar el pedido
+        const pedidoRes = await pool.query(
+            "SELECT id, numero_documento, estado, acta_entrega_b64, acta_entrega_drive_path FROM grupo_inter_pedidos WHERE id = $1",
+            [idNum]
+        );
+
+        if (pedidoRes.rowCount === 0) {
+            res.status(404).json({ ok: false, mensaje: 'Factura/pedido no encontrado' });
+            return;
+        }
+
+        const pedido = pedidoRes.rows[0];
+
+        if (!pedido.acta_entrega_b64 && !pedido.acta_entrega_drive_path) {
+            res.status(400).json({ ok: false, mensaje: 'Este pedido no tiene ningún cumplido adjunto' });
+            return;
+        }
+
+        const drivePathPrevio = pedido.acta_entrega_drive_path || '';
+        const teniaB64 = !!pedido.acta_entrega_b64;
+
+        // 1. Eliminar archivo físico de almacenamiento (Google Drive o Local Fallback) si existía
+        if (drivePathPrevio) {
+            await deleteFileFromStorage(drivePathPrevio);
+        }
+
+        // 2. Resetear campos de cumplido en la base de datos
+        await pool.query(`
+            UPDATE grupo_inter_pedidos
+            SET acta_entrega_b64 = NULL,
+                acta_entrega_drive_path = NULL,
+                estado = 'Pendiente',
+                fecha_entregado = NULL,
+                update_at = CURRENT_TIMESTAMP,
+                update_by = $1
+            WHERE id = $2
+        `, [`Eliminó cumplido: ${currentUser}`, idNum]);
+
+        // 3. Registrar auditoría e histórico inmutable
+        const obsHistorico = `Cumplido adjunto eliminado. Motivo: ${motivo.trim()}.${drivePathPrevio ? ` [Drive/Local path: ${drivePathPrevio}]` : ''}${teniaB64 ? ' [Tenía soporte Base64 en DB]' : ''}`;
+        
+        await pool.query(`
+            INSERT INTO grupo_inter_pedidos_historico (pedido_id, estado, observacion, usuario)
+            VALUES ($1, $2, $3, $4)
+        `, [idNum, 'CUMPLIDO_ELIMINADO', obsHistorico, currentUser]);
+
+        res.json({
+            ok: true,
+            mensaje: `Cumplido de la factura ${pedido.numero_documento} eliminado exitosamente. Estado reestablecido a Pendiente.`
+        });
+    } catch (error: any) {
+        console.error('[GRUPO-INTER] Error al eliminar cumplido:', error);
+        res.status(500).json({ ok: false, mensaje: 'Error interno al eliminar el cumplido' });
+    }
+};
+

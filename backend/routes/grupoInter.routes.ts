@@ -31,6 +31,7 @@ router.post('/process-pdf', upload.single('file'), grupoInterController.processP
 router.get('/orders', grupoInterController.getOrders);
 router.put('/status/:id', grupoInterController.updateStatus);
 router.put('/manifiesto/:id', grupoInterController.updateManifiesto);
+router.delete('/cumplido/:id', grupoInterController.deleteCumplido);
 router.get('/details/:id', grupoInterController.getOrderDetails);
 
 // Novedades y Reajustes

@@ -363,15 +363,27 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  const handleEliminarPendiente = async (firmaId: number, nombre: string) => {
-    if (!window.confirm(`¿Eliminar el pendiente de firma de "${nombre}"? Solo se puede eliminar mientras esté pendiente. Esta acción no se puede deshacer.`)) return;
+  const handleEliminarPendiente = async (firmaId: number, nombre: string, estado: string) => {
+    let motivo = 'Eliminación manual por administración';
+    if (estado === 'firmado') {
+      const inputMotivo = window.prompt(`¡Atención! Este documento para "${nombre}" ya se encuentra FIRMADO.\n\nAl eliminarlo, se removerá el PDF de Google Drive / Almacenamiento local y se conservará la traza inmutable en el histórico auditor.\n\nPor favor ingrese el MOTIVO de eliminación:`);
+      if (inputMotivo === null) return;
+      if (!inputMotivo.trim()) {
+        toast.error('Debe especificar un motivo para eliminar un documento firmado');
+        return;
+      }
+      motivo = inputMotivo.trim();
+    } else {
+      if (!window.confirm(`¿Eliminar la solicitud de firma pendiente para "${nombre}"? Esta acción no se puede deshacer.`)) return;
+    }
+
     setDeletingId(firmaId);
     try {
-      await api.ghPerfilesCargo.eliminarPendiente(firmaId);
-      toast.success('Pendiente eliminado');
+      const res = await api.ghPerfilesCargo.eliminarPendiente(firmaId, motivo);
+      toast.success(res.message || 'Registro de firma eliminado exitosamente');
       load();
     } catch (err: any) {
-      toast.error(err.message || 'Error al eliminar el pendiente');
+      toast.error(err.message || 'Error al eliminar la firma');
     } finally {
       setDeletingId(null);
     }
@@ -801,18 +813,18 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
                     {r.firmado_at ? new Date(r.firmado_at).toLocaleString('es-CO') : '—'}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    {r.estado === 'firmado' ? (
-                      <a
-                        href={api.ghPerfilesCargo.verPdfFirmado(r.id)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white bg-slate-900 hover:bg-emerald-600 transition-all shadow-sm active:scale-95"
-                      >
-                        <Icons.FileText className="w-3.5 h-3.5 text-emerald-400" />
-                        Ver PDF Firmado
-                      </a>
-                    ) : (
-                      <div className="inline-flex items-center gap-2">
+                    <div className="inline-flex items-center gap-2 justify-end">
+                      {r.estado === 'firmado' ? (
+                        <a
+                          href={api.ghPerfilesCargo.verPdfFirmado(r.id)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white bg-slate-900 hover:bg-emerald-600 transition-all shadow-sm active:scale-95"
+                        >
+                          <Icons.FileText className="w-3.5 h-3.5 text-emerald-400" />
+                          Ver PDF Firmado
+                        </a>
+                      ) : (
                         <button
                           onClick={() => handleGenerarLink(r)}
                           className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all shadow-sm active:scale-95"
@@ -820,16 +832,16 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
                           <Icons.Share className="w-3.5 h-3.5" />
                           Generar link público
                         </button>
-                        <button
-                          onClick={() => handleEliminarPendiente(r.id, r.nombre)}
-                          disabled={deletingId === r.id}
-                          title="Eliminar este pendiente (persona mal asociada al cargo)"
-                          className="inline-flex items-center justify-center w-8 h-8 rounded-xl text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-all shadow-sm active:scale-95 disabled:opacity-50"
-                        >
-                          <Icons.Trash className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    )}
+                      )}
+                      <button
+                        onClick={() => handleEliminarPendiente(r.id, r.nombre, r.estado)}
+                        disabled={deletingId === r.id}
+                        title={r.estado === 'firmado' ? 'Eliminar firma realizada (removerá el PDF de Drive y registrará trazabilidad en histórico)' : 'Eliminar esta solicitud pendiente'}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-xl text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                      >
+                        <Icons.Trash className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
