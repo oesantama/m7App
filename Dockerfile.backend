@@ -34,6 +34,7 @@ RUN apk add --no-cache ca-certificates tzdata rclone ghostscript poppler-utils \
 
 ENV NODE_ENV=production \
     TZ=America/Bogota \
+    NODE_OPTIONS="--max-old-space-size=768" \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
@@ -51,4 +52,4 @@ COPY --from=builder /app/public ./public
 EXPOSE 8080
 
 # Ejecutamos con node directamente
-CMD ["node", "--max-old-space-size=512", "dist_backend/server.js"]
+CMD ["node", "--max-old-space-size=768", "dist_backend/server.js"]
