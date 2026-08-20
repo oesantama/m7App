@@ -301,6 +301,10 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
   const [addingPersonaId, setAddingPersonaId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
+  // Modal de eliminación elegante
+  const [deleteModal, setDeleteModal] = useState<{ firmaId: number; nombre: string; estado: string } | null>(null);
+  const [deleteMotivoInput, setDeleteMotivoInput] = useState('');
+
   // Filtros de búsqueda
   const [searchPerfil, setSearchPerfil] = useState('');
   const [filterVinculado, setFilterVinculado] = useState<'all' | 'vinculados' | 'sin_vincular'>('all');
@@ -363,24 +367,24 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
     }
   };
 
-  const handleEliminarPendiente = async (firmaId: number, nombre: string, estado: string) => {
-    let motivo = 'Eliminación manual por administración';
-    if (estado === 'firmado') {
-      const inputMotivo = window.prompt(`¡Atención! Este documento para "${nombre}" ya se encuentra FIRMADO.\n\nAl eliminarlo, se removerá el PDF de Google Drive / Almacenamiento local y se conservará la traza inmutable en el histórico auditor.\n\nPor favor ingrese el MOTIVO de eliminación:`);
-      if (inputMotivo === null) return;
-      if (!inputMotivo.trim()) {
-        toast.error('Debe especificar un motivo para eliminar un documento firmado');
-        return;
-      }
-      motivo = inputMotivo.trim();
-    } else {
-      if (!window.confirm(`¿Eliminar la solicitud de firma pendiente para "${nombre}"? Esta acción no se puede deshacer.`)) return;
+  const handleOpenDeleteModal = (row: { id: number; nombre: string; estado: string }) => {
+    setDeleteMotivoInput('');
+    setDeleteModal({ firmaId: row.id, nombre: row.nombre, estado: row.estado });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteModal) return;
+    if (deleteModal.estado === 'firmado' && !deleteMotivoInput.trim()) {
+      toast.error('Debe especificar un motivo para eliminar un documento firmado');
+      return;
     }
 
-    setDeletingId(firmaId);
+    setDeletingId(deleteModal.firmaId);
+    const motivoToSend = deleteMotivoInput.trim() || 'Eliminación manual por administración';
     try {
-      const res = await api.ghPerfilesCargo.eliminarPendiente(firmaId, motivo);
+      const res = await api.ghPerfilesCargo.eliminarPendiente(deleteModal.firmaId, motivoToSend);
       toast.success(res.message || 'Registro de firma eliminado exitosamente');
+      setDeleteModal(null);
       load();
     } catch (err: any) {
       toast.error(err.message || 'Error al eliminar la firma');
@@ -834,7 +838,7 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
                         </button>
                       )}
                       <button
-                        onClick={() => handleEliminarPendiente(r.id, r.nombre, r.estado)}
+                        onClick={() => handleOpenDeleteModal(r)}
                         disabled={deletingId === r.id}
                         title={r.estado === 'firmado' ? 'Eliminar firma realizada (removerá el PDF de Drive y registrará trazabilidad en histórico)' : 'Eliminar esta solicitud pendiente'}
                         className="inline-flex items-center justify-center w-8 h-8 rounded-xl text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 transition-all shadow-sm active:scale-95 disabled:opacity-50"
@@ -859,18 +863,13 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
       {addPersonaModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-start justify-between gap-4">
+            <div className="p-6 pb-4 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-black uppercase tracking-tight text-slate-900">Agregar Persona al Perfil</h3>
-                <p className="text-xs text-slate-400 font-semibold mt-0.5">
-                  {addPersonaModal.cargo_nombre || addPersonaModal.hoja_excel}
-                </p>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-tight">Agregar persona por firmar</h3>
+                <p className="text-xs text-slate-400 font-semibold mt-0.5">{addPersonaModal.cargo_nombre || addPersonaModal.hoja_excel}</p>
               </div>
-              <button
-                onClick={() => { setAddPersonaModal(null); setPersonaQuery(''); setPersonaResults([]); }}
-                className="text-slate-400 hover:text-slate-700 transition-colors"
-              >
-                <Icons.X className="w-5 h-5" />
+              <button onClick={() => setAddPersonaModal(null)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                <Icons.X className="w-4 h-4" />
               </button>
             </div>
 
@@ -919,6 +918,99 @@ const Administracion: React.FC<{ user: User }> = ({ user }) => {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal elegante para eliminar firma / pendiente */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full p-6 space-y-5 animate-in zoom-in-95 duration-200">
+            
+            {/* Encabezado e ícono */}
+            <div className="flex items-start gap-4">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${deleteModal.estado === 'firmado' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-amber-50 text-amber-600 border border-amber-100'}`}>
+                <Icons.AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-black text-slate-900 tracking-tight">
+                  {deleteModal.estado === 'firmado' ? 'Eliminar Firma Realizada' : 'Eliminar Solicitud Pendiente'}
+                </h3>
+                <p className="text-xs text-slate-500 font-bold truncate mt-0.5">
+                  {deleteModal.nombre}
+                </p>
+              </div>
+              <button
+                onClick={() => setDeleteModal(null)}
+                className="w-8 h-8 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-all"
+              >
+                <Icons.X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Banner de advertencia */}
+            <div className={`p-4 rounded-2xl text-xs space-y-2 border ${deleteModal.estado === 'firmado' ? 'bg-red-50/50 border-red-100 text-red-950' : 'bg-amber-50/50 border-amber-100 text-amber-950'}`}>
+              <div className="flex items-center gap-2">
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${deleteModal.estado === 'firmado' ? 'bg-red-600 text-white' : 'bg-amber-500 text-white'}`}>
+                  {deleteModal.estado === 'firmado' ? 'Documento Firmado' : 'Pendiente'}
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed text-slate-600 font-medium">
+                {deleteModal.estado === 'firmado' ? (
+                  <>
+                    <strong>¡Atención!</strong> Se removerá el PDF firmado físicamente de Google Drive / Almacenamiento Local. Se registrará la traza auditora inmutable en el historial.
+                  </>
+                ) : (
+                  <>
+                    Se eliminará la solicitud de firma pendiente. Esta acción no se puede deshacer.
+                  </>
+                )}
+              </p>
+            </div>
+
+            {/* Input de motivo (obligatorio para firmado) */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700">
+                Motivo de Eliminación {deleteModal.estado === 'firmado' && <span className="text-red-500">*</span>}
+              </label>
+              <textarea
+                rows={3}
+                value={deleteMotivoInput}
+                onChange={(e) => setDeleteMotivoInput(e.target.value)}
+                placeholder={deleteModal.estado === 'firmado' ? "Describa el motivo (ej: El colaborador completó erróneamente un perfil que no correspondía)..." : "Motivo opcional..."}
+                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:border-red-500 focus:ring-2 focus:ring-red-500/10 transition-all resize-none"
+              />
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeleteModal(null)}
+                className="px-4 py-2.5 rounded-2xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                disabled={deletingId === deleteModal.firmaId || (deleteModal.estado === 'firmado' && !deleteMotivoInput.trim())}
+                className="px-5 py-2.5 rounded-2xl text-xs font-black text-white bg-red-600 hover:bg-red-700 border border-red-700 shadow-md shadow-red-600/20 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {deletingId === deleteModal.firmaId ? (
+                  <>
+                    <Icons.Loader className="w-4 h-4 animate-spin" />
+                    Eliminando...
+                  </>
+                ) : (
+                  <>
+                    <Icons.Trash className="w-4 h-4" />
+                    Confirmar Eliminación
+                  </>
+                )}
+              </button>
+            </div>
+
           </div>
         </div>
       )}

@@ -230,10 +230,32 @@ export const eliminarPendiente = async (req: AuthRequest, res: Response) => {
     const actor = req.user?.email || req.user?.name || 'Administración GH';
 
     try {
+        // Asegurar existencia de tabla auditora en la base de datos
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS gh_perfiles_cargo_firmas_historico (
+                id SERIAL PRIMARY KEY,
+                firma_id INT,
+                perfil_id INT NOT NULL,
+                perfil_version INT NOT NULL,
+                personal_id INT,
+                cedula VARCHAR(50) NOT NULL,
+                nombre VARCHAR(255) NOT NULL,
+                cargo_nombre VARCHAR(255),
+                hoja_excel VARCHAR(255),
+                estado_previo VARCHAR(20) NOT NULL,
+                firmado_at TIMESTAMPTZ,
+                drive_path_eliminado TEXT,
+                drive_link_eliminado TEXT,
+                eliminado_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                eliminado_por VARCHAR(255),
+                motivo TEXT
+            );
+        `);
+
         const checkRes = await pool.query(
             `SELECT f.*, pc.hoja_excel, pc.cargo_nombre
              FROM gh_perfiles_cargo_firmas f
-             JOIN gh_perfiles_cargo pc ON pc.id = f.perfil_id
+             LEFT JOIN gh_perfiles_cargo pc ON pc.id = f.perfil_id
              WHERE f.id = $1`,
             [firmaId]
         );
@@ -261,16 +283,16 @@ export const eliminarPendiente = async (req: AuthRequest, res: Response) => {
             [
                 firma.id,
                 firma.perfil_id,
-                firma.perfil_version,
+                firma.perfil_version || 1,
                 firma.personal_id,
-                firma.cedula,
-                firma.nombre,
-                firma.cargo_nombre,
-                firma.hoja_excel,
-                firma.estado,
-                firma.firmado_at,
-                firma.drive_path,
-                firma.drive_link,
+                firma.cedula || 'N/A',
+                firma.nombre || 'N/A',
+                firma.cargo_nombre || 'N/A',
+                firma.hoja_excel || 'N/A',
+                firma.estado || 'pendiente',
+                firma.firmado_at || null,
+                firma.drive_path || null,
+                firma.drive_link || null,
                 actor,
                 motivo
             ]
@@ -287,7 +309,7 @@ export const eliminarPendiente = async (req: AuthRequest, res: Response) => {
         });
     } catch (error: any) {
         console.error('Error eliminarPendiente:', error);
-        res.status(500).json({ success: false, error: 'Error del servidor al eliminar la firma' });
+        res.status(500).json({ success: false, error: error.message || 'Error del servidor al eliminar la firma' });
     }
 };
 
