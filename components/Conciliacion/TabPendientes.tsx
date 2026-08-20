@@ -670,6 +670,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 docInfo: any, 
                 plateInvoices: any[], 
                 plateGroupPayments: any[], 
+                plateSurcharges: any[],
                 isGeneral: boolean, 
                 placaName: string,
                 driverName: string
@@ -718,6 +719,17 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     const v = Number(i.valor) || 0;
                     totalConsignaciones += v;
                     consignaciones.push([i.forma_pago || 'BANCOLOMBIA', v, i.comprobante || '—', i.fecha_pago ? String(i.fecha_pago).slice(0, 10) : '—', i.route_vehicle_plate || i.vehicle_plate || '—']);
+                });
+                plateSurcharges?.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').forEach(s => {
+                    const v = Number(s.valor) || 0;
+                    totalConsignaciones += v;
+                    consignaciones.push([
+                        'TRANSFERENCIA',
+                        v,
+                        s.referencia || s.nit || s.facturas || '—',
+                        s.fecha ? String(s.fecha).slice(0, 10) : '—',
+                        s.plate || placaName || docInfo.vehicle_plate || '—'
+                    ]);
                 });
 
                 const leftRows = [
@@ -812,7 +824,7 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
             };
 
             // Sheet 1: General (PLANILLAS(R))
-            const generalAoa = buildAjoverAOA(selectedDoc, invoices, groupPayments, true, '', selectedDoc.conductor_name || '');
+            const generalAoa = buildAjoverAOA(selectedDoc, invoices, groupPayments, routeSurcharges, true, '', selectedDoc.conductor_name || '');
             const wsGeneral = XLSX.utils.aoa_to_sheet(generalAoa);
             XLSX.utils.book_append_sheet(wb, wsGeneral, 'PLANILLAS(R)');
 
@@ -822,12 +834,13 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 if (!p) return;
                 const plateInvs = invoices.filter(i => i.route_vehicle_plate === p);
                 const plateGroup = groupPayments?.filter(g => g.plate === p) || [];
+                const plateSur = routeSurcharges?.filter(s => s.plate === p) || [];
                 // Para obtener el nombre del conductor, lo sacamos del invoice (o si estuviera en routes)
                 const firstInv = plateInvs.find(i => i.conductor_name) || plateInvs[0];
                 const driverName = firstInv?.conductor_name || '';
                 const sheetName = `${p} ${driverName}`.trim().slice(0, 30);
                 
-                const plateAoa = buildAjoverAOA(selectedDoc, plateInvs, plateGroup, false, p, driverName);
+                const plateAoa = buildAjoverAOA(selectedDoc, plateInvs, plateGroup, plateSur, false, p, driverName);
                 const wsPlate = XLSX.utils.aoa_to_sheet(plateAoa);
                 XLSX.utils.book_append_sheet(wb, wsPlate, sheetName);
             });
