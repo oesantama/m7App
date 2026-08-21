@@ -720,17 +720,21 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                     totalConsignaciones += v;
                     consignaciones.push([i.forma_pago || 'BANCOLOMBIA', v, i.comprobante || '—', i.fecha_pago ? String(i.fecha_pago).slice(0, 10) : '—', i.route_vehicle_plate || i.vehicle_plate || '—']);
                 });
-                plateSurcharges?.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02').forEach(s => {
-                    const v = Number(s.valor) || 0;
-                    totalConsignaciones += v;
-                    consignaciones.push([
-                        'TRANSFERENCIA',
-                        v,
-                        s.referencia || s.nit || s.facturas || '—',
-                        s.fecha ? String(s.fecha).slice(0, 10) : '—',
-                        s.plate || placaName || docInfo.vehicle_plate || '—'
-                    ]);
-                });
+                const approvedSurcharges = plateSurcharges?.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02') || [];
+                if (approvedSurcharges.length > 0) {
+                    const totalSurchargesVal = approvedSurcharges.reduce((acc, s) => acc + (Number(s.valor) || 0), 0);
+                    if (totalSurchargesVal > 0) {
+                        const firstSur = approvedSurcharges[0];
+                        totalConsignaciones += totalSurchargesVal;
+                        consignaciones.push([
+                            'TRANSFERENCIA',
+                            totalSurchargesVal,
+                            firstSur.referencia || firstSur.nit || firstSur.facturas || '—',
+                            firstSur.fecha ? String(firstSur.fecha).slice(0, 10) : '—',
+                            firstSur.plate || placaName || docInfo.vehicle_plate || '—'
+                        ]);
+                    }
+                }
 
                 const leftRows = [
                     ['Fecha Planilla', docInfo.delivery_date ? String(docInfo.delivery_date).slice(0,10) : ''],

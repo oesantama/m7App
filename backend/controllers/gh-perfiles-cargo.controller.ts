@@ -230,19 +230,19 @@ export const eliminarPendiente = async (req: AuthRequest, res: Response) => {
     const actor = req.user?.email || req.user?.name || 'Administración GH';
 
     try {
-        // Asegurar existencia de tabla auditora en la base de datos
+        // Asegurar existencia y columnas de tabla auditora en cualquier base de datos
         await pool.query(`
             CREATE TABLE IF NOT EXISTS gh_perfiles_cargo_firmas_historico (
                 id SERIAL PRIMARY KEY,
                 firma_id INT,
                 perfil_id INT NOT NULL,
-                perfil_version INT NOT NULL,
+                perfil_version INT NOT NULL DEFAULT 1,
                 personal_id INT,
-                cedula VARCHAR(50) NOT NULL,
-                nombre VARCHAR(255) NOT NULL,
+                cedula VARCHAR(50) NOT NULL DEFAULT 'N/A',
+                nombre VARCHAR(255) NOT NULL DEFAULT 'N/A',
                 cargo_nombre VARCHAR(255),
                 hoja_excel VARCHAR(255),
-                estado_previo VARCHAR(20) NOT NULL,
+                estado_previo VARCHAR(20) NOT NULL DEFAULT 'pendiente',
                 firmado_at TIMESTAMPTZ,
                 drive_path_eliminado TEXT,
                 drive_link_eliminado TEXT,
@@ -250,6 +250,16 @@ export const eliminarPendiente = async (req: AuthRequest, res: Response) => {
                 eliminado_por VARCHAR(255),
                 motivo TEXT
             );
+
+            ALTER TABLE gh_perfiles_cargo_firmas_historico ADD COLUMN IF NOT EXISTS cargo_nombre VARCHAR(255);
+            ALTER TABLE gh_perfiles_cargo_firmas_historico ADD COLUMN IF NOT EXISTS hoja_excel VARCHAR(255);
+            ALTER TABLE gh_perfiles_cargo_firmas_historico ADD COLUMN IF NOT EXISTS estado_previo VARCHAR(20);
+            ALTER TABLE gh_perfiles_cargo_firmas_historico ADD COLUMN IF NOT EXISTS firmado_at TIMESTAMPTZ;
+            ALTER TABLE gh_perfiles_cargo_firmas_historico ADD COLUMN IF NOT EXISTS drive_path_eliminado TEXT;
+            ALTER TABLE gh_perfiles_cargo_firmas_historico ADD COLUMN IF NOT EXISTS drive_link_eliminado TEXT;
+            ALTER TABLE gh_perfiles_cargo_firmas_historico ADD COLUMN IF NOT EXISTS eliminado_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+            ALTER TABLE gh_perfiles_cargo_firmas_historico ADD COLUMN IF NOT EXISTS eliminado_por VARCHAR(255);
+            ALTER TABLE gh_perfiles_cargo_firmas_historico ADD COLUMN IF NOT EXISTS motivo TEXT;
         `);
 
         const checkRes = await pool.query(
