@@ -722,18 +722,27 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                 });
                 const approvedSurcharges = plateSurcharges?.filter(s => s.status_id === 'APROBADO' || s.status_id === 'EST-02') || [];
                 if (approvedSurcharges.length > 0) {
-                    const totalSurchargesVal = approvedSurcharges.reduce((acc, s) => acc + (Number(s.valor) || 0), 0);
-                    if (totalSurchargesVal > 0) {
-                        const firstSur = approvedSurcharges[0];
-                        totalConsignaciones += totalSurchargesVal;
-                        consignaciones.push([
-                            'TRANSFERENCIA',
-                            totalSurchargesVal,
-                            firstSur.referencia || firstSur.nit || firstSur.facturas || '—',
-                            firstSur.fecha ? String(firstSur.fecha).slice(0, 10) : '—',
-                            firstSur.plate || placaName || docInfo.vehicle_plate || '—'
-                        ]);
-                    }
+                    const surchargesByPlate: Record<string, any[]> = {};
+                    approvedSurcharges.forEach(s => {
+                        const pName = String(s.plate || placaName || docInfo.vehicle_plate || '—').trim().toUpperCase();
+                        if (!surchargesByPlate[pName]) surchargesByPlate[pName] = [];
+                        surchargesByPlate[pName].push(s);
+                    });
+
+                    Object.entries(surchargesByPlate).forEach(([pName, surList]) => {
+                        const totalPlateSurVal = surList.reduce((acc, s) => acc + (Number(s.valor) || 0), 0);
+                        if (totalPlateSurVal > 0) {
+                            const firstSur = surList[0];
+                            totalConsignaciones += totalPlateSurVal;
+                            consignaciones.push([
+                                'TRANSFERENCIA',
+                                totalPlateSurVal,
+                                firstSur.referencia || firstSur.nit || firstSur.facturas || '—',
+                                firstSur.fecha ? String(firstSur.fecha).slice(0, 10) : '—',
+                                pName
+                            ]);
+                        }
+                    });
                 }
 
                 const leftRows = [
