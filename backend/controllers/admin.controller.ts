@@ -191,15 +191,21 @@ export const deleteRecord = async (req: any, res: Response) => {
     if (!isUserAdmin(user)) return res.status(403).json({ error: "Acceso denegado." });
     if (!tableName || !id) return res.status(400).json({ error: "Datos incompletos" });
 
-    // Validate table name to prevent SQL injection
     if (!/^[a-zA-Z0-9_]+$/.test(tableName)) {
       return res.status(400).json({ error: "Nombre de tabla inválido" });
+    }
+
+    if (tableName === 'modules') {
+      await pool.query('DELETE FROM pages WHERE module_id = $1 OR parent_id = $1', [id]);
     }
 
     await pool.query(`DELETE FROM ${tableName} WHERE id = $1`, [id]);
     res.json({ success: true, action: 'DELETE' });
   } catch (err: any) {
     console.error('[ADMIN-DELETE]', err.message);
+    if (err.code === '23503') {
+      return res.status(400).json({ error: "No se puede eliminar el registro porque tiene datos vinculados en otras tablas (restricción de clave foránea)." });
+    }
     res.status(500).json({ error: "Error al eliminar registro" });
   }
 };
@@ -218,11 +224,19 @@ export const bulkDeleteRecords = async (req: any, res: Response) => {
     }
 
     const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
+
+    if (tableName === 'modules') {
+      await pool.query(`DELETE FROM pages WHERE module_id IN (${placeholders}) OR parent_id IN (${placeholders})`, ids);
+    }
+
     await pool.query(`DELETE FROM ${tableName} WHERE id IN (${placeholders})`, ids);
     
     res.json({ success: true, action: 'BULK_DELETE', count: ids.length });
   } catch (err: any) {
     console.error('[ADMIN-BULK-DELETE]', err.message);
+    if (err.code === '23503') {
+      return res.status(400).json({ error: "No se pueden eliminar los registros seleccionados porque están asociados a otras tablas (restricción de clave foránea)." });
+    }
     res.status(500).json({ error: "Error al eliminar registros masivamente" });
   }
 };

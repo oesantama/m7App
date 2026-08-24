@@ -1498,6 +1498,34 @@ export const restoreSystem = async () => {
     `);
     */
 
+    // ── PURGA Y MIGRACIÓN AUTOMÁTICA DE IDs LEGACY OBSOLETOS (PRODUCCIÓN & DEV) ──
+    await client.query(`
+      UPDATE pages SET module_id = 'MOD-16', parent_id = 'MOD-16' WHERE module_id = 'MOD-BASC' OR parent_id = 'MOD-BASC';
+      UPDATE pages SET module_id = 'MOD-17', parent_id = 'MOD-17' WHERE module_id = 'MOD-DOC' OR parent_id = 'MOD-DOC';
+      UPDATE pages SET module_id = 'MOD-18', parent_id = 'MOD-18' WHERE module_id = 'MOD-TI' OR parent_id = 'MOD-TI';
+
+      UPDATE role_permissions SET permissions = replace(permissions::text, 'PAG-WA01', 'PAG-02')::jsonb WHERE permissions::text LIKE '%PAG-WA01%';
+      UPDATE role_permissions SET permissions = replace(permissions::text, 'PAG-SQL', 'PAG-59')::jsonb WHERE permissions::text LIKE '%PAG-SQL%';
+      UPDATE role_permissions SET permissions = replace(permissions::text, 'PAG-CYBER', 'PAG-69')::jsonb WHERE permissions::text LIKE '%PAG-CYBER%';
+      UPDATE role_permissions SET permissions = replace(permissions::text, 'PAG-BASC-01', 'PAG-70')::jsonb WHERE permissions::text LIKE '%PAG-BASC-01%';
+      UPDATE role_permissions SET permissions = replace(permissions::text, 'PAG-BASC-02', 'PAG-71')::jsonb WHERE permissions::text LIKE '%PAG-BASC-02%';
+      UPDATE role_permissions SET permissions = replace(permissions::text, 'PAG-BASC-03', 'PAG-72')::jsonb WHERE permissions::text LIKE '%PAG-BASC-03%';
+      UPDATE role_permissions SET permissions = replace(permissions::text, 'PAG-BASC-04', 'PAG-73')::jsonb WHERE permissions::text LIKE '%PAG-BASC-04%';
+      UPDATE role_permissions SET permissions = replace(permissions::text, 'PAG-TI-01', 'PAG-74')::jsonb WHERE permissions::text LIKE '%PAG-TI-01%';
+
+      UPDATE user_permissions SET permissions = replace(permissions::text, 'PAG-WA01', 'PAG-02')::jsonb WHERE permissions::text LIKE '%PAG-WA01%';
+      UPDATE user_permissions SET permissions = replace(permissions::text, 'PAG-SQL', 'PAG-59')::jsonb WHERE permissions::text LIKE '%PAG-SQL%';
+      UPDATE user_permissions SET permissions = replace(permissions::text, 'PAG-CYBER', 'PAG-69')::jsonb WHERE permissions::text LIKE '%PAG-CYBER%';
+      UPDATE user_permissions SET permissions = replace(permissions::text, 'PAG-BASC-01', 'PAG-70')::jsonb WHERE permissions::text LIKE '%PAG-BASC-01%';
+      UPDATE user_permissions SET permissions = replace(permissions::text, 'PAG-BASC-02', 'PAG-71')::jsonb WHERE permissions::text LIKE '%PAG-BASC-02%';
+      UPDATE user_permissions SET permissions = replace(permissions::text, 'PAG-BASC-03', 'PAG-72')::jsonb WHERE permissions::text LIKE '%PAG-BASC-03%';
+      UPDATE user_permissions SET permissions = replace(permissions::text, 'PAG-BASC-04', 'PAG-73')::jsonb WHERE permissions::text LIKE '%PAG-BASC-04%';
+      UPDATE user_permissions SET permissions = replace(permissions::text, 'PAG-TI-01', 'PAG-74')::jsonb WHERE permissions::text LIKE '%PAG-TI-01%';
+
+      DELETE FROM pages WHERE id IN ('PAG-BASC-01', 'PAG-BASC-02', 'PAG-BASC-03', 'PAG-BASC-04', 'PAG-CYBER', 'PAG-SQL', 'PAG-WA01', 'PAG-TI-01');
+      DELETE FROM modules WHERE id IN ('MOD-BASC', 'MOD-DOC', 'MOD-TI');
+    `);
+
     await client.query(`
       INSERT INTO modules (id, name, icon_class, status_id) VALUES
       ('MOD-01', 'CONFIGURACIÓN MAESTROS', 'Settings', 'EST-01'),
