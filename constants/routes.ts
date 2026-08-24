@@ -31,7 +31,7 @@ export const ROUTE_TO_MASTER_CATEGORY: Record<string, MasterCategory> = {
   'roles': 'masterRol',
   'PAG-01': 'masterArticulo',
   'PAG-21': 'masterUsuarios',
-  'PAG-02': 'masterRol',
+  'PAG-22': 'masterRol',
 };
 
 /**

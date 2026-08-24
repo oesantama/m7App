@@ -105,6 +105,7 @@ const PerfilesCargo = lazyWithRetry(() => import('./components/GestionHumana/Per
 const PerfilCargoPublicSign = lazyWithRetry(() => import('./components/PerfilCargoPublicSign'));
 const GrupoInterCumplidoPage = lazyWithRetry(() => import('./components/GrupoInterCumplidoPage'));
 const GrupoInterSeguimientoPage = lazyWithRetry(() => import('./components/GrupoInterSeguimientoPage'));
+const LegalizacionesDicorp = lazyWithRetry(() => import('./components/Dicorp/LegalizacionesDicorp'));
 
 // Import Admin Module
 const AdminDBManager = lazyWithRetry(() => import('./pages/AdminDBManager'));
@@ -636,7 +637,7 @@ const App: React.FC = () => {
     const availableVehiclesCount = vehicles.filter(v => v.status === 'Disponible' || v.status === 'Available').length;
 
     // Páginas con componentes dedicados — tienen prioridad absoluta sobre MasterModule
-    if (String(activeTab).toLowerCase() === 'alertas-whatsapp') {
+    if (String(activeTab).toLowerCase() === 'alertas-whatsapp' || activePageId === 'PAG-02') {
       return (
         <React.Suspense fallback={<div className="p-10 text-center text-slate-400 text-sm">Cargando Alertas WhatsApp...</div>}>
           <AlertasWhatsapp />
@@ -1172,6 +1173,12 @@ const App: React.FC = () => {
         return (
           <React.Suspense fallback={<div className="p-10">Cargando Hojas de Vida DMS...</div>}>
             <HojasDeVidaMain />
+          </React.Suspense>
+        );
+      case 'legalizaciones-dicorp':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Legalizaciones DICORP...</div>}>
+            <LegalizacionesDicorp user={user!} />
           </React.Suspense>
         );
       case 'basc':

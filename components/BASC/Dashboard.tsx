@@ -44,7 +44,7 @@ const Dashboard: React.FC<DashboardProps> = ({ tree, loading, onNavigate }) => {
         
         <div className="flex gap-3">
           <button
-            onClick={() => onNavigate('PAG-BASC-03')}
+            onClick={() => onNavigate('PAG-72')}
             className="flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-300 shadow-lg shadow-emerald-500/20 active:scale-95"
           >
             <Icons.Brain className="w-4 h-4" />
@@ -60,7 +60,7 @@ const Dashboard: React.FC<DashboardProps> = ({ tree, loading, onNavigate }) => {
           </button>
           
           <button
-            onClick={() => onNavigate('PAG-BASC-02')}
+            onClick={() => onNavigate('PAG-71')}
             className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-white px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all duration-300"
           >
             <Icons.RefreshCw className="w-4 h-4" />
@@ -205,7 +205,7 @@ const Dashboard: React.FC<DashboardProps> = ({ tree, loading, onNavigate }) => {
                     </div>
 
                     <button
-                      onClick={() => onNavigate('PAG-BASC-02')}
+                      onClick={() => onNavigate('PAG-71')}
                       className="p-1 text-slate-500 hover:text-white transition-colors"
                     >
                       <Icons.ChevronRight className="w-5 h-5" />
@@ -233,7 +233,7 @@ const Dashboard: React.FC<DashboardProps> = ({ tree, loading, onNavigate }) => {
             </p>
 
             <button
-              onClick={() => onNavigate('PAG-BASC-03')}
+              onClick={() => onNavigate('PAG-72')}
               className="w-full flex items-center justify-center gap-2 bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 py-3 rounded-xl font-bold text-xs uppercase tracking-wider border border-purple-500/30 transition-all active:scale-95"
             >
               <Icons.Chat className="w-4 h-4" />
@@ -261,7 +261,7 @@ const Dashboard: React.FC<DashboardProps> = ({ tree, loading, onNavigate }) => {
             </div>
 
             <button
-              onClick={() => onNavigate('PAG-BASC-04')}
+              onClick={() => onNavigate('PAG-73')}
               className="mt-6 w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
             >
               <Icons.Download className="w-4 h-4" />

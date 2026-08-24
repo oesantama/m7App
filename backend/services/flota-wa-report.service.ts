@@ -14,52 +14,6 @@ function getLogoBase64(): string {
 }
 
 interface FlotaRow { client_name: string; operator: string; city: string; quantity: number; }
-interface TdmSummary { total_manifiestos: number; total_cobrar: number; total_pagar: number; }
-interface M7Summary { total_manifiestos: number; total_cobrar: number; total_pagar: number; }
-
-const CITY_TO_DEPT: Record<string, string> = {
-  'MEDELLIN':'ANTIOQUIA','ITAGUI':'ANTIOQUIA','ENVIGADO':'ANTIOQUIA','BELLO':'ANTIOQUIA','SABANETA':'ANTIOQUIA',
-  'LA ESTRELLA':'ANTIOQUIA','COPACABANA':'ANTIOQUIA','GIRARDOTA':'ANTIOQUIA','CALDAS':'ANTIOQUIA','BARBOSA':'ANTIOQUIA',
-  'RIONEGRO':'ANTIOQUIA','MARINILLA':'ANTIOQUIA','GUARNE':'ANTIOQUIA','CAUCASIA':'ANTIOQUIA','APARTADO':'ANTIOQUIA',
-  'TURBO':'ANTIOQUIA','CAREPA':'ANTIOQUIA','CHIGORODO':'ANTIOQUIA','DON MATIAS':'ANTIOQUIA','YARUMAL':'ANTIOQUIA',
-  'SANTA ROSA DE OSOS':'ANTIOQUIA','LA CEJA':'ANTIOQUIA','EL BAGRE':'ANTIOQUIA','SEGOVIA':'ANTIOQUIA',
-  'REMEDIOS':'ANTIOQUIA','ZARAGOZA':'ANTIOQUIA','CACERES':'ANTIOQUIA','TARAZA':'ANTIOQUIA','NECHI':'ANTIOQUIA',
-  'AMAGA':'ANTIOQUIA','FREDONIA':'ANTIOQUIA','ANDES':'ANTIOQUIA','URRAO':'ANTIOQUIA','DABEIBA':'ANTIOQUIA',
-  'ANGOSTURA':'ANTIOQUIA','CAMPAMENTO':'ANTIOQUIA','VALDIVIA':'ANTIOQUIA','SOPETRAN':'ANTIOQUIA',
-  'ABEJORRAL':'ANTIOQUIA','GRANADA':'ANTIOQUIA','SAN CARLOS':'ANTIOQUIA','SONSON':'ANTIOQUIA',
-  'CALI':'VALLE DEL CAUCA','YUMBO':'VALLE DEL CAUCA','PALMIRA':'VALLE DEL CAUCA','BUENAVENTURA':'VALLE DEL CAUCA',
-  'CARTAGO':'VALLE DEL CAUCA','JAMUNDI':'VALLE DEL CAUCA','TULUA':'VALLE DEL CAUCA','BUGA':'VALLE DEL CAUCA',
-  'DAGUA':'VALLE DEL CAUCA','SEVILLA':'VALLE DEL CAUCA','ZARZAL':'VALLE DEL CAUCA','ROLDANILLO':'VALLE DEL CAUCA',
-  'MONTERIA':'CORDOBA','VALENCIA':'CORDOBA','CERETE':'CORDOBA','LORICA':'CORDOBA','SAHAGUN':'CORDOBA',
-  'PLANETA RICA':'CORDOBA','MONTELIBANO':'CORDOBA','TIERRALTA':'CORDOBA',
-  'BOGOTA':'CUNDINAMARCA','BOGOTÁ':'CUNDINAMARCA','COTA':'CUNDINAMARCA','FUNZA':'CUNDINAMARCA',
-  'MOSQUERA':'CUNDINAMARCA','MADRID':'CUNDINAMARCA','SOACHA':'CUNDINAMARCA','CHIA':'CUNDINAMARCA',
-  'CAJICA':'CUNDINAMARCA','ZIPAQUIRA':'CUNDINAMARCA','TOCANCIPA':'CUNDINAMARCA','GIRARDOT':'CUNDINAMARCA',
-  'BARRANQUILLA':'ATLANTICO','SOLEDAD':'ATLANTICO','MALAMBO':'ATLANTICO','GALAPA':'ATLANTICO',
-  'CARTAGENA':'BOLIVAR','MAGANGUE':'BOLIVAR','ARJONA':'BOLIVAR','TURBACO':'BOLIVAR',
-  'SANTA MARTA':'MAGDALENA','PLATO':'MAGDALENA','FUNDACION':'MAGDALENA','CIENAGA':'MAGDALENA',
-  'SINCELEJO':'SUCRE','SAN MARCOS':'SUCRE','COROZAL':'SUCRE','SAMPUES':'SUCRE',
-  'VALLEDUPAR':'CESAR','AGUACHICA':'CESAR','CODAZZI':'CESAR','CURUMANI':'CESAR',
-  'PEREIRA':'RISARALDA','DOSQUEBRADAS':'RISARALDA','SANTA ROSA DE CABAL':'RISARALDA',
-  'MANIZALES':'CALDAS','LA DORADA':'CALDAS','CHINCHINA':'CALDAS',
-  'ARMENIA':'QUINDIO','CALARCA':'QUINDIO','MONTENEGRO':'QUINDIO',
-  'IBAGUE':'TOLIMA','ESPINAL':'TOLIMA','MELGAR':'TOLIMA','FLANDES':'TOLIMA',
-  'NEIVA':'HUILA','PITALITO':'HUILA','GARZON':'HUILA','GARZÓN':'HUILA',
-  'VILLAVICENCIO':'META','ACACIAS':'META',
-  'YOPAL':'CASANARE','AGUAZUL':'CASANARE',
-  'BUCARAMANGA':'SANTANDER','FLORIDABLANCA':'SANTANDER','GIRON':'SANTANDER','PIEDECUESTA':'SANTANDER',
-  'BARRANCABERMEJA':'SANTANDER','SAN GIL':'SANTANDER',
-  'CUCUTA':'NORTE DE SANTANDER','CÚCUTA':'NORTE DE SANTANDER','OCAÑA':'NORTE DE SANTANDER',
-  'POPAYAN':'CAUCA','POPAYÁN':'CAUCA','SANTANDER DE QUILICHAO':'CAUCA',
-  'PASTO':'NARIÑO','IPIALES':'NARIÑO','TUMACO':'NARIÑO',
-  'TUNJA':'BOYACA','SOGAMOSO':'BOYACA','DUITAMA':'BOYACA',
-  'QUIBDO':'CHOCO','QUIBDÓ':'CHOCO',
-  'RIOHACHA':'LA GUAJIRA','MAICAO':'LA GUAJIRA',
-};
-
-function getDept(city: string): string {
-  return CITY_TO_DEPT[(city || '').toUpperCase().trim()] || city || 'SIN DEPTO.';
-}
 
 function yesterday(): { from: string; to: string } {
   // Obtener la fecha actual en Colombia (UTC-5) para evitar el desfase de zona horaria.
@@ -69,6 +23,13 @@ function yesterday(): { from: string; to: string } {
   const ayer = new Date(y, m - 1, d - 1);
   const iso = `${ayer.getFullYear()}-${String(ayer.getMonth() + 1).padStart(2, '0')}-${String(ayer.getDate()).padStart(2, '0')}`;
   return { from: iso, to: iso };
+}
+
+function formatFechaLarga(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  const s = dt.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  return s.toUpperCase();
 }
 
 async function queryFlota(from: string, to: string): Promise<FlotaRow[]> {
@@ -97,261 +58,291 @@ async function queryFlota(from: string, to: string): Promise<FlotaRow[]> {
   return result.rows;
 }
 
-async function queryTdmSummary(from: string, to: string): Promise<TdmSummary> {
-  const result = await pool.query(
-    `SELECT COUNT(*)::int AS total_manifiestos,
-            COALESCE(SUM(valor_cobrar),0)::int AS total_cobrar,
-            COALESCE(SUM(valor_pagar),0)::int AS total_pagar
-     FROM flota_tdm_manifiestos WHERE fecha_operacion BETWEEN $1 AND $2`,
-    [from, to]
-  );
-  return result.rows[0] || { total_manifiestos: 0, total_cobrar: 0, total_pagar: 0 };
-}
-
-async function queryM7Summary(from: string, to: string): Promise<M7Summary> {
-  const result = await pool.query(
-    `SELECT COUNT(*)::int AS total_manifiestos,
-            COALESCE(SUM(total_value_cxc_final),0)::bigint AS total_cobrar,
-            COALESCE(SUM(total_value_cxp_final),0)::bigint AS total_pagar
-     FROM management_orders
-     WHERE manifest_date::date BETWEEN $1 AND $2
-       AND manifest_status NOT IN ('ANULADO','CANCELADO','ANULADA')
-       AND manifest_date IS NOT NULL
-       AND UPPER(TRIM(client_name)) NOT LIKE '%TDM%'`,
-    [from, to]
-  );
-  return result.rows[0] || { total_manifiestos: 0, total_cobrar: 0, total_pagar: 0 };
+async function queryVehiculos(from: string, to: string): Promise<{ m7: number; tdm: number }> {
+  const [m7Res, tdmRes] = await Promise.all([
+    pool.query(
+      `SELECT COUNT(DISTINCT UPPER(TRIM(plate)))::int AS n
+       FROM management_orders
+       WHERE manifest_date::date BETWEEN $1 AND $2
+         AND manifest_status NOT IN ('ANULADO','CANCELADO','ANULADA')
+         AND manifest_date IS NOT NULL
+         AND plate IS NOT NULL AND TRIM(plate) <> ''`,
+      [from, to]
+    ),
+    pool.query(
+      `SELECT COUNT(DISTINCT UPPER(TRIM(placa)))::int AS n
+       FROM flota_tdm_manifiestos
+       WHERE fecha_operacion BETWEEN $1 AND $2
+         AND placa IS NOT NULL AND TRIM(placa) <> ''`,
+      [from, to]
+    ),
+  ]);
+  return { m7: m7Res.rows[0]?.n || 0, tdm: tdmRes.rows[0]?.n || 0 };
 }
 
 const fmt = (n: number) => n.toLocaleString('es-CO');
-const pct = (n: number, t: number) => t > 0 ? ((n / t) * 100).toFixed(1) + '%' : '0%';
+const pct0 = (n: number, t: number) => t > 0 ? Math.round((n / t) * 100) : 0;
+const pctComma = (n: number, t: number) => t > 0 ? ((n / t) * 100).toFixed(1).replace('.', ',') : '0';
 
-function hBars(items: [string, number][], total: number, color: string, maxLabel = 28): string {
-  if (!items.length) return '<p style="color:#80a0a0;font-size:9px;padding:8px">Sin datos</p>';
-  const maxVal = Math.max(...items.map(x => x[1]), 1);
-  return items.map(([name, qty]) => {
-    const w = (qty / maxVal) * 100;
-    const wStr = w.toFixed(1);
-    const label = name.length > maxLabel ? name.slice(0, maxLabel) + '…' : name;
-    // Si la barra ocupa >38% → texto blanco dentro; si no → texto oscuro justo después
-    const txtColor  = w > 38 ? '#fff' : '#0a3535';
-    const txtLeft   = w > 38 ? '5px' : `calc(${wStr}% + 5px)`;
-    return `<div style="display:flex;align-items:center;margin-bottom:3px;gap:6px">
-      <div style="width:120px;font-size:7.5px;text-align:right;color:#2a5555;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${name}">${label}</div>
-      <div style="flex:1;background:#ddf0f0;border-radius:3px;height:14px;position:relative">
-        <div style="position:absolute;left:0;top:0;width:${wStr}%;height:100%;background:${color};border-radius:3px;min-width:3px"></div>
-        <span style="position:absolute;left:${txtLeft};top:50%;transform:translateY(-50%);font-size:7px;font-weight:700;color:${txtColor};white-space:nowrap">${qty} (${pct(qty, total)})</span>
-      </div>
-    </div>`;
-  }).join('');
+// Paleta clásica de gráficos Excel (tema Office), ciclando cuando hay más de 6 categorías.
+const PALETTE = [
+  '#4472C4', '#ED7D31', '#A5A5A5', '#FFC000', '#5B9BD5', '#70AD47',
+  '#264478', '#9E480E', '#636363', '#997300', '#255E91', '#43682B',
+  '#698ED0', '#F1975A', '#B7B7B7', '#FFCD33',
+];
+
+interface Seg { name: string; qty: number; start: number; end: number; mid: number; color: string; }
+
+function buildSegments(items: [string, number][], total: number): Seg[] {
+  let cum = 0;
+  return items.map(([name, qty], i) => {
+    const start = (cum / total) * 360;
+    cum += qty;
+    const end = (cum / total) * 360;
+    return { name, qty, start, end, mid: (start + end) / 2, color: PALETTE[i % PALETTE.length] };
+  });
 }
 
-function buildHtml(rows: FlotaRow[], tdm: TdmSummary, m7sum: M7Summary, fecha: string, logoSrc: string): string {
+/** Punto sobre el borde de la elipse (vista "3D" achatada) para un ángulo (0°=arriba),
+ *  en el sentido visual antihorario que usa Excel para el primer slice. */
+function edgePoint(cx: number, cy: number, rx: number, ry: number, thetaDeg: number): { x: number; y: number } {
+  const t = (thetaDeg * Math.PI) / 180;
+  return { x: cx - rx * Math.sin(t), y: cy - ry * Math.cos(t) };
+}
+
+function isLeftSide(thetaDeg: number): boolean {
+  return Math.sin((thetaDeg * Math.PI) / 180) >= 0;
+}
+
+/** Gráfica de pastel 2D plana, con etiquetas y líneas de llamada replicando el layout de Excel:
+ *  slices grandes con etiqueta directa al lado (sin línea) y slices pequeños apilados con leader-line. */
+function pieWithLabels(items: [string, number][], total: number, size: number, leftW: number, rightW: number): string {
+  const r = size / 2;
+
+  if (!items.length || total <= 0) {
+    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#e5e5e5;flex-shrink:0"></div>`;
+  }
+  if (items.length === 1) {
+    const [name] = items[0];
+    return `<div style="position:relative;width:${leftW + size + rightW}px;height:${size}px;flex-shrink:0">
+      <div style="position:absolute;left:${leftW}px;top:0;width:${size}px;height:${size}px;border-radius:50%;background:${PALETTE[0]};
+        box-shadow:0 1px 3px rgba(0,0,0,.18), inset 0 0 0 1.5px rgba(255,255,255,.5)"></div>
+      <div style="position:absolute;left:${leftW}px;top:0;width:${size}px;height:${size}px;border-radius:50%;pointer-events:none;
+        background:radial-gradient(circle at 34% 28%, rgba(255,255,255,.4), rgba(255,255,255,0) 55%)"></div>
+      <div style="position:absolute;left:${leftW + size + 4}px;top:${size / 2 - 9}px;width:${rightW - 4}px;text-align:left">
+        <div style="font-size:6.8px;font-weight:800;color:#1a1a1a;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name}</div>
+        <div style="font-size:6px;color:#8a8a8a;line-height:1.1">100%</div>
+      </div>
+    </div>`;
+  }
+
+  const segs = buildSegments(items, total);
+  const rowH = 16;
+  const cxLocal = leftW + r;
+
+  type Row = { seg: Seg; anchorX: number; anchorY: number; y: number };
+  const left: Row[] = [];
+  const right: Row[] = [];
+  segs.forEach(seg => {
+    const a = edgePoint(cxLocal, r, r, r, seg.mid);
+    const row: Row = { seg, anchorX: a.x, anchorY: a.y, y: a.y };
+    (isLeftSide(seg.mid) ? left : right).push(row);
+  });
+  const declutter = (arr: Row[]) => {
+    arr.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < arr.length; i++) {
+      if (arr[i].y < arr[i - 1].y + rowH) arr[i].y = arr[i - 1].y + rowH;
+    }
+  };
+  declutter(left);
+  declutter(right);
+
+  const allY = [0, size, ...left.map(x => x.y), ...left.map(x => x.y + rowH), ...right.map(x => x.y), ...right.map(x => x.y + rowH)];
+  const minY = Math.min(...allY);
+  const maxY = Math.max(...allY);
+  const shift = -minY;
+  const height = maxY - minY;
+
+  const gradient = segs.map(s => `${s.color} ${s.start.toFixed(2)}deg ${s.end.toFixed(2)}deg`).join(', ');
+
+  const label = (row: Row, side: 'left' | 'right') => {
+    const y = row.y + shift;
+    const pct = pctComma(row.seg.qty, total);
+    if (side === 'left') {
+      return `<div style="position:absolute;left:0;top:${y}px;width:${leftW - 4}px;text-align:right">
+        <div style="font-size:6.8px;font-weight:800;color:#1a1a1a;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${row.seg.name}</div>
+        <div style="font-size:6px;color:#8a8a8a;line-height:1.1">${pct}%</div>
+      </div>`;
+    }
+    return `<div style="position:absolute;left:${leftW + size + 4}px;top:${y}px;width:${rightW - 4}px;text-align:left">
+      <div style="font-size:6.8px;font-weight:800;color:#1a1a1a;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${row.seg.name}</div>
+      <div style="font-size:6px;color:#8a8a8a;line-height:1.1">${pct}%</div>
+    </div>`;
+  };
+
+  const leaderLines = right.map(row => {
+    const x1 = row.anchorX, y1 = row.anchorY + shift;
+    const x2 = leftW + size + 2, y2 = row.y + shift + 5;
+    return `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#a8a8a8" stroke-width="0.6"/>`;
+  }).join('');
+
+  // Líneas blancas entre porciones para que cada slice se distinga con nitidez.
+  const pieCx = cxLocal, pieCy = r + shift;
+  const boundaries = [...new Set(segs.map(s => s.start))];
+  const separators = boundaries.map(b => {
+    const p = edgePoint(pieCx, pieCy, r, r, b);
+    return `<line x1="${pieCx}" y1="${pieCy.toFixed(1)}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="#ffffff" stroke-width="1.4"/>`;
+  }).join('');
+
+  return `<div style="position:relative;width:${leftW + size + rightW}px;height:${height}px;flex-shrink:0">
+    <div style="position:absolute;left:${leftW}px;top:${shift}px;width:${size}px;height:${size}px;border-radius:50%;
+      background:conic-gradient(${gradient});transform:scaleX(-1);
+      box-shadow:0 1px 3px rgba(0,0,0,.18), inset 0 0 0 1.5px rgba(255,255,255,.5)"></div>
+    <svg width="${leftW + size + rightW}" height="${height}" style="position:absolute;left:0;top:0;pointer-events:none">${separators}</svg>
+    <div style="position:absolute;left:${leftW}px;top:${shift}px;width:${size}px;height:${size}px;border-radius:50%;pointer-events:none;
+      background:radial-gradient(circle at 34% 28%, rgba(255,255,255,.35), rgba(255,255,255,0) 55%)"></div>
+    <svg width="${leftW + size + rightW}" height="${height}" style="position:absolute;left:0;top:0;pointer-events:none">${leaderLines}</svg>
+    ${left.map(row => label(row, 'left')).join('')}
+    ${right.map(row => label(row, 'right')).join('')}
+  </div>`;
+}
+
+function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fecha: string, logoSrc: string): string {
   const m7Rows  = rows.filter(r => r.operator === 'M7');
   const tdmRows = rows.filter(r => r.operator === 'TDM');
   const totalM7  = m7Rows.reduce((s, r) => s + r.quantity, 0);
   const totalTDM = tdmRows.reduce((s, r) => s + r.quantity, 0);
   const total    = totalM7 + totalTDM;
+  const uniqueClients = new Set(rows.map(r => r.client_name)).size;
 
-  // M7 por cliente
   const m7Client = new Map<string, number>();
   m7Rows.forEach(r => m7Client.set(r.client_name, (m7Client.get(r.client_name) || 0) + r.quantity));
   const m7ClientList = [...m7Client.entries()].sort((a, b) => b[1] - a[1]);
 
-  // TDM por cliente
   const tdmClient = new Map<string, number>();
   tdmRows.forEach(r => tdmClient.set(r.client_name, (tdmClient.get(r.client_name) || 0) + r.quantity));
   const tdmClientList = [...tdmClient.entries()].sort((a, b) => b[1] - a[1]);
 
-  // M7 por departamento
-  const m7Dept = new Map<string, number>();
-  m7Rows.forEach(r => { const d = getDept(r.city); m7Dept.set(d, (m7Dept.get(d) || 0) + r.quantity); });
-  const m7DeptList = [...m7Dept.entries()].sort((a, b) => b[1] - a[1]);
+  // Top 2 ciudades por volumen (combinando M7 + TDM)
+  const cityTotals = new Map<string, number>();
+  rows.forEach(r => cityTotals.set(r.city, (cityTotals.get(r.city) || 0) + r.quantity));
+  const topCities = [...cityTotals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2);
 
-  // TDM por departamento
-  const tdmDept = new Map<string, number>();
-  tdmRows.forEach(r => { const d = getDept(r.city); tdmDept.set(d, (tdmDept.get(d) || 0) + r.quantity); });
-  const tdmDeptList = [...tdmDept.entries()].sort((a, b) => b[1] - a[1]);
+  const cityClientBreakdown = (city: string): [string, number][] => {
+    const m = new Map<string, number>();
+    rows.filter(r => r.city === city).forEach(r => m.set(r.client_name, (m.get(r.client_name) || 0) + r.quantity));
+    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+  };
 
-  const uniqueClients = new Set(rows.map(r => r.client_name)).size;
+  const tablaRow = (name: string, qty: number, bold = false) => `
+    <tr${bold ? ' style="background:#C6E0B4;font-weight:800"' : ''}>
+      <td style="padding:1.5px 4px;text-align:left;color:#666;width:24px;border-bottom:1px solid #e2e2e2">${bold ? '' : pct0(qty, total) + '%'}</td>
+      <td style="padding:1.5px 4px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:1px solid #e2e2e2" title="${name}">${bold ? '' : name}</td>
+      <td style="padding:1.5px 4px;text-align:right;font-weight:700;border-bottom:1px solid #e2e2e2">${fmt(qty)}</td>
+    </tr>`;
 
-  // Intermediaciones como porcentaje de margen: (cobrar - pagar) / cobrar × 100
-  const m7IntPct       = m7sum.total_cobrar > 0 ? (m7sum.total_cobrar - m7sum.total_pagar) / m7sum.total_cobrar * 100 : 0;
-  const tdmIntTotalPct = tdm.total_cobrar   > 0 ? (tdm.total_cobrar   - tdm.total_pagar)   / tdm.total_cobrar   * 100 : 0;
-  // TDM Real: si Total >= 20 → Total/2; si Total < 20 → Total - 10
-  const tdmIntRealPct = tdmIntTotalPct >= 20
-    ? tdmIntTotalPct / 2
-    : Math.max(0, tdmIntTotalPct - 10);
-  const fmtPct = (n: number) => `${Math.round(n)}`;
+  const TABLA_IZQ = `
+  <table style="width:100%;border-collapse:collapse;font-size:7.2px">
+    <thead><tr style="background:#D9D9D9;color:#1a1a1a">
+      <th colspan="2" style="padding:3px 4px;text-align:left;font-style:italic">M7</th>
+      <th style="padding:3px 4px;text-align:right">TOTAL</th>
+    </tr></thead>
+    <tbody>
+      ${m7ClientList.map(([n, q]) => tablaRow(n, q)).join('')}
+      ${tablaRow('', totalM7, true)}
+      ${tdmClientList.map(([n, q]) => tablaRow(n, q)).join('')}
+      ${tablaRow('', totalTDM, true)}
+      <tr style="background:#A9D18E;font-weight:900">
+        <td colspan="2" style="padding:3px 4px"></td>
+        <td style="padding:3px 4px;text-align:right">${fmt(total)}</td>
+      </tr>
+    </tbody>
+  </table>`;
 
-  // Barras comparativas (altura proporcional, mín 4px)
-  const totalCli = m7ClientList.length + tdmClientList.length || 1;
-  const m7CliH  = Math.round((m7ClientList.length / Math.max(m7ClientList.length, tdmClientList.length, 1)) * 60);
-  const tdmCliH = Math.max(Math.round((tdmClientList.length / Math.max(m7ClientList.length, tdmClientList.length, 1)) * 60), 4);
-  const m7ViaH  = Math.round((totalM7 / Math.max(totalM7, totalTDM, 1)) * 60);
-  const tdmViaH = Math.max(Math.round((totalTDM / Math.max(totalM7, totalTDM, 1)) * 60), 4);
-
-  const HEADER = `
-  <div class="hdr">
-    <div style="display:flex;align-items:center;gap:12px">
-      ${logoSrc ? `<img src="${logoSrc}" style="height:36px;object-fit:contain;filter:brightness(0) invert(1)" alt="logo">` : ''}
+  const flotaBlock = (titulo: string, items: [string, number][], subtotal: number) => `
+  <div style="border:1px solid #bbb;padding:5px 6px;flex:1">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
       <div>
-        <div style="font-size:15px;font-weight:900;letter-spacing:-.3px">OrbitM7 — Informe Flota</div>
-        <div style="font-size:8.5px;color:#a0c4ff;margin-top:1px">Fecha: ${fecha} &nbsp;|&nbsp; Generado automáticamente</div>
+        <div style="font-size:10.5px;font-weight:900;color:#1a1a1a">${titulo}</div>
+        <div style="font-size:19px;font-weight:900;color:#3CB44B;line-height:1">${fmt(subtotal)}</div>
       </div>
+      <div style="font-size:16px;font-weight:900;color:#1F6FD0">${pct0(subtotal, total)}%</div>
     </div>
-    <div style="background:rgba(255,255,255,.12);padding:5px 14px;border-radius:18px;font-size:9.5px;font-weight:700;color:#7fdbff">MILLA SIE7E</div>
-  </div>`;
-
-  // Fila 1: viajes y clientes | Fila 2: intermediaciones
-  const KPIS = `
-  <div style="background:var(--bg);padding:5px 20px 0">
-    <div style="display:flex;gap:4px;margin-bottom:4px">
-      <div class="kpi" style="background:linear-gradient(135deg,#4f46e5,#6366f1)"><div class="kv">${fmt(total)}</div><div class="kt">Total Viajes</div></div>
-      <div class="kpi" style="background:linear-gradient(135deg,#059669,#10b981)"><div class="kv">${fmt(totalM7)}</div><div class="kt">Viajes M7</div></div>
-      <div class="kpi" style="background:linear-gradient(135deg,#d97706,#f59e0b)"><div class="kv">${fmt(totalTDM)}</div><div class="kt">Viajes TDM</div></div>
-      <div class="kpi" style="background:linear-gradient(135deg,#0f766e,#14b8a6)"><div class="kv">${uniqueClients}</div><div class="kt">Total Clientes</div></div>
-      <div class="kpi" style="background:linear-gradient(135deg,#0891b2,#06b6d4)"><div class="kv">${m7ClientList.length}</div><div class="kt">M7 Clientes</div></div>
-      <div class="kpi" style="background:linear-gradient(135deg,#92400e,#b45309)"><div class="kv">${tdmClientList.length}</div><div class="kt">TDM Clientes</div></div>
-    </div>
-    <div style="display:flex;gap:4px;padding-bottom:5px">
-      <div class="kpi" style="background:linear-gradient(135deg,#065f46,#059669)"><div class="kv">${fmtPct(m7IntPct)}</div><div class="kt">M7 Ruta</div></div>
-      <div class="kpi" style="background:linear-gradient(135deg,#6d28d9,#7c3aed)"><div class="kv">${fmtPct(tdmIntTotalPct)}</div><div class="kt">TDM Ruta Total</div></div>
-      <div class="kpi" style="background:linear-gradient(135deg,#9f1239,#e11d48)"><div class="kv">${fmtPct(tdmIntRealPct)}</div><div class="kt">TDM Ruta Real</div></div>
+    <div style="display:flex;justify-content:center;margin-top:2px">
+      ${pieWithLabels(items, subtotal, 96, 82, 124)}
     </div>
   </div>`;
 
-  // Gráfica comparativa M7 vs TDM
-  const COMPARATIVO = `
-  <div style="padding:4px 20px 3px;background:var(--bg)">
-    <div class="sec">📊 Comparativo M7 vs TDM</div>
-    <div style="display:flex;gap:20px;align-items:flex-start;margin-top:4px">
-      <!-- Clientes -->
-      <div style="flex:1;text-align:center">
-        <div style="font-size:7px;font-weight:700;color:var(--acc2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px">Clientes</div>
-        <div style="display:flex;align-items:flex-end;justify-content:center;gap:18px;height:72px;border-bottom:1.5px solid #99cccc">
-          <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;height:100%">
-            <span style="font-size:9px;font-weight:900;color:var(--m7c)">${m7ClientList.length}</span>
-            <span style="font-size:6.5px;font-weight:700;color:var(--acc2)">${pct(m7ClientList.length, totalCli)}</span>
-            <div style="width:38px;height:${m7CliH}px;background:linear-gradient(180deg,var(--acc3),var(--acc2));border-radius:4px 4px 0 0"></div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;height:100%">
-            <span style="font-size:9px;font-weight:900;color:var(--tdmc)">${tdmClientList.length}</span>
-            <span style="font-size:6.5px;font-weight:700;color:#b36000">${pct(tdmClientList.length, totalCli)}</span>
-            <div style="width:38px;height:${tdmCliH}px;background:linear-gradient(180deg,#f5a623,#b36000);border-radius:4px 4px 0 0"></div>
-          </div>
-        </div>
-        <div style="display:flex;justify-content:center;gap:18px;margin-top:3px">
-          <span style="font-size:6.5px;font-weight:700;color:var(--m7c);width:38px;text-align:center">M7</span>
-          <span style="font-size:6.5px;font-weight:700;color:var(--tdmc);width:38px;text-align:center">TDM</span>
-        </div>
-      </div>
-      <!-- Viajes -->
-      <div style="flex:1;text-align:center">
-        <div style="font-size:7px;font-weight:700;color:var(--acc2);margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px">Viajes</div>
-        <div style="display:flex;align-items:flex-end;justify-content:center;gap:18px;height:72px;border-bottom:1.5px solid #99cccc">
-          <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;height:100%">
-            <span style="font-size:9px;font-weight:900;color:var(--m7c)">${fmt(totalM7)}</span>
-            <span style="font-size:6.5px;font-weight:700;color:var(--acc2)">${pct(totalM7, total)}</span>
-            <div style="width:38px;height:${m7ViaH}px;background:linear-gradient(180deg,var(--acc3),var(--acc2));border-radius:4px 4px 0 0"></div>
-          </div>
-          <div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;height:100%">
-            <span style="font-size:9px;font-weight:900;color:var(--tdmc)">${fmt(totalTDM)}</span>
-            <span style="font-size:6.5px;font-weight:700;color:#b36000">${pct(totalTDM, total)}</span>
-            <div style="width:38px;height:${tdmViaH}px;background:linear-gradient(180deg,#f5a623,#b36000);border-radius:4px 4px 0 0"></div>
-          </div>
-        </div>
-        <div style="display:flex;justify-content:center;gap:18px;margin-top:3px">
-          <span style="font-size:6.5px;font-weight:700;color:var(--m7c);width:38px;text-align:center">M7</span>
-          <span style="font-size:6.5px;font-weight:700;color:var(--tdmc);width:38px;text-align:center">TDM</span>
-        </div>
-      </div>
-      <!-- Tabla resumen -->
-      <div style="flex:2;font-size:8px">
-        <table style="width:100%;border-collapse:collapse;font-size:7.5px">
-          <thead><tr style="background:var(--pri);color:#fff">
-            <th style="padding:3px 5px;text-align:left">Operador</th>
-            <th style="padding:3px 5px;text-align:right">Clientes</th>
-            <th style="padding:3px 5px;text-align:right">% Cli.</th>
-            <th style="padding:3px 5px;text-align:right">Viajes</th>
-            <th style="padding:3px 5px;text-align:right">% Viaj.</th>
-          </tr></thead>
-          <tbody>
-            <tr style="background:#e8f7f7">
-              <td style="padding:2.5px 5px;color:var(--m7c);font-weight:800">Milla 7</td>
-              <td style="padding:2.5px 5px;text-align:right">${m7ClientList.length}</td>
-              <td style="padding:2.5px 5px;text-align:right;color:#4a7a7a">${pct(m7ClientList.length, totalCli)}</td>
-              <td style="padding:2.5px 5px;text-align:right">${fmt(totalM7)}</td>
-              <td style="padding:2.5px 5px;text-align:right;color:#4a7a7a">${pct(totalM7, total)}</td>
-            </tr>
-            <tr>
-              <td style="padding:2.5px 5px;color:var(--tdmc);font-weight:800">TDM</td>
-              <td style="padding:2.5px 5px;text-align:right">${tdmClientList.length}</td>
-              <td style="padding:2.5px 5px;text-align:right;color:#4a7a7a">${pct(tdmClientList.length, totalCli)}</td>
-              <td style="padding:2.5px 5px;text-align:right">${fmt(totalTDM)}</td>
-              <td style="padding:2.5px 5px;text-align:right;color:#4a7a7a">${pct(totalTDM, total)}</td>
-            </tr>
-            <tr style="background:#c2eaea;font-weight:800">
-              <td style="padding:2.5px 5px">TOTAL</td>
-              <td style="padding:2.5px 5px;text-align:right">${uniqueClients}</td>
-              <td style="padding:2.5px 5px;text-align:right">100%</td>
-              <td style="padding:2.5px 5px;text-align:right">${fmt(total)}</td>
-              <td style="padding:2.5px 5px;text-align:right">100%</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+  const cityBlock = (city: string, cityTotal: number, items: [string, number][]) => `
+  <div style="border:1px solid #bbb;padding:5px 6px">
+    <div style="display:flex;align-items:baseline;gap:6px;margin-bottom:1px">
+      <div style="font-size:9px;font-weight:900;color:#1a1a1a">${city}</div>
+      <div style="font-size:14px;font-weight:900;color:#1a1a1a">${fmt(cityTotal)}</div>
+    </div>
+    <div style="display:flex;justify-content:center">
+      ${pieWithLabels(items, cityTotal, 56, 56, 88)}
     </div>
   </div>`;
 
-  const m7ClientChart  = m7ClientList;
-  const tdmClientChart = tdmClientList;
-  const m7DeptChart    = m7DeptList;
-  const tdmDeptChart   = tdmDeptList;
+  const totalVehiculos = vehiculos.m7 + vehiculos.tdm;
+  const barW = (n: number) => totalVehiculos > 0 ? (n / Math.max(vehiculos.m7, vehiculos.tdm, 1)) * 100 : 0;
+  const OPERACIONES = `
+  <div style="border:1px solid #bbb;padding:6px 10px;margin-top:6px">
+    <div style="font-size:10.5px;font-weight:900;color:#1a1a1a;margin-bottom:4px">OPERACIONES</div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="width:74px;font-size:8.5px;font-weight:800;color:#1a1a1a">M7: ${pct0(vehiculos.m7, totalVehiculos)}%</span>
+        <div style="flex:1;height:14px;background:#eef0f2"><div style="height:100%;width:${barW(vehiculos.m7)}%;background:#8FAABE;min-width:2px"></div></div>
+        <span style="width:24px;font-size:11px;font-weight:900;color:#1a1a1a;text-align:right">${vehiculos.m7}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="width:74px;font-size:8.5px;font-weight:800;color:#1a1a1a">TDM: ${pct0(vehiculos.tdm, totalVehiculos)}%</span>
+        <div style="flex:1;height:14px;background:#eef0f2"><div style="height:100%;width:${barW(vehiculos.tdm)}%;background:#8FAABE;min-width:2px"></div></div>
+        <span style="width:24px;font-size:11px;font-weight:900;color:#1a1a1a;text-align:right">${vehiculos.tdm}</span>
+      </div>
+    </div>
+  </div>`;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
-:root{--pri:#0a3535;--acc:#00b4b4;--acc2:#007a7a;--acc3:#00d4d4;--bg:#f0fafa;--wh:#fff;--txt:#0a3535;--m7c:#00b4b4;--tdmc:#e67e00}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Segoe UI',Arial,sans-serif;font-size:10px;color:var(--txt);background:var(--wh);width:794px}
-.hdr{background:linear-gradient(135deg,var(--pri) 0%,#0f4a4a 100%);color:var(--wh);padding:10px 20px;display:flex;align-items:center;justify-content:space-between}
-.kpi{flex:1;border-radius:6px;padding:5px 7px;color:var(--wh)}
-.kv{font-size:12px;font-weight:900;line-height:1}
-.kt{font-size:5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;margin-top:2px;opacity:.9}
-.sec{font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:var(--acc2);border-bottom:2px solid var(--acc);padding-bottom:2px;margin-bottom:4px}
-.charts{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;gap:5px 10px;padding:5px 20px;align-content:start}
-.chart-cell{min-width:0;overflow:hidden}
-.ftr{background:var(--pri);color:#80d4d4;font-size:7.5px;padding:5px 20px;display:flex;justify-content:space-between}
-.ftr strong{color:var(--acc3)}
+body{font-family:Calibri,Arial,sans-serif;font-size:10px;color:#1a1a1a;background:#fff;width:794px;padding:14px 16px}
 </style></head><body>
 
-${HEADER}
-${KPIS}
-${COMPARATIVO}
-
-<!-- 4 gráficas en cuadrícula 2×2 -->
-<div class="charts">
-  <div class="chart-cell">
-    <div class="sec">🏢 M7 — Por Cliente (${m7ClientList.length})</div>
-    ${hBars(m7ClientChart, totalM7, 'linear-gradient(90deg,var(--acc3),var(--acc2))')}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+  <div style="text-align:center">
+    <div style="font-size:26px;font-weight:900;color:#3CB44B;line-height:1">${fmt(total)}</div>
+    <div style="font-size:6.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#777;margin-top:2px">Total viajes</div>
   </div>
-  <div class="chart-cell">
-    <div class="sec">⭐ TDM — Por Cliente (${tdmClientList.length})</div>
-    ${tdmClientList.length ? hBars(tdmClientChart, totalTDM, 'linear-gradient(90deg,#f5a623,#b36000)') : '<p style="color:#80a0a0;font-size:9px;padding:6px 0">Sin datos TDM</p>'}
+  <div style="text-align:center">
+    ${logoSrc ? `<img src="${logoSrc}" style="height:38px;object-fit:contain;margin-bottom:3px" alt="logo">` : ''}
+    <div style="font-size:19px;font-weight:900;letter-spacing:.3px;color:#1a1a1a;white-space:nowrap">${fecha}</div>
   </div>
-  <div class="chart-cell">
-    <div class="sec">📍 M7 — Por Departamento (${m7DeptList.length})</div>
-    ${hBars(m7DeptChart, totalM7, 'linear-gradient(90deg,var(--acc3),var(--acc2))')}
-  </div>
-  <div class="chart-cell">
-    <div class="sec">📍 TDM — Por Departamento (${tdmDeptList.length})</div>
-    ${tdmDeptList.length ? hBars(tdmDeptChart, totalTDM, 'linear-gradient(90deg,#f5a623,#b36000)') : '<p style="color:#80a0a0;font-size:9px;padding:6px 0">Sin datos TDM</p>'}
+  <div style="text-align:center">
+    <div style="font-size:26px;font-weight:900;color:#1a1a1a;border:1.5px solid #1a1a1a;padding:2px 16px;line-height:1.2">${uniqueClients}</div>
+    <div style="font-size:6.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#777;margin-top:2px">Clientes</div>
   </div>
 </div>
 
-<div class="ftr">
-  <span><strong>OrbitM7</strong> — Milla 7 S.A.S.</span>
-  <span>Fecha: ${fecha} &nbsp;|&nbsp; Total: <strong>${fmt(total)}</strong> viajes &nbsp;|&nbsp; M7: <strong>${fmt(totalM7)}</strong> &nbsp;TDM: <strong>${fmt(totalTDM)}</strong></span>
+<div style="display:flex;gap:6px">
+  <div style="display:flex;flex-direction:column">
+    <div style="display:flex;gap:6px">
+      <div style="width:224px;flex-shrink:0;border:1px solid #bbb">${TABLA_IZQ}</div>
+      <div style="width:320px;flex-shrink:0;display:flex;flex-direction:column;gap:6px">
+        ${flotaBlock('FLOTA M7', m7ClientList, totalM7)}
+        ${flotaBlock('FLOTA TDM', tdmClientList, totalTDM)}
+      </div>
+    </div>
+    ${OPERACIONES}
+  </div>
+  <div style="width:214px;flex-shrink:0;display:flex;flex-direction:column;gap:6px">
+    ${topCities.map(([city, qty]) => cityBlock(city, qty, cityClientBreakdown(city))).join('')}
+  </div>
+</div>
+
+<div style="border-top:1.5px solid #1a1a1a;margin-top:8px;padding-top:5px;display:flex;justify-content:space-between;font-size:7.5px;color:#444">
+  <span><strong style="color:#1a1a1a">OrbitM7</strong> — Milla 7 S.A.S.</span>
+  <span>Fecha: ${fecha} &nbsp;|&nbsp; Total: <strong style="color:#1a1a1a">${fmt(total)}</strong> viajes &nbsp;|&nbsp; M7: <strong style="color:#1a1a1a">${fmt(totalM7)}</strong> &nbsp;TDM: <strong style="color:#1a1a1a">${fmt(totalTDM)}</strong></span>
 </div>
 
 </body></html>`;
@@ -359,10 +350,9 @@ ${COMPARATIVO}
 
 export async function generateFlotaReportPdf(fechaOverride?: string): Promise<{ base64: string; fileName: string; caption: string }> {
   const { from } = fechaOverride ? { from: fechaOverride } : yesterday();
-  const [rows, tdm, m7sum] = await Promise.all([
+  const [rows, vehiculos] = await Promise.all([
     queryFlota(from, from),
-    queryTdmSummary(from, from),
-    queryM7Summary(from, from),
+    queryVehiculos(from, from),
   ]);
 
   const totalM7  = rows.filter(r => r.operator === 'M7').reduce((s, r) => s + r.quantity, 0);
@@ -370,7 +360,8 @@ export async function generateFlotaReportPdf(fechaOverride?: string): Promise<{ 
   const total    = totalM7 + totalTDM;
 
   const logoSrc = getLogoBase64();
-  const html = buildHtml(rows, tdm, m7sum, from, logoSrc);
+  const fechaLarga = formatFechaLarga(from);
+  const html = buildHtml(rows, vehiculos, fechaLarga, logoSrc);
 
   const browser = await puppeteer.launch({
     headless: true,

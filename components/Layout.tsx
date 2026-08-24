@@ -165,7 +165,7 @@ const Layout: React.FC<LayoutProps> = ({
       return;
     }
     if (item.module) setActiveTab(item.module);
-    if (item.masterCat && setActiveMasterCategory) setActiveMasterCategory(item.masterCat);
+    if (setActiveMasterCategory) setActiveMasterCategory(item.masterCat || '' as MasterCategory);
     if (item.id && setActivePageId) setActivePageId(item.id);
     if (window.innerWidth < 768) setIsMobileMenuOpen(false);
   };

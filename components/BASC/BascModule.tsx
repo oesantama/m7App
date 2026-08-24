@@ -36,14 +36,18 @@ const BascModule: React.FC<BascModuleProps> = ({ activePageId, setActivePageId }
 
   const renderContent = () => {
     switch (activePageId) {
+      case 'PAG-71':
       case 'PAG-BASC-02':
         return <DriveSync tree={tree} loading={loading} onRefresh={fetchSyncStatus} />;
+      case 'PAG-72':
       case 'PAG-BASC-03':
         return <AuditorAI />;
+      case 'PAG-73':
       case 'PAG-BASC-04':
         return <Reportes tree={tree} loading={loading} />;
       case 'PAG-BASC-05':
         return <BascUploader />;
+      case 'PAG-70':
       case 'PAG-BASC-01':
       default:
         return <Dashboard tree={tree} loading={loading} onNavigate={setActivePageId} />;

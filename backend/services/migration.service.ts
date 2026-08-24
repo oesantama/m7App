@@ -1489,7 +1489,7 @@ export const restoreSystem = async () => {
         'PAG-01','PAG-03','PAG-04','PAG-05','PAG-06','PAG-07','PAG-08','PAG-09','PAG-10','PAG-11',
         'PAG-12','PAG-13','PAG-14','PAG-15','PAG-16','PAG-17',
         'PAG-18','PAG-19','PAG-20','PAG-21','PAG-22','PAG-23','PAG-24',
-        'PAG-25','PAG-26','PAG-27','PAG-28','PAG-29','PAG-30','PAG-SQL', 'PAG-31', 'PAG-32', 'PAG-33', 'PAG-34', 'PAG-35', 'PAG-36', 'PAG-37', 'PAG-38', 'PAG-39', 'PAG-40',
+        'PAG-25','PAG-26','PAG-27','PAG-28','PAG-29','PAG-30','PAG-59', 'PAG-31', 'PAG-32', 'PAG-33', 'PAG-34', 'PAG-35', 'PAG-36', 'PAG-37', 'PAG-38', 'PAG-39', 'PAG-40',
         'PAG-41', 'PAG-42'
       )
     `);
@@ -1509,8 +1509,15 @@ export const restoreSystem = async () => {
       ('MOD-07', 'GESTIÓN GRUPO INTER', 'Truck', 'EST-01'),
       ('MOD-08', 'CENTRO DE FORMACIÓN', 'Award', 'EST-01'),
       ('MOD-09', 'GESTIÓN HUMANA', 'Users', 'EST-01'),
+      ('MOD-10', 'GESTIÓN DOCUMENTOS DRIVE', 'FileText', 'EST-01'),
       ('MOD-11', 'OPERACIÓN ÉXITO', 'Star', 'EST-01'),
-      ('MOD-12', 'GERENCIA', 'PieChart', 'EST-01')
+      ('MOD-12', 'GERENCIA', 'PieChart', 'EST-01'),
+      ('MOD-13', 'OPERACION JHON URIBE', 'Truck', 'EST-01'),
+      ('MOD-14', 'HOJAS DE VIDA', 'Users', 'EST-01'),
+      ('MOD-15', 'GESTIÓN DICORP', 'FileCheck', 'EST-01'),
+      ('MOD-16', 'GESTIÓN BASC', 'Shield', 'EST-01'),
+      ('MOD-17', 'GESTIÓN DOCUMENTAL', 'FileText', 'EST-01'),
+      ('MOD-18', 'GESTIÓN TI', 'Laptop', 'EST-01')
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon_class = EXCLUDED.icon_class, status_id = EXCLUDED.status_id;
     `);
 
@@ -1550,6 +1557,7 @@ export const restoreSystem = async () => {
       ('PAG-40', 'SALIDA A PROVEEDOR', 'salida-proveedor', 'MOD-03', 'MOD-03', 'EST-01'),
 
       -- Seguridad (MOD-04)
+      ('PAG-02', 'ALERTAS WHATSAPP', 'alertas-whatsapp', 'MOD-04', 'MOD-04', 'EST-01'),
       ('PAG-18', 'CONEXIÓN WHATSAPP', 'whatsapp-status', 'MOD-04', 'MOD-04', 'EST-01'),
       ('PAG-19', 'MÓDULOS SISTEMA', 'modules', 'MOD-04', 'MOD-04', 'EST-01'),
       ('PAG-20', 'PÁGINAS WEB', 'pages', 'MOD-04', 'MOD-04', 'EST-01'),
@@ -1564,8 +1572,11 @@ export const restoreSystem = async () => {
       ('PAG-27', 'M7 CHATBOT', 'chatbot', 'MOD-05', 'MOD-05', 'EST-01'),
 
       -- Administración (MOD-06)
-      ('PAG-SQL', 'Gestor DB', 'admin-db', 'MOD-06', 'MOD-06', 'EST-01'),
-      ('PAG-CYBER', 'Ciberseguridad', 'cybersecurity', 'MOD-06', 'MOD-06', 'EST-01'),
+      ('PAG-59', 'Gestor DB', 'admin-db', 'MOD-06', 'MOD-06', 'EST-01'),
+      ('PAG-69', 'Ciberseguridad', 'cybersecurity', 'MOD-06', 'MOD-06', 'EST-01'),
+
+      -- DICORP (MOD-15)
+      ('PAG-58', 'LEGALIZACIONES DICORP', 'legalizaciones-dicorp', 'MOD-15', 'MOD-15', 'EST-01'),
 
       -- Grupo Inter (MOD-07)
       ('PAG-31', 'GESTIÓN OPERATIVA', 'grupo-inter-ops', 'MOD-07', 'MOD-07', 'EST-01'),
@@ -2073,23 +2084,23 @@ export const restoreSystem = async () => {
     // Página en el menú — Configuración Maestros
     await client.query(`
       INSERT INTO pages (id, name, route, parent_id, module_id, status_id)
-      VALUES ('PAG-WA01', 'ALERTAS WHATSAPP', 'alertas-whatsapp', 'MOD-04', 'MOD-04', 'EST-01')
+      VALUES ('PAG-02', 'ALERTAS WHATSAPP', 'alertas-whatsapp', 'MOD-04', 'MOD-04', 'EST-01')
       ON CONFLICT (id) DO NOTHING;
     `);
 
     // ── MÓDULO BASC ─────────────────────────────────────────────────────
     await client.query(`
       INSERT INTO modules (id, name, icon_class, status_id) VALUES
-      ('MOD-BASC', 'GESTIÓN BASC', 'Shield', 'EST-01')
+      ('MOD-16', 'GESTIÓN BASC', 'Shield', 'EST-01')
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, icon_class = EXCLUDED.icon_class, status_id = EXCLUDED.status_id;
     `);
 
     await client.query(`
       INSERT INTO pages (id, name, route, parent_id, module_id, status_id) VALUES
-      ('PAG-BASC-01', 'DASHBOARD BASC', 'basc/dashboard', 'MOD-BASC', 'MOD-BASC', 'EST-01'),
-      ('PAG-BASC-02', 'GOOGLE DRIVE SYNC', 'basc/drive-sync', 'MOD-BASC', 'MOD-BASC', 'EST-01'),
-      ('PAG-BASC-03', 'AUDITOR IA BASC', 'basc/auditor-ai', 'MOD-BASC', 'MOD-BASC', 'EST-01'),
-      ('PAG-BASC-04', 'REPORTES BASC', 'basc/reportes', 'MOD-BASC', 'MOD-BASC', 'EST-01')
+      ('PAG-70', 'DASHBOARD BASC', 'basc/dashboard', 'MOD-16', 'MOD-16', 'EST-01'),
+      ('PAG-71', 'GOOGLE DRIVE SYNC', 'basc/drive-sync', 'MOD-16', 'MOD-16', 'EST-01'),
+      ('PAG-72', 'AUDITOR IA BASC', 'basc/auditor-ai', 'MOD-16', 'MOD-16', 'EST-01'),
+      ('PAG-73', 'REPORTES BASC', 'basc/reportes', 'MOD-16', 'MOD-16', 'EST-01')
       ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, route = EXCLUDED.route, parent_id = EXCLUDED.parent_id, module_id = EXCLUDED.module_id, status_id = EXCLUDED.status_id;
     `);
 
