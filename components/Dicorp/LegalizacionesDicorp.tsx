@@ -30,18 +30,23 @@ interface DetalleRow {
 interface PagoIndividual {
   id: number; id_detalle: number; placa: string; banco: string | null; comprobante: string;
   valor: string | number; fecha_pago: string | null; metodo_pago: string; observacion: string | null; usuario: string | null;
+  anulado?: boolean; anulado_motivo?: string | null; anulado_por?: string | null; anulado_at?: string | null;
 }
 interface PagoGrupal {
   id: number; placa: string; banco: string | null; comprobante: string; valor: string | number;
   fecha_pago: string | null; metodo_pago: string; observacion: string | null; usuario: string | null;
+  anulado?: boolean; anulado_motivo?: string | null; anulado_por?: string | null; anulado_at?: string | null;
 }
 interface Sobrecosto {
   id: number; placa: string; id_encabezado: number | null; valor: string | number; referencia: string | null;
   fecha: string | null; tipo: string; status: string; observaciones: string | null; usuario: string | null;
+  anulado?: boolean; anulado_motivo?: string | null; anulado_por?: string | null; anulado_at?: string | null;
 }
 interface Devolucion {
   id: number; placa: string; valor: string | number; fecha: string | null; observacion: string | null; usuario: string | null;
+  anulado?: boolean; anulado_motivo?: string | null; anulado_por?: string | null; anulado_at?: string | null;
 }
+interface MasterRecord { id: string; category: string; name: string; }
 interface DuplicadoInfo {
   tipo: 'individual' | 'grupal'; id: number; cargue_numero: string | null; pedido_sap: string | null;
   nombre_cliente: string | null; ciudad: string | null; placa: string;
@@ -76,21 +81,25 @@ const Metric: React.FC<{ label: string; value: string | number; color: string }>
 const inputCls = "w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-cyan-500 transition-all";
 const labelCls = "block text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1";
 
-interface IndividualFormData { banco: string; comprobante: string; valor: string; fechaPago: string; metodoPago: string; observacion: string; }
-const EMPTY_IND_FORM: IndividualFormData = { banco: 'BANCOLOMBIA', comprobante: '', valor: '', fechaPago: '', metodoPago: 'CONSIGNACION', observacion: '' };
-const BANCOS_COLOMBIA = ['BANCOLOMBIA', 'DAVIVIENDA', 'BANCO DE BOGOTA', 'BBVA', 'BANCO DE OCCIDENTE', 'BANCO AV VILLAS', 'BANCO CAJA SOCIAL', 'NEQUI', 'DAVIPLATA'];
+interface IndividualFormData { bancoId: string; comprobante: string; valor: string; fechaPago: string; metodoPagoId: string; observacion: string; }
+const DEFAULT_BANCO_ID = 'BANCO-BANCOLOMBIA';
+const DEFAULT_METODO_PAGO_ID = 'MPAGO-CONSIGNACION';
+const EMPTY_IND_FORM: IndividualFormData = { bancoId: DEFAULT_BANCO_ID, comprobante: '', valor: '', fechaPago: '', metodoPagoId: DEFAULT_METODO_PAGO_ID, observacion: '' };
 
 // Formulario de pago individual por PEDIDO (factura) — estado propio para no chocar entre filas expandidas.
 const IndividualPagoForm: React.FC<{
   pedido: DetalleRow;
   pagos: PagoIndividual[];
+  bancos: MasterRecord[];
+  metodosPago: MasterRecord[];
   onSave: (idDetalle: number, data: IndividualFormData) => Promise<boolean>;
   onAlert: (title: string, message: string) => void;
-}> = ({ pedido, pagos, onSave, onAlert }) => {
+  onAnular: (tipo: 'individual', id: number, label: string) => void;
+}> = ({ pedido, pagos, bancos, metodosPago, onSave, onAlert, onAnular }) => {
   const [form, setForm] = useState<IndividualFormData>(EMPTY_IND_FORM);
   const [saving, setSaving] = useState(false);
 
-  const pagadoPrevio = pagos.reduce((s, p) => s + Number(p.valor), 0);
+  const pagadoPrevio = pagos.filter(p => !p.anulado).reduce((s, p) => s + Number(p.valor), 0);
   const saldoDisponible = Math.max(0, Number(pedido.valor) - pagadoPrevio);
 
   const submit = async () => {
@@ -115,12 +124,14 @@ const IndividualPagoForm: React.FC<{
       <div className="grid grid-cols-3 gap-3">
         <div>
           <label className={labelCls}>Banco</label>
-          <input className={inputCls} list="dicorp-bancos" value={form.banco} onChange={e => setForm(f => ({ ...f, banco: e.target.value }))} />
+          <select className={inputCls} value={form.bancoId} onChange={e => setForm(f => ({ ...f, bancoId: e.target.value }))}>
+            {bancos.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
         </div>
         <div><label className={labelCls}>Comprobante *</label><input className={inputCls} value={form.comprobante} onChange={e => setForm(f => ({ ...f, comprobante: e.target.value }))} /></div>
         <div><label className={labelCls}>Método</label>
-          <select className={inputCls} value={form.metodoPago} onChange={e => setForm(f => ({ ...f, metodoPago: e.target.value }))}>
-            <option value="CONSIGNACION">Consignación</option><option value="TRANSFERENCIA">Transferencia</option>
+          <select className={inputCls} value={form.metodoPagoId} onChange={e => setForm(f => ({ ...f, metodoPagoId: e.target.value }))}>
+            {metodosPago.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
         </div>
         <div>
@@ -137,9 +148,24 @@ const IndividualPagoForm: React.FC<{
       {pagos.length > 0 && (
         <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
           <table className="w-full text-[10px] text-left">
-            <thead className="bg-slate-100 text-slate-500 uppercase font-black"><tr><th className="px-3 py-1.5">Comprobante</th><th className="px-3 py-1.5">Banco</th><th className="px-3 py-1.5">Fecha</th><th className="px-3 py-1.5 text-right">Valor</th></tr></thead>
+            <thead className="bg-slate-100 text-slate-500 uppercase font-black"><tr><th className="px-3 py-1.5">Comprobante</th><th className="px-3 py-1.5">Banco</th><th className="px-3 py-1.5">Fecha</th><th className="px-3 py-1.5 text-right">Valor</th><th></th></tr></thead>
             <tbody className="divide-y divide-slate-100">
-              {pagos.map(p => <tr key={p.id}><td className="px-3 py-1.5 font-mono">{p.comprobante}</td><td className="px-3 py-1.5">{p.banco || '—'}</td><td className="px-3 py-1.5">{fmtDate(p.fecha_pago)}</td><td className="px-3 py-1.5 text-right font-black text-emerald-700">{fmtCOP(p.valor)}</td></tr>)}
+              {pagos.map(p => (
+                <tr key={p.id} className={p.anulado ? 'opacity-50' : ''}>
+                  <td className={`px-3 py-1.5 font-mono ${p.anulado ? 'line-through' : ''}`}>{p.comprobante}</td>
+                  <td className="px-3 py-1.5">{p.banco || '—'}</td>
+                  <td className="px-3 py-1.5">{fmtDate(p.fecha_pago)}</td>
+                  <td className={`px-3 py-1.5 text-right font-black text-emerald-700 ${p.anulado ? 'line-through' : ''}`}>{fmtCOP(p.valor)}</td>
+                  <td className="px-3 py-1.5 text-right">
+                    {p.anulado ? (
+                      <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase bg-rose-100 text-rose-700" title={p.anulado_motivo || ''}>Anulado</span>
+                    ) : (
+                      <button onClick={() => onAnular('individual', p.id, `Comprobante ${p.comprobante} — ${fmtCOP(p.valor)}`)}
+                        className="text-rose-500 hover:text-rose-700 font-black text-[9px] uppercase">Anular</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
@@ -150,6 +176,22 @@ const IndividualPagoForm: React.FC<{
 
 export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user }) => {
   const [tab, setTab] = useState<'pendientes' | 'cerrados'>('pendientes');
+
+  // ── Catálogos maestros compartidos (bancos / métodos de pago) ────────────
+  const [bancos, setBancos] = useState<MasterRecord[]>([]);
+  const [metodosPago, setMetodosPago] = useState<MasterRecord[]>([]);
+  useEffect(() => {
+    api.getGenericMasters().then((rows: MasterRecord[]) => {
+      if (!Array.isArray(rows)) return;
+      setBancos(rows.filter(r => r.category === 'bancos').sort((a, b) => a.name.localeCompare(b.name)));
+      setMetodosPago(rows.filter(r => r.category === 'metodos_pago').sort((a, b) => a.name.localeCompare(b.name)));
+    }).catch(err => console.error(err));
+  }, []);
+
+  // ── Anulación (con motivo obligatorio) de pagos individuales/grupales/sobrecostos/devoluciones ──
+  const [anularTarget, setAnularTarget] = useState<{ tipo: 'individual' | 'grupal' | 'sobrecosto' | 'devolucion'; id: number; label: string } | null>(null);
+  const [anularMotivo, setAnularMotivo] = useState('');
+  const [anulando, setAnulando] = useState(false);
 
   // ── PENDIENTES: consolidado por placa+fecha ──────────────────────────────
   const [consolidado, setConsolidado] = useState<ConsolidadoRow[]>([]);
@@ -343,7 +385,7 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
   };
 
   // ── Formularios de captura ──────────────────────────────────────────────
-  const [formGru, setFormGru] = useState({ banco: 'BANCOLOMBIA', comprobante: '', valor: '', fechaPago: '', metodoPago: 'CONSIGNACION', observacion: '' });
+  const [formGru, setFormGru] = useState({ bancoId: DEFAULT_BANCO_ID, comprobante: '', valor: '', fechaPago: '', metodoPagoId: DEFAULT_METODO_PAGO_ID, observacion: '' });
   const [formSob, setFormSob] = useState({ idEncabezado: '', valor: '', referencia: '', fecha: '', tipo: 'EFECTIVO', observaciones: '' });
   const [editingSobId, setEditingSobId] = useState<number | null>(null);
   const EMPTY_SOB_FORM = { idEncabezado: '', valor: '', referencia: '', fecha: '', tipo: 'EFECTIVO', observaciones: '' };
@@ -366,9 +408,9 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
   const doSaveIndividual = async (idDetalle: number, data: IndividualFormData): Promise<boolean> => {
     try {
       const res = await api.saveDicorpPagoIndividual({
-        idDetalle, banco: data.banco || undefined, comprobante: data.comprobante.trim(),
+        idDetalle, bancoId: data.bancoId || undefined, comprobante: data.comprobante.trim(),
         valor: Number(data.valor) || 0, fechaPago: data.fechaPago || undefined,
-        metodoPago: data.metodoPago, observacion: data.observacion || undefined,
+        metodoPagoId: data.metodoPagoId, observacion: data.observacion || undefined,
       });
       if (res.success) {
         toast.success('Pago individual registrado.');
@@ -414,13 +456,13 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
     setSavingGru(true);
     try {
       const res = await api.saveDicorpPagoGrupal({
-        placa: selectedGroup.placa, banco: formGru.banco || undefined, comprobante: formGru.comprobante.trim(),
+        placa: selectedGroup.placa, bancoId: formGru.bancoId || undefined, comprobante: formGru.comprobante.trim(),
         valor: Number(formGru.valor) || 0, fechaPago: formGru.fechaPago || undefined,
-        metodoPago: formGru.metodoPago, observacion: formGru.observacion || undefined,
+        metodoPagoId: formGru.metodoPagoId, observacion: formGru.observacion || undefined,
       });
       if (res.success) {
         toast.success(`Consignación grupal registrada para la placa ${selectedGroup.placa}.`);
-        setFormGru({ banco: 'BANCOLOMBIA', comprobante: '', valor: '', fechaPago: '', metodoPago: 'CONSIGNACION', observacion: '' });
+        setFormGru({ bancoId: DEFAULT_BANCO_ID, comprobante: '', valor: '', fechaPago: '', metodoPagoId: DEFAULT_METODO_PAGO_ID, observacion: '' });
         loadGroupDetail(selectedGroup);
         refreshAfterChange();
       } else if (res.duplicado) setDuplicado(res.duplicado);
@@ -486,6 +528,26 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
       } else setAlertInfo({ title: 'No se pudo guardar la devolución', message: res.error || 'Ocurrió un error al guardar la devolución.' });
     } catch (err: any) { toast.error(`Error: ${err.message || err}`); }
     finally { setSavingDevo(false); }
+  };
+
+  const confirmAnular = async () => {
+    if (!anularTarget) return;
+    if (!anularMotivo.trim()) { setAlertInfo({ title: 'Motivo requerido', message: 'Debes indicar el motivo de la anulación para conservar el histórico.' }); return; }
+    setAnulando(true);
+    try {
+      const { tipo, id } = anularTarget;
+      const res = tipo === 'individual' ? await api.anularDicorpPagoIndividual(id, anularMotivo.trim())
+        : tipo === 'grupal' ? await api.anularDicorpPagoGrupal(id, anularMotivo.trim())
+        : tipo === 'sobrecosto' ? await api.anularDicorpSobrecosto(id, anularMotivo.trim())
+        : await api.anularDicorpDevolucion(id, anularMotivo.trim());
+      if (res.success) {
+        toast.success('Registro anulado — el histórico queda visible en el detalle.');
+        setAnularTarget(null); setAnularMotivo('');
+        if (selectedGroup) loadGroupDetail(selectedGroup);
+        refreshAfterChange();
+      } else setAlertInfo({ title: 'No se pudo anular', message: res.error || 'Ocurrió un error al anular el registro.' });
+    } catch (err: any) { setAlertInfo({ title: 'Error', message: err.message || String(err) }); }
+    finally { setAnulando(false); }
   };
 
   const handleCancelDuplicate = () => {
@@ -592,15 +654,16 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
         const pagos = (det.pagosIndividuales as PagoIndividual[]).filter(pi => pi.id_detalle === p.id);
         pedidos.push({
           Cargue: enc.cargue_numero, 'Pedido SAP': p.pedido_sap, Cliente: p.nombre_cliente || p.codigo_cliente || '',
-          Ciudad: p.ciudad || '', Valor: Number(p.valor), Pagado: pagos.reduce((s, pi) => s + Number(pi.valor), 0),
+          Ciudad: p.ciudad || '', Valor: Number(p.valor), Pagado: pagos.filter(pi => !pi.anulado).reduce((s, pi) => s + Number(pi.valor), 0),
         });
         for (const pi of pagos) {
           movimientos.push({
             Tipo: 'Individual', Referencia: `Cargue ${enc.cargue_numero} · Pedido ${p.pedido_sap}`, Fecha: pi.fecha_pago || '',
-            Banco: pi.banco || '', 'Comprobante/Ref': pi.comprobante, Valor: Number(pi.valor), Estado: '',
-            Observación: pi.observacion || '', Usuario: pi.usuario || '',
+            Banco: pi.banco || '', 'Comprobante/Ref': pi.comprobante, Valor: Number(pi.valor), Estado: pi.anulado ? 'ANULADO' : '',
+            Observación: pi.anulado ? `${pi.observacion || ''} [ANULADO: ${pi.anulado_motivo || ''}]`.trim() : (pi.observacion || ''), Usuario: pi.usuario || '',
           });
-          if (pi.observacion) obsList.push(`Individual: ${pi.observacion}`);
+          if (pi.anulado) obsList.push(`Individual ANULADO: ${pi.anulado_motivo || ''}`);
+          else if (pi.observacion) obsList.push(`Individual: ${pi.observacion}`);
         }
       }
 
@@ -609,10 +672,11 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
         for (const pg of det.pagosGrupales as PagoGrupal[]) {
           movimientos.push({
             Tipo: 'Grupal', Referencia: `Placa ${row.placa}`, Fecha: pg.fecha_pago || '',
-            Banco: pg.banco || '', 'Comprobante/Ref': pg.comprobante, Valor: Number(pg.valor), Estado: '',
-            Observación: pg.observacion || '', Usuario: pg.usuario || '',
+            Banco: pg.banco || '', 'Comprobante/Ref': pg.comprobante, Valor: Number(pg.valor), Estado: pg.anulado ? 'ANULADO' : '',
+            Observación: pg.anulado ? `${pg.observacion || ''} [ANULADO: ${pg.anulado_motivo || ''}]`.trim() : (pg.observacion || ''), Usuario: pg.usuario || '',
           });
-          if (pg.observacion) obsList.push(`Grupal: ${pg.observacion}`);
+          if (pg.anulado) obsList.push(`Grupal ANULADO: ${pg.anulado_motivo || ''}`);
+          else if (pg.observacion) obsList.push(`Grupal: ${pg.observacion}`);
         }
         grupalesCargadas = true;
       }
@@ -620,10 +684,11 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
         for (const s of det.sobrecostos as Sobrecosto[]) {
           movimientos.push({
             Tipo: 'Sobrecosto', Referencia: `Placa ${row.placa} (${s.tipo})`, Fecha: s.fecha || '',
-            Banco: '', 'Comprobante/Ref': s.referencia || '', Valor: Number(s.valor), Estado: s.status,
-            Observación: s.observaciones || '', Usuario: s.usuario || '',
+            Banco: '', 'Comprobante/Ref': s.referencia || '', Valor: Number(s.valor), Estado: s.anulado ? 'ANULADO' : s.status,
+            Observación: s.anulado ? `${s.observaciones || ''} [ANULADO: ${s.anulado_motivo || ''}]`.trim() : (s.observaciones || ''), Usuario: s.usuario || '',
           });
-          if (s.observaciones) obsList.push(`Sobrecosto (${s.status}): ${s.observaciones}`);
+          if (s.anulado) obsList.push(`Sobrecosto ANULADO: ${s.anulado_motivo || ''}`);
+          else if (s.observaciones) obsList.push(`Sobrecosto (${s.status}): ${s.observaciones}`);
         }
         sobrecostosCargados = true;
       }
@@ -631,10 +696,11 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
         for (const dv of (det.devoluciones || []) as Devolucion[]) {
           movimientos.push({
             Tipo: 'Devolución', Referencia: `Placa ${row.placa}`, Fecha: dv.fecha || '',
-            Banco: '', 'Comprobante/Ref': '', Valor: Number(dv.valor), Estado: '',
-            Observación: dv.observacion || '', Usuario: dv.usuario || '',
+            Banco: '', 'Comprobante/Ref': '', Valor: Number(dv.valor), Estado: dv.anulado ? 'ANULADO' : '',
+            Observación: dv.anulado ? `${dv.observacion || ''} [ANULADO: ${dv.anulado_motivo || ''}]`.trim() : (dv.observacion || ''), Usuario: dv.usuario || '',
           });
-          if (dv.observacion) obsList.push(`Devolución: ${dv.observacion}`);
+          if (dv.anulado) obsList.push(`Devolución ANULADA: ${dv.anulado_motivo || ''}`);
+          else if (dv.observacion) obsList.push(`Devolución: ${dv.observacion}`);
         }
         devolucionesCargadas = true;
       }
@@ -943,8 +1009,6 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
         </div>
       )}
 
-      <datalist id="dicorp-bancos">{BANCOS_COLOMBIA.map(b => <option key={b} value={b} />)}</datalist>
-
       {/* Modal placa+fecha: individual/grupal/sobrecosto */}
       {selectedGroup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -997,15 +1061,16 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                       {
                         header: 'Pagado', key: 'id', sortable: false,
                         render: r => {
-                          const pagado = (pagosIndividuales[r.id] || []).reduce((s, p) => s + Number(p.valor), 0);
+                          const pagado = (pagosIndividuales[r.id] || []).filter(p => !p.anulado).reduce((s, p) => s + Number(p.valor), 0);
                           return <span className={`font-black text-xs ${pagado > 0 ? 'text-emerald-700' : 'text-slate-300'}`}>{pagado > 0 ? fmtCOP(pagado) : '—'}</span>;
                         },
-                        exportRender: r => (pagosIndividuales[r.id] || []).reduce((s, p) => s + Number(p.valor), 0),
+                        exportRender: r => (pagosIndividuales[r.id] || []).filter(p => !p.anulado).reduce((s, p) => s + Number(p.valor), 0),
                       },
                     ] as ColumnDef<DetalleRow>[]}
                     renderExpandedRow={(row) => (
-                      <IndividualPagoForm pedido={row} pagos={pagosIndividuales[row.id] || []} onSave={trySaveIndividual}
-                        onAlert={(title, message) => setAlertInfo({ title, message })} />
+                      <IndividualPagoForm pedido={row} pagos={pagosIndividuales[row.id] || []} bancos={bancos} metodosPago={metodosPago}
+                        onSave={trySaveIndividual} onAlert={(title, message) => setAlertInfo({ title, message })}
+                        onAnular={(tipo, id, label) => setAnularTarget({ tipo, id, label })} />
                     )}
                   />
                 </div>
@@ -1013,11 +1078,15 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                 <div className="space-y-3">
                   <p className="text-[10px] text-slate-500 font-bold">Este recaudo se asocia a la placa <span className="font-mono text-slate-800">{selectedGroup.placa}</span> y suma al acumulado de todos sus cargues, no solo a los de esta fecha.</p>
                   <div className="grid grid-cols-3 gap-3">
-                    <div><label className={labelCls}>Banco</label><input className={inputCls} list="dicorp-bancos" value={formGru.banco} onChange={e => setFormGru(f => ({ ...f, banco: e.target.value }))} /></div>
+                    <div><label className={labelCls}>Banco</label>
+                      <select className={inputCls} value={formGru.bancoId} onChange={e => setFormGru(f => ({ ...f, bancoId: e.target.value }))}>
+                        {bancos.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                      </select>
+                    </div>
                     <div><label className={labelCls}>Comprobante *</label><input className={inputCls} value={formGru.comprobante} onChange={e => setFormGru(f => ({ ...f, comprobante: e.target.value }))} /></div>
                     <div><label className={labelCls}>Método</label>
-                      <select className={inputCls} value={formGru.metodoPago} onChange={e => setFormGru(f => ({ ...f, metodoPago: e.target.value }))}>
-                        <option value="CONSIGNACION">Consignación</option><option value="TRANSFERENCIA">Transferencia</option>
+                      <select className={inputCls} value={formGru.metodoPagoId} onChange={e => setFormGru(f => ({ ...f, metodoPagoId: e.target.value }))}>
+                        {metodosPago.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                       </select>
                     </div>
                     <div><label className={labelCls}>Valor</label><input type="number" className={inputCls} value={formGru.valor} onChange={e => setFormGru(f => ({ ...f, valor: e.target.value }))} /></div>
@@ -1031,9 +1100,24 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                   {pagosGrupales.length > 0 && (
                     <div className="rounded-xl border border-slate-200 overflow-hidden">
                       <table className="w-full text-[10px] text-left">
-                        <thead className="bg-slate-100 text-slate-500 uppercase font-black"><tr><th className="px-3 py-1.5">Comprobante</th><th className="px-3 py-1.5">Banco</th><th className="px-3 py-1.5">Fecha</th><th className="px-3 py-1.5 text-right">Valor</th></tr></thead>
+                        <thead className="bg-slate-100 text-slate-500 uppercase font-black"><tr><th className="px-3 py-1.5">Comprobante</th><th className="px-3 py-1.5">Banco</th><th className="px-3 py-1.5">Fecha</th><th className="px-3 py-1.5 text-right">Valor</th><th></th></tr></thead>
                         <tbody className="divide-y divide-slate-100">
-                          {pagosGrupales.map(p => <tr key={p.id}><td className="px-3 py-1.5 font-mono">{p.comprobante}</td><td className="px-3 py-1.5">{p.banco || '—'}</td><td className="px-3 py-1.5">{fmtDate(p.fecha_pago)}</td><td className="px-3 py-1.5 text-right font-black text-violet-700">{fmtCOP(p.valor)}</td></tr>)}
+                          {pagosGrupales.map(p => (
+                            <tr key={p.id} className={p.anulado ? 'opacity-50' : ''}>
+                              <td className={`px-3 py-1.5 font-mono ${p.anulado ? 'line-through' : ''}`}>{p.comprobante}</td>
+                              <td className="px-3 py-1.5">{p.banco || '—'}</td>
+                              <td className="px-3 py-1.5">{fmtDate(p.fecha_pago)}</td>
+                              <td className={`px-3 py-1.5 text-right font-black text-violet-700 ${p.anulado ? 'line-through' : ''}`}>{fmtCOP(p.valor)}</td>
+                              <td className="px-3 py-1.5 text-right">
+                                {p.anulado ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase bg-rose-100 text-rose-700" title={p.anulado_motivo || ''}>Anulado</span>
+                                ) : (
+                                  <button onClick={() => setAnularTarget({ tipo: 'grupal', id: p.id, label: `Comprobante ${p.comprobante} — ${fmtCOP(p.valor)}` })}
+                                    className="text-rose-500 hover:text-rose-700 font-black text-[9px] uppercase">Anular</button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
                         </tbody>
                       </table>
                     </div>
@@ -1076,18 +1160,24 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                         <tbody className="divide-y divide-slate-100">
                           {sobrecostos.map(s => (
                             <tr key={s.id}
-                              onClick={() => s.status === 'PENDIENTE' && startEditSobrecosto(s)}
-                              className={s.status === 'PENDIENTE' ? `cursor-pointer hover:bg-orange-50/60 transition-colors ${editingSobId === s.id ? 'bg-orange-50' : ''}` : ''}
-                              title={s.status === 'PENDIENTE' ? 'Clic para editar' : undefined}
+                              onClick={() => !s.anulado && s.status === 'PENDIENTE' && startEditSobrecosto(s)}
+                              className={`${s.anulado ? 'opacity-50' : ''} ${!s.anulado && s.status === 'PENDIENTE' ? `cursor-pointer hover:bg-orange-50/60 transition-colors ${editingSobId === s.id ? 'bg-orange-50' : ''}` : ''}`}
+                              title={!s.anulado && s.status === 'PENDIENTE' ? 'Clic para editar' : undefined}
                             >
-                              <td className="px-3 py-1.5 font-mono">{s.referencia || '—'}</td>
+                              <td className={`px-3 py-1.5 font-mono ${s.anulado ? 'line-through' : ''}`}>{s.referencia || '—'}</td>
                               <td className="px-3 py-1.5">{s.tipo}</td>
                               <td className="px-3 py-1.5">{fmtDate(s.fecha)}</td>
-                              <td className="px-3 py-1.5 text-right font-black text-orange-700">{fmtCOP(s.valor)}</td>
+                              <td className={`px-3 py-1.5 text-right font-black text-orange-700 ${s.anulado ? 'line-through' : ''}`}>{fmtCOP(s.valor)}</td>
                               <td className="px-3 py-1.5 text-slate-600 max-w-[160px] truncate" title={s.observaciones || ''}>{s.observaciones || '—'}</td>
-                              <td className="px-3 py-1.5"><span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${s.status === 'APROBADO' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{s.status}</span></td>
-                              <td className="px-3 py-1.5 text-right">
-                                {s.status === 'PENDIENTE' && (
+                              <td className="px-3 py-1.5">
+                                {s.anulado ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase bg-rose-100 text-rose-700" title={s.anulado_motivo || ''}>Anulado</span>
+                                ) : (
+                                  <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase ${s.status === 'APROBADO' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{s.status}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-1.5 text-right space-x-2">
+                                {!s.anulado && s.status === 'PENDIENTE' && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -1098,6 +1188,14 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                                     title={!s.referencia ? 'Requiere referencia' : 'Aprobar'}
                                   >
                                     Aprobar
+                                  </button>
+                                )}
+                                {!s.anulado && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setAnularTarget({ tipo: 'sobrecosto', id: s.id, label: `Sobrecosto (${s.status}) — ${fmtCOP(s.valor)}` }); }}
+                                    className="text-rose-500 hover:text-rose-700 font-black text-[9px] uppercase"
+                                  >
+                                    Anular
                                   </button>
                                 )}
                               </td>
@@ -1123,14 +1221,22 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                   {devoluciones.length > 0 && (
                     <div className="rounded-xl border border-slate-200 overflow-hidden">
                       <table className="w-full text-[10px] text-left">
-                        <thead className="bg-slate-100 text-slate-500 uppercase font-black"><tr><th className="px-3 py-1.5">Fecha</th><th className="px-3 py-1.5 text-right">Valor</th><th className="px-3 py-1.5">Observación</th><th className="px-3 py-1.5">Usuario</th></tr></thead>
+                        <thead className="bg-slate-100 text-slate-500 uppercase font-black"><tr><th className="px-3 py-1.5">Fecha</th><th className="px-3 py-1.5 text-right">Valor</th><th className="px-3 py-1.5">Observación</th><th className="px-3 py-1.5">Usuario</th><th></th></tr></thead>
                         <tbody className="divide-y divide-slate-100">
                           {devoluciones.map(dv => (
-                            <tr key={dv.id}>
+                            <tr key={dv.id} className={dv.anulado ? 'opacity-50' : ''}>
                               <td className="px-3 py-1.5">{fmtDate(dv.fecha)}</td>
-                              <td className="px-3 py-1.5 text-right font-black text-blue-700">{fmtCOP(dv.valor)}</td>
+                              <td className={`px-3 py-1.5 text-right font-black text-blue-700 ${dv.anulado ? 'line-through' : ''}`}>{fmtCOP(dv.valor)}</td>
                               <td className="px-3 py-1.5 text-slate-600 max-w-[200px] truncate" title={dv.observacion || ''}>{dv.observacion || '—'}</td>
                               <td className="px-3 py-1.5">{dv.usuario || '—'}</td>
+                              <td className="px-3 py-1.5 text-right">
+                                {dv.anulado ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase bg-rose-100 text-rose-700" title={dv.anulado_motivo || ''}>Anulado</span>
+                                ) : (
+                                  <button onClick={() => setAnularTarget({ tipo: 'devolucion', id: dv.id, label: `Devolución — ${fmtCOP(dv.valor)}` })}
+                                    className="text-rose-500 hover:text-rose-700 font-black text-[9px] uppercase">Anular</button>
+                                )}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -1149,6 +1255,33 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
       )}
 
       {/* Alerta genérica de validación (valor inválido, campo requerido, error de guardado...) */}
+      {/* Anular pago/sobrecosto/devolución — motivo obligatorio, conserva el histórico */}
+      {anularTarget && (
+        <div className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="p-5 bg-rose-50 border-b border-rose-100 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0"><AlertTriangle className="w-5 h-5 text-rose-600" /></div>
+              <h3 className="text-base font-black text-slate-900">Anular Registro</h3>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-xs text-slate-600 font-bold">{anularTarget.label}</p>
+              <p className="text-[11px] text-slate-500">El registro no se elimina — queda marcado como anulado y visible en el histórico del detalle, y su valor se reversa del total legalizado.</p>
+              <div>
+                <label className={labelCls}>Motivo de anulación *</label>
+                <textarea className={`${inputCls} min-h-[70px]`} value={anularMotivo} onChange={e => setAnularMotivo(e.target.value)} placeholder="Ej: comprobante duplicado por error, valor mal digitado, etc." />
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => { setAnularTarget(null); setAnularMotivo(''); }} className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-black uppercase tracking-widest hover:bg-slate-50">Cancelar</button>
+                <button onClick={confirmAnular} disabled={anulando || !anularMotivo.trim()}
+                  className="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow flex items-center gap-2">
+                  {anulando && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Anular
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {alertInfo && (
         <div className="fixed inset-0 z-[1050] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">

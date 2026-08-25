@@ -1416,7 +1416,7 @@ export const api = {
     }),
 
   saveDicorpPagoIndividual: (data: {
-    idDetalle: number; banco?: string; comprobante: string; valor: number; fechaPago?: string; metodoPago?: string; observacion?: string;
+    idDetalle: number; bancoId?: string; comprobante: string; valor: number; fechaPago?: string; metodoPagoId?: string; observacion?: string;
   }) =>
     fetchJson(`${API_URL}/dicorp-legalizacion/pagos-individuales`, {
       method: 'POST',
@@ -1424,8 +1424,15 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  anularDicorpPagoIndividual: (id: number, motivo: string) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/pagos-individuales/${id}/anular`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo }),
+    }),
+
   saveDicorpPagoGrupal: (data: {
-    placa: string; banco?: string; comprobante: string; valor: number; fechaPago?: string; metodoPago?: string; observacion?: string;
+    placa: string; bancoId?: string; comprobante: string; valor: number; fechaPago?: string; metodoPagoId?: string; observacion?: string;
   }) =>
     fetchJson(`${API_URL}/dicorp-legalizacion/pagos-grupales`, {
       method: 'POST',
@@ -1433,11 +1440,25 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  anularDicorpPagoGrupal: (id: number, motivo: string) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/pagos-grupales/${id}/anular`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo }),
+    }),
+
   saveDicorpDevolucion: (data: { placa: string; valor: number; fecha: string; observacion?: string }) =>
     fetchJson(`${API_URL}/dicorp-legalizacion/devoluciones`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+    }),
+
+  anularDicorpDevolucion: (id: number, motivo: string) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/devoluciones/${id}/anular`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo }),
     }),
 
   saveDicorpSobrecosto: (data: {
@@ -1460,6 +1481,13 @@ export const api = {
 
   aprobarDicorpSobrecosto: (id: number) =>
     fetchJson(`${API_URL}/dicorp-legalizacion/sobrecostos/${id}/aprobar`, { method: 'PUT' }),
+
+  anularDicorpSobrecosto: (id: number, motivo: string) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/sobrecostos/${id}/anular`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo }),
+    }),
 
   getDicorpResumenPlacas: () =>
     fetchJson(`${API_URL}/dicorp-legalizacion/resumen-placas`),

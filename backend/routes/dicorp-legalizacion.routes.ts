@@ -18,6 +18,10 @@ import {
   getConsolidadoPorFecha,
   cerrarPlacaDia,
   cambiarEstado,
+  anularPagoIndividual,
+  anularPagoGrupal,
+  anularDevolucion,
+  anularSobrecosto,
 } from '../controllers/dicorp-legalizacion.controller.js';
 
 const router = Router();
@@ -32,11 +36,15 @@ router.get('/encabezados/:id',                getEncabezadoDetalle);
 router.put('/encabezados/:id/estado',         cambiarEstado);
 router.get('/check-comprobante/:reference',   checkComprobante);
 router.post('/pagos-individuales',            savePagoIndividual);
+router.put('/pagos-individuales/:id/anular',  anularPagoIndividual);
 router.post('/pagos-grupales',                savePagoGrupal);
+router.put('/pagos-grupales/:id/anular',      anularPagoGrupal);
 router.post('/devoluciones',                  saveDevolucion);
+router.put('/devoluciones/:id/anular',        anularDevolucion);
 router.post('/sobrecostos',                   saveSobrecosto);
 router.put('/sobrecostos/:id',                updateSobrecosto);
 router.put('/sobrecostos/:id/aprobar',        aprobarSobrecosto);
+router.put('/sobrecostos/:id/anular',         anularSobrecosto);
 router.get('/resumen-placas',                 getResumenPlacas);
 router.get('/consolidado-pendientes',         getConsolidadoPendientes);
 router.get('/consolidado-por-fecha',          getConsolidadoPorFecha);
