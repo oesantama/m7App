@@ -1374,7 +1374,112 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  // ── Legalización Dicorp ──────────────────────────────────────────────────
+  previewDicorpEntregas: (file: File) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return fetchJson(`${API_URL}/dicorp-legalizacion/upload-preview`, { method: 'POST', body: fd });
+  },
 
+  uploadDicorpEntregas: (file: File, modo: 'nuevo' | 'editar' = 'nuevo') => {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('modo', modo);
+    return fetchJson(`${API_URL}/dicorp-legalizacion/upload`, { method: 'POST', body: fd });
+  },
+
+  getDicorpEncabezados: (params?: { estado?: 'pendientes' | 'cerrados'; search?: string; from?: string; to?: string; placa?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.estado) qs.set('estado', params.estado);
+    if (params?.search) qs.set('search', params.search);
+    if (params?.from)   qs.set('from', params.from);
+    if (params?.to)     qs.set('to', params.to);
+    if (params?.placa)  qs.set('placa', params.placa);
+    return fetchJson(`${API_URL}/dicorp-legalizacion/encabezados?${qs.toString()}`);
+  },
+
+  getDicorpEncabezadoDetalle: (id: number) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/encabezados/${id}`),
+
+  checkDicorpComprobante: (reference: string, excludeId?: number, excludeType?: 'individual' | 'grupal') => {
+    const qs = new URLSearchParams();
+    if (excludeId) qs.set('excludeId', String(excludeId));
+    if (excludeType) qs.set('excludeType', excludeType);
+    return fetchJson(`${API_URL}/dicorp-legalizacion/check-comprobante/${encodeURIComponent(reference)}?${qs.toString()}`);
+  },
+
+  cambiarEstadoDicorpEncabezado: (id: number, data: { estado: string; observacion?: string }) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/encabezados/${id}/estado`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  saveDicorpPagoIndividual: (data: {
+    idDetalle: number; banco?: string; comprobante: string; valor: number; fechaPago?: string; metodoPago?: string; observacion?: string;
+  }) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/pagos-individuales`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  saveDicorpPagoGrupal: (data: {
+    placa: string; banco?: string; comprobante: string; valor: number; fechaPago?: string; metodoPago?: string; observacion?: string;
+  }) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/pagos-grupales`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  saveDicorpDevolucion: (data: { placa: string; valor: number; fecha: string; observacion?: string }) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/devoluciones`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  saveDicorpSobrecosto: (data: {
+    placa: string; idEncabezado?: number; valor: number; referencia?: string; fecha?: string; tipo?: string; observaciones?: string;
+  }) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/sobrecostos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  updateDicorpSobrecosto: (id: number, data: {
+    idEncabezado?: number; valor: number; referencia?: string; fecha: string; tipo?: string; observaciones?: string;
+  }) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/sobrecostos/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+
+  aprobarDicorpSobrecosto: (id: number) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/sobrecostos/${id}/aprobar`, { method: 'PUT' }),
+
+  getDicorpResumenPlacas: () =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/resumen-placas`),
+
+  getDicorpConsolidadoPendientes: () =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/consolidado-pendientes`),
+
+  getDicorpConsolidadoPorFecha: (params: { from: string; to: string; placa?: string; conductor?: string }) => {
+    const qs = new URLSearchParams({ from: params.from, to: params.to });
+    if (params.placa) qs.set('placa', params.placa);
+    if (params.conductor) qs.set('conductor', params.conductor);
+    return fetchJson(`${API_URL}/dicorp-legalizacion/consolidado-por-fecha?${qs.toString()}`);
+  },
+
+  cerrarDicorpPlacaDia: (data: { placa: string; fecha: string; observacion?: string; tipoDescuadre?: string; comentarioDescuadre?: string }) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/cerrar-placa-dia`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
 
   // GPS Tracking (Nueva API dedicada)
   updateVehicleLocation: (data: any) => fetchJson(`${API_URL}/locations/update`, {
