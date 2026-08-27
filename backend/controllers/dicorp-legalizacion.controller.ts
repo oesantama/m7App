@@ -9,7 +9,17 @@ const ESTADO_LEGALIZADO_ID = 'EST-18';  // agregado por este módulo (name = 'LE
 const METODO_PAGO_DEFAULT_ID = 'MPAGO-CONSIGNACION';
 
 // ─── Garantizar tablas en primera llamada ─────────────────────────────────────
-const ensureTables = async () => {
+// Memoizado: correr las migraciones/DDL en cada request (bajo concurrencia, p.ej. el export
+// disparando varias peticiones en paralelo) provocaba ALTER TABLE/ADD CONSTRAINT concurrentes
+// sobre las mismas tablas y terminaba en "deadlock detected". Se ejecuta una sola vez por proceso.
+let ensureTablesPromise: Promise<void> | null = null;
+const ensureTables = () => {
+  if (!ensureTablesPromise) {
+    ensureTablesPromise = ensureTablesImpl().catch(err => { ensureTablesPromise = null; throw err; });
+  }
+  return ensureTablesPromise;
+};
+const ensureTablesImpl = async () => {
   // Estado propio del módulo dentro del catálogo compartido `estados` (id con formato EST-XX).
   await pool.query(`
     INSERT INTO estados (id, name, status_id) VALUES ($1, 'LEGALIZADO', 'EST-01')
