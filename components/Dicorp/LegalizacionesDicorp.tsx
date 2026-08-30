@@ -233,12 +233,23 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
     } finally { setLoadingCerrados(false); }
   };
 
+  // ── Filtro de pendientes por fecha y/o placa (se puede aplicar uno, el otro, o ambos) ──
+  const [filtroPendFecha, setFiltroPendFecha] = useState('');
+  const [filtroPendPlaca, setFiltroPendPlaca] = useState('');
+  const consolidadoFiltrado = consolidado.filter(r =>
+    (!filtroPendFecha || r.fecha === filtroPendFecha) &&
+    (!filtroPendPlaca || r.placa.toUpperCase().includes(filtroPendPlaca.toUpperCase().trim()))
+  );
+  const hayFiltroPendientes = !!(filtroPendFecha || filtroPendPlaca);
+  const limpiarFiltroPendientes = () => { setFiltroPendFecha(''); setFiltroPendPlaca(''); };
+
   // ── KPIs generales ────────────────────────────────────────────────────────
   const totalPlacas = consolidado.length;
-  const totalValor = consolidado.reduce((s, r) => s + Number(r.valor_total), 0);
-  const totalPendiente = consolidado.reduce((s, r) => s + Number(r.pendiente), 0);
+  const totalValor = consolidadoFiltrado.reduce((s, r) => s + Number(r.valor_total), 0);
+  const totalPendiente = consolidadoFiltrado.reduce((s, r) => s + Number(r.pendiente), 0);
   const totalPagado = totalValor - totalPendiente;
   const fechasPresentes = [...new Set(consolidado.map(r => r.fecha))].sort().reverse();
+  const fechasFiltradas = [...new Set(consolidadoFiltrado.map(r => r.fecha))].sort().reverse();
 
   // ── Upload con previsualización previa — modo "nuevo" bloquea cualquier duplicado,
   // modo "editar" permite corregir cargues ya cargados pero SIEMPRE protege los ya legalizados.
@@ -733,7 +744,7 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
   const exportGeneral = async () => {
     setExportingGeneral(true);
     try {
-      await exportConsolidadoRows(consolidado, `legalizacion_dicorp_pendientes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      await exportConsolidadoRows(consolidadoFiltrado, `legalizacion_dicorp_pendientes_${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch (err: any) {
       toast.error(`Error al exportar: ${err.message || err}`);
     } finally { setExportingGeneral(false); }
@@ -850,8 +861,8 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white rounded-2xl border-2 border-slate-100 p-4">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5"><Calendar className="w-3 h-3" />Fechas Activas</p>
-              <p className="text-xl font-black text-slate-900 mt-1">{fechasPresentes.length}</p>
-              <p className="text-[9px] text-slate-400 font-bold mt-0.5">{fechasPresentes.slice(0, 3).map(fmtDate).join(' · ')}</p>
+              <p className="text-xl font-black text-slate-900 mt-1">{fechasFiltradas.length}</p>
+              <p className="text-[9px] text-slate-400 font-bold mt-0.5">{fechasFiltradas.slice(0, 3).map(fmtDate).join(' · ')}</p>
             </div>
             <div className="bg-white rounded-2xl border-2 border-slate-100 p-4">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Valor Total</p>
@@ -869,10 +880,29 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
 
           <div className="flex items-center justify-between">
             <h3 className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Consolidado por placa y fecha</h3>
-            <button onClick={exportGeneral} disabled={!consolidado.length || exportingGeneral}
+            <button onClick={exportGeneral} disabled={!consolidadoFiltrado.length || exportingGeneral}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-600 text-[9px] font-black uppercase tracking-widest rounded-xl disabled:opacity-40">
               {exportingGeneral ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} {exportingGeneral ? 'Exportando...' : 'Exportar General'}
             </button>
+          </div>
+
+          {/* Filtro por fecha y/o placa — aplica uno, el otro, o ambos */}
+          <div className="flex items-end gap-3 bg-white rounded-2xl border-2 border-slate-100 p-4">
+            <div className="w-44">
+              <label className={labelCls}>Fecha</label>
+              <select className={inputCls} value={filtroPendFecha} onChange={e => setFiltroPendFecha(e.target.value)}>
+                <option value="">Todas</option>
+                {fechasPresentes.map(f => <option key={f} value={f}>{fmtDate(f)}</option>)}
+              </select>
+            </div>
+            <div className="w-44">
+              <label className={labelCls}>Placa</label>
+              <input className={inputCls} value={filtroPendPlaca} onChange={e => setFiltroPendPlaca(e.target.value)} placeholder="Ej: NNL629" />
+            </div>
+            {hayFiltroPendientes && (
+              <button onClick={limpiarFiltroPendientes} className="px-3 py-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 text-[9px] font-black uppercase tracking-widest">Limpiar</button>
+            )}
+            <span className="text-[9px] text-slate-400 font-bold ml-auto">{consolidadoFiltrado.length} de {consolidado.length} placa{consolidado.length !== 1 ? 's' : ''}</span>
           </div>
 
           {/* Cards individuales por placa+fecha */}
@@ -884,9 +914,15 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
               <p className="text-[12px] font-black text-slate-400 uppercase tracking-widest">No hay legalizaciones pendientes</p>
               <p className="text-[10px] text-slate-400">Carga un Excel de entregas para comenzar</p>
             </div>
+          ) : consolidadoFiltrado.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-2">
+              <Search className="w-10 h-10 text-slate-300" />
+              <p className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Sin resultados para ese filtro</p>
+              <button onClick={limpiarFiltroPendientes} className="text-[10px] font-black text-cyan-600 hover:text-cyan-800 uppercase tracking-widest">Limpiar filtro</button>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {consolidado.map(row => {
+              {consolidadoFiltrado.map(row => {
                 const pct = Number(row.valor_total) > 0 ? Math.min(100, Math.round(((Number(row.pagado_individual) + Number(row.pagado_pool)) / Number(row.valor_total)) * 100)) : 0;
                 return (
                   <div key={`${row.placa}-${row.fecha}`} className="rounded-2xl border-2 border-slate-100 bg-white overflow-hidden hover:border-slate-200 transition-all">
