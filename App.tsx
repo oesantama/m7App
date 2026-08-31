@@ -96,6 +96,8 @@ const FormatosTransportes = lazyWithRetry(() => import('./components/AdminCenter
 const MaestrasDogama = lazyWithRetry(() => import('./components/Dogama/MaestrasDogama'));
 const CitasDespachosCarga = lazyWithRetry(() => import('./components/Dogama/CitasDespachosCarga'));
 const ConciliacionJhonUribe = lazyWithRetry(() => import('./components/Dogama/ConciliacionJhonUribe'));
+const MaestrasFulfillment = lazyWithRetry(() => import('./components/Fulfillment/MaestrasFulfillment'));
+const RegistroLegalizacionFulfillment = lazyWithRetry(() => import('./components/Fulfillment/RegistroLegalizacionFulfillment'));
 const HelpDesk = lazyWithRetry(() => import('./components/HelpDesk'));
 const ValidadorDocumentos = lazyWithRetry(() => import('./components/RRHH/ValidadorDocumentos'));
 const HojasDeVidaMain = lazyWithRetry(() => import('./components/HojasDeVida/HojasDeVidaMain'));
@@ -1156,6 +1158,18 @@ const App: React.FC = () => {
         return (
           <React.Suspense fallback={<div className="p-10">Cargando Conciliación Jhon Uribe...</div>}>
             <ConciliacionJhonUribe user={user!} />
+          </React.Suspense>
+        );
+      case 'maestras-fullfilment':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Maestras Fullfilment...</div>}>
+            <MaestrasFulfillment user={user!} />
+          </React.Suspense>
+        );
+      case 'registro-legalizacion-fullfilment':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Registro y Legalización...</div>}>
+            <RegistroLegalizacionFulfillment user={user!} />
           </React.Suspense>
         );
       case 'validacion-conciliaciones':

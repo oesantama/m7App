@@ -2183,6 +2183,23 @@ export const restoreSystem = async () => {
       CREATE INDEX IF NOT EXISTS idx_wqr_user ON whatsapp_quick_replies (user_id);
     `);
 
+    // ── MOD-19 / PAG-76 / PAG-77: Operación Fullfilment ─────────────────────
+    // Las tablas fulfillment_* se crean solas (ensureTables) en fulfillment.controller.ts
+    // al primer request al módulo; aquí solo se siembra la navegación (modules/pages).
+    await client.query(`
+      INSERT INTO modules (id, name, icon_class, status_id)
+      SELECT 'MOD-19', 'OPERACION FULLFILMENT', 'Package', 'EST-01'
+      WHERE NOT EXISTS (SELECT 1 FROM modules WHERE id = 'MOD-19');
+
+      INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
+      VALUES ('PAG-76', 'MAESTRAS FULLFILMENT', 'maestras-fullfilment', 'MOD-19', 'MOD-19', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = 'MAESTRAS FULLFILMENT', route = 'maestras-fullfilment', module_id = 'MOD-19', parent_id = 'MOD-19';
+
+      INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
+      VALUES ('PAG-77', 'REGISTRO Y LEGALIZACION', 'registro-legalizacion-fullfilment', 'MOD-19', 'MOD-19', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = 'REGISTRO Y LEGALIZACION', route = 'registro-legalizacion-fullfilment', module_id = 'MOD-19', parent_id = 'MOD-19';
+    `);
+
     // RESCATE DE DATOS: Recupera rutas huérfanas y repara fechas nulas
     await recoverOrphanedRoutes(client);
     await seedGhMiscelaneos(client);

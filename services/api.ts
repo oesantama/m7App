@@ -2618,4 +2618,85 @@ export const api = {
   deleteCyberCampaign: (id: number) => fetchJson(`${API_URL}/cybersecurity/phishing/campaigns/${id}`, { method: 'DELETE' }),
   sendCyberCampaign: (id: number) => fetchJson(`${API_URL}/cybersecurity/phishing/campaigns/${id}/send`, { method: 'POST' }),
   getCyberCampaignStats: (id: number) => fetchJson(`${API_URL}/cybersecurity/phishing/campaigns/${id}/stats`),
+
+  // ── Operación Fullfilment ────────────────────────────────────────────────
+  getFulfillmentClientes: () => fetchJson(`${API_URL}/fulfillment/clientes`),
+  createFulfillmentCliente: (data: { codigo: string; nombre: string; pais?: string; moneda: 'USD' | 'COP'; notas_tarifas?: string }) =>
+    fetchJson(`${API_URL}/fulfillment/clientes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+  updateFulfillmentCliente: (id: number, data: Record<string, any>) =>
+    fetchJson(`${API_URL}/fulfillment/clientes/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+
+  getFulfillmentTransportistas: () => fetchJson(`${API_URL}/fulfillment/transportistas`),
+  createFulfillmentTransportista: (nombre: string) =>
+    fetchJson(`${API_URL}/fulfillment/transportistas`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre }) }),
+  updateFulfillmentTransportista: (id: number, data: { nombre?: string; estado_id?: string }) =>
+    fetchJson(`${API_URL}/fulfillment/transportistas/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+
+  getFulfillmentProductos: () => fetchJson(`${API_URL}/fulfillment/productos`),
+  createFulfillmentProducto: (nombre: string) =>
+    fetchJson(`${API_URL}/fulfillment/productos`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nombre }) }),
+  updateFulfillmentProducto: (id: number, data: { nombre?: string; estado_id?: string }) =>
+    fetchJson(`${API_URL}/fulfillment/productos/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+
+  getFulfillmentRegistros: (filters?: { cliente_id?: number | string; anio?: number | string; mes?: string; latest?: boolean }) => {
+    const params = new URLSearchParams();
+    if (filters?.cliente_id) params.set('cliente_id', String(filters.cliente_id));
+    if (filters?.anio) params.set('anio', String(filters.anio));
+    if (filters?.mes) params.set('mes', filters.mes);
+    if (filters?.latest) params.set('latest', 'true');
+    const qs = params.toString();
+    return fetchJson(`${API_URL}/fulfillment/registros${qs ? '?' + qs : ''}`);
+  },
+  getFulfillmentRegistroDetalle: (id: number) => fetchJson(`${API_URL}/fulfillment/registros/${id}`),
+  deleteFulfillmentRegistro: (id: number) => fetchJson(`${API_URL}/fulfillment/registros/${id}`, { method: 'DELETE' }),
+
+  getFulfillmentResumenGerencial: (filters?: { cliente_id?: number | string; anio?: number | string; mes?: string; latest?: boolean }) => {
+    const params = new URLSearchParams();
+    if (filters?.cliente_id) params.set('cliente_id', String(filters.cliente_id));
+    if (filters?.anio) params.set('anio', String(filters.anio));
+    if (filters?.mes) params.set('mes', filters.mes);
+    if (filters?.latest) params.set('latest', 'true');
+    const qs = params.toString();
+    return fetchJson(`${API_URL}/fulfillment/resumen-gerencial${qs ? '?' + qs : ''}`);
+  },
+
+  downloadFulfillmentPlantilla: async () => {
+    const token = getStoredToken();
+    const res = await fetch(`${API_URL}/fulfillment/plantilla`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error('No se pudo descargar la plantilla');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'plantilla_fullfilment.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  importFulfillmentXlsx: async (file: File, cliente_id: number) => {
+    const token = getStoredToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('cliente_id', String(cliente_id));
+    const res = await fetch(`${API_URL}/fulfillment/importar`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
+    return res.json();
+  },
+
+  createFulfillmentDetalleManual: (data: {
+    cliente_id: number; anio: number | string; mes: string; subtipo?: string;
+    fecha?: string; producto: string; descripcion?: string; orden?: string;
+    cantidad?: number | string; tarifa?: number | string; monto: number | string;
+    costo_transportista?: number | string; transportista?: string; seguimiento?: string;
+    comprado_en?: string; destinatario?: string;
+  }) =>
+    fetchJson(`${API_URL}/fulfillment/detalle-manual`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    }),
 };

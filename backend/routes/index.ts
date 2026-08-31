@@ -75,6 +75,7 @@ import itActivosRoutes from './it-activos.routes.js';
 import ghPerfilesCargoRoutes, { publicRouter as ghPerfilesCargoPublicRoutes } from './gh-perfiles-cargo.routes.js';
 import whatsappWebhookRoutes from './whatsapp-webhook.routes.js';
 import dicorpLegalizacionRoutes from './dicorp-legalizacion.routes.js';
+import fulfillmentRoutes from './fulfillment.routes.js';
 
 const router = Router();
 
@@ -130,6 +131,7 @@ router.use('/gh-visitas', ghVisitasRoutes);
 router.use('/delivery-schedules', deliveryScheduleRoutes);
 router.use('/ajover-b36', ajoverB36Routes);
 router.use('/dicorp-legalizacion', dicorpLegalizacionRoutes);
+router.use('/fulfillment', fulfillmentRoutes);
 router.use('/management-reports', managementReportRoutes);
 router.use('/prov-clientes', provClienteRoutes);
 router.use('/gh-master-inventario', ghMasterInventarioRoutes);
