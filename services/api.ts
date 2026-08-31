@@ -2355,8 +2355,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ estado_id, usuario_actualizacion }),
     }),
-  dogamaDeleteOrdenServicio: (id: number) =>
-    fetchJson(`${API_URL}/dogama/ordenes-servicio/${id}`, { method: 'DELETE' }),
+  dogamaDeleteOrdenServicio: (id: number, motivo: string, usuario_actualizacion?: string) =>
+    fetchJson(`${API_URL}/dogama/ordenes-servicio/${id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo, usuario_actualizacion }),
+    }),
 
   dogamaGetOsRecogidas: (os_id: number) =>
     fetchJson(`${API_URL}/dogama/ordenes-servicio/${os_id}/recogidas`),
@@ -2385,6 +2389,37 @@ export const api = {
     if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
     return res.json();
   },
+
+  dogamaImportOrdenesServicioXlsx: async (file: File) => {
+    const token = localStorage.getItem('token') ||
+                  localStorage.getItem('m7_token') ||
+                  localStorage.getItem('m7_auth_token') ||
+                  localStorage.getItem('m7_client_token');
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_URL}/dogama/ordenes-servicio/import-xlsx`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
+    return res.json();
+  },
+
+  dogamaGetConciliacionJhonUribe: (filters?: { from?: string; to?: string }) => {
+    const params = new URLSearchParams();
+    if (filters?.from) params.set('from', filters.from);
+    if (filters?.to) params.set('to', filters.to);
+    const qs = params.toString();
+    return fetchJson(`${API_URL}/dogama/conciliacion-jhon-uribe${qs ? '?' + qs : ''}`);
+  },
+
+  dogamaConciliarOrdenesServicio: (data: { ids?: number[]; codigo_sap?: string; nota?: string; usuario_actualizacion?: string }) =>
+    fetchJson(`${API_URL}/dogama/conciliacion-jhon-uribe/conciliar`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
 
   dogamaGetNotifCorreos: (filters?: { estado?: string; fecha_desde?: string; fecha_hasta?: string; enc_id?: number }) => {
     const params = new URLSearchParams();

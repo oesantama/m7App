@@ -102,7 +102,14 @@ router.get('/ordenes-servicio/:os_id/recogidas',      requirePermission('CITAS_D
 router.post('/ordenes-servicio/:os_id/recogidas',     requirePermission('CITAS_DESPACHO_CARGA', 'create'), dogama.createOsRecogida);
 router.delete('/ordenes-servicio/:os_id/recogidas/:id', requirePermission('CITAS_DESPACHO_CARGA', 'delete'), dogama.deleteOsRecogida);
 
-// ── Importación masiva CSV ────────────────────────────────────────────────────
+// ── Importación masiva CSV (legacy, específica ida/recogida) ──────────────────
 router.post('/ordenes-servicio/import', requirePermission('CITAS_DESPACHO_CARGA', 'create'), upload.single('file'), dogama.importOrdenesServicio);
+
+// ── Importación unificada XLSX (un solo archivo, ida + recogida por fila) ─────
+router.post('/ordenes-servicio/import-xlsx', requirePermission('CITAS_DESPACHO_CARGA', 'create'), upload.single('file'), dogama.importOrdenesServicioXlsx);
+
+// ── Conciliación Jhon Uribe ────────────────────────────────────────────────────
+router.get('/conciliacion-jhon-uribe', requirePermission('CONCILIACION_JHON_URIBE', 'view'), dogama.getConciliacionJhonUribe);
+router.patch('/conciliacion-jhon-uribe/conciliar', requirePermission('CONCILIACION_JHON_URIBE', 'edit'), dogama.conciliarOrdenesServicio);
 
 export default router;

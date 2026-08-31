@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
-import { Search, Download, ChevronRight } from 'lucide-react';
+import { Search, Download, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import { api } from '../../services/api';
 import { User } from '../../types';
 import { hasPermission } from '../../utils/permissions';
@@ -5472,46 +5472,21 @@ const EMPTY_OS_FORM = {
   remesa: '',
   factura_inicial: '',
   fecha_factura: '',
-  estado_id: 'EST-01',
+  estado_id: 'EST-03',
 };
 
+// Estados de conciliación (catálogo compartido `estados`) — el mismo modelo de 3 estados
+// que usa la página Conciliación Jhon Uribe: Pendiente → Conciliado, o Eliminado (soft-delete).
 const OS_ESTADOS: { id: string; label: string; color: string }[] = [
-  { id: 'EST-01', label: 'Activo',     color: 'bg-emerald-100 text-emerald-700' },
-  { id: 'EST-02', label: 'Bloqueado',  color: 'bg-amber-100 text-amber-700' },
-  { id: 'EST-10', label: 'Confirmado', color: 'bg-indigo-100 text-indigo-700' },
-  { id: 'EST-16', label: 'Cancelado',  color: 'bg-red-100 text-red-700' },
+  { id: 'EST-03', label: 'Pendiente',  color: 'bg-amber-100 text-amber-700' },
+  { id: 'EST-19', label: 'Conciliado', color: 'bg-emerald-100 text-emerald-700' },
+  { id: 'EST-16', label: 'Eliminado',  color: 'bg-red-100 text-red-700' },
 ];
 
 function fmtCOP(v: string | number | null | undefined): string {
   if (v == null || v === '') return '—';
   const n = Number(v);
   return isNaN(n) ? '—' : n.toLocaleString('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-}
-
-function exportOrdenesExcel(rows: OrdenServicio[], tipo: 'ida' | 'recogida') {
-  const filtered = rows.filter(r => r.tipo_os === tipo);
-  if (!filtered.length) { toast.error(`Sin registros de tipo "${tipo}" para exportar`); return; }
-  const wb = XLSX.utils.book_new();
-  const data = filtered.map(r => ({
-    OC: r.numero_oc,
-    OM: r.numero_om ?? '',
-    Confeccionista: r.confeccionista_nombre ?? '',
-    Cantidad: r.cantidad,
-    'Cant. Entregada CEDI': r.cantidad_entregada_cedi,
-    'Cant. por Entregar': r.cantidad - r.cantidad_entregada_cedi,
-    'Precio Unitario': r.precio_unitario != null ? Math.round(Number(r.precio_unitario)) : '',
-    'Valor Total': r.valor_total != null ? Math.round(Number(r.valor_total)) : '',
-    Flete: r.flete != null ? Math.round(Number(r.flete)) : '',
-    Tarifa: r.tarifa != null ? Math.round(Number(r.tarifa)) : '',
-    Manifiesto: r.manifiesto ?? '',
-    Remesa: r.remesa ?? '',
-    'Factura Inicial': r.factura_inicial ?? '',
-    'Fecha Factura': r.fecha_factura ?? '',
-    Estado: r.estado_nombre ?? r.estado_id,
-    'Fecha Creación': r.fecha_creacion ? new Date(r.fecha_creacion).toLocaleDateString('es-CO') : '',
-  }));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), `Informe ${tipo === 'ida' ? 'Ida' : 'Recogida'}`);
-  XLSX.writeFile(wb, `informe_os_${tipo}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 
 function OrdenesServicioTab({ user }: { user: User }) {
@@ -5522,6 +5497,7 @@ function OrdenesServicioTab({ user }: { user: User }) {
   const [showModal,    setShowModal]    = useState(false);
   const [editItem,     setEditItem]     = useState<OrdenServicio | null>(null);
   const [confirmDel,   setConfirmDel]   = useState<OrdenServicio | null>(null);
+  const [motivoDel,    setMotivoDel]    = useState('');
   const [fleteConfig,  setFleteConfig]  = useState<FleteConfig | null>(null);
   const [confs,        setConfs]        = useState<ConfItem[]>([]);
   const [form,         setForm]         = useState({ ...EMPTY_OS_FORM });
@@ -5535,60 +5511,10 @@ function OrdenesServicioTab({ user }: { user: User }) {
   const [savingRec,      setSavingRec]      = useState(false);
   const [newRec,         setNewRec]         = useState({ cantidad: '', remesa: '', manifiesto: '', codigo_sap: '', flete: '' });
 
-  const [showImport,      setShowImport]      = useState(false);
-  const [importTipo,      setImportTipo]      = useState<'ida' | 'recogida'>('ida');
-  const [importFile,      setImportFile]      = useState<File | null>(null);
-  const [importing,       setImporting]       = useState(false);
-  const [importPreview,   setImportPreview]   = useState<{ headers: string[]; rows: string[][]; total: number } | null>(null);
-  const importFileRef = useRef<HTMLInputElement>(null);
-
-  const parseImportPreview = (file: File, tipo: 'ida' | 'recogida') => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const lines = text.split(/\r?\n/).filter(l => l.trim());
-      if (lines.length < 2) { setImportPreview(null); return; }
-
-      // Parse CSV with quoted fields
-      const parseCSVLine = (line: string): string[] => {
-        const result: string[] = [];
-        let cur = '', inQuote = false;
-        for (let i = 0; i < line.length; i++) {
-          if (line[i] === '"') { inQuote = !inQuote; continue; }
-          if (line[i] === ';' && !inQuote) { result.push(cur.trim()); cur = ''; continue; }
-          cur += line[i];
-        }
-        result.push(cur.trim());
-        return result;
-      };
-
-      const allHeaders = parseCSVLine(lines[0]);
-      // Show only the columns we'll actually import
-      const colMap: Record<string, string[]> = {
-        recogida: ['04_oc_uribe_oc_text','07_om_uribe_text_text','tipo_confeccion','nombre_confeccionista','total_prendas','total_prendas_recibidas_text','referencia_antigua_text'],
-        ida:      ['n_mero_de_oc_text','n_mero_de_om_text','tipo_de_confeccion_text','nombre_del_confeccionista','total_prendas_text','prendas_recibidas_text','empresa_text'],
-      };
-      const wantedCols = colMap[tipo];
-      const colLabels: Record<string, string> = {
-        '04_oc_uribe_oc_text': 'OC', '07_om_uribe_text_text': 'OM',
-        'tipo_confeccion': 'Tipo', 'nombre_confeccionista': 'Confeccionista',
-        'total_prendas': 'Total Prendas', 'total_prendas_recibidas_text': 'Recibidas',
-        'referencia_antigua_text': 'Ref. Ant.',
-        'n_mero_de_oc_text': 'OC', 'n_mero_de_om_text': 'OM',
-        'tipo_de_confeccion_text': 'Tipo', 'nombre_del_confeccionista': 'Confeccionista',
-        'total_prendas_text': 'Total Prendas', 'prendas_recibidas_text': 'Recibidas',
-        'empresa_text': 'Empresa',
-      };
-      const colIdxs = wantedCols.map(c => allHeaders.findIndex(h => h.toLowerCase() === c.toLowerCase()));
-      const displayHeaders = wantedCols.map(c => colLabels[c] || c);
-      const previewRows = lines.slice(1, 6).map(l => {
-        const cells = parseCSVLine(l);
-        return colIdxs.map(i => (i >= 0 ? cells[i] || '' : '—'));
-      });
-      setImportPreview({ headers: displayHeaders, rows: previewRows, total: lines.length - 1 });
-    };
-    reader.readAsText(file, 'utf-8');
-  };
+  const [showImportXlsx,  setShowImportXlsx]  = useState(false);
+  const [importXlsxFile,  setImportXlsxFile]  = useState<File | null>(null);
+  const [importingXlsx,   setImportingXlsx]   = useState(false);
+  const importXlsxRef = useRef<HTMLInputElement>(null);
 
   const canCreate = hasPermission(user, 'CITAS_DESPACHO_CARGA', 'create');
   const canEdit   = hasPermission(user, 'CITAS_DESPACHO_CARGA', 'edit');
@@ -5629,10 +5555,12 @@ function OrdenesServicioTab({ user }: { user: User }) {
       flete: fleteConfig?.flete_minimo ?? '',
     });
     setEditItem(null);
+    setDetalleOs(null);
+    setRecogidas([]);
     setShowModal(true);
   };
 
-  const openEdit = (item: OrdenServicio) => {
+  const openEdit = async (item: OrdenServicio) => {
     setForm({
       numero_oc:               item.numero_oc,
       numero_om:               item.numero_om ?? '',
@@ -5652,6 +5580,16 @@ function OrdenesServicioTab({ user }: { user: User }) {
     });
     setEditItem(item);
     setShowModal(true);
+
+    // Al editar también se muestra/gestiona el detalle de recogidas (regreso) de esta OS.
+    setDetalleOs(item);
+    setNewRec({ cantidad: '', remesa: '', manifiesto: '', codigo_sap: '', flete: '' });
+    setLoadingRec(true);
+    try {
+      const data = await api.dogamaGetOsRecogidas(item.id);
+      setRecogidas(Array.isArray(data) ? data : []);
+    } catch { toast.error('Error al cargar recogidas'); }
+    finally { setLoadingRec(false); }
   };
 
   const handleSave = async () => {
@@ -5683,6 +5621,7 @@ function OrdenesServicioTab({ user }: { user: User }) {
         toast.success('Orden de servicio creada');
       }
       setShowModal(false);
+      setDetalleOs(null);
       loadAll();
     } catch (e: any) { toast.error(e?.message || 'Error al guardar'); }
     finally { setSaving(false); }
@@ -5690,33 +5629,16 @@ function OrdenesServicioTab({ user }: { user: User }) {
 
   const handleDelete = async () => {
     if (!confirmDel) return;
+    if (!motivoDel.trim()) { toast.error('El motivo de eliminación es obligatorio.'); return; }
     setDeleting(true);
     try {
-      await api.dogamaDeleteOrdenServicio(confirmDel.id);
+      await api.dogamaDeleteOrdenServicio(confirmDel.id, motivoDel.trim(), user.id);
       toast.success('Orden eliminada');
       setConfirmDel(null);
+      setMotivoDel('');
       loadAll();
-    } catch { toast.error('Error al eliminar'); }
+    } catch (e: any) { toast.error(e?.message || 'Error al eliminar'); }
     finally { setDeleting(false); }
-  };
-
-  const handleEstado = async (item: OrdenServicio, estado_id: string) => {
-    try {
-      await api.dogamaPatchOrdenServicioEstado(item.id, estado_id, user.id);
-      toast.success('Estado actualizado');
-      loadAll();
-    } catch { toast.error('Error al cambiar estado'); }
-  };
-
-  const openDetalle = async (item: OrdenServicio) => {
-    setDetalleOs(item);
-    setNewRec({ cantidad: '', remesa: '', manifiesto: '', codigo_sap: '', flete: '' });
-    setLoadingRec(true);
-    try {
-      const data = await api.dogamaGetOsRecogidas(item.id);
-      setRecogidas(Array.isArray(data) ? data : []);
-    } catch { toast.error('Error al cargar recogidas'); }
-    finally { setLoadingRec(false); }
   };
 
   const handleAddRecogida = async () => {
@@ -5807,33 +5729,16 @@ function OrdenesServicioTab({ user }: { user: User }) {
       header: 'Acciones', key: 'fecha_factura' as keyof OrdenServicio, sortable: false, noWrap: true,
       render: (r: OrdenServicio) => (
         <div className="flex gap-1 items-center">
-          {/* Ver detalle recogidas */}
-          <button onClick={() => openDetalle(r)} title="Ver recogidas"
-            className="p-1 rounded-lg text-teal-600 hover:bg-teal-50 transition" aria-label="Ver recogidas">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-          </button>
           {canEdit && (
             <button onClick={() => openEdit(r)} title="Editar"
-              className="p-1 rounded-lg text-indigo-600 hover:bg-indigo-50 transition" aria-label="Editar">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-            </button>
-          )}
-          {canEdit && r.estado_id !== 'EST-02' && (
-            <button onClick={() => handleEstado(r, 'EST-02')} title="Bloquear"
-              className="p-1 rounded-lg text-amber-600 hover:bg-amber-50 transition" aria-label="Bloquear">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-            </button>
-          )}
-          {canEdit && r.estado_id !== 'EST-10' && (
-            <button onClick={() => handleEstado(r, 'EST-10')} title="Confirmar"
-              className="p-1 rounded-lg text-emerald-600 hover:bg-emerald-50 transition" aria-label="Confirmar">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+              className="p-1.5 rounded-lg text-indigo-600 hover:bg-indigo-50 transition" aria-label="Editar">
+              <Pencil className="w-3.5 h-3.5" />
             </button>
           )}
           {canDelete && (
-            <button onClick={() => setConfirmDel(r)} title="Eliminar"
-              className="p-1 rounded-lg text-red-500 hover:bg-red-50 transition" aria-label="Eliminar">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
+            <button onClick={() => { setConfirmDel(r); setMotivoDel(''); }} title="Eliminar"
+              className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition" aria-label="Eliminar">
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
         </div>
@@ -5946,8 +5851,84 @@ function OrdenesServicioTab({ user }: { user: User }) {
                 </select>
               </div>
             </div>
+
+            {/* Recogidas (regreso) — solo al editar una OS existente */}
+            {editItem && (
+              <div className="border-t border-slate-100 mt-5 pt-5">
+                <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Recogidas (Regreso)</p>
+                {loadingRec
+                  ? <div className="flex justify-center py-6"><div className="w-6 h-6 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
+                  : recogidas.length === 0
+                    ? <p className="text-center text-slate-400 text-sm py-4">Sin recogidas registradas aún.</p>
+                    : (
+                      <div className="overflow-x-auto mb-4">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-slate-800 text-white">
+                              {['Ingreso / Cant.', 'Remesa', 'Manifiesto', 'Cód. SAP', 'Flete', 'Fecha', ''].map(h => (
+                                <th key={h} className="px-3 py-2 text-left font-bold uppercase tracking-wide whitespace-nowrap">{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {recogidas.map((rec, i) => (
+                              <tr key={rec.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                                <td className="px-3 py-2 font-black text-slate-800">{rec.cantidad.toLocaleString('es-CO')}</td>
+                                <td className="px-3 py-2">{rec.remesa ?? '—'}</td>
+                                <td className="px-3 py-2">{rec.manifiesto ?? '—'}</td>
+                                <td className="px-3 py-2">{rec.codigo_sap ?? '—'}</td>
+                                <td className="px-3 py-2 font-mono">{rec.flete ? `$${fmtCOP(rec.flete)}` : '—'}</td>
+                                <td className="px-3 py-2 text-slate-400 whitespace-nowrap">{new Date(rec.fecha_creacion).toLocaleDateString('es-CO')}</td>
+                                <td className="px-3 py-2">
+                                  {canDelete && (
+                                    <button onClick={() => handleDeleteRecogida(rec)} title="Eliminar"
+                                      className="text-red-400 hover:text-red-600 transition p-0.5">
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )
+                }
+                {canCreate && (
+                  <div className="border-t border-slate-100 pt-4">
+                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Agregar Recogida</p>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
+                      {([
+                        { k: 'cantidad',   label: 'Cantidad *',   type: 'number', placeholder: '0' },
+                        { k: 'remesa',     label: 'Remesa *',     type: 'text',   placeholder: 'N° remesa' },
+                        { k: 'manifiesto', label: 'Manifiesto *', type: 'text',   placeholder: 'N° manifiesto' },
+                        { k: 'codigo_sap', label: 'Cód. SAP *',  type: 'text',   placeholder: 'SAP' },
+                        { k: 'flete',      label: 'Flete ($) *',  type: 'number', placeholder: '0' },
+                      ] as const).map(f => (
+                        <div key={f.k}>
+                          <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">{f.label}</label>
+                          <input
+                            type={f.type}
+                            value={(newRec as any)[f.k]}
+                            onChange={e => setNewRec(p => ({ ...p, [f.k]: e.target.value }))}
+                            placeholder={f.placeholder}
+                            className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-300"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <button onClick={handleAddRecogida} disabled={savingRec}
+                      className="mt-3 px-5 py-2 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-black disabled:opacity-50 transition flex items-center gap-2">
+                      {savingRec && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                      {savingRec ? 'Guardando…' : '+ Agregar'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex gap-3 mt-5">
-              <button onClick={() => setShowModal(false)} disabled={saving}
+              <button onClick={() => { setShowModal(false); setDetalleOs(null); }} disabled={saving}
                 className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition">
                 Cancelar
               </button>
@@ -5962,136 +5943,25 @@ function OrdenesServicioTab({ user }: { user: User }) {
         </div>
       )}
 
-      {/* Modal Detalle Recogidas */}
-      {detalleOs && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl my-8 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-150">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-6 py-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-black text-teal-200 uppercase tracking-widest mb-0.5">Detalle de Recogidas</p>
-                <div className="flex items-center gap-3">
-                  <span className="text-white font-black text-base">OC: {detalleOs.numero_oc}</span>
-                  {detalleOs.numero_om && <span className="text-teal-200 text-sm">OM: {detalleOs.numero_om}</span>}
-                  {detalleOs.manifiesto && <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Manif: {detalleOs.manifiesto}</span>}
-                  {detalleOs.remesa && <span className="bg-white/20 text-white text-xs px-2 py-0.5 rounded-full">Remesa: {detalleOs.remesa}</span>}
-                </div>
-              </div>
-              <button onClick={() => setDetalleOs(null)}
-                className="text-white/70 hover:text-white transition p-1">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-
-            {/* Resumen cantidades */}
-            <div className="flex gap-6 px-6 py-3 bg-teal-50 border-b border-teal-100 text-sm">
-              <div><span className="text-slate-500">Total OS:</span> <span className="font-black text-slate-800">{detalleOs.cantidad.toLocaleString('es-CO')}</span></div>
-              <div><span className="text-slate-500">Entregado CEDI:</span> <span className="font-black text-emerald-700">{detalleOs.cantidad_entregada_cedi.toLocaleString('es-CO')}</span></div>
-              <div><span className="text-slate-500">Por entregar:</span> <span className={`font-black ${detalleOs.cantidad - detalleOs.cantidad_entregada_cedi > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{(detalleOs.cantidad - detalleOs.cantidad_entregada_cedi).toLocaleString('es-CO')}</span></div>
-            </div>
-
-            <div className="p-6">
-              {/* Tabla recogidas existentes */}
-              {loadingRec
-                ? <div className="flex justify-center py-8"><div className="w-7 h-7 border-4 border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
-                : recogidas.length === 0
-                  ? <p className="text-center text-slate-400 text-sm py-6">Sin recogidas registradas aún.</p>
-                  : (
-                    <div className="overflow-x-auto mb-4">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="bg-slate-800 text-white">
-                            {['Ingreso / Cant.', 'Remesa', 'Manifiesto', 'Cód. SAP', 'Flete', 'Fecha', ''].map(h => (
-                              <th key={h} className="px-3 py-2 text-left font-bold uppercase tracking-wide whitespace-nowrap">{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {recogidas.map((rec, i) => (
-                            <tr key={rec.id} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                              <td className="px-3 py-2 font-black text-slate-800">{rec.cantidad.toLocaleString('es-CO')}</td>
-                              <td className="px-3 py-2">{rec.remesa ?? '—'}</td>
-                              <td className="px-3 py-2">{rec.manifiesto ?? '—'}</td>
-                              <td className="px-3 py-2">{rec.codigo_sap ?? '—'}</td>
-                              <td className="px-3 py-2 font-mono">{rec.flete ? `$${fmtCOP(rec.flete)}` : '—'}</td>
-                              <td className="px-3 py-2 text-slate-400 whitespace-nowrap">{new Date(rec.fecha_creacion).toLocaleDateString('es-CO')}</td>
-                              <td className="px-3 py-2">
-                                {canDelete && (
-                                  <button onClick={() => handleDeleteRecogida(rec)} title="Eliminar"
-                                    className="text-red-400 hover:text-red-600 transition p-0.5">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )
-              }
-
-              {/* Formulario agregar recogida */}
-              {canCreate && (
-                <div className="border-t border-slate-100 pt-4">
-                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-3">Agregar Recogida</p>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2 items-end">
-                    {([
-                      { k: 'cantidad',   label: 'Cantidad *',   type: 'number', placeholder: '0' },
-                      { k: 'remesa',     label: 'Remesa *',     type: 'text',   placeholder: 'N° remesa' },
-                      { k: 'manifiesto', label: 'Manifiesto *', type: 'text',   placeholder: 'N° manifiesto' },
-                      { k: 'codigo_sap', label: 'Cód. SAP *',  type: 'text',   placeholder: 'SAP' },
-                      { k: 'flete',      label: 'Flete ($) *',  type: 'number', placeholder: '0' },
-                    ] as const).map(f => (
-                      <div key={f.k}>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wide mb-1">{f.label}</label>
-                        <input
-                          type={f.type}
-                          value={(newRec as any)[f.k]}
-                          onChange={e => setNewRec(p => ({ ...p, [f.k]: e.target.value }))}
-                          placeholder={f.placeholder}
-                          className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-300"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  <button onClick={handleAddRecogida} disabled={savingRec}
-                    className="mt-3 px-5 py-2 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-black disabled:opacity-50 transition flex items-center gap-2">
-                    {savingRec && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                    {savingRec ? 'Guardando…' : '+ Agregar'}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="px-6 pb-5 flex justify-end gap-3">
-              <button onClick={() => { setDetalleOs(null); openEdit(detalleOs); }}
-                className="px-5 py-2.5 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-black transition">
-                Editar OS
-              </button>
-              <button onClick={() => setDetalleOs(null)}
-                className="px-5 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">
-                Cerrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal Confirmar Eliminación */}
       {confirmDel && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-in fade-in slide-in-from-bottom-4 duration-150">
             <p className="text-base font-black text-slate-800 mb-1">Eliminar OS</p>
-            <p className="text-sm text-slate-500 mb-5">
-              ¿Eliminar la orden <span className="font-black text-slate-800">{confirmDel.numero_oc}</span>? Esta acción no se puede deshacer.
+            <p className="text-sm text-slate-500 mb-4">
+              ¿Eliminar la orden <span className="font-black text-slate-800">{confirmDel.numero_oc}</span>? Queda marcada como eliminada — el histórico se conserva y sigue visible en Conciliación Jhon Uribe.
             </p>
+            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Motivo de eliminación *</label>
+            <textarea value={motivoDel} onChange={e => setMotivoDel(e.target.value)} rows={3}
+              placeholder="Ej: OC duplicada, se cargó por error, etc."
+              className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 mb-5 focus:outline-none focus:ring-2 focus:ring-red-300" />
             <div className="flex gap-3">
-              <button onClick={() => setConfirmDel(null)} disabled={deleting}
+              <button onClick={() => { setConfirmDel(null); setMotivoDel(''); }} disabled={deleting}
                 className="flex-1 px-4 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold hover:bg-slate-50 disabled:opacity-50 transition">
                 Cancelar
               </button>
-              <button onClick={handleDelete} disabled={deleting}
+              <button onClick={handleDelete} disabled={deleting || !motivoDel.trim()}
                 className="flex-1 px-4 py-2.5 rounded-2xl bg-red-600 text-white text-sm font-black hover:bg-red-700 disabled:opacity-50 transition flex items-center justify-center gap-2">
                 {deleting && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                 {deleting ? 'Eliminando…' : 'Eliminar'}
@@ -6102,102 +5972,50 @@ function OrdenesServicioTab({ user }: { user: User }) {
       )}
 
       {/* Header y filtros */}
-      {/* Modal importar CSV */}
-      {showImport && (
+      {/* Modal importar Excel unificado (ida + recogida en un solo archivo) */}
+      {showImportXlsx && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl animate-in fade-in slide-in-from-bottom-4 duration-150 overflow-hidden">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-in fade-in slide-in-from-bottom-4 duration-150 overflow-hidden">
             <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-6 py-4">
-              <p className="text-xs font-black text-teal-200 uppercase tracking-widest mb-0.5">Importar desde m7track</p>
-              <p className="text-lg font-black text-white">Carga masiva CSV</p>
+              <p className="text-xs font-black text-teal-200 uppercase tracking-widest mb-0.5">Órdenes de Servicio</p>
+              <p className="text-lg font-black text-white">Importar Excel</p>
             </div>
             <div className="p-6 space-y-4">
+              <p className="text-xs text-slate-500">
+                Un solo archivo <span className="font-bold">.xlsx</span> con una fila por registro. Columna <span className="font-mono font-bold">Tipo</span> = "Ida" o "Recogida"
+                (si se omite se asume Ida). Columnas admitidas: OC, OM, Tipo, Confeccionista, Cantidad, Cantidad Entregada CEDI,
+                Valor Total, Precio Unitario, Tarifa, Flete, Manifiesto, Remesa, Factura, Fecha Factura, Pedido SAP, Referencia Antigua.
+              </p>
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Tipo de informe</label>
-                <div className="flex gap-3">
-                  {(['ida', 'recogida'] as const).map(t => (
-                    <button key={t} onClick={() => {
-                      setImportTipo(t);
-                      setImportPreview(null);
-                      if (importFile) parseImportPreview(importFile, t);
-                    }}
-                      className={`flex-1 py-2.5 rounded-2xl text-sm font-bold border-2 transition ${importTipo === t ? 'border-teal-500 bg-teal-50 text-teal-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}>
-                      {t === 'ida' ? '📤 Informe Ida' : '📥 Informe Recogida'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Archivo CSV</label>
-                <input ref={importFileRef} type="file" accept=".csv" className="hidden"
-                  onChange={e => {
-                    const f = e.target.files?.[0] ?? null;
-                    setImportFile(f);
-                    setImportPreview(null);
-                    if (f) parseImportPreview(f, importTipo);
-                  }} />
-                <button onClick={() => importFileRef.current?.click()}
-                  className={`w-full py-3 rounded-2xl border-2 border-dashed text-sm font-semibold transition ${importFile ? 'border-teal-400 bg-teal-50 text-teal-700' : 'border-slate-300 text-slate-500 hover:border-teal-400 hover:text-teal-600'}`}>
-                  {importFile ? `✓ ${importFile.name}` : 'Seleccionar archivo…'}
+                <input ref={importXlsxRef} type="file" accept=".xlsx,.xls" className="hidden"
+                  onChange={e => setImportXlsxFile(e.target.files?.[0] ?? null)} />
+                <button onClick={() => importXlsxRef.current?.click()}
+                  className={`w-full py-3 rounded-2xl border-2 border-dashed text-sm font-semibold transition ${importXlsxFile ? 'border-teal-400 bg-teal-50 text-teal-700' : 'border-slate-300 text-slate-500 hover:border-teal-400 hover:text-teal-600'}`}>
+                  {importXlsxFile ? `✓ ${importXlsxFile.name}` : 'Seleccionar archivo .xlsx…'}
                 </button>
-                {importFile && <p className="text-xs text-slate-400 mt-1">Tamaño: {(importFile.size / 1024 / 1024).toFixed(2)} MB</p>}
+                {importXlsxFile && <p className="text-xs text-slate-400 mt-1">Tamaño: {(importXlsxFile.size / 1024 / 1024).toFixed(2)} MB</p>}
               </div>
-
-              {/* Vista previa */}
-              {importPreview && (
-                <div className="border border-teal-200 rounded-2xl overflow-hidden">
-                  <div className="bg-teal-50 px-4 py-2.5 flex items-center justify-between">
-                    <span className="text-xs font-black text-teal-700 uppercase tracking-wide">Vista previa</span>
-                    <span className="text-xs font-bold text-teal-600 bg-teal-100 px-2.5 py-1 rounded-full">
-                      {importPreview.total.toLocaleString()} filas a cargar
-                    </span>
-                  </div>
-                  <div className="overflow-x-auto max-h-40">
-                    <table className="w-full text-xs">
-                      <thead className="bg-slate-50 sticky top-0">
-                        <tr>
-                          {importPreview.headers.map((h, i) => (
-                            <th key={i} className="px-3 py-2 text-left font-bold text-slate-600 whitespace-nowrap border-b border-slate-200">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {importPreview.rows.map((row, ri) => (
-                          <tr key={ri} className="border-b border-slate-100 hover:bg-slate-50">
-                            {row.map((cell, ci) => (
-                              <td key={ci} className="px-3 py-1.5 text-slate-700 whitespace-nowrap max-w-[140px] truncate">{cell || '—'}</td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="bg-amber-50 px-4 py-2 flex items-center gap-2">
-                    <svg className="w-3.5 h-3.5 text-amber-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
-                    <span className="text-xs text-amber-700">Mostrando primeras 5 filas. Los registros duplicados (misma OC+OM+tipo) serán omitidos.</span>
-                  </div>
-                </div>
-              )}
             </div>
             <div className="px-6 pb-6 flex gap-3">
-              <button onClick={() => { setShowImport(false); setImportFile(null); setImportPreview(null); }}
+              <button onClick={() => { setShowImportXlsx(false); setImportXlsxFile(null); }}
                 className="flex-1 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">
                 Cancelar
               </button>
               <button
-                disabled={!importFile || importing || !importPreview}
+                disabled={!importXlsxFile || importingXlsx}
                 onClick={async () => {
-                  if (!importFile) return;
-                  setImporting(true);
+                  if (!importXlsxFile) return;
+                  setImportingXlsx(true);
                   try {
-                    const r: any = await api.dogamaImportOrdenesServicio(importFile, importTipo);
-                    toast.success(`Importación completa: ${r.inserted} insertados, ${r.skipped} omitidos${r.confCreated ? `, ${r.confCreated} confeccionistas creados` : ''}`);
-                    setShowImport(false); setImportFile(null); setImportPreview(null);
+                    const r: any = await api.dogamaImportOrdenesServicioXlsx(importXlsxFile);
+                    toast.success(`Importación completa: ${r.insertados} insertados, ${r.omitidos} omitidos, ${r.errores} con error${r.confCreados ? `, ${r.confCreados} confeccionistas creados` : ''}`);
+                    setShowImportXlsx(false); setImportXlsxFile(null);
                     loadAll();
                   } catch (e: any) { toast.error(e?.message || 'Error al importar'); }
-                  finally { setImporting(false); }
+                  finally { setImportingXlsx(false); }
                 }}
                 className="flex-1 py-2.5 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold transition disabled:opacity-50">
-                {importing ? 'Importando…' : importPreview ? `Importar ${importPreview.total.toLocaleString()} filas` : 'Seleccione un archivo'}
+                {importingXlsx ? 'Importando…' : 'Importar'}
               </button>
             </div>
           </div>
@@ -6212,20 +6030,12 @@ function OrdenesServicioTab({ user }: { user: User }) {
           </button>
         )}
         {canCreate && (
-          <button onClick={() => setShowImport(true)}
+          <button onClick={() => setShowImportXlsx(true)}
             className="px-4 py-2.5 rounded-2xl text-sm font-bold bg-teal-600 hover:bg-teal-700 text-white flex items-center gap-2 shadow-sm transition">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-            Importar CSV
+            Importar Excel
           </button>
         )}
-        <button onClick={() => exportOrdenesExcel(rows, 'ida')}
-          className="px-4 py-2.5 rounded-2xl text-sm font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition">
-          <Download className="w-4 h-4" /> Informe Ida
-        </button>
-        <button onClick={() => exportOrdenesExcel(rows, 'recogida')}
-          className="px-4 py-2.5 rounded-2xl text-sm font-bold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex items-center gap-2 transition">
-          <Download className="w-4 h-4" /> Informe Recogida
-        </button>
         <div className="flex gap-2 ml-auto flex-wrap">
           <input value={filterOc} onChange={e => setFilterOc(e.target.value)} placeholder="Filtrar OC…"
             className="text-sm border border-slate-200 rounded-2xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 w-36" />
@@ -6254,10 +6064,6 @@ export default function CitasDespachosCarga({ user }: Props) {
   const [tab, setTab] = useState('asignacion');
   return (
     <div className="p-6 max-w-full mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-black text-slate-800 uppercase tracking-tight">Citas, Despacho y Carga</h1>
-        <p className="text-slate-400 text-sm mt-1">Operación Jhon Uribe — Dogama</p>
-      </div>
       <div className="flex gap-1 mb-6 border-b border-slate-200 flex-wrap">
         {[
           { key: 'asignacion', label: 'Asignación Placa × Planilla' },

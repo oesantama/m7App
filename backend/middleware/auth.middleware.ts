@@ -65,6 +65,7 @@ const ID_MAP: Record<string, string> = {
     'NOTICIAS': 'PAG-63',
     'MAESTRAS_DOGAMA': 'PAG-64',
     'CITAS_DESPACHO_CARGA': 'PAG-65',
+    'CONCILIACION_JHON_URIBE': 'PAG-75',
     'PAG-33': 'PAG-33',
     'PAG-35': 'PAG-35',
     'CONCILIACION': 'PAG-36',

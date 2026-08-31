@@ -95,6 +95,7 @@ const OperacionesFlotaManual = lazyWithRetry(() => import('./components/Operacio
 const FormatosTransportes = lazyWithRetry(() => import('./components/AdminCenter/FormatosTransportes'));
 const MaestrasDogama = lazyWithRetry(() => import('./components/Dogama/MaestrasDogama'));
 const CitasDespachosCarga = lazyWithRetry(() => import('./components/Dogama/CitasDespachosCarga'));
+const ConciliacionJhonUribe = lazyWithRetry(() => import('./components/Dogama/ConciliacionJhonUribe'));
 const HelpDesk = lazyWithRetry(() => import('./components/HelpDesk'));
 const ValidadorDocumentos = lazyWithRetry(() => import('./components/RRHH/ValidadorDocumentos'));
 const HojasDeVidaMain = lazyWithRetry(() => import('./components/HojasDeVida/HojasDeVidaMain'));
@@ -1149,6 +1150,12 @@ const App: React.FC = () => {
         return (
           <React.Suspense fallback={<div className="p-10">Cargando Citas, Despacho y Carga...</div>}>
             <CitasDespachosCarga user={user!} />
+          </React.Suspense>
+        );
+      case 'conciliacion-jhon-uribe':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Conciliación Jhon Uribe...</div>}>
+            <ConciliacionJhonUribe user={user!} />
           </React.Suspense>
         );
       case 'validacion-conciliaciones':

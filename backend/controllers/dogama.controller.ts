@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import pool from '../config/database.js';
 import nodemailer from 'nodemailer';
 import axios from 'axios';
+import * as XLSX from 'xlsx';
 import { sendEmail } from '../services/notification.service.js';
 
 // ── CONFECCIONISTAS ───────────────────────────────────────────────────────────
@@ -2077,7 +2078,27 @@ export const deleteAuxiliarExterno = async (req: Request, res: Response): Promis
 
 // ── ÓRDENES DE SERVICIO ───────────────────────────────────────────────────────
 
-const ensureOrdenesServicioTable = async () => {
+// Estados de conciliación de una Orden de Servicio (catálogo compartido `estados`).
+const OS_ESTADO_PENDIENTE  = 'EST-03'; // ya existe en el catálogo (name = 'PENDIENTE')
+const OS_ESTADO_ELIMINADO  = 'EST-16'; // ya existe en el catálogo (name = 'ELIMINADO')
+const OS_ESTADO_CONCILIADO = 'EST-19'; // agregado por esta funcionalidad (name = 'CONCILIADO')
+
+// Memoizado: correr este DDL en cada request (bajo concurrencia) puede generar contención de
+// locks entre peticiones simultáneas. Se ejecuta una sola vez por proceso del backend.
+let ensureOrdenesServicioTablePromise: Promise<void> | null = null;
+const ensureOrdenesServicioTable = () => {
+  if (!ensureOrdenesServicioTablePromise) {
+    ensureOrdenesServicioTablePromise = ensureOrdenesServicioTableImpl().catch(err => { ensureOrdenesServicioTablePromise = null; throw err; });
+  }
+  return ensureOrdenesServicioTablePromise;
+};
+const ensureOrdenesServicioTableImpl = async () => {
+  // Estado propio de la conciliación dentro del catálogo compartido `estados`.
+  await pool.query(`
+    INSERT INTO estados (id, name, status_id) VALUES ($1, 'CONCILIADO', 'EST-01')
+    ON CONFLICT (id) DO NOTHING
+  `, [OS_ESTADO_CONCILIADO]);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dogama_ordenes_servicio (
       id                      SERIAL PRIMARY KEY,
@@ -2095,7 +2116,7 @@ const ensureOrdenesServicioTable = async () => {
       remesa                  VARCHAR(100),
       factura_inicial         VARCHAR(100),
       fecha_factura           DATE,
-      estado_id               VARCHAR(20) NOT NULL DEFAULT 'EST-01',
+      estado_id               VARCHAR(20) NOT NULL DEFAULT 'EST-03',
       usuario_creacion        TEXT,
       fecha_creacion          TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'America/Bogota'),
       usuario_actualizacion   TEXT,
@@ -2108,6 +2129,17 @@ const ensureOrdenesServicioTable = async () => {
   await pool.query(`ALTER TABLE dogama_ordenes_servicio ADD COLUMN IF NOT EXISTS codigo_sap VARCHAR(100)`);
   await pool.query(`ALTER TABLE dogama_ordenes_servicio ADD COLUMN IF NOT EXISTS empresa VARCHAR(255)`);
   await pool.query(`ALTER TABLE dogama_ordenes_servicio ADD COLUMN IF NOT EXISTS referencia_antigua VARCHAR(100)`);
+  // Nota obligatoria al eliminar (soft-delete) y nota opcional al conciliar (aprobar).
+  await pool.query(`ALTER TABLE dogama_ordenes_servicio ADD COLUMN IF NOT EXISTS motivo_eliminacion TEXT`);
+  await pool.query(`ALTER TABLE dogama_ordenes_servicio ADD COLUMN IF NOT EXISTS nota_conciliacion TEXT`);
+  // Migración: el estado por defecto pasó de EST-01 (ACTIVO, sin significado real aquí) a EST-03
+  // (PENDIENTE de conciliar). Los registros que aún tengan el default viejo se consideran pendientes,
+  // porque la conciliación nunca existió antes de esto — ninguno pudo haber sido aprobado ya.
+  await pool.query(`ALTER TABLE dogama_ordenes_servicio ALTER COLUMN estado_id SET DEFAULT '${OS_ESTADO_PENDIENTE}'`);
+  await pool.query(`
+    UPDATE dogama_ordenes_servicio SET estado_id = '${OS_ESTADO_PENDIENTE}'
+    WHERE estado_id NOT IN ('${OS_ESTADO_PENDIENTE}', '${OS_ESTADO_ELIMINADO}', '${OS_ESTADO_CONCILIADO}')
+  `);
   // Índice único para deduplicación en importación masiva (COALESCE maneja NULLs en numero_om)
   await pool.query(`
     CREATE UNIQUE INDEX IF NOT EXISTS uq_os_oc_om_tipo
@@ -2129,11 +2161,13 @@ export const getOrdenesServicio = async (req: Request, res: Response) => {
   try {
     await ensureOrdenesServicioTable();
     const { numero_oc, numero_om } = req.query;
-    const conds: string[] = [];
+    // La vista operativa de Órdenes de Servicio solo muestra las PENDIENTES — las conciliadas
+    // o eliminadas (soft-delete) solo se ven en Conciliación Jhon Uribe, que sí muestra los 3 estados.
+    const conds: string[] = [`os.estado_id = '${OS_ESTADO_PENDIENTE}'`];
     const vals: any[] = [];
     if (numero_oc) { conds.push(`os.numero_oc ILIKE $${vals.length + 1}`); vals.push(`%${numero_oc}%`); }
     if (numero_om) { conds.push(`os.numero_om ILIKE $${vals.length + 1}`); vals.push(`%${numero_om}%`); }
-    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const where = `WHERE ${conds.join(' AND ')}`;
     const r = await pool.query(`${OS_SELECT} ${where} ORDER BY os.fecha_creacion DESC, os.id DESC LIMIT 2000`, vals);
     res.json(r.rows);
   } catch (e: any) { res.status(500).json({ error: e.message }); }
@@ -2174,7 +2208,7 @@ export const createOrdenServicio = async (req: Request, res: Response) => {
         remesa?.trim() || null,
         factura_inicial?.trim() || null,
         fecha_factura || null,
-        estado_id || 'EST-01',
+        estado_id || OS_ESTADO_PENDIENTE,
         usuario_creacion || null,
       ]
     );
@@ -2219,7 +2253,7 @@ export const updateOrdenServicio = async (req: Request, res: Response) => {
         remesa?.trim() || null,
         factura_inicial?.trim() || null,
         fecha_factura || null,
-        estado_id || 'EST-01',
+        estado_id || OS_ESTADO_PENDIENTE,
         usuario_actualizacion || null,
         id,
       ]
@@ -2229,12 +2263,52 @@ export const updateOrdenServicio = async (req: Request, res: Response) => {
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 };
 
+// Soft-delete: nunca se borra el registro, solo se marca ELIMINADO — se conserva el histórico
+// y sigue siendo visible en Conciliación Jhon Uribe (que muestra los 3 estados).
+// El motivo de eliminación es obligatorio — queda como parte del histórico del soft-delete.
 export const deleteOrdenServicio = async (req: Request, res: Response) => {
   await ensureOrdenesServicioTable();
+  const { motivo, usuario_actualizacion } = req.body || {};
+  if (!motivo || !String(motivo).trim()) {
+    return res.status(400).json({ error: 'El motivo de eliminación es obligatorio.' });
+  }
   try {
-    const r = await pool.query('DELETE FROM dogama_ordenes_servicio WHERE id=$1 RETURNING id', [req.params.id]);
-    if (r.rowCount === 0) return res.status(404).json({ error: 'No encontrado' });
+    const r = await pool.query(
+      `UPDATE dogama_ordenes_servicio SET
+         estado_id=$1,
+         motivo_eliminacion=$2,
+         fecha_actualizacion=(NOW() AT TIME ZONE 'America/Bogota'),
+         usuario_actualizacion=$3
+       WHERE id=$4 AND estado_id <> $1 RETURNING id`,
+      [OS_ESTADO_ELIMINADO, String(motivo).trim(), usuario_actualizacion || null, req.params.id]
+    );
+    if (r.rowCount === 0) return res.status(404).json({ error: 'No encontrado o ya estaba eliminado' });
     res.json({ success: true });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+};
+
+// Concilia (aprueba) una o varias OS. Acepta `ids` (array) y/o `codigo_sap` (aprueba TODAS las
+// filas PENDIENTES que compartan ese Pedido SAP, sin importar cuántas sean). La nota es opcional.
+export const conciliarOrdenesServicio = async (req: Request, res: Response) => {
+  await ensureOrdenesServicioTable();
+  const { ids, codigo_sap, nota, usuario_actualizacion } = req.body || {};
+  const idList = Array.isArray(ids) ? ids.map(Number).filter(n => !isNaN(n)) : [];
+  if (!idList.length && !codigo_sap) {
+    return res.status(400).json({ error: 'Se requiere ids o codigo_sap.' });
+  }
+  try {
+    const r = await pool.query(
+      `UPDATE dogama_ordenes_servicio SET
+         estado_id=$1,
+         nota_conciliacion=$2,
+         fecha_actualizacion=(NOW() AT TIME ZONE 'America/Bogota'),
+         usuario_actualizacion=$3
+       WHERE estado_id=$4
+         AND (($5::int[] IS NOT NULL AND id = ANY($5::int[])) OR ($6::text IS NOT NULL AND codigo_sap = $6))
+       RETURNING id`,
+      [OS_ESTADO_CONCILIADO, (nota && String(nota).trim()) || null, usuario_actualizacion || null, OS_ESTADO_PENDIENTE, idList.length ? idList : null, codigo_sap || null]
+    );
+    res.json({ success: true, conciliados: r.rowCount });
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 };
 
@@ -2422,7 +2496,7 @@ export const importOrdenesServicio = async (req: Request, res: Response) => {
               precio_unitario, valor_total, flete, tarifa,
               manifiesto, remesa, factura_inicial, fecha_factura,
               codigo_sap, empresa, referencia_antigua, estado_id, usuario_creacion)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'EST-01',$18)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'${OS_ESTADO_PENDIENTE}',$18)
            ON CONFLICT (numero_oc, COALESCE(numero_om,''), tipo_os) DO NOTHING`,
           [
             numero_oc, numero_om, confeccionista_id, tipo_os,
@@ -2528,6 +2602,227 @@ export const deleteOsRecogida = async (req: Request, res: Response) => {
     await recalcCantidadEntregada(client, Number(os_id));
     await client.query('COMMIT');
     res.json({ success: true });
+  } catch (e: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: e.message });
+  } finally { client.release(); }
+};
+
+// ── CONCILIACIÓN JHON URIBE ──────────────────────────────────────────────────
+// Reporte consolidado (ida + regreso) por OM, alimentado por lo registrado en el
+// tab "Órdenes de Servicio". La regreso mostrada es la recogida más reciente de esa OS.
+export const getConciliacionJhonUribe = async (req: Request, res: Response) => {
+  await ensureOrdenesServicioTable();
+  await ensureOsRecogidas();
+  const { from, to } = req.query as { from?: string; to?: string };
+
+  const conditions: string[] = [`os.tipo_os = 'ida'`];
+  const vals: any[] = [];
+  if (from) { vals.push(from); conditions.push(`os.fecha_creacion::date >= $${vals.length}`); }
+  if (to)   { vals.push(to);   conditions.push(`os.fecha_creacion::date <= $${vals.length}`); }
+
+  try {
+    const r = await pool.query(`
+      SELECT
+        os.id,
+        os.numero_om              AS orden_maestra,
+        os.cantidad                AS unidades_reales,
+        os.numero_oc               AS documento_compras,
+        os.factura_inicial         AS factura,
+        os.valor_total             AS valor_por_om,
+        os.tarifa,
+        os.flete                   AS flete_ida,
+        os.manifiesto              AS manifiesto_ida,
+        os.remesa                  AS remesa_ida,
+        os.codigo_sap              AS pedido_sap,
+        rec.flete                  AS flete_regreso,
+        rec.manifiesto             AS manifiesto_regreso,
+        rec.remesa                 AS remesa_regreso,
+        os.cantidad_entregada_cedi AS cantidad_ingresada_cedi,
+        os.fecha_factura           AS liquidacion_factura,
+        os.fecha_creacion,
+        c.descripcion_conf         AS confeccionista_nombre,
+        os.estado_id,
+        es.name                    AS estado,
+        os.motivo_eliminacion,
+        os.nota_conciliacion
+      FROM dogama_ordenes_servicio os
+      LEFT JOIN dogama_confeccionistas c ON c.id = os.confeccionista_id
+      LEFT JOIN estados es ON es.id = os.estado_id
+      LEFT JOIN LATERAL (
+        SELECT flete, manifiesto, remesa
+        FROM dogama_os_recogidas
+        WHERE os_id = os.id
+        ORDER BY id DESC LIMIT 1
+      ) rec ON true
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY os.fecha_creacion DESC, os.id DESC
+      LIMIT 5000
+    `, vals);
+    res.json(r.rows);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
+// ── IMPORTACIÓN UNIFICADA (XLSX) DE ÓRDENES DE SERVICIO ─────────────────────
+// Reemplaza los dos imports CSV separados (ida/recogida) por un único archivo Excel
+// con todas las columnas de la tabla de Órdenes de Servicio; el tipo se indica por fila.
+const OS_XLSX_HEADERS: Record<string, string> = {
+  oc: 'oc', 'orden de compra': 'oc',
+  om: 'om', 'orden maestra': 'om',
+  tipo: 'tipo',
+  confeccionista: 'confeccionista', empresa: 'confeccionista',
+  cantidad: 'cantidad', 'unidades reales': 'cantidad',
+  'cantidad entregada cedi': 'cantidad_entregada_cedi', 'cantidad ingresada al cedi': 'cantidad_entregada_cedi',
+  'valor total': 'valor_total', 'valor por om': 'valor_total',
+  'precio unitario': 'precio_unitario',
+  tarifa: 'tarifa',
+  flete: 'flete',
+  manifiesto: 'manifiesto',
+  remesa: 'remesa',
+  factura: 'factura', 'documento compras': 'oc', 'liquidacion factura': 'fecha_factura',
+  'fecha factura': 'fecha_factura',
+  'pedido sap': 'codigo_sap', 'sap': 'codigo_sap',
+  'referencia antigua': 'referencia_antigua',
+};
+
+function xlsxCellToDate(v: any): string | null {
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v.toISOString().split('T')[0];
+  if (typeof v === 'number') {
+    // Fecha serial de Excel → epoch (evita depender de XLSX.SSF, que es undefined en ESM)
+    const ms = Math.round((v - 25569) * 86400 * 1000);
+    const dd = new Date(ms);
+    return isNaN(dd.getTime()) ? null : dd.toISOString().split('T')[0];
+  }
+  const dd = new Date(String(v));
+  return isNaN(dd.getTime()) ? null : dd.toISOString().split('T')[0];
+}
+function xlsxCellToNum(v: any): number | null {
+  if (v === null || v === undefined || v === '') return null;
+  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.'));
+  return isNaN(n) ? null : n;
+}
+
+export const importOrdenesServicioXlsx = async (req: Request, res: Response) => {
+  await ensureOrdenesServicioTable();
+  await ensureOsRecogidas();
+  if (!req.file) return res.status(400).json({ error: 'Se requiere un archivo Excel (.xlsx)' });
+
+  let json: any[];
+  try {
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  } catch (e: any) {
+    return res.status(400).json({ error: `No se pudo leer el archivo: ${e.message}` });
+  }
+  if (!json.length) return res.status(400).json({ error: 'El archivo no contiene filas de datos.' });
+
+  const normRow = (row: Record<string, any>): Record<string, any> => {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(row)) {
+      const norm = OS_XLSX_HEADERS[k.toString().trim().toLowerCase()];
+      if (norm && out[norm] === undefined) out[norm] = v;
+    }
+    return out;
+  };
+
+  const confCache = new Map<string, number>();
+  const confRows = await pool.query('SELECT id, descripcion_conf FROM dogama_confeccionistas');
+  for (const r of confRows.rows) confCache.set(normConf(r.descripcion_conf), r.id);
+  const resolveConf = async (nombre: string): Promise<number | null> => {
+    if (!nombre || isComodin(nombre)) return null;
+    const key = normConf(nombre);
+    if (confCache.has(key)) return confCache.get(key)!;
+    const q = await pool.query(`SELECT id FROM dogama_confeccionistas WHERE UPPER(TRIM(descripcion_conf)) = $1 LIMIT 1`, [key]);
+    if (q.rows.length) { confCache.set(key, q.rows[0].id); return q.rows[0].id; }
+    const ins = await pool.query(
+      `INSERT INTO dogama_confeccionistas (descripcion_conf, direccion, usuariocreacion)
+       VALUES ($1, 'Sin dirección', 'importacion_xlsx')
+       ON CONFLICT (descripcion_conf, direccion) DO UPDATE SET descripcion_conf=EXCLUDED.descripcion_conf
+       RETURNING id`,
+      [nombre.trim()]
+    );
+    confCache.set(key, ins.rows[0].id);
+    return ins.rows[0].id;
+  };
+
+  let insertados = 0, omitidos = 0, errores = 0, confCreados = 0;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    for (const rawRow of json) {
+      const row = normRow(rawRow);
+      const numero_oc = String(row.oc || '').trim();
+      if (!numero_oc) { omitidos++; continue; }
+      const numero_om = row.om ? String(row.om).trim() : null;
+      const tipo_os = String(row.tipo || 'ida').trim().toLowerCase().startsWith('rec') ? 'recogida' : 'ida';
+
+      try {
+        if (tipo_os === 'recogida') {
+          const parent = await client.query(
+            `SELECT id FROM dogama_ordenes_servicio
+             WHERE UPPER(numero_oc) = UPPER($1) AND UPPER(COALESCE(numero_om,'')) = UPPER(COALESCE($2,'')) AND tipo_os='ida'
+             LIMIT 1`,
+            [numero_oc, numero_om]
+          );
+          if (!parent.rows.length) { errores++; continue; }
+          const os_id = parent.rows[0].id;
+          await client.query(
+            `INSERT INTO dogama_os_recogidas (os_id, cantidad, remesa, manifiesto, codigo_sap, flete, usuario_creacion)
+             VALUES ($1,$2,$3,$4,$5,$6,'importacion_xlsx')`,
+            [
+              os_id,
+              Math.round(xlsxCellToNum(row.cantidad) ?? 0),
+              row.remesa ? String(row.remesa).trim() : null,
+              row.manifiesto ? String(row.manifiesto).trim() : null,
+              row.codigo_sap ? String(row.codigo_sap).trim() : null,
+              xlsxCellToNum(row.flete),
+            ]
+          );
+          await recalcCantidadEntregada(client, os_id);
+          insertados++;
+        } else {
+          const nombreConf = row.confeccionista ? String(row.confeccionista).trim() : '';
+          const prevSize = confCache.size;
+          const confeccionista_id = nombreConf ? await resolveConf(nombreConf) : null;
+          if (confCache.size > prevSize) confCreados++;
+
+          const r = await client.query(
+            `INSERT INTO dogama_ordenes_servicio
+               (numero_oc, numero_om, confeccionista_id, tipo_os,
+                cantidad, cantidad_entregada_cedi,
+                precio_unitario, valor_total, flete, tarifa,
+                manifiesto, remesa, factura_inicial, fecha_factura,
+                codigo_sap, empresa, referencia_antigua, estado_id, usuario_creacion)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'${OS_ESTADO_PENDIENTE}',$18)
+             ON CONFLICT (numero_oc, COALESCE(numero_om,''), tipo_os) DO NOTHING`,
+            [
+              numero_oc, numero_om, confeccionista_id, tipo_os,
+              Math.round(xlsxCellToNum(row.cantidad) ?? 0),
+              Math.round(xlsxCellToNum(row.cantidad_entregada_cedi) ?? 0),
+              xlsxCellToNum(row.precio_unitario), xlsxCellToNum(row.valor_total),
+              xlsxCellToNum(row.flete), xlsxCellToNum(row.tarifa),
+              row.manifiesto ? String(row.manifiesto).trim() : null,
+              row.remesa ? String(row.remesa).trim() : null,
+              row.factura ? String(row.factura).trim() : null,
+              xlsxCellToDate(row.fecha_factura),
+              row.codigo_sap ? String(row.codigo_sap).trim() : null,
+              nombreConf || null,
+              row.referencia_antigua ? String(row.referencia_antigua).trim() : null,
+              'importacion_xlsx',
+            ]
+          );
+          if ((r.rowCount ?? 0) > 0) insertados++; else omitidos++;
+        }
+      } catch (e: any) { errores++; }
+    }
+
+    await client.query('COMMIT');
+    res.json({ insertados, omitidos, errores, confCreados, total: json.length });
   } catch (e: any) {
     await client.query('ROLLBACK');
     res.status(500).json({ error: e.message });
