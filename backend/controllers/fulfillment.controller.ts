@@ -748,7 +748,7 @@ export const importFulfillmentXlsx = async (req: Request, res: Response) => {
               [l.producto, usuario]
             );
             productoId = pRes.rows[0].id;
-            prodCache.set(prodKey, productoId);
+            prodCache.set(prodKey, productoId!);
           }
 
           let transportistaId: number | null = null;
@@ -762,7 +762,7 @@ export const importFulfillmentXlsx = async (req: Request, res: Response) => {
                 [l.transportista.trim().toUpperCase(), usuario]
               );
               transportistaId = tRes.rows[0].id;
-              confCache.set(tKey, transportistaId);
+              confCache.set(tKey, transportistaId!);
             }
           }
 
