@@ -2390,13 +2390,38 @@ export const api = {
     return res.json();
   },
 
-  dogamaImportOrdenesServicioXlsx: async (file: File) => {
+  dogamaValidateOrdenesServicioXlsx: async (file: File, modo?: 'ida' | 'regreso') => {
     const token = localStorage.getItem('token') ||
                   localStorage.getItem('m7_token') ||
                   localStorage.getItem('m7_auth_token') ||
                   localStorage.getItem('m7_client_token');
     const formData = new FormData();
     formData.append('file', file);
+    if (modo) formData.append('modo', modo);
+    const res = await fetch(`${API_URL}/dogama/ordenes-servicio/validate-xlsx`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
+    return res.json();
+  },
+
+  dogamaImportOrdenesServicioXlsx: async (
+    file: File,
+    modo?: 'ida' | 'regreso',
+    crearConfeccionistasFaltantes?: boolean,
+    selectedIndices?: number[]
+  ) => {
+    const token = localStorage.getItem('token') ||
+                  localStorage.getItem('m7_token') ||
+                  localStorage.getItem('m7_auth_token') ||
+                  localStorage.getItem('m7_client_token');
+    const formData = new FormData();
+    formData.append('file', file);
+    if (modo) formData.append('modo', modo);
+    if (crearConfeccionistasFaltantes) formData.append('crearConfeccionistasFaltantes', 'true');
+    if (selectedIndices) formData.append('selectedIndices', JSON.stringify(selectedIndices));
     const res = await fetch(`${API_URL}/dogama/ordenes-servicio/import-xlsx`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
@@ -2419,6 +2444,65 @@ export const api = {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+    }),
+
+  dogamaDescargarPlantillaConciliacion: async () => {
+    const token = getStoredToken();
+    const res = await fetch(`${API_URL}/dogama/conciliacion-jhon-uribe/plantilla`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error('No se pudo descargar la plantilla');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'plantilla_conciliacion_jhon_uribe.xlsx';
+    document.body.appendChild(a); a.click(); a.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  dogamaValidarConciliacionXlsx: async (file: File) => {
+    const token = getStoredToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_URL}/dogama/conciliacion-jhon-uribe/validar-xlsx`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData,
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
+    return res.json();
+  },
+
+  dogamaGetFacturasM7: () => fetchJson(`${API_URL}/dogama/conciliacion-jhon-uribe/facturas-m7`),
+
+  dogamaRegistrarFacturaM7: (data: { ids: number[]; numero_factura_m7: string; fecha_factura_m7: string; usuario_actualizacion?: string }) =>
+    fetchJson(`${API_URL}/dogama/conciliacion-jhon-uribe/factura-m7`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    }),
+
+  dogamaDescargarPlantillaFacturaM7: async () => {
+    const token = getStoredToken();
+    const res = await fetch(`${API_URL}/dogama/conciliacion-jhon-uribe/factura-m7/plantilla`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error('No se pudo descargar la plantilla');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'plantilla_factura_m7.xlsx';
+    document.body.appendChild(a); a.click(); a.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  dogamaImportarFacturaM7Xlsx: async (file: File, usuario_actualizacion?: string) => {
+    const token = getStoredToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    if (usuario_actualizacion) formData.append('usuario_actualizacion', usuario_actualizacion);
+    const res = await fetch(`${API_URL}/dogama/conciliacion-jhon-uribe/factura-m7/import`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData,
+    });
+    if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || res.statusText); }
+    return res.json();
+  },
+
+  dogamaMarcarPagoFacturaM7: (data: { numero_factura_m7: string; fecha_pago_factura: string | null; usuario_actualizacion?: string }) =>
+    fetchJson(`${API_URL}/dogama/conciliacion-jhon-uribe/factura-m7/pago`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
     }),
 
   dogamaGetNotifCorreos: (filters?: { estado?: string; fecha_desde?: string; fecha_hasta?: string; enc_id?: number }) => {

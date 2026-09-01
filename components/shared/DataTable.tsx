@@ -34,6 +34,15 @@ interface DataTableProps<T> {
   loading?: boolean;
   hideTopControls?: boolean;
   naked?: boolean;
+
+  // Selección de filas (checkbox por fila + "seleccionar todo" en el encabezado,
+  // que respeta lo que esté actualmente visible por la búsqueda/orden — no solo la página actual).
+  selectable?: boolean;
+  isRowSelectable?: (row: T) => boolean;
+  selectedIds?: Set<string | number>;
+  onSelectionChange?: (ids: Set<string | number>) => void;
+  // Acciones extra junto al botón "Exportar" (ej: "Aprobar seleccionados").
+  toolbarActions?: React.ReactNode;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -55,6 +64,11 @@ export function DataTable<T extends Record<string, any>>({
   loading = false,
   hideTopControls = false,
   naked = false,
+  selectable = false,
+  isRowSelectable,
+  selectedIds,
+  onSelectionChange,
+  toolbarActions,
 }: DataTableProps<T>) {
   // Búsqueda
   const [searchTerm, setSearchTerm] = useState('');
@@ -217,6 +231,34 @@ export function DataTable<T extends Record<string, any>>({
     XLSX.writeFile(workbook, excelFileName);
   };
 
+  // Filas elegibles para selección dentro de lo que el usuario tiene filtrado/ordenado ahora mismo
+  // (no solo la página visible) — así "seleccionar todo" respeta la búsqueda aplicada.
+  const selectableRows = useMemo(() => {
+    if (!selectable) return [];
+    return isRowSelectable ? sortedData.filter(isRowSelectable) : sortedData;
+  }, [selectable, isRowSelectable, sortedData]);
+
+  const toggleRowSelected = (id: string | number) => {
+    if (!onSelectionChange) return;
+    const next = new Set(selectedIds || []);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    onSelectionChange(next);
+  };
+
+  const allSelectableSelected = selectableRows.length > 0 && selectableRows.every(r => (selectedIds || new Set()).has(r.id));
+  const toggleSelectAll = () => {
+    if (!onSelectionChange) return;
+    if (allSelectableSelected) {
+      const next = new Set(selectedIds || []);
+      selectableRows.forEach(r => next.delete(r.id));
+      onSelectionChange(next);
+    } else {
+      const next = new Set(selectedIds || []);
+      selectableRows.forEach(r => next.add(r.id));
+      onSelectionChange(next);
+    }
+  };
+
   // Estado para filas expandidas
   const [expandedRows, setExpandedRows] = useState<Set<string | number>>(new Set());
 
@@ -262,6 +304,8 @@ export function DataTable<T extends Record<string, any>>({
             </span>
           </div>
 
+          {toolbarActions}
+
           <button
             onClick={handleExportExcel}
             className="flex items-center gap-2.5 px-6 py-3.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-500/10 hover:shadow-emerald-500/20 active:scale-95 transition-all"
@@ -278,6 +322,13 @@ export function DataTable<T extends Record<string, any>>({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 text-white select-none">
+              {selectable && (
+                <th className="px-4 py-4.5 border-b border-slate-800 w-10">
+                  <input type="checkbox" className="w-4 h-4 accent-indigo-500"
+                    checked={allSelectableSelected} disabled={!selectableRows.length}
+                    onChange={toggleSelectAll} title="Seleccionar todo lo filtrado" />
+                </th>
+              )}
               {columns.map((col) => {
                 const isSortable = col.sortable !== false;
                 const isCurrentSort = sortKey === col.key;
@@ -314,7 +365,7 @@ export function DataTable<T extends Record<string, any>>({
           <tbody className="divide-y divide-slate-100 relative">
             {loading && (
               <tr>
-                <td colSpan={columns.length} className="p-0 border-0 h-1">
+                <td colSpan={columns.length + (selectable ? 1 : 0)} className="p-0 border-0 h-1">
                   <div className="absolute top-0 left-0 w-full h-1 bg-slate-100 overflow-hidden">
                     <div className="h-full bg-indigo-500 animate-pulse w-1/3"></div>
                   </div>
@@ -331,6 +382,15 @@ export function DataTable<T extends Record<string, any>>({
                       className={`hover:bg-slate-50/70 transition-colors group ${renderExpandedRow ? 'cursor-pointer' : ''}`}
                       onClick={() => renderExpandedRow && toggleRow(rowId)}
                     >
+                      {selectable && (
+                        <td className="px-4 py-4 align-top" onClick={e => e.stopPropagation()}>
+                          {(!isRowSelectable || isRowSelectable(row)) && (
+                            <input type="checkbox" className="w-4 h-4 accent-indigo-600"
+                              checked={(selectedIds || new Set()).has(rowId)}
+                              onChange={() => toggleRowSelected(rowId)} />
+                          )}
+                        </td>
+                      )}
                       {columns.map((col) => {
                         const value = row[col.key as string];
                         return (
@@ -355,7 +415,7 @@ export function DataTable<T extends Record<string, any>>({
                     </tr>
                     {renderExpandedRow && isExpanded && (
                       <tr>
-                        <td colSpan={columns.length} className="bg-slate-50 border-b-2 border-slate-200 p-0">
+                        <td colSpan={columns.length + (selectable ? 1 : 0)} className="bg-slate-50 border-b-2 border-slate-200 p-0">
                           <div className="animate-in fade-in slide-in-from-top-2 duration-300">
                             {renderExpandedRow(row)}
                           </div>
@@ -368,7 +428,7 @@ export function DataTable<T extends Record<string, any>>({
             ) : (
               <tr>
                 <td
-                  colSpan={columns.length}
+                  colSpan={columns.length + (selectable ? 1 : 0)}
                   className="px-6 py-12 text-center text-slate-400 font-medium"
                 >
                   No se encontraron registros.

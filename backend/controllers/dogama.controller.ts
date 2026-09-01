@@ -2132,6 +2132,11 @@ const ensureOrdenesServicioTableImpl = async () => {
   // Nota obligatoria al eliminar (soft-delete) y nota opcional al conciliar (aprobar).
   await pool.query(`ALTER TABLE dogama_ordenes_servicio ADD COLUMN IF NOT EXISTS motivo_eliminacion TEXT`);
   await pool.query(`ALTER TABLE dogama_ordenes_servicio ADD COLUMN IF NOT EXISTS nota_conciliacion TEXT`);
+  // Facturación M7: la factura que M7 (no el cliente) emite sobre un lote ya conciliado, y su pago.
+  await pool.query(`ALTER TABLE dogama_ordenes_servicio ADD COLUMN IF NOT EXISTS numero_factura_m7 VARCHAR(100)`);
+  await pool.query(`ALTER TABLE dogama_ordenes_servicio ADD COLUMN IF NOT EXISTS fecha_factura_m7 DATE`);
+  await pool.query(`ALTER TABLE dogama_ordenes_servicio ADD COLUMN IF NOT EXISTS fecha_pago_factura DATE`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_os_factura_m7 ON dogama_ordenes_servicio (numero_factura_m7)`);
   // Migración: el estado por defecto pasó de EST-01 (ACTIVO, sin significado real aquí) a EST-03
   // (PENDIENTE de conciliar). Los registros que aún tengan el default viejo se consideran pendientes,
   // porque la conciliación nunca existió antes de esto — ninguno pudo haber sido aprobado ya.
@@ -2151,10 +2156,19 @@ const OS_SELECT = `
   SELECT
     os.*,
     dc.descripcion_conf AS confeccionista_nombre,
-    e.name              AS estado_nombre
+    e.name              AS estado_nombre,
+    rec.flete           AS flete_regreso,
+    rec.manifiesto      AS manifiesto_regreso,
+    rec.remesa          AS remesa_regreso
   FROM dogama_ordenes_servicio os
   LEFT JOIN dogama_confeccionistas dc ON dc.id = os.confeccionista_id
   LEFT JOIN estados                e  ON e.id  = os.estado_id
+  LEFT JOIN LATERAL (
+    SELECT flete, manifiesto, remesa
+    FROM dogama_os_recogidas
+    WHERE os_id = os.id
+    ORDER BY id DESC LIMIT 1
+  ) rec ON true
 `;
 
 export const getOrdenesServicio = async (req: Request, res: Response) => {
@@ -2645,7 +2659,10 @@ export const getConciliacionJhonUribe = async (req: Request, res: Response) => {
         os.estado_id,
         es.name                    AS estado,
         os.motivo_eliminacion,
-        os.nota_conciliacion
+        os.nota_conciliacion,
+        os.numero_factura_m7,
+        os.fecha_factura_m7,
+        os.fecha_pago_factura
       FROM dogama_ordenes_servicio os
       LEFT JOIN dogama_confeccionistas c ON c.id = os.confeccionista_id
       LEFT JOIN estados es ON es.id = os.estado_id
@@ -2669,22 +2686,41 @@ export const getConciliacionJhonUribe = async (req: Request, res: Response) => {
 // Reemplaza los dos imports CSV separados (ida/recogida) por un único archivo Excel
 // con todas las columnas de la tabla de Órdenes de Servicio; el tipo se indica por fila.
 const OS_XLSX_HEADERS: Record<string, string> = {
-  oc: 'oc', 'orden de compra': 'oc',
-  om: 'om', 'orden maestra': 'om',
-  tipo: 'tipo',
-  confeccionista: 'confeccionista', empresa: 'confeccionista',
-  cantidad: 'cantidad', 'unidades reales': 'cantidad',
-  'cantidad entregada cedi': 'cantidad_entregada_cedi', 'cantidad ingresada al cedi': 'cantidad_entregada_cedi',
-  'valor total': 'valor_total', 'valor por om': 'valor_total',
-  'precio unitario': 'precio_unitario',
+  // OC / Documento Compras
+  oc: 'oc', 'orden de compra': 'oc', 'orden de compras': 'oc', 'documento compras': 'oc', 'documento de compras': 'oc', 'doc compras': 'oc', 'doc. compras': 'oc', 'doc_compras': 'oc',
+  // OM / Orden Maestra
+  om: 'om', 'orden maestra': 'om', 'orden_maestra': 'om',
+  // Tipo
+  tipo: 'tipo', 'tipo os': 'tipo', 'tipo_os': 'tipo',
+  // Confeccionista
+  confeccionista: 'confeccionista', empresa: 'confeccionista', 'confeccionista/empresa': 'confeccionista',
+  // Cantidad Ida / Unidades
+  cantidad: 'cantidad', 'unidades reales': 'cantidad', 'cantidad ida': 'cantidad', 'unidades': 'cantidad',
+  // Cantidad Entregada CEDI / Recogida
+  'cantidad entregada cedi': 'cantidad_entregada_cedi', 'cantidad ingresada al cedi': 'cantidad_entregada_cedi', 'cantidad ingresada cedi': 'cantidad_entregada_cedi', 'cantidad cedi': 'cantidad_entregada_cedi', 'entregado cedi': 'cantidad_entregada_cedi', 'cantidad regreso': 'cantidad_entregada_cedi', 'cantidad recogida': 'cantidad_entregada_cedi',
+  // Valuación
+  'valor total': 'valor_total', 'valor por om': 'valor_total', 'valor_total': 'valor_total',
+  'precio unitario': 'precio_unitario', 'precio_unitario': 'precio_unitario',
   tarifa: 'tarifa',
-  flete: 'flete',
-  manifiesto: 'manifiesto',
-  remesa: 'remesa',
-  factura: 'factura', 'documento compras': 'oc', 'liquidacion factura': 'fecha_factura',
-  'fecha factura': 'fecha_factura',
-  'pedido sap': 'codigo_sap', 'sap': 'codigo_sap',
-  'referencia antigua': 'referencia_antigua',
+  // Flete Ida
+  flete: 'flete', 'flete ida': 'flete', 'flete ($)': 'flete', 'valor flete': 'flete', 'flete de ida': 'flete', 'flete_ida': 'flete',
+  // Manifiesto Ida
+  manifiesto: 'manifiesto', 'manifiesto ida': 'manifiesto', 'nro manifiesto': 'manifiesto', 'n° manifiesto': 'manifiesto', 'numero manifiesto': 'manifiesto', 'manifiesto de ida': 'manifiesto', 'manifiesto_ida': 'manifiesto',
+  // Remesa Ida
+  remesa: 'remesa', 'remesa ida': 'remesa', 'nro remesa': 'remesa', 'n° remesa': 'remesa', 'numero remesa': 'remesa', 'remesa de ida': 'remesa', 'remesa_ida': 'remesa',
+  // Factura y Fecha
+  factura: 'factura', 'factura inicial': 'factura', 'nro factura': 'factura', 'n° factura': 'factura', 'factura_inicial': 'factura',
+  'fecha factura': 'fecha_factura', 'liquidacion factura': 'fecha_factura', 'fecha de factura': 'fecha_factura', 'fecha_factura': 'fecha_factura',
+  // SAP
+  'pedido sap': 'codigo_sap', sap: 'codigo_sap', 'codigo sap': 'codigo_sap', 'codigo_sap': 'codigo_sap', 'cod. sap': 'codigo_sap', 'cod sap': 'codigo_sap',
+  // Referencia
+  'referencia antigua': 'referencia_antigua', 'ref antigua': 'referencia_antigua', 'ref. antigua': 'referencia_antigua', 'referencia_antigua': 'referencia_antigua',
+  // Flete Regreso
+  'flete regreso': 'flete_regreso', 'flete de regreso': 'flete_regreso', 'flete rec': 'flete_regreso', 'flete recogida': 'flete_regreso', 'flete_regreso': 'flete_regreso',
+  // Manifiesto Regreso
+  'manifiesto regreso': 'manifiesto_regreso', 'manifiesto de regreso': 'manifiesto_regreso', 'manifiesto rec': 'manifiesto_regreso', 'manifiesto recogida': 'manifiesto_regreso', 'manifiesto_regreso': 'manifiesto_regreso',
+  // Remesa Regreso
+  'remesa regreso': 'remesa_regreso', 'remesa de regreso': 'remesa_regreso', 'remesa rec': 'remesa_regreso', 'remesa recogida': 'remesa_regreso', 'remesa_regreso': 'remesa_regreso',
 };
 
 function xlsxCellToDate(v: any): string | null {
@@ -2696,6 +2732,14 @@ function xlsxCellToDate(v: any): string | null {
     const dd = new Date(ms);
     return isNaN(dd.getTime()) ? null : dd.toISOString().split('T')[0];
   }
+  // Fecha como texto en formato colombiano DD/MM/AAAA — new Date(string) la interpretaría
+  // como MM/DD/AAAA (US) y desplazaría el mes, así que se parsea explícito primero.
+  const dmy = String(v).trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    const dd2 = new Date(Number(y), Number(m) - 1, Number(d));
+    return isNaN(dd2.getTime()) ? null : dd2.toISOString().split('T')[0];
+  }
   const dd = new Date(String(v));
   return isNaN(dd.getTime()) ? null : dd.toISOString().split('T')[0];
 }
@@ -2705,10 +2749,188 @@ function xlsxCellToNum(v: any): number | null {
   return isNaN(n) ? null : n;
 }
 
+export const validateOrdenesServicioXlsx = async (req: Request, res: Response) => {
+  await ensureOrdenesServicioTable();
+  await ensureOsRecogidas();
+  if (!req.file) return res.status(400).json({ error: 'Se requiere un archivo Excel (.xlsx)' });
+
+  const modoReq = String(req.body?.modo || '').trim().toLowerCase(); // 'ida' o 'regreso'
+
+  let json: any[];
+  try {
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  } catch (e: any) {
+    return res.status(400).json({ error: `No se pudo leer el archivo: ${e.message}` });
+  }
+  if (!json.length) return res.status(400).json({ error: 'El archivo no contiene filas de datos.' });
+
+  const normRow = (row: Record<string, any>): Record<string, any> => {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(row)) {
+      const norm = OS_XLSX_HEADERS[k.toString().trim().toLowerCase()];
+      if (norm && out[norm] === undefined) out[norm] = v;
+    }
+    return out;
+  };
+
+  const confMap = new Map<string, { id: number; nombre: string }>();
+  const confRows = await pool.query('SELECT id, descripcion_conf FROM dogama_confeccionistas');
+  for (const r of confRows.rows) {
+    confMap.set(normConf(r.descripcion_conf), { id: r.id, nombre: r.descripcion_conf });
+  }
+
+  const validatedRows: any[] = [];
+  const missingConfeccionistasSet = new Set<string>();
+
+  let validCount = 0, warningCount = 0, errorCount = 0;
+
+  for (let i = 0; i < json.length; i++) {
+    const rawRow = json[i];
+    const row = normRow(rawRow);
+    const numero_oc = String(row.oc || '').trim();
+    const numero_om = row.om ? String(row.om).trim() : null;
+    const codigo_sap = row.codigo_sap ? String(row.codigo_sap).trim() : '';
+    const nombreConf = row.confeccionista ? String(row.confeccionista).trim() : '';
+
+    if (!numero_oc && !numero_om) {
+      validatedRows.push({
+        index: i,
+        oc: '', om: '', codigo_sap: '', confeccionista_txt: nombreConf,
+        confeccionista_id: null, confeccionista_exists: false,
+        status: 'error',
+        issues: ['Fila vacía sin OC ni OM'],
+        selected: false,
+      });
+      errorCount++;
+      continue;
+    }
+
+    let esRegreso = modoReq === 'regreso';
+    if (!esRegreso && row.tipo) {
+      const t = String(row.tipo).trim().toLowerCase();
+      if (t.startsWith('rec') || t.startsWith('reg')) esRegreso = true;
+    }
+
+    const issues: string[] = [];
+    let rowStatus: string = 'ok';
+    let confeccionista_id: number | null = null;
+    let confeccionista_exists = true;
+
+    // Buscar confeccionista en Maestra
+    if (nombreConf && !isComodin(nombreConf)) {
+      const key = normConf(nombreConf);
+      if (confMap.has(key)) {
+        confeccionista_id = confMap.get(key)!.id;
+      } else {
+        confeccionista_exists = false;
+        missingConfeccionistasSet.add(nombreConf);
+        issues.push(`Confeccionista "${nombreConf}" NO existe en Maestra`);
+        if (rowStatus !== 'error') rowStatus = 'warning';
+      }
+    }
+
+    let parent_os_id: number | null = null;
+    let parent_exists = true;
+
+    if (esRegreso) {
+      if (!numero_oc) {
+        rowStatus = 'error';
+        issues.push('Falta Documento de Compras (OC)');
+      }
+      if (!numero_om) {
+        rowStatus = 'error';
+        issues.push('Falta Orden Maestra (OM)');
+      }
+      if (!codigo_sap) {
+        rowStatus = 'error';
+        issues.push('Falta Código SAP');
+      }
+
+      if (numero_oc && numero_om && codigo_sap) {
+        const parent = await pool.query(
+          `SELECT os.id, os.codigo_sap
+           FROM dogama_ordenes_servicio os
+           LEFT JOIN LATERAL (
+             SELECT codigo_sap FROM dogama_os_recogidas WHERE os_id = os.id AND codigo_sap IS NOT NULL ORDER BY id DESC LIMIT 1
+           ) rec ON true
+           WHERE UPPER(TRIM(os.numero_oc)) = UPPER(TRIM($1))
+             AND UPPER(TRIM(COALESCE(os.numero_om,''))) = UPPER(TRIM($2))
+             AND (
+               os.codigo_sap IS NULL OR TRIM(os.codigo_sap) = ''
+               OR UPPER(TRIM(os.codigo_sap)) = UPPER(TRIM($3))
+               OR UPPER(TRIM(COALESCE(rec.codigo_sap,''))) = UPPER(TRIM($3))
+             )
+             AND os.tipo_os = 'ida'
+           ORDER BY os.id DESC LIMIT 1`,
+          [numero_oc, numero_om, codigo_sap]
+        );
+
+        if (parent && parent.rows.length) {
+          parent_os_id = parent.rows[0].id;
+        } else {
+          parent_exists = false;
+          rowStatus = 'error';
+          issues.push(`No existe OS de Ida coincidente con los 3 campos exactos (OC: ${numero_oc}, OM: ${numero_om}, SAP: ${codigo_sap})`);
+        }
+      } else {
+        parent_exists = false;
+        rowStatus = 'error';
+      }
+    } else {
+      if (!numero_oc) {
+        rowStatus = 'error';
+        issues.push('Falta Documento de Compras (OC)');
+      }
+    }
+
+    if (rowStatus === 'ok') validCount++;
+    else if (rowStatus === 'warning') warningCount++;
+    else errorCount++;
+
+    validatedRows.push({
+      index: i,
+      oc: numero_oc,
+      om: numero_om,
+      codigo_sap,
+      confeccionista_txt: nombreConf,
+      confeccionista_id,
+      confeccionista_exists,
+      parent_os_id,
+      parent_exists,
+      es_regreso: esRegreso,
+      status: rowStatus,
+      issues,
+      selected: rowStatus !== 'error',
+    });
+  }
+
+  res.json({
+    total: json.length,
+    validCount,
+    warningCount,
+    errorCount,
+    missingConfeccionistas: Array.from(missingConfeccionistasSet),
+    rows: validatedRows,
+  });
+};
+
 export const importOrdenesServicioXlsx = async (req: Request, res: Response) => {
   await ensureOrdenesServicioTable();
   await ensureOsRecogidas();
   if (!req.file) return res.status(400).json({ error: 'Se requiere un archivo Excel (.xlsx)' });
+
+  const modoReq = String(req.body?.modo || '').trim().toLowerCase(); // 'ida' o 'regreso'
+  const autoCreateConf = String(req.body?.crearConfeccionistasFaltantes || '').toLowerCase() === 'true';
+
+  let selectedIndices: Set<number> | null = null;
+  if (req.body?.selectedIndices) {
+    try {
+      const parsed = typeof req.body.selectedIndices === 'string' ? JSON.parse(req.body.selectedIndices) : req.body.selectedIndices;
+      if (Array.isArray(parsed)) selectedIndices = new Set(parsed.map(Number));
+    } catch {}
+  }
 
   let json: any[];
   try {
@@ -2738,6 +2960,9 @@ export const importOrdenesServicioXlsx = async (req: Request, res: Response) => 
     if (confCache.has(key)) return confCache.get(key)!;
     const q = await pool.query(`SELECT id FROM dogama_confeccionistas WHERE UPPER(TRIM(descripcion_conf)) = $1 LIMIT 1`, [key]);
     if (q.rows.length) { confCache.set(key, q.rows[0].id); return q.rows[0].id; }
+
+    if (!autoCreateConf) return null;
+
     const ins = await pool.query(
       `INSERT INTO dogama_confeccionistas (descripcion_conf, direccion, usuariocreacion)
        VALUES ($1, 'Sin dirección', 'importacion_xlsx')
@@ -2754,38 +2979,79 @@ export const importOrdenesServicioXlsx = async (req: Request, res: Response) => 
   try {
     await client.query('BEGIN');
 
-    for (const rawRow of json) {
+    for (let i = 0; i < json.length; i++) {
+      if (selectedIndices && !selectedIndices.has(i)) { omitidos++; continue; }
+
+      const rawRow = json[i];
       const row = normRow(rawRow);
       const numero_oc = String(row.oc || '').trim();
-      if (!numero_oc) { omitidos++; continue; }
       const numero_om = row.om ? String(row.om).trim() : null;
-      const tipo_os = String(row.tipo || 'ida').trim().toLowerCase().startsWith('rec') ? 'recogida' : 'ida';
+
+      if (!numero_oc && !numero_om) { omitidos++; continue; }
+
+      // Determinar si esta fila es de Regreso (Recogida) o Ida
+      let esRegreso = modoReq === 'regreso';
+      if (!esRegreso && row.tipo) {
+        const t = String(row.tipo).trim().toLowerCase();
+        if (t.startsWith('rec') || t.startsWith('reg')) esRegreso = true;
+      }
 
       try {
-        if (tipo_os === 'recogida') {
+        if (esRegreso) {
+          const codSap = row.codigo_sap ? String(row.codigo_sap).trim() : '';
+
+          if (!numero_oc || !numero_om || !codSap) {
+            errores++;
+            continue;
+          }
+
           const parent = await client.query(
-            `SELECT id FROM dogama_ordenes_servicio
-             WHERE UPPER(numero_oc) = UPPER($1) AND UPPER(COALESCE(numero_om,'')) = UPPER(COALESCE($2,'')) AND tipo_os='ida'
-             LIMIT 1`,
-            [numero_oc, numero_om]
+            `SELECT os.id, os.codigo_sap
+             FROM dogama_ordenes_servicio os
+             LEFT JOIN LATERAL (
+               SELECT codigo_sap FROM dogama_os_recogidas WHERE os_id = os.id AND codigo_sap IS NOT NULL ORDER BY id DESC LIMIT 1
+             ) rec ON true
+             WHERE UPPER(TRIM(os.numero_oc)) = UPPER(TRIM($1))
+               AND UPPER(TRIM(COALESCE(os.numero_om,''))) = UPPER(TRIM($2))
+               AND (
+                 os.codigo_sap IS NULL OR TRIM(os.codigo_sap) = ''
+                 OR UPPER(TRIM(os.codigo_sap)) = UPPER(TRIM($3))
+                 OR UPPER(TRIM(COALESCE(rec.codigo_sap,''))) = UPPER(TRIM($3))
+               )
+               AND os.tipo_os = 'ida'
+             ORDER BY os.id DESC LIMIT 1`,
+            [numero_oc, numero_om, codSap]
           );
-          if (!parent.rows.length) { errores++; continue; }
+
+          if (!parent || !parent.rows.length) { errores++; continue; }
           const os_id = parent.rows[0].id;
+
+          if (codSap && !parent.rows[0].codigo_sap) {
+            await client.query(`UPDATE dogama_ordenes_servicio SET codigo_sap = $1 WHERE id = $2`, [codSap, os_id]);
+          }
+
+          const fleteReg = xlsxCellToNum(row.flete_regreso ?? row.flete);
+          const manifiestoReg = (row.manifiesto_regreso || row.manifiesto) ? String(row.manifiesto_regreso || row.manifiesto).trim() : null;
+          const remesaReg = (row.remesa_regreso || row.remesa) ? String(row.remesa_regreso || row.remesa).trim() : null;
+          const cantReg = Math.round(xlsxCellToNum(row.cantidad_entregada_cedi ?? row.cantidad) ?? 0);
+
           await client.query(
             `INSERT INTO dogama_os_recogidas (os_id, cantidad, remesa, manifiesto, codigo_sap, flete, usuario_creacion)
              VALUES ($1,$2,$3,$4,$5,$6,'importacion_xlsx')`,
             [
               os_id,
-              Math.round(xlsxCellToNum(row.cantidad) ?? 0),
-              row.remesa ? String(row.remesa).trim() : null,
-              row.manifiesto ? String(row.manifiesto).trim() : null,
-              row.codigo_sap ? String(row.codigo_sap).trim() : null,
-              xlsxCellToNum(row.flete),
+              cantReg,
+              remesaReg,
+              manifiestoReg,
+              codSap,
+              fleteReg,
             ]
           );
           await recalcCantidadEntregada(client, os_id);
           insertados++;
         } else {
+          // Carga Completa (Ida)
+          if (!numero_oc) { omitidos++; continue; }
           const nombreConf = row.confeccionista ? String(row.confeccionista).trim() : '';
           const prevSize = confCache.size;
           const confeccionista_id = nombreConf ? await resolveConf(nombreConf) : null;
@@ -2798,10 +3064,27 @@ export const importOrdenesServicioXlsx = async (req: Request, res: Response) => 
                 precio_unitario, valor_total, flete, tarifa,
                 manifiesto, remesa, factura_inicial, fecha_factura,
                 codigo_sap, empresa, referencia_antigua, estado_id, usuario_creacion)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'${OS_ESTADO_PENDIENTE}',$18)
-             ON CONFLICT (numero_oc, COALESCE(numero_om,''), tipo_os) DO NOTHING`,
+             VALUES ($1,$2,$3,'ida',$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'${OS_ESTADO_PENDIENTE}',$17)
+             ON CONFLICT (numero_oc, COALESCE(numero_om,''), tipo_os) DO UPDATE SET
+               confeccionista_id = COALESCE(EXCLUDED.confeccionista_id, dogama_ordenes_servicio.confeccionista_id),
+               cantidad = CASE WHEN EXCLUDED.cantidad > 0 THEN EXCLUDED.cantidad ELSE dogama_ordenes_servicio.cantidad END,
+               cantidad_entregada_cedi = CASE WHEN EXCLUDED.cantidad_entregada_cedi > 0 THEN EXCLUDED.cantidad_entregada_cedi ELSE dogama_ordenes_servicio.cantidad_entregada_cedi END,
+               precio_unitario = COALESCE(EXCLUDED.precio_unitario, dogama_ordenes_servicio.precio_unitario),
+               valor_total = COALESCE(EXCLUDED.valor_total, dogama_ordenes_servicio.valor_total),
+               flete = COALESCE(EXCLUDED.flete, dogama_ordenes_servicio.flete),
+               tarifa = COALESCE(EXCLUDED.tarifa, dogama_ordenes_servicio.tarifa),
+               manifiesto = COALESCE(EXCLUDED.manifiesto, dogama_ordenes_servicio.manifiesto),
+               remesa = COALESCE(EXCLUDED.remesa, dogama_ordenes_servicio.remesa),
+               factura_inicial = COALESCE(EXCLUDED.factura_inicial, dogama_ordenes_servicio.factura_inicial),
+               fecha_factura = COALESCE(EXCLUDED.fecha_factura, dogama_ordenes_servicio.fecha_factura),
+               codigo_sap = COALESCE(EXCLUDED.codigo_sap, dogama_ordenes_servicio.codigo_sap),
+               empresa = COALESCE(EXCLUDED.empresa, dogama_ordenes_servicio.empresa),
+               referencia_antigua = COALESCE(EXCLUDED.referencia_antigua, dogama_ordenes_servicio.referencia_antigua),
+               fecha_actualizacion = (NOW() AT TIME ZONE 'America/Bogota'),
+               usuario_actualizacion = EXCLUDED.usuario_creacion
+             RETURNING id`,
             [
-              numero_oc, numero_om, confeccionista_id, tipo_os,
+              numero_oc, numero_om, confeccionista_id,
               Math.round(xlsxCellToNum(row.cantidad) ?? 0),
               Math.round(xlsxCellToNum(row.cantidad_entregada_cedi) ?? 0),
               xlsxCellToNum(row.precio_unitario), xlsxCellToNum(row.valor_total),
@@ -2827,4 +3110,349 @@ export const importOrdenesServicioXlsx = async (req: Request, res: Response) => 
     await client.query('ROLLBACK');
     res.status(500).json({ error: e.message });
   } finally { client.release(); }
+};
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── VALIDACIÓN MASIVA DE CONCILIACIÓN POR EXCEL ─────────────────────────────
+// Formato real de Jhon Uribe: Entrega | Pedido | Fecha Entrega | Pto. Plan | Transporte |
+// Placa | Factura | Fecha Factura | Solicitante | Solicitante | Origen | Destino | Ingreso tercero.
+// Cada Pedido (código SAP) trae 2 filas — ida (con Fecha Entrega/Pto. Plan) y regreso (sin ellas) —
+// donde Entrega=remesa y Transporte=manifiesto cambian por fila, Factura/Fecha Factura se repiten,
+// e Ingreso tercero=flete difiere entre ida y regreso. Solo lo que coincide EXACTO en los 8 campos
+// comparables (remesa/manifiesto/flete de ida y de regreso + factura + fecha factura) queda
+// habilitado para pasar masivamente a estado CONCILIADO (vía el endpoint /conciliar ya existente).
+function normTxt(v: any): string { return v === null || v === undefined ? '' : String(v).trim().toUpperCase(); }
+function normMoney(v: any): number | null {
+  const n = xlsxCellToNum(v);
+  return n === null ? null : Math.round(n * 100) / 100;
+}
+function toISODateSafe(v: any): string | null {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v.getTime()) ? null : v.toISOString().split('T')[0];
+  return String(v).slice(0, 10);
+}
+
+const CONCILIACION_TEMPLATE_COLS = [
+  'Entrega', 'Pedido', 'Fecha Entrega', 'Pto. Plan', 'Transporte', 'Placa',
+  'Factura', 'Fecha Factura', 'Solicitante', 'Solicitante', 'Origen', 'Destino', 'Ingreso tercero',
+];
+
+export const getPlantillaConciliacion = async (_req: Request, res: Response) => {
+  const ejemplo = [
+    ['86500739', '15874975', '23/06/2026', 'TD11', '1529860', 'LKP046', '7624983', '02/07/2026', '100027', 'COMODIN S.A.S.', 'MEDELLIN', 'MEDELLIN', 550000],
+    ['86501234', '15874975', '', '', '1530041', 'WMZ215', '7624983', '02/07/2026', '', '', '', '', 550001],
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([CONCILIACION_TEMPLATE_COLS, ...ejemplo]);
+  ws['!cols'] = CONCILIACION_TEMPLATE_COLS.map(() => ({ wch: 18 }));
+  XLSX.utils.book_append_sheet(wb, ws, 'Conciliacion');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="plantilla_conciliacion_jhon_uribe.xlsx"');
+  res.send(buf);
+};
+
+function colIdx(header: string[], name: string, occurrence = 0): number {
+  const target = name.trim().toLowerCase();
+  let seen = 0;
+  for (let i = 0; i < header.length; i++) {
+    if (header[i].trim().toLowerCase() === target) {
+      if (seen === occurrence) return i;
+      seen++;
+    }
+  }
+  return -1;
+}
+
+export const validarConciliacionXlsx = async (req: Request, res: Response) => {
+  await ensureOrdenesServicioTable();
+  await ensureOsRecogidas();
+  if (!req.file) return res.status(400).json({ error: 'Se requiere un archivo Excel (.xlsx)' });
+
+  let rows: any[][];
+  try {
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as any[][];
+  } catch (e: any) {
+    return res.status(400).json({ error: `No se pudo leer el archivo: ${e.message}` });
+  }
+  if (rows.length < 2) return res.status(400).json({ error: 'El archivo no contiene filas de datos.' });
+
+  const header = rows[0].map(c => String(c ?? ''));
+  const cEntrega = colIdx(header, 'Entrega');
+  const cPedido = colIdx(header, 'Pedido');
+  const cFechaEntrega = colIdx(header, 'Fecha Entrega');
+  const cPtoPlan = colIdx(header, 'Pto. Plan');
+  const cTransporte = colIdx(header, 'Transporte');
+  const cFactura = colIdx(header, 'Factura');
+  const cFechaFactura = colIdx(header, 'Fecha Factura');
+  const cIngresoTercero = colIdx(header, 'Ingreso tercero');
+  if (cPedido < 0 || cEntrega < 0 || cTransporte < 0) {
+    return res.status(400).json({ error: 'El archivo no tiene el formato esperado (columnas Entrega, Pedido, Transporte). Descarga la plantilla.' });
+  }
+
+  // Agrupa las filas del archivo por Pedido (código SAP) — ida vs regreso se distingue por si
+  // trae Fecha Entrega / Pto. Plan diligenciados (eso solo se registra en la fila de ida).
+  const grupos = new Map<string, { ida?: any; regreso?: any }>();
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !row.length) continue;
+    const pedido = String(row[cPedido] ?? '').trim();
+    if (!pedido) continue;
+    const esIda = !!(String(row[cFechaEntrega] ?? '').trim() || String(row[cPtoPlan] ?? '').trim());
+    const fila = {
+      remesa: String(row[cEntrega] ?? '').trim() || null,
+      manifiesto: String(row[cTransporte] ?? '').trim() || null,
+      flete: cIngresoTercero >= 0 ? normMoney(row[cIngresoTercero]) : null,
+      factura: cFactura >= 0 ? (String(row[cFactura] ?? '').trim() || null) : null,
+      fecha_factura: cFechaFactura >= 0 ? xlsxCellToDate(row[cFechaFactura]) : null,
+    };
+    const g = grupos.get(pedido) || {};
+    if (esIda && !g.ida) g.ida = fila; else if (!g.regreso) g.regreso = fila;
+    grupos.set(pedido, g);
+  }
+  if (!grupos.size) return res.status(400).json({ error: 'No se reconoció ninguna fila con Pedido (código SAP) válido.' });
+
+  // Sistema: OS pendientes con código SAP, agrupadas por código SAP (normalmente 1 OM por Pedido;
+  // si hay varias, no se puede comparar campo a campo con certeza y se marcan como ambiguas).
+  const sistemaRows = await pool.query(`
+    SELECT
+      os.id, os.codigo_sap, os.remesa, os.manifiesto, os.flete,
+      os.factura_inicial AS factura, os.fecha_factura,
+      rec.remesa AS remesa_regreso, rec.manifiesto AS manifiesto_regreso, rec.flete AS flete_regreso
+    FROM dogama_ordenes_servicio os
+    LEFT JOIN LATERAL (
+      SELECT flete, manifiesto, remesa FROM dogama_os_recogidas WHERE os_id = os.id ORDER BY id DESC LIMIT 1
+    ) rec ON true
+    WHERE os.tipo_os = 'ida' AND os.estado_id = $1 AND os.codigo_sap IS NOT NULL AND TRIM(os.codigo_sap) <> ''
+  `, [OS_ESTADO_PENDIENTE]);
+
+  const sistemaMap = new Map<string, any[]>();
+  for (const r of sistemaRows.rows) {
+    const key = normTxt(r.codigo_sap);
+    const arr = sistemaMap.get(key) || [];
+    arr.push(r);
+    sistemaMap.set(key, arr);
+  }
+  const usados = new Set<string>();
+
+  const CAMPO_GETTERS: Record<string, (r: any) => any> = {
+    remesa_ida: r => r.remesa, manifiesto_ida: r => r.manifiesto,
+    flete_ida: r => r.flete !== null ? Math.round(Number(r.flete) * 100) / 100 : null,
+    remesa_regreso: r => r.remesa_regreso, manifiesto_regreso: r => r.manifiesto_regreso,
+    flete_regreso: r => r.flete_regreso !== null ? Math.round(Number(r.flete_regreso) * 100) / 100 : null,
+    factura: r => r.factura, fecha_factura: r => toISODateSafe(r.fecha_factura),
+  };
+  const CAMPO_TIPO: Record<string, 'texto' | 'moneda' | 'fecha'> = {
+    remesa_ida: 'texto', manifiesto_ida: 'texto', flete_ida: 'moneda',
+    remesa_regreso: 'texto', manifiesto_regreso: 'texto', flete_regreso: 'moneda',
+    factura: 'texto', fecha_factura: 'fecha',
+  };
+  const normComparable = (v: any, tipo: 'texto' | 'moneda' | 'fecha'): any =>
+    (v === null || v === undefined || v === '') ? null : (tipo === 'texto' ? normTxt(v) : v);
+
+  const coincidencias: any[] = [];
+  const diferencias: any[] = [];
+  const soloEnArchivo: any[] = [];
+
+  // Comparación por campo y por VALOR (no por registro completo): cada campo se evalúa contra el
+  // conjunto de valores que traen TODAS las OM pendientes de ese Pedido — normalmente 1 sola, pero
+  // puede haber varias — así se puede indicar coincide / solo en archivo / solo en sistema campo por
+  // campo incluso cuando el Pedido agrupa más de una OM, en vez de descartar la comparación entera.
+  for (const [pedido, grupo] of grupos) {
+    const key = normTxt(pedido);
+    const candidatos = sistemaMap.get(key);
+    if (!candidatos || !candidatos.length) { soloEnArchivo.push({ pedido }); continue; }
+    usados.add(key);
+
+    const archivo: Record<string, any> = {
+      remesa_ida: grupo.ida?.remesa ?? null,
+      manifiesto_ida: grupo.ida?.manifiesto ?? null,
+      flete_ida: grupo.ida?.flete ?? null,
+      remesa_regreso: grupo.regreso?.remesa ?? null,
+      manifiesto_regreso: grupo.regreso?.manifiesto ?? null,
+      flete_regreso: grupo.regreso?.flete ?? null,
+      factura: (grupo.ida?.factura ?? grupo.regreso?.factura) ?? null,
+      fecha_factura: (grupo.ida?.fecha_factura ?? grupo.regreso?.fecha_factura) ?? null,
+    };
+
+    const campos = Object.keys(CAMPO_GETTERS).map(k => {
+      const tipo = CAMPO_TIPO[k];
+      const archivoVal = archivo[k];
+      const archivoNorm = normComparable(archivoVal, tipo);
+      const sistemaValoresRaw: any[] = [];
+      const sistemaNorm = new Set<any>();
+      for (const c of candidatos) {
+        const v = CAMPO_GETTERS[k](c);
+        if (v === null || v === undefined || v === '') continue;
+        const n = normComparable(v, tipo);
+        if (!sistemaNorm.has(n)) { sistemaNorm.add(n); sistemaValoresRaw.push(v); }
+      }
+      let estado: 'coincide' | 'solo_archivo' | 'solo_sistema' | 'diferente' | 'sin_datos';
+      if (archivoNorm === null && sistemaNorm.size === 0) estado = 'sin_datos';
+      else if (archivoNorm !== null && sistemaNorm.has(archivoNorm)) estado = 'coincide';
+      else if (archivoNorm !== null && sistemaNorm.size === 0) estado = 'solo_archivo';
+      else if (archivoNorm === null && sistemaNorm.size > 0) estado = 'solo_sistema';
+      else estado = 'diferente';
+      return { key: k, archivo: archivoVal, sistema: sistemaValoresRaw, estado };
+    });
+
+    const todosCoinciden = campos.every(c => c.estado === 'coincide' || c.estado === 'sin_datos');
+    // Con varias OM bajo un mismo Pedido, solo es seguro aprobarlas TODAS de una vez cuando además
+    // de coincidir con el archivo, las OM candidatas no se contradicen entre sí en ningún campo
+    // (cada campo trae como máximo 1 valor distinto entre todas ellas) — si no, no se puede saber
+    // cuál de las OM es la que realmente corresponde a la fila del archivo.
+    const sistemaConsistente = campos.every(c => c.sistema.length <= 1);
+    const item = { id: candidatos.length === 1 ? candidatos[0].id : null, ids: candidatos.map(c => c.id), pedido, campos, multiplesOm: candidatos.length > 1 };
+    if (todosCoinciden && sistemaConsistente) coincidencias.push(item);
+    else diferencias.push(item);
+  }
+
+  const soloEnSistema = [...sistemaMap.entries()]
+    .filter(([key]) => !usados.has(key))
+    .flatMap(([, arr]) => arr.map(r => ({ id: r.id, pedido: r.codigo_sap })));
+
+  res.json({ total: grupos.size, coincidencias, diferencias, soloEnArchivo, soloEnSistema });
+};
+
+// ── FACTURACIÓN M7 ───────────────────────────────────────────────────────────
+// La "Factura M7" es la factura que Milla 7 emite al cliente sobre un lote YA CONCILIADO
+// (distinta de `factura_inicial`, que es la factura del confeccionista). Número y fecha se
+// registran siempre juntos — manual (por ids) o masivo por Excel — nunca uno sin el otro.
+export const registrarFacturaM7 = async (req: Request, res: Response) => {
+  await ensureOrdenesServicioTable();
+  const { ids, numero_factura_m7, fecha_factura_m7, usuario_actualizacion } = req.body || {};
+  const idList = Array.isArray(ids) ? ids.map(Number).filter(n => !isNaN(n)) : [];
+  if (!idList.length) return res.status(400).json({ error: 'Se requiere al menos un registro conciliado.' });
+  if (!numero_factura_m7?.trim() || !fecha_factura_m7) {
+    return res.status(400).json({ error: 'El número de factura M7 y su fecha son obligatorios — deben registrarse juntos.' });
+  }
+  try {
+    const r = await pool.query(
+      `UPDATE dogama_ordenes_servicio SET
+         numero_factura_m7 = $1, fecha_factura_m7 = $2,
+         fecha_actualizacion = (NOW() AT TIME ZONE 'America/Bogota'), usuario_actualizacion = $3
+       WHERE id = ANY($4::int[]) AND estado_id = $5
+       RETURNING id`,
+      [numero_factura_m7.trim(), fecha_factura_m7, usuario_actualizacion || null, idList, OS_ESTADO_CONCILIADO]
+    );
+    res.json({ success: true, actualizados: r.rowCount });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+};
+
+const FACTURA_M7_HEADERS: Record<string, string> = {
+  om: 'om', 'orden maestra': 'om', 'orden_maestra': 'om', 'orden maestra (om)': 'om',
+  oc: 'oc', 'orden de compra': 'oc', 'documento compras': 'oc', 'documento compras (oc) - opcional': 'oc',
+  'numero factura m7': 'numero_factura_m7', 'número factura m7': 'numero_factura_m7', 'numero_factura_m7': 'numero_factura_m7', 'factura m7': 'numero_factura_m7',
+  'fecha factura m7': 'fecha_factura_m7', 'fecha_factura_m7': 'fecha_factura_m7', 'fecha envio': 'fecha_factura_m7', 'fecha de envio': 'fecha_factura_m7', 'fecha de envío': 'fecha_factura_m7',
+};
+
+export const getPlantillaFacturaM7 = async (_req: Request, res: Response) => {
+  const headers = ['Orden Maestra (OM)', 'Documento Compras (OC) - opcional', 'Numero Factura M7', 'Fecha Factura M7'];
+  const ejemplo = [['OM-00456', 'OC-00123', 'FM7-000123', '2026-01-20']];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...ejemplo]);
+  ws['!cols'] = headers.map(() => ({ wch: 28 }));
+  XLSX.utils.book_append_sheet(wb, ws, 'FacturaM7');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="plantilla_factura_m7.xlsx"');
+  res.send(buf);
+};
+
+export const importFacturaM7Xlsx = async (req: Request, res: Response) => {
+  await ensureOrdenesServicioTable();
+  if (!req.file) return res.status(400).json({ error: 'Se requiere un archivo Excel (.xlsx)' });
+  const usuario_actualizacion = req.body?.usuario_actualizacion || null;
+
+  let json: any[];
+  try {
+    const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+  } catch (e: any) {
+    return res.status(400).json({ error: `No se pudo leer el archivo: ${e.message}` });
+  }
+  if (!json.length) return res.status(400).json({ error: 'El archivo no contiene filas de datos.' });
+
+  const normRow = (row: Record<string, any>): Record<string, any> => {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(row)) {
+      const norm = FACTURA_M7_HEADERS[k.toString().trim().toLowerCase()];
+      if (norm && out[norm] === undefined) out[norm] = v;
+    }
+    return out;
+  };
+
+  let actualizados = 0, sinCoincidencia = 0, incompletos = 0;
+  const noEncontrados: string[] = [];
+
+  for (const rawRow of json) {
+    const row = normRow(rawRow);
+    const numero_om = row.om ? String(row.om).trim() : '';
+    const numero_oc = row.oc ? String(row.oc).trim() : '';
+    const numero_factura_m7 = row.numero_factura_m7 ? String(row.numero_factura_m7).trim() : '';
+    const fecha_factura_m7 = xlsxCellToDate(row.fecha_factura_m7);
+    if (!numero_om && !numero_oc) continue;
+    if (!numero_factura_m7 || !fecha_factura_m7) { incompletos++; continue; }
+
+    const conds: string[] = [`estado_id = $1`];
+    const vals: any[] = [OS_ESTADO_CONCILIADO];
+    if (numero_om) { vals.push(numero_om); conds.push(`UPPER(TRIM(numero_om)) = UPPER(TRIM($${vals.length}))`); }
+    if (numero_oc) { vals.push(numero_oc); conds.push(`UPPER(TRIM(numero_oc)) = UPPER(TRIM($${vals.length}))`); }
+    vals.push(numero_factura_m7, fecha_factura_m7, usuario_actualizacion);
+
+    const r = await pool.query(
+      `UPDATE dogama_ordenes_servicio SET
+         numero_factura_m7 = $${vals.length - 2}, fecha_factura_m7 = $${vals.length - 1},
+         fecha_actualizacion = (NOW() AT TIME ZONE 'America/Bogota'), usuario_actualizacion = $${vals.length}
+       WHERE ${conds.join(' AND ')} RETURNING id`,
+      vals
+    );
+    if (r.rowCount) actualizados += r.rowCount;
+    else { sinCoincidencia++; noEncontrados.push(numero_om || numero_oc); }
+  }
+
+  res.json({ success: true, actualizados, sinCoincidencia, incompletos, noEncontrados: noEncontrados.slice(0, 50) });
+};
+
+// ── PAGO DE FACTURAS M7 ──────────────────────────────────────────────────────
+// Vista consolidada por número de factura M7 (solo lo ya conciliado) con su valor total
+// enviado, para indicar si ya fue pagada y en qué fecha.
+export const getFacturasM7Resumen = async (_req: Request, res: Response) => {
+  await ensureOrdenesServicioTable();
+  try {
+    const r = await pool.query(`
+      SELECT
+        numero_factura_m7,
+        MIN(fecha_factura_m7) AS fecha_factura_m7,
+        COUNT(*)              AS cantidad_oms,
+        SUM(valor_total)      AS valor_total_enviado,
+        MAX(fecha_pago_factura) AS fecha_pago_factura,
+        BOOL_AND(fecha_pago_factura IS NOT NULL) AS pagada
+      FROM dogama_ordenes_servicio
+      WHERE numero_factura_m7 IS NOT NULL AND estado_id = $1
+      GROUP BY numero_factura_m7
+      ORDER BY MIN(fecha_factura_m7) DESC NULLS LAST, numero_factura_m7 DESC
+    `, [OS_ESTADO_CONCILIADO]);
+    res.json(r.rows);
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
+};
+
+export const marcarPagoFacturaM7 = async (req: Request, res: Response) => {
+  await ensureOrdenesServicioTable();
+  const { numero_factura_m7, fecha_pago_factura, usuario_actualizacion } = req.body || {};
+  if (!numero_factura_m7?.trim()) return res.status(400).json({ error: 'numero_factura_m7 es obligatorio.' });
+  try {
+    const r = await pool.query(
+      `UPDATE dogama_ordenes_servicio SET
+         fecha_pago_factura = $1,
+         fecha_actualizacion = (NOW() AT TIME ZONE 'America/Bogota'), usuario_actualizacion = $2
+       WHERE numero_factura_m7 = $3
+       RETURNING id`,
+      [fecha_pago_factura || null, usuario_actualizacion || null, numero_factura_m7.trim()]
+    );
+    res.json({ success: true, actualizados: r.rowCount });
+  } catch (e: any) { res.status(500).json({ error: e.message }); }
 };

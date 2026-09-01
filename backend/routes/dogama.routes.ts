@@ -106,10 +106,20 @@ router.delete('/ordenes-servicio/:os_id/recogidas/:id', requirePermission('CITAS
 router.post('/ordenes-servicio/import', requirePermission('CITAS_DESPACHO_CARGA', 'create'), upload.single('file'), dogama.importOrdenesServicio);
 
 // ── Importación unificada XLSX (un solo archivo, ida + recogida por fila) ─────
+router.post('/ordenes-servicio/validate-xlsx', requirePermission('CITAS_DESPACHO_CARGA', 'create'), upload.single('file'), dogama.validateOrdenesServicioXlsx);
 router.post('/ordenes-servicio/import-xlsx', requirePermission('CITAS_DESPACHO_CARGA', 'create'), upload.single('file'), dogama.importOrdenesServicioXlsx);
 
 // ── Conciliación Jhon Uribe ────────────────────────────────────────────────────
 router.get('/conciliacion-jhon-uribe', requirePermission('CONCILIACION_JHON_URIBE', 'view'), dogama.getConciliacionJhonUribe);
 router.patch('/conciliacion-jhon-uribe/conciliar', requirePermission('CONCILIACION_JHON_URIBE', 'edit'), dogama.conciliarOrdenesServicio);
+router.get('/conciliacion-jhon-uribe/plantilla', requirePermission('CONCILIACION_JHON_URIBE', 'view'), dogama.getPlantillaConciliacion);
+router.post('/conciliacion-jhon-uribe/validar-xlsx', requirePermission('CONCILIACION_JHON_URIBE', 'edit'), upload.single('file'), dogama.validarConciliacionXlsx);
+
+// ── Facturación M7 (número + fecha de factura M7 y su pago, sobre lo ya conciliado) ──
+router.get('/conciliacion-jhon-uribe/facturas-m7', requirePermission('CONCILIACION_JHON_URIBE', 'view'), dogama.getFacturasM7Resumen);
+router.post('/conciliacion-jhon-uribe/factura-m7', requirePermission('CONCILIACION_JHON_URIBE', 'edit'), dogama.registrarFacturaM7);
+router.get('/conciliacion-jhon-uribe/factura-m7/plantilla', requirePermission('CONCILIACION_JHON_URIBE', 'view'), dogama.getPlantillaFacturaM7);
+router.post('/conciliacion-jhon-uribe/factura-m7/import', requirePermission('CONCILIACION_JHON_URIBE', 'edit'), upload.single('file'), dogama.importFacturaM7Xlsx);
+router.patch('/conciliacion-jhon-uribe/factura-m7/pago', requirePermission('CONCILIACION_JHON_URIBE', 'edit'), dogama.marcarPagoFacturaM7);
 
 export default router;

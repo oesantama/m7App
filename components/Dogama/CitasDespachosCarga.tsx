@@ -5434,6 +5434,10 @@ interface OrdenServicio {
   remesa: string | null;
   factura_inicial: string | null;
   fecha_factura: string | null;
+  codigo_sap: string | null;
+  flete_regreso?: string | null;
+  manifiesto_regreso?: string | null;
+  remesa_regreso?: string | null;
   estado_id: string;
   estado_nombre: string | null;
   fecha_creacion: string;
@@ -5514,7 +5518,96 @@ function OrdenesServicioTab({ user }: { user: User }) {
   const [showImportXlsx,  setShowImportXlsx]  = useState(false);
   const [importXlsxFile,  setImportXlsxFile]  = useState<File | null>(null);
   const [importingXlsx,   setImportingXlsx]   = useState(false);
+  const [validatingXlsx,  setValidatingXlsx]  = useState(false);
+  const [importModo,      setImportModo]      = useState<'ida' | 'regreso'>('ida');
+  const [autoCreateConf,  setAutoCreateConf]  = useState(true);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+  const [valFilterTab, setValFilterTab] = useState<'all' | 'valid' | 'warning' | 'error'>('all');
+  const [validationResult, setValidationResult] = useState<{
+    total: number;
+    validCount: number;
+    warningCount: number;
+    errorCount: number;
+    missingConfeccionistas: string[];
+    rows: Array<{
+      index: number;
+      oc: string;
+      om: string | null;
+      codigo_sap: string | null;
+      confeccionista_txt: string;
+      confeccionista_id: number | null;
+      confeccionista_exists: boolean;
+      parent_os_id: number | null;
+      parent_exists: boolean;
+      status: 'ok' | 'warning' | 'error';
+      issues: string[];
+      selected: boolean;
+    }>;
+  } | null>(null);
   const importXlsxRef = useRef<HTMLInputElement>(null);
+
+  const handleDownloadTemplateUnificada = () => {
+    const cols = [
+      'Orden Maestra',
+      'Unidades Reales',
+      'Documento Compras',
+      'Factura',
+      'Valor por OM',
+      'Tarifa',
+      'Flete Ida',
+      'Manifiesto Ida',
+      'Remesa Ida',
+      'Pedido SAP',
+      'Flete Regreso',
+      'Manifiesto Regreso',
+      'Remesa Regreso',
+      'Cantidad Ingresada al CEDI',
+      'Liquidacion Factura',
+      'Confeccionista',
+      'Referencia Antigua'
+    ];
+    const example: Record<string, string> = {
+      'Orden Maestra': '33780',
+      'Unidades Reales': '1000',
+      'Documento Compras': '4500320395',
+      'Factura': 'FACT-001',
+      'Valor por OM': '25000000',
+      'Tarifa': '1500',
+      'Flete Ida': '450000',
+      'Manifiesto Ida': 'MAN-12345',
+      'Remesa Ida': 'REM-98765',
+      'Pedido SAP': 'SAP-8821',
+      'Flete Regreso': '400000',
+      'Manifiesto Regreso': 'MAN-99887',
+      'Remesa Regreso': 'REM-55443',
+      'Cantidad Ingresada al CEDI': '967',
+      'Liquidacion Factura': '2026-06-15',
+      'Confeccionista': 'CONFECCIONES M7',
+      'Referencia Antigua': 'REF-001'
+    };
+    downloadTemplate('plantilla_ordenes_servicio_unificada.xlsx', cols, example);
+  };
+
+  const handleValidateFile = async (file: File, modo: 'ida' | 'regreso') => {
+    setImportXlsxFile(file);
+    setValidatingXlsx(true);
+    setValidationResult(null);
+    setValFilterTab('all');
+    try {
+      const res: any = await api.dogamaValidateOrdenesServicioXlsx(file, modo);
+      setValidationResult(res);
+      const sel = new Set<number>();
+      (res.rows || []).forEach((r: any) => {
+        if (r.selected) sel.add(r.index);
+      });
+      setSelectedIndices(sel);
+    } catch (e: any) {
+      toast.error(`Error al validar archivo: ${e.message || e}`);
+      setImportXlsxFile(null);
+    } finally {
+      setValidatingXlsx(false);
+    }
+  };
 
   const canCreate = hasPermission(user, 'CITAS_DESPACHO_CARGA', 'create');
   const canEdit   = hasPermission(user, 'CITAS_DESPACHO_CARGA', 'edit');
@@ -5706,25 +5799,23 @@ function OrdenesServicioTab({ user }: { user: User }) {
   const labelCls = 'block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1';
 
   const columns: ColumnDef<OrdenServicio>[] = [
-    { header: 'OC',          key: 'numero_oc',              sortable: true, noWrap: true, render: r => <span className="font-black text-slate-800 font-mono text-xs">{r.numero_oc}</span> },
-    { header: 'OM',          key: 'numero_om',              sortable: true, noWrap: true, render: r => <span className="font-mono text-xs">{r.numero_om ?? '—'}</span> },
-    { header: 'Tipo',        key: 'tipo_os',                sortable: true, noWrap: true, render: r => (
-      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${r.tipo_os === 'ida' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
-        {r.tipo_os === 'ida' ? 'Ida' : 'Recogida'}
-      </span>
-    )},
-    { header: 'Confeccionista', key: 'confeccionista_nombre', sortable: true, render: r => <span className="text-xs">{r.confeccionista_nombre ?? '—'}</span> },
-    { header: 'Cantidad',    key: 'cantidad',               sortable: true, noWrap: true, render: r => <span className="font-mono text-xs">{r.cantidad.toLocaleString('es-CO')}</span> },
-    { header: 'Ent. CEDI',   key: 'cantidad_entregada_cedi',sortable: true, noWrap: true, render: r => <span className="font-mono text-xs text-emerald-700">{r.cantidad_entregada_cedi.toLocaleString('es-CO')}</span> },
-    { header: 'Por Entregar',key: 'id' as any,              sortable: false, noWrap: true, render: r => {
-      const pend = r.cantidad - r.cantidad_entregada_cedi;
-      return <span className={`font-mono text-xs font-bold ${pend > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{pend.toLocaleString('es-CO')}</span>;
-    }},
-    { header: 'Valor Total', key: 'valor_total',            sortable: true, noWrap: true, render: r => <span className="font-mono text-xs">{r.valor_total ? `$${fmtCOP(r.valor_total)}` : '—'}</span> },
-    { header: 'Manifiesto',  key: 'manifiesto',             sortable: true, noWrap: true, render: r => <span className="text-xs">{r.manifiesto ?? '—'}</span> },
-    { header: 'Remesa',      key: 'remesa',                 sortable: true, noWrap: true, render: r => <span className="text-xs">{r.remesa ?? '—'}</span> },
-    { header: 'Factura',     key: 'factura_inicial',        sortable: true, noWrap: true, render: r => <span className="text-xs">{r.factura_inicial ?? '—'}</span> },
-    { header: 'Estado',      key: 'estado_id',              sortable: true, noWrap: true, render: r => estadoBadge(r.estado_id, r.estado_nombre) },
+    { header: 'Orden Maestra',              key: 'numero_om',              sortable: true, noWrap: true, render: r => <span className="font-mono font-black text-slate-900 text-xs">{r.numero_om || '—'}</span> },
+    { header: 'Unidades Reales',           key: 'cantidad',               sortable: true, noWrap: true, render: r => <span className="font-mono text-xs">{r.cantidad != null ? r.cantidad.toLocaleString('es-CO') : '—'}</span> },
+    { header: 'Documento Compras',         key: 'numero_oc',              sortable: true, noWrap: true, render: r => <span className="font-mono font-black text-slate-800 text-xs">{r.numero_oc}</span> },
+    { header: 'Factura',                   key: 'factura_inicial',        sortable: true, noWrap: true, render: r => <span className="text-xs">{r.factura_inicial || '—'}</span> },
+    { header: 'Valor por OM',              key: 'valor_total',            sortable: true, noWrap: true, render: r => <span className="font-black text-slate-800 text-xs">{r.valor_total ? `$${fmtCOP(r.valor_total)}` : '—'}</span> },
+    { header: 'Tarifa',                    key: 'tarifa',                 sortable: true, noWrap: true, render: r => <span className="text-xs">{r.tarifa ? `$${fmtCOP(r.tarifa)}` : '—'}</span> },
+    { header: 'Flete Ida',                 key: 'flete',                  sortable: true, noWrap: true, render: r => <span className="text-xs">{r.flete ? `$${fmtCOP(r.flete)}` : '—'}</span> },
+    { header: 'Manifiesto Ida',            key: 'manifiesto',             sortable: true, noWrap: true, render: r => <span className="text-xs">{r.manifiesto || '—'}</span> },
+    { header: 'Remesa Ida',                key: 'remesa',                 sortable: true, noWrap: true, render: r => <span className="text-xs">{r.remesa || '—'}</span> },
+    { header: 'Pedido SAP',                key: 'codigo_sap',             sortable: true, noWrap: true, render: r => <span className="text-xs font-mono font-bold text-slate-700">{r.codigo_sap || '—'}</span> },
+    { header: 'Flete Regreso',             key: 'flete_regreso' as any,   sortable: true, noWrap: true, render: r => <span className="text-xs">{r.flete_regreso ? `$${fmtCOP(r.flete_regreso)}` : '—'}</span> },
+    { header: 'Manifiesto Regreso',        key: 'manifiesto_regreso' as any, sortable: true, noWrap: true, render: r => <span className="text-xs">{r.manifiesto_regreso || '—'}</span> },
+    { header: 'Remesa Regreso',            key: 'remesa_regreso' as any,  sortable: true, noWrap: true, render: r => <span className="text-xs">{r.remesa_regreso || '—'}</span> },
+    { header: 'Cantidad Ingresada al CEDI', key: 'cantidad_entregada_cedi', sortable: true, noWrap: true, render: r => <span className="font-mono text-xs text-emerald-700 font-bold">{r.cantidad_entregada_cedi != null ? r.cantidad_entregada_cedi.toLocaleString('es-CO') : 0}</span> },
+    { header: 'Liquidacion Factura',       key: 'fecha_factura',          sortable: true, noWrap: true, render: r => <span className="text-xs">{r.fecha_factura ? r.fecha_factura.slice(0, 10) : '—'}</span> },
+    { header: 'Confeccionista',            key: 'confeccionista_nombre', sortable: true, render: r => <span className="text-xs">{r.confeccionista_nombre || '—'}</span> },
+    { header: 'Estado',                    key: 'estado_id',              sortable: true, noWrap: true, render: r => estadoBadge(r.estado_id, r.estado_nombre) },
     ...(canEdit || canDelete ? [{
       header: 'Acciones', key: 'fecha_factura' as keyof OrdenServicio, sortable: false, noWrap: true,
       render: (r: OrdenServicio) => (
@@ -5972,51 +6063,308 @@ function OrdenesServicioTab({ user }: { user: User }) {
       )}
 
       {/* Header y filtros */}
-      {/* Modal importar Excel unificado (ida + recogida en un solo archivo) */}
+      {/* Modal importar Excel (Ida / Regreso) con previsualización */}
       {showImportXlsx && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg animate-in fade-in slide-in-from-bottom-4 duration-150 overflow-hidden">
-            <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-6 py-4">
-              <p className="text-xs font-black text-teal-200 uppercase tracking-widest mb-0.5">Órdenes de Servicio</p>
-              <p className="text-lg font-black text-white">Importar Excel</p>
-            </div>
-            <div className="p-6 space-y-4">
-              <p className="text-xs text-slate-500">
-                Un solo archivo <span className="font-bold">.xlsx</span> con una fila por registro. Columna <span className="font-mono font-bold">Tipo</span> = "Ida" o "Recogida"
-                (si se omite se asume Ida). Columnas admitidas: OC, OM, Tipo, Confeccionista, Cantidad, Cantidad Entregada CEDI,
-                Valor Total, Precio Unitario, Tarifa, Flete, Manifiesto, Remesa, Factura, Fecha Factura, Pedido SAP, Referencia Antigua.
-              </p>
+          <div className={`bg-white rounded-3xl shadow-2xl w-full ${validationResult ? 'max-w-4xl max-h-[90vh]' : 'max-w-xl'} animate-in fade-in slide-in-from-bottom-4 duration-150 overflow-hidden flex flex-col`}>
+            {/* Header modal */}
+            <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-6 py-4 flex justify-between items-center shrink-0">
               <div>
-                <input ref={importXlsxRef} type="file" accept=".xlsx,.xls" className="hidden"
-                  onChange={e => setImportXlsxFile(e.target.files?.[0] ?? null)} />
-                <button onClick={() => importXlsxRef.current?.click()}
-                  className={`w-full py-3 rounded-2xl border-2 border-dashed text-sm font-semibold transition ${importXlsxFile ? 'border-teal-400 bg-teal-50 text-teal-700' : 'border-slate-300 text-slate-500 hover:border-teal-400 hover:text-teal-600'}`}>
-                  {importXlsxFile ? `✓ ${importXlsxFile.name}` : 'Seleccionar archivo .xlsx…'}
-                </button>
-                {importXlsxFile && <p className="text-xs text-slate-400 mt-1">Tamaño: {(importXlsxFile.size / 1024 / 1024).toFixed(2)} MB</p>}
+                <p className="text-xs font-black text-teal-200 uppercase tracking-widest mb-0.5">Órdenes de Servicio</p>
+                <p className="text-lg font-black text-white">Importar Excel</p>
               </div>
-            </div>
-            <div className="px-6 pb-6 flex gap-3">
-              <button onClick={() => { setShowImportXlsx(false); setImportXlsxFile(null); }}
-                className="flex-1 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition">
-                Cancelar
-              </button>
               <button
-                disabled={!importXlsxFile || importingXlsx}
-                onClick={async () => {
-                  if (!importXlsxFile) return;
-                  setImportingXlsx(true);
-                  try {
-                    const r: any = await api.dogamaImportOrdenesServicioXlsx(importXlsxFile);
-                    toast.success(`Importación completa: ${r.insertados} insertados, ${r.omitidos} omitidos, ${r.errores} con error${r.confCreados ? `, ${r.confCreados} confeccionistas creados` : ''}`);
-                    setShowImportXlsx(false); setImportXlsxFile(null);
-                    loadAll();
-                  } catch (e: any) { toast.error(e?.message || 'Error al importar'); }
-                  finally { setImportingXlsx(false); }
-                }}
-                className="flex-1 py-2.5 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold transition disabled:opacity-50">
-                {importingXlsx ? 'Importando…' : 'Importar'}
+                onClick={handleDownloadTemplateUnificada}
+                className="px-3.5 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-white text-xs font-bold transition flex items-center gap-1.5 border border-white/30 backdrop-blur-sm"
+                title="Descargar plantilla de Excel unificada"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Plantilla Excel (.xlsx)
               </button>
+            </div>
+
+            {/* Pestañas de modalidad (Ida / Regreso) */}
+            {!validationResult && (
+              <div className="flex border-b border-slate-100 bg-slate-50/80 px-6 pt-3 gap-2 shrink-0">
+                <button
+                  onClick={() => { setImportModo('ida'); setImportXlsxFile(null); setValidationResult(null); }}
+                  className={`pb-2.5 px-4 text-xs font-black uppercase tracking-wide border-b-2 transition ${importModo === 'ida' ? 'border-teal-600 text-teal-700 font-extrabold' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                >
+                  1. Carga Completa (Ida)
+                </button>
+                <button
+                  onClick={() => { setImportModo('regreso'); setImportXlsxFile(null); setValidationResult(null); }}
+                  className={`pb-2.5 px-4 text-xs font-black uppercase tracking-wide border-b-2 transition ${importModo === 'regreso' ? 'border-teal-600 text-teal-700 font-extrabold' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                >
+                  2. Carga de Regreso (CEDI)
+                </button>
+              </div>
+            )}
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              {!validationResult ? (
+                <>
+                  <div className="bg-teal-50/50 rounded-2xl p-4 border border-teal-100/60 flex justify-between items-center gap-4">
+                    <div>
+                      <p className="text-xs font-bold text-teal-900 mb-1">
+                        {importModo === 'ida' ? 'Opción 1: Carga Información Completa (Ida)' : 'Opción 2: Carga de Regreso (Recogida / CEDI)'}
+                      </p>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        {importModo === 'ida'
+                          ? 'Permite cargar o actualizar registros de Ida con información completa: OM, Cantidad, OC, Factura, Tarifa, Flete, Manifiesto, Remesa, SAP, Confeccionista, etc.'
+                          : 'Actualiza la información de regreso validando por Orden Maestra (OM) y Documento de Compras (OC) existente.'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleDownloadTemplateUnificada}
+                      className="px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition flex items-center gap-1.5 shrink-0"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Descargar Plantilla .xlsx
+                    </button>
+                  </div>
+
+                  <div>
+                    <input
+                      ref={importXlsxRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      className="hidden"
+                      onChange={e => {
+                        const file = e.target.files?.[0];
+                        if (file) handleValidateFile(file, importModo);
+                      }}
+                    />
+                    <button
+                      disabled={validatingXlsx}
+                      onClick={() => importXlsxRef.current?.click()}
+                      className={`w-full py-6 rounded-2xl border-2 border-dashed text-sm font-semibold transition flex flex-col items-center justify-center gap-2 ${importXlsxFile ? 'border-teal-400 bg-teal-50 text-teal-700' : 'border-slate-300 text-slate-500 hover:border-teal-400 hover:text-teal-600'}`}
+                    >
+                      {validatingXlsx ? (
+                        <div className="flex items-center gap-2">
+                          <span className="w-5 h-5 border-2 border-teal-600 border-t-transparent rounded-full animate-spin" />
+                          <span>Validando y analizando archivo Excel…</span>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-base font-bold">Seleccionar archivo .xlsx</span>
+                          <span className="text-xs text-slate-400">Las columnas serán pre-validadas antes de guardar</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Resumen y Pestañas de Filtro de Validación */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50 rounded-2xl p-3 border border-slate-200">
+                    <div className="flex items-center gap-2 flex-wrap text-xs font-bold">
+                      <button
+                        onClick={() => setValFilterTab('all')}
+                        className={`px-3 py-1 rounded-full border transition ${valFilterTab === 'all' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'}`}
+                      >
+                        Todas ({validationResult.total})
+                      </button>
+                      <button
+                        onClick={() => setValFilterTab('valid')}
+                        className={`px-3 py-1 rounded-full border transition ${valFilterTab === 'valid' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'}`}
+                      >
+                        ✓ Válidas ({validationResult.validCount})
+                      </button>
+                      {validationResult.warningCount > 0 && (
+                        <button
+                          onClick={() => setValFilterTab('warning')}
+                          className={`px-3 py-1 rounded-full border transition ${valFilterTab === 'warning' ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'}`}
+                        >
+                          ⚠️ Advertencias ({validationResult.warningCount})
+                        </button>
+                      )}
+                      {validationResult.errorCount > 0 && (
+                        <button
+                          onClick={() => setValFilterTab('error')}
+                          className={`px-3 py-1 rounded-full border transition ${valFilterTab === 'error' ? 'bg-red-600 text-white border-red-600 animate-pulse' : 'bg-red-50 text-red-800 border-red-200 hover:bg-red-100'}`}
+                        >
+                          ❌ Errores ({validationResult.errorCount})
+                        </button>
+                      )}
+                    </div>
+                    <span className="text-xs font-black text-teal-700 bg-teal-100/60 px-3 py-1 rounded-full uppercase">
+                      Modo: {importModo === 'ida' ? 'Carga Ida' : 'Carga Regreso'}
+                    </span>
+                  </div>
+
+                  {/* Advertencia de Confeccionistas Faltantes */}
+                  {validationResult.missingConfeccionistas.length > 0 && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
+                      <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                        <span>⚠️</span> Se encontraron {validationResult.missingConfeccionistas.length} confeccionista(s) que NO existen en la Maestra de Confeccionistas:
+                      </p>
+                      <p className="text-xs text-amber-800 font-mono font-semibold">
+                        {validationResult.missingConfeccionistas.join(', ')}
+                      </p>
+                      <label className="flex items-center gap-2 pt-1 text-xs font-bold text-slate-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={autoCreateConf}
+                          onChange={e => setAutoCreateConf(e.target.checked)}
+                          className="w-4 h-4 accent-teal-600 rounded"
+                        />
+                        Crear automáticamente estos confeccionistas en la Maestra al guardar
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Tabla de filas validadas */}
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-72 overflow-y-auto text-xs">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-slate-100 text-slate-600 font-bold sticky top-0 uppercase tracking-wider text-[10px]">
+                        <tr>
+                          <th className="p-2.5 text-center w-10">
+                            <input
+                              type="checkbox"
+                              checked={validationResult.rows.length > 0 && validationResult.rows.every(r => selectedIndices.has(r.index))}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setSelectedIndices(new Set(validationResult.rows.filter(r => r.status !== 'error').map(r => r.index)));
+                                } else {
+                                  setSelectedIndices(new Set());
+                                }
+                              }}
+                              className="w-3.5 h-3.5 accent-teal-600"
+                            />
+                          </th>
+                          <th className="p-2.5">Doc Compras (OC)</th>
+                          <th className="p-2.5">Orden Maestra (OM)</th>
+                          <th className="p-2.5">Código SAP</th>
+                          <th className="p-2.5">Confeccionista</th>
+                          <th className="p-2.5 text-center">Estado</th>
+                          <th className="p-2.5">Detalles / Advertencias</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 text-slate-700">
+                        {validationResult.rows
+                          .filter(r => {
+                            if (valFilterTab === 'valid') return r.status === 'ok';
+                            if (valFilterTab === 'warning') return r.status === 'warning';
+                            if (valFilterTab === 'error') return r.status === 'error';
+                            return true;
+                          })
+                          .map((row: any) => {
+                            const isSel = selectedIndices.has(row.index);
+                            const isErr = row.status === 'error';
+                            const isWarn = row.status === 'warning';
+                            return (
+                              <tr
+                                key={row.index}
+                                className={`transition ${
+                                  isErr
+                                    ? 'bg-red-50/80 border-l-4 border-l-red-500 hover:bg-red-100/60'
+                                    : isWarn
+                                    ? 'bg-amber-50/60 hover:bg-amber-100/50'
+                                    : !isSel
+                                    ? 'opacity-50 bg-slate-50'
+                                    : 'hover:bg-slate-50/80'
+                                }`}
+                              >
+                                <td className="p-2.5 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSel}
+                                    disabled={isErr}
+                                    onChange={e => {
+                                      const next = new Set(selectedIndices);
+                                      if (e.target.checked) next.add(row.index);
+                                      else next.delete(row.index);
+                                      setSelectedIndices(next);
+                                    }}
+                                    className="w-3.5 h-3.5 accent-teal-600 disabled:opacity-30"
+                                  />
+                                </td>
+                                <td className={`p-2.5 font-mono font-bold ${!row.oc ? 'text-red-600 font-extrabold' : 'text-slate-900'}`}>
+                                  {row.oc || '— (Falta OC)'}
+                                </td>
+                                <td className={`p-2.5 font-mono ${!row.om ? 'text-red-600 font-extrabold' : 'text-slate-700'}`}>
+                                  {row.om || '— (Falta OM)'}
+                                </td>
+                                <td className={`p-2.5 font-mono text-xs ${!row.codigo_sap ? 'text-red-600 font-extrabold' : 'text-slate-700'}`}>
+                                  {row.codigo_sap || '— (Falta SAP)'}
+                                </td>
+                                <td className="p-2.5 font-medium">
+                                  {row.confeccionista_txt ? (
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${row.confeccionista_exists ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-100 text-amber-800'}`}>
+                                      {row.confeccionista_txt} {row.confeccionista_exists ? '✓' : '(No existe)'}
+                                    </span>
+                                  ) : '—'}
+                                </td>
+                                <td className="p-2.5 text-center">
+                                  {row.status === 'ok' && <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-black">OK</span>}
+                                  {row.status === 'warning' && <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full text-[10px] font-black">ADVERTENCIA</span>}
+                                  {row.status === 'error' && <span className="bg-red-600 text-white px-2 py-0.5 rounded-full text-[10px] font-black shadow-sm">❌ RECHAZADO</span>}
+                                </td>
+                                <td className="p-2.5 text-[11px]">
+                                  {row.issues.length > 0 ? (
+                                    <span className={row.status === 'error' ? 'text-red-700 font-bold' : 'text-amber-800 font-semibold'}>
+                                      {row.issues.join(' | ')}
+                                    </span>
+                                  ) : (
+                                    <span className="text-emerald-600 font-medium">Listo para guardar</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer modal */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex gap-3 justify-end shrink-0">
+              <button
+                onClick={() => {
+                  setShowImportXlsx(false);
+                  setImportXlsxFile(null);
+                  setValidationResult(null);
+                }}
+                className="px-5 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-white transition"
+              >
+                {validationResult ? 'Cambiar Archivo / Cancelar' : 'Cancelar'}
+              </button>
+
+              {validationResult && (
+                <button
+                  disabled={selectedIndices.size === 0 || importingXlsx}
+                  onClick={async () => {
+                    if (!importXlsxFile || selectedIndices.size === 0) return;
+                    setImportingXlsx(true);
+                    try {
+                      const r: any = await api.dogamaImportOrdenesServicioXlsx(
+                        importXlsxFile,
+                        importModo,
+                        autoCreateConf,
+                        Array.from(selectedIndices)
+                      );
+                      toast.success(
+                        `Importación completada (${importModo === 'ida' ? 'Ida' : 'Regreso'}): ${r.insertados} procesados correctamente, ${r.omitidos} omitidos${r.confCreados ? `, ${r.confCreados} confeccionista(s) creado(s)` : ''}`
+                      );
+                      setShowImportXlsx(false);
+                      setImportXlsxFile(null);
+                      setValidationResult(null);
+                      loadAll();
+                    } catch (e: any) {
+                      toast.error(e?.message || 'Error al guardar la importación');
+                    } finally {
+                      setImportingXlsx(false);
+                    }
+                  }}
+                  className="px-6 py-2.5 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold transition disabled:opacity-50 flex items-center gap-2"
+                >
+                  {importingXlsx && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                  {importingXlsx ? 'Guardando…' : `Confirmar y Guardar (${selectedIndices.size} filas)`}
+                </button>
+              )}
             </div>
           </div>
         </div>
