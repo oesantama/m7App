@@ -378,16 +378,12 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
     // Si hay resultados de búsqueda directa por API, aplicar solo filtros locales restantes
     const source = searchResults !== null ? searchResults : documents;
 
-    return source.filter(doc => {
-      if (!hasSearched) {
-         // Sin búsqueda activa: solo mes actual de los documentos en memoria
-         if (!doc.createdAt && !(doc as any).created_at) return false;
-         const docDate = new Date(doc.createdAt || (doc as any).created_at);
-         const now = new Date();
-         return docDate.getMonth() === now.getMonth() && docDate.getFullYear() === now.getFullYear();
-      }
+    // Sin búsqueda activa: no se muestra nada — hay que dar clic en Consultar (con
+    // 1, 2, 3 o los 4 filtros que se quieran combinar) para traer resultados.
+    if (!hasSearched) return [];
 
-      // Si la API ya filtró por docL y plate, estos checks son redundantes pero inofensivos
+    return source.filter(doc => {
+      // La API ya filtró por docL, plate, status y planType — estos checks son redundantes pero inofensivos
       const matchPlaca = !appliedFilters.plate || (doc.vehicleData || '').toLowerCase().includes(appliedFilters.plate.toLowerCase());
       const matchDocL = !appliedFilters.docL || appliedFilters.docL.split(',').some(term =>
         doc.externalDocId.toLowerCase().includes(term.trim().toLowerCase())
@@ -427,25 +423,25 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const handleSearch = async () => {
     setAppliedFilters(filters);
     setHasSearched(true);
-    // Fetch directo a la API para no depender de la carga inicial en memoria
-    if (filters.docL || filters.plate) {
-      setSearching(true);
-      try {
-        const data = await api.getDocuments(
-          undefined,
-          filters.status ? [filters.status] : undefined,
-          filters.docL || undefined,
-          filters.plate || undefined,
-        );
-        setSearchResults(Array.isArray(data) ? data : []);
-      } catch {
-        toast.error('Error al consultar documentos');
-        setSearchResults([]);
-      } finally {
-        setSearching(false);
-      }
-    } else {
-      setSearchResults(null);
+    // Siempre se consulta directo a la API con los filtros aplicados (Placa, Documento L,
+    // Tipo Plan, Estado — cualquier combinación: uno, dos, tres o los cuatro) en vez de filtrar
+    // en memoria sobre el listado completo precargado — así el resultado que se ve abajo es
+    // exactamente lo que trae la consulta, y solo aparece después de dar clic en Consultar.
+    setSearching(true);
+    try {
+      const data = await api.getDocuments(
+        undefined,
+        filters.status ? [filters.status] : undefined,
+        filters.docL || undefined,
+        filters.plate || undefined,
+        filters.planType || undefined,
+      );
+      setSearchResults(Array.isArray(data) ? data : []);
+    } catch {
+      toast.error('Error al consultar documentos');
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
     }
   };
 

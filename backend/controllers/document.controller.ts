@@ -63,9 +63,9 @@ export const getDocuments = async (req: Request, res: Response) => {
                u_s.name          as "uomStdName"
         FROM document_items i
         LEFT JOIN estados e_i ON e_i.id = i.item_status
-        LEFT JOIN document_l_payments p ON i.document_id = p.document_id AND TRIM(UPPER(i.invoice)) = TRIM(UPPER(p.invoice))
-        LEFT JOIN document_consolidated_items c ON i.document_id = c.document_id AND TRIM(UPPER(i.article_id)) = TRIM(UPPER(c.article_id))
-        LEFT JOIN articles a ON TRIM(UPPER(a.id)) = TRIM(UPPER(i.article_id))
+        LEFT JOIN document_l_payments p ON i.document_id = p.document_id AND i.invoice = p.invoice
+        LEFT JOIN document_consolidated_items c ON i.document_id = c.document_id AND i.article_id = c.article_id
+        LEFT JOIN articles a ON a.id = i.article_id
         LEFT JOIN unidades_medida u_i ON u_i.id = a.uom_inter_id
         LEFT JOIN unidades_medida u_s ON u_s.id = a.uom_std
         WHERE i.document_id = d.id
@@ -81,7 +81,7 @@ export const getDocuments = async (req: Request, res: Response) => {
     `;
 
     const queryParams: any[] = [];
-    const { clientId, docL, statuses, plate } = req.query;
+    const { clientId, docL, statuses, plate, planType } = req.query;
     const user = (req as any).user;
     const isSuper = user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
 
@@ -109,6 +109,11 @@ export const getDocuments = async (req: Request, res: Response) => {
     if (plate) {
         queryParams.push(`%${String(plate).trim().toUpperCase()}%`);
         query += ` AND UPPER(COALESCE(d.vehicle_plate,'')) LIKE $${queryParams.length}`;
+    }
+
+    if (planType) {
+        queryParams.push(planType);
+        query += ` AND d.plan_type = $${queryParams.length}`;
     }
 
     if (!isSuper) {

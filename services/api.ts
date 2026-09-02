@@ -1154,12 +1154,13 @@ export const api = {
   }),
   deleteDriver: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/drivers/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
-  getDocuments: (clientId?: string, statuses?: string[], docL?: string, plate?: string) => {
+  getDocuments: (clientId?: string, statuses?: string[], docL?: string, plate?: string, planType?: string) => {
     const params = new URLSearchParams();
     if (clientId) params.set('clientId', clientId);
     if (statuses?.length) params.set('statuses', statuses.join(','));
     if (docL) params.set('docL', docL);
     if (plate) params.set('plate', plate);
+    if (planType) params.set('planType', planType);
     const qs = params.toString();
     return fetchJson(`${API_URL}/documents${qs ? `?${qs}` : ''}`);
   },
