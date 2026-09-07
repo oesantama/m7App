@@ -186,7 +186,7 @@ const App: React.FC = () => {
     if (!isAuthenticated || !user) return;
     api.noticiasGetFeed().then((data: any[]) => {
       if (data?.length) { setNoticiasFeed(data); setShowNoticiasModal(true); }
-    }).catch(() => {});
+    }).catch(() => { });
   }, [isAuthenticated, user?.id]);
 
   // ============ PORTAL ROUTING ============
@@ -574,7 +574,7 @@ const App: React.FC = () => {
   // Rutas 100% públicas — deben evaluarse ANTES de cualquier guard de auth o restore
   if (window.location.pathname.startsWith('/publico/noticia')) {
     return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"/></div>}>
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
         <PublicNoticiaPage />
       </React.Suspense>
     );
@@ -585,7 +585,7 @@ const App: React.FC = () => {
   if (raMatch) {
     const [, raBatchCode, raToken] = raMatch;
     return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"/></div>}>
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
         <ReturnApprovalPage batchCode={raBatchCode} token={raToken} />
       </React.Suspense>
     );
@@ -596,7 +596,7 @@ const App: React.FC = () => {
   if (pcMatch) {
     const [, pcToken] = pcMatch;
     return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"/></div>}>
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
         <PerfilCargoPublicSign token={pcToken} />
       </React.Suspense>
     );
@@ -607,7 +607,7 @@ const App: React.FC = () => {
   if (giCumplidoMatch) {
     const [, giToken] = giCumplidoMatch;
     return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"/></div>}>
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
         <GrupoInterCumplidoPage token={giToken} />
       </React.Suspense>
     );
@@ -619,7 +619,7 @@ const App: React.FC = () => {
     const [, giDoc] = giSeguimientoMatch;
     const giToken2 = new URLSearchParams(window.location.search).get('token') || '';
     return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"/></div>}>
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
         <GrupoInterSeguimientoPage numeroDocumento={decodeURIComponent(giDoc)} token={giToken2} />
       </React.Suspense>
     );
@@ -1160,13 +1160,13 @@ const App: React.FC = () => {
             <ConciliacionJhonUribe user={user!} />
           </React.Suspense>
         );
-      case 'maestras-fullfilment':
+      case 'maestras-FULFILLMENT':
         return (
-          <React.Suspense fallback={<div className="p-10">Cargando Maestras Fullfilment...</div>}>
+          <React.Suspense fallback={<div className="p-10">Cargando Maestras FULFILLMENT...</div>}>
             <MaestrasFulfillment user={user!} />
           </React.Suspense>
         );
-      case 'registro-legalizacion-fullfilment':
+      case 'registro-legalizacion-FULFILLMENT':
         return (
           <React.Suspense fallback={<div className="p-10">Cargando Registro y Legalización...</div>}>
             <RegistroLegalizacionFulfillment user={user!} />

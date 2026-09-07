@@ -30,8 +30,7 @@ export default function MaestrasFulfillment({ user }: Props) {
           { key: 'productos', label: 'Productos / Servicios' },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key as any)}
-            className={`px-5 py-2.5 text-sm font-bold rounded-t-2xl transition border-b-2 -mb-px ${
-              tab === t.key ? 'border-indigo-600 text-indigo-700 bg-indigo-50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
+            className={`px-5 py-2.5 text-sm font-bold rounded-t-2xl transition border-b-2 -mb-px ${tab === t.key ? 'border-indigo-600 text-indigo-700 bg-indigo-50' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
             {t.label}
           </button>
         ))}
@@ -151,7 +150,7 @@ function ClientesTab() {
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <p className="text-sm text-slate-500">Marcas/clientes de la operación Fullfilment — cada uno con su moneda nativa (USD o COP).</p>
+        <p className="text-sm text-slate-500">Marcas/clientes de la operación FULFILLMENT — cada uno con su moneda nativa (USD o COP).</p>
         <button onClick={openCreate} className="px-4 py-2.5 rounded-2xl text-sm font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm flex items-center gap-2">
           <Plus className="w-4 h-4" /> Agregar Cliente
         </button>

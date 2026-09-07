@@ -34,7 +34,7 @@ const CreatableSelect: React.FC<{
   </div>
 );
 
-// ── Formulario reutilizable para capturar UNA línea de Fullfilment ──────────
+// ── Formulario reutilizable para capturar UNA línea de FULFILLMENT ──────────
 // Se usa tanto en el tab "Registro" (dentro de un diálogo, período libre) como dentro del
 // modal de Detalle de un registro ya existente (período fijo, solo se agrega el ítem/valor).
 export const LineaManualForm: React.FC<{

@@ -182,19 +182,19 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
 
   // ─── GESTIÓN HUMANA: MISCELÁNEOS ─────────────────────────────────────────
   'gh_horarios_laborales': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
-  'gh_eps':                ['nombre', 'estado', 'usuario_control', 'fecha_control'],
-  'gh_afp':                ['nombre', 'estado', 'usuario_control', 'fecha_control'],
-  'gh_tipos_vivienda':     ['nombre', 'estado', 'usuario_control', 'fecha_control'],
-  'gh_tipos_contrato':     ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_eps': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_afp': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_tipos_vivienda': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_tipos_contrato': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
   'gh_ingresos_mensuales': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
-  'gh_cargos':             ['nombre', 'estado', 'usuario_control', 'fecha_control'],
-  'gh_tipos_sangre':       ['nombre', 'estado', 'usuario_control', 'fecha_control'],
-  'gh_estados_civiles':    ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_cargos': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_tipos_sangre': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
+  'gh_estados_civiles': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
   'gh_niveles_educativos': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
 
   // ─── CONFIGURACIÓN: CIUDADES ──────────────────────────────────────────────
   'cfg_departamentos': ['nombre', 'estado', 'usuario_control', 'fecha_control'],
-  'cfg_ciudades':      ['nombre', 'id_departamento', 'estado', 'usuario_control', 'fecha_control'],
+  'cfg_ciudades': ['nombre', 'id_departamento', 'estado', 'usuario_control', 'fecha_control'],
 
   // ─── TRANSACCIONES DE CONCILIACIÓN ────────────────────────────────────────
   // Detalle por factura dentro de una conciliación: qué pasó con cada una.
@@ -226,11 +226,11 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
     'fecha_registro', 'status_id'
   ],
   'management_orders': [
-    'oc_number', 'oc_status', 'oc_date', 'remesa_number', 'remission', 
-    'remission_status', 'remission_date', 'manifest_number', 'client_order', 
-    'manifest_observations', 'manifest_status', 'manifest_date', 'plate', 
-    'client_name', 'total_value_cxc_final', 'total_value_cxp_final', 
-    'invoice_cxc', 'receipt', 'invoice_date', 'total_cxc', 'egress', 
+    'oc_number', 'oc_status', 'oc_date', 'remesa_number', 'remission',
+    'remission_status', 'remission_date', 'manifest_number', 'client_order',
+    'manifest_observations', 'manifest_status', 'manifest_date', 'plate',
+    'client_name', 'total_value_cxc_final', 'total_value_cxp_final',
+    'invoice_cxc', 'receipt', 'invoice_date', 'total_cxc', 'egress',
     'cxp_date', 'total_cxp', 'created_by', 'created_at', 'updated_at', 'client_document',
     'origin', 'destination'
   ]
@@ -238,7 +238,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
 
 const healSchema = async (client: any) => {
   console.log('[M7-DB] Iniciando Curación Nuclear de Esquema (REPLICA EXACTA)...');
-  
+
   // Alter tables for management_orders
   try {
     await client.query(`ALTER TABLE management_orders ADD COLUMN IF NOT EXISTS city VARCHAR(100)`);
@@ -492,14 +492,14 @@ const healSchema = async (client: any) => {
   const nuclearTables = Object.keys(UNIVERSAL_SCHEMA);
   for (const table of nuclearTables) {
     try {
-        const checkCols = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = '${table}'`);
-        const currentCols = checkCols.rows.map((r: any) => r.column_name);
-        if (currentCols.length > 0) {
-            const expectedCols = ['id', ...UNIVERSAL_SCHEMA[table]];
-         // M7-SAFETY: Bloque de borrado automático ELIMINADO permanentemente.
-         // Solo permitimos expansión de esquema, nunca destrucción.
-        }
-    } catch (e) {}
+      const checkCols = await client.query(`SELECT column_name FROM information_schema.columns WHERE table_name = '${table}'`);
+      const currentCols = checkCols.rows.map((r: any) => r.column_name);
+      if (currentCols.length > 0) {
+        const expectedCols = ['id', ...UNIVERSAL_SCHEMA[table]];
+        // M7-SAFETY: Bloque de borrado automático ELIMINADO permanentemente.
+        // Solo permitimos expansión de esquema, nunca destrucción.
+      }
+    } catch (e) { }
   }
 
   // FASE 2: CURACIÓN ATÓMICA POR TABLA (BATCHING)
@@ -526,13 +526,13 @@ const healSchema = async (client: any) => {
           } else if (col.includes('qty') || col.includes('count_') || col.includes('capacity') || col.includes('factor') || col.includes('total_') || col.includes('value_') || col === 'peso' || col === 'volume' || col === 'strength' || col === 'latitude' || col === 'longitude' || col === 'latitud' || col === 'longitud' || col === 'lat' || col === 'lng' || col === 'accuracy' || col === 'speed' || col === 'heading' || col === 'level' || col === 'order' || col === 'cantidad' || col === 'valor_flete' || col === 'valor_declarado' || col === 'cantidad_total' || col === 'precio_total' || col === 'peso_total_prod' || col === 'quantity' || col === 'assigned_qty' || col === 'total_items' || col === 'total_qty' || col === 'total_invoices' || col === 'total_delivered' || col === 'total_partial' || col === 'total_returned' || col === 'total_repice' || col === 'total_collected' || col === 'total_pending_collect' || col === 'total_to_return' || col === 'delivery_qty' || col === 'returned_qty' || col === 'repice_qty' || col === 'invoice_value' || col === 'collected_value' || col === 'total_volume_m3' || col === 'vehicle_capacity_m3' || col === 'utilization_pct' || col === 'id_departamento') {
             type = 'NUMERIC DEFAULT 0';
           } else if (col === 'client_ids') {
-             type = 'TEXT[]';
+            type = 'TEXT[]';
           } else if (col === 'permissions' || col === 'record_data') {
-             type = 'JSONB';
+            type = 'JSONB';
           } else if (col.includes('enabled') || col.includes('is_active') || col.includes('policy_accepted') || col.includes('approved') || col === 'aceptapolitica' || col === 'aprobada' || col === 'signed' || col === 'es_devolucion') {
-             type = 'BOOLEAN DEFAULT FALSE';
+            type = 'BOOLEAN DEFAULT FALSE';
           }
-          
+
           alterStatements.push(`ADD COLUMN IF NOT EXISTS "${col}" ${type}`);
         }
       }
@@ -550,7 +550,7 @@ const healSchema = async (client: any) => {
     `CREATE UNIQUE INDEX IF NOT EXISTS geocoding_cache_address_key_idx ON geocoding_cache (address_key)`,
     `CREATE UNIQUE INDEX IF NOT EXISTS uq_invoice_conciliations_doc_inv ON invoice_conciliations (document_id, invoice_number)`,
   ]) {
-    try { await client.query(sql); } catch (e) {}
+    try { await client.query(sql); } catch (e) { }
   }
 
   // ─── Índices de rendimiento crítico (agregados en auditoría Sprint 1) ──────────
@@ -662,7 +662,7 @@ const healSchema = async (client: any) => {
   // En autocommit cada statement es su propio txn: un IF NOT EXISTS fallido no
   // envenena la conexión, así que plain try/catch es suficiente.
   for (const idxSql of performanceIndexes) {
-    try { await client.query(idxSql); } catch (e) {}
+    try { await client.query(idxSql); } catch (e) { }
   }
   // ─── Tablas auxiliares de conciliación (antes vivían en el request handler) ──
   for (const ddl of [
@@ -692,12 +692,12 @@ const healSchema = async (client: any) => {
         estado_id TEXT DEFAULT 'EST-01', 
         usuario_control TEXT, 
         fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`
-  ]) { try { await client.query(ddl); } catch (e) {} }
+  ]) { try { await client.query(ddl); } catch (e) { } }
 
   // New Inventario, Ordenes, Entradas, Salidas tables and columns
   try {
     await client.query(`ALTER TABLE gh_elementos ADD COLUMN IF NOT EXISTS es_serializado BOOLEAN DEFAULT FALSE;`);
-    
+
     await client.query(`CREATE TABLE IF NOT EXISTS gh_inventario_elemento (
         id SERIAL PRIMARY KEY,
         elemento_id INTEGER REFERENCES gh_elementos(id) ON DELETE CASCADE UNIQUE,
@@ -888,7 +888,7 @@ const healSchema = async (client: any) => {
           ('1cF-K05Jp-9u27D0P5N3v1r6wG4x8y9z2', 'F-OPT-008 Control de Fatiga y Descanso', 3)
         ON CONFLICT (id) DO NOTHING;
       `);
-      
+
       console.log('[M7-DB-ADMINCENTER] Tabla y semillas de opt_formatos creadas.');
     } finally {
       client.release();
@@ -910,14 +910,14 @@ const healSchema = async (client: any) => {
       LEFT JOIN drivers d ON vl.driver_id = d.id
       ORDER BY vehicle_id, updated_at DESC;
     `);
-  } catch (e) {}
+  } catch (e) { }
 
   for (const table of serialTables) {
     try {
       const typeCheck = await client.query(`SELECT data_type FROM information_schema.columns WHERE table_name = '${table}' AND column_name = 'id'`);
       if (typeCheck.rows.length > 0 && typeCheck.rows[0].data_type === 'text') {
         console.log(`[M7-DB-HEAL] Harmonizando SERIAL para ${table}...`);
-        
+
         if (table === 'picking_assignments') {
           await client.query('ALTER TABLE picking_signatures DROP CONSTRAINT IF EXISTS picking_signatures_picking_id_fkey');
           await client.query('ALTER TABLE picking_signatures ALTER COLUMN picking_id TYPE INTEGER USING (picking_id::INTEGER)');
@@ -932,10 +932,10 @@ const healSchema = async (client: any) => {
         await client.query(`SELECT setval('${table}_id_seq', COALESCE((SELECT MAX(id) FROM ${table}), 0) + 1)`);
 
         if (table === 'picking_assignments') {
-           await client.query('ALTER TABLE picking_signatures ADD CONSTRAINT picking_signatures_picking_id_fkey FOREIGN KEY (picking_id) REFERENCES picking_assignments(id) ON DELETE CASCADE');
+          await client.query('ALTER TABLE picking_signatures ADD CONSTRAINT picking_signatures_picking_id_fkey FOREIGN KEY (picking_id) REFERENCES picking_assignments(id) ON DELETE CASCADE');
         }
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   // FASE: CREACIÓN DE TABLAS DE CIBERSEGURIDAD
@@ -987,7 +987,7 @@ const healSchema = async (client: any) => {
           false
         )
       `);
-    } catch (e) {}
+    } catch (e) { }
   }
 
   // FASE ESPECIAL M7 IQ: Reparación de tipos para Capacitaciones (Solución Profesional)
@@ -1023,12 +1023,12 @@ const healSchema = async (client: any) => {
           ORDER BY vehicle_id, created_at DESC
         )
     `);
-  } catch (e) {}
+  } catch (e) { }
 
   // FASE ESPECIAL: LIMPIEZA DE DUPLICADOS PARA ON CONFLICT (ESTABILIDAD NUCLEAR)
   try {
     console.log('[M7-DB-HEAL] Limpiando duplicados para estabilidad ON CONFLICT...');
-    
+
     // Limpiar document_consolidated_items
     await client.query(`
       DELETE FROM document_consolidated_items a USING (
@@ -1055,7 +1055,7 @@ const healSchema = async (client: any) => {
     `);
 
     console.log('[M7-DB-HEAL] Creando restricciones UNIQUE definitivas...');
-    
+
     await client.query(`
       CREATE UNIQUE INDEX IF NOT EXISTS unq_doc_art_consolidated 
       ON document_consolidated_items (document_id, article_id)
@@ -1072,7 +1072,7 @@ const healSchema = async (client: any) => {
     `);
 
     console.log('[M7-DB-HEAL] Limpiando duplicados de Patrones IA para estabilidad ON CONFLICT...');
-    
+
     // Limpiar routing_patterns
     await client.query(`
       DELETE FROM routing_patterns a USING (
@@ -1129,7 +1129,7 @@ const healSchema = async (client: any) => {
       CREATE UNIQUE INDEX IF NOT EXISTS unq_management_orders_oc ON management_orders (oc_number);
       CREATE INDEX IF NOT EXISTS idx_management_orders_plate ON management_orders (plate);
       CREATE INDEX IF NOT EXISTS idx_management_orders_client ON management_orders (client_name);
-    `).catch(() => {});
+    `).catch(() => { });
 
     // ── FIX: delivery_patterns.id debe tener secuencia BIGSERIAL para INSERT sin id ──
     await client.query(`
@@ -1187,9 +1187,9 @@ const healSchema = async (client: any) => {
       );
     `);
 
-    await client.query(`ALTER TABLE document_drive_logs ADD COLUMN IF NOT EXISTS folder_date DATE`).catch(() => {});
+    await client.query(`ALTER TABLE document_drive_logs ADD COLUMN IF NOT EXISTS folder_date DATE`).catch(() => { });
     // Fix user_id type mismatch
-    await client.query(`ALTER TABLE document_drive_logs ALTER COLUMN user_id TYPE TEXT;`).catch(() => {});
+    await client.query(`ALTER TABLE document_drive_logs ALTER COLUMN user_id TYPE TEXT;`).catch(() => { });
 
     // Add deletion columns
     await client.query(`
@@ -1359,10 +1359,10 @@ const executeSqlFileInBatches = async (client: any, filePath: string) => {
     });
 
   console.log(`[M7-DB-MIGRATION] Total de sentencias detectadas en ${path.basename(filePath)}: ${statements.length}`);
-  
+
   const batchSize = 100;
   let successCount = 0;
-  
+
   for (let i = 0; i < statements.length; i += batchSize) {
     const batch = statements.slice(i, i + batchSize);
     await client.query('BEGIN');
@@ -1372,11 +1372,11 @@ const executeSqlFileInBatches = async (client: any, filePath: string) => {
         successCount++;
       }
       await client.query('COMMIT');
-      
+
       if (successCount % 1000 === 0 || successCount === statements.length) {
         console.log(`[M7-DB-MIGRATION] Progreso: ${successCount}/${statements.length} sentencias ejecutadas.`);
       }
-      
+
       // Pequeña pausa para liberar CPU y permitir otras operaciones en la base de datos
       await new Promise(resolve => setTimeout(resolve, 5));
     } catch (error: any) {
@@ -1424,7 +1424,7 @@ export const restoreSystem = async () => {
     // SEMILLAS DE DATOS BOOTSTRAP — solo se ejecutan en entornos NO-producción
     // En producción, los datos maestros se gestionan desde la UI y nunca se sobreescriben aquí.
     const isProduction = process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'production-dev';
-    
+
     if (!isProduction) {
       console.log('[M7-SYSTEM] Entorno de desarrollo detectado. Verificando semillas de ejemplo...');
       await client.query(`
@@ -1654,7 +1654,7 @@ export const restoreSystem = async () => {
     const adminHash = await bcrypt.hash('admin123', 10);
     // [M7-SAFETY] Eliminados borrados automáticos de usuarios USR-02, USR-03 y USR-DEMO.
     // Esto garantiza que los registros vinculados (pagos, logs, etc) no desaparezcan en cada deploy.
-    
+
     await client.query(`
       INSERT INTO users (id, email, password, name, role_id, status_id, permissions)
       VALUES 
@@ -2183,21 +2183,21 @@ export const restoreSystem = async () => {
       CREATE INDEX IF NOT EXISTS idx_wqr_user ON whatsapp_quick_replies (user_id);
     `);
 
-    // ── MOD-19 / PAG-76 / PAG-77: Operación Fullfilment ─────────────────────
+    // ── MOD-19 / PAG-76 / PAG-77: Operación FULFILLMENT ─────────────────────
     // Las tablas fulfillment_* se crean solas (ensureTables) en fulfillment.controller.ts
     // al primer request al módulo; aquí solo se siembra la navegación (modules/pages).
     await client.query(`
       INSERT INTO modules (id, name, icon_class, status_id)
-      SELECT 'MOD-19', 'OPERACION FULLFILMENT', 'Package', 'EST-01'
+      SELECT 'MOD-19', 'OPERACION FULFILLMENT', 'Package', 'EST-01'
       WHERE NOT EXISTS (SELECT 1 FROM modules WHERE id = 'MOD-19');
 
       INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
-      VALUES ('PAG-76', 'MAESTRAS FULLFILMENT', 'maestras-fullfilment', 'MOD-19', 'MOD-19', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET name = 'MAESTRAS FULLFILMENT', route = 'maestras-fullfilment', module_id = 'MOD-19', parent_id = 'MOD-19';
+      VALUES ('PAG-76', 'MAESTRAS FULFILLMENT', 'maestras-FULFILLMENT', 'MOD-19', 'MOD-19', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = 'MAESTRAS FULFILLMENT', route = 'maestras-FULFILLMENT', module_id = 'MOD-19', parent_id = 'MOD-19';
 
       INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
-      VALUES ('PAG-77', 'REGISTRO Y LEGALIZACION', 'registro-legalizacion-fullfilment', 'MOD-19', 'MOD-19', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET name = 'REGISTRO Y LEGALIZACION', route = 'registro-legalizacion-fullfilment', module_id = 'MOD-19', parent_id = 'MOD-19';
+      VALUES ('PAG-77', 'REGISTRO Y LEGALIZACION', 'registro-legalizacion-FULFILLMENT', 'MOD-19', 'MOD-19', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = 'REGISTRO Y LEGALIZACION', route = 'registro-legalizacion-FULFILLMENT', module_id = 'MOD-19', parent_id = 'MOD-19';
     `);
 
     // RESCATE DE DATOS: Recupera rutas huérfanas y repara fechas nulas
@@ -2220,20 +2220,20 @@ export const restoreSystem = async () => {
  * Ejecuta optimizaciones pesadas en segundo plano para no bloquear el arranque del sistema (Evita 503)
  */
 export const runBackgroundOptimizations = async () => {
-    const client = await pool.connect();
-    try {
-        console.log('[M7-BACKGROUND] Iniciando optimizaciones de rendimiento (No bloqueante)...');
-        // Índice para corregir el timeout en GPS (Lentitud en DISTINCT ON)
-        await client.query(`
+  const client = await pool.connect();
+  try {
+    console.log('[M7-BACKGROUND] Iniciando optimizaciones de rendimiento (No bloqueante)...');
+    // Índice para corregir el timeout en GPS (Lentitud en DISTINCT ON)
+    await client.query(`
             CREATE INDEX IF NOT EXISTS idx_vehicle_locations_latest 
             ON vehicle_locations (vehicle_id, updated_at DESC)
         `);
-        console.log('[M7-BACKGROUND] Optimizaciones completadas exitosamente.');
-    } catch (err: any) {
-        console.error('[M7-BACKGROUND-ERROR] Falló optimización de índices:', err.message);
-    } finally {
-        client.release();
-    }
+    console.log('[M7-BACKGROUND] Optimizaciones completadas exitosamente.');
+  } catch (err: any) {
+    console.error('[M7-BACKGROUND-ERROR] Falló optimización de índices:', err.message);
+  } finally {
+    client.release();
+  }
 };
 
 async function seedGhMiscelaneos(client: any) {
@@ -2281,39 +2281,39 @@ async function seedGhMiscelaneos(client: any) {
  * pero que aún tienen facturas asociadas en route_invoices, o tienen fechas nulas.
  */
 async function recoverOrphanedRoutes(client: any) {
-    try {
-        console.log('[M7-RECOVERY] Iniciando rescate inteligente de datos...');
-        
-        // 1. Reparar fechas nulas
-        await client.query(`UPDATE routes SET created_at = NOW() WHERE created_at IS NULL`);
-        await client.query(`UPDATE route_invoices SET created_at = NOW() WHERE created_at IS NULL`);
-        
-        // 2. Buscar rutas huérfanas o con nombre genérico para recuperarlas
-        const orphans = await client.query(`
+  try {
+    console.log('[M7-RECOVERY] Iniciando rescate inteligente de datos...');
+
+    // 1. Reparar fechas nulas
+    await client.query(`UPDATE routes SET created_at = NOW() WHERE created_at IS NULL`);
+    await client.query(`UPDATE route_invoices SET created_at = NOW() WHERE created_at IS NULL`);
+
+    // 2. Buscar rutas huérfanas o con nombre genérico para recuperarlas
+    const orphans = await client.query(`
             SELECT DISTINCT ri.route_id 
             FROM route_invoices ri 
             LEFT JOIN routes r ON r.id::text = ri.route_id::text 
             WHERE r.id IS NULL OR r.name = 'RUTA RECUPERADA'
         `);
-        
-        if (orphans.rows.length > 0) {
-            console.log(`[M7-RECOVERY] Detectadas ${orphans.rows.length} rutas para reconstrucción inteligente.`);
-            for (const row of orphans.rows) {
-                const rid = row.route_id;
-                
-                // Deducir Placa y Cliente de los documentos originales vinculados a esta ruta
-                const meta = await client.query(`
+
+    if (orphans.rows.length > 0) {
+      console.log(`[M7-RECOVERY] Detectadas ${orphans.rows.length} rutas para reconstrucción inteligente.`);
+      for (const row of orphans.rows) {
+        const rid = row.route_id;
+
+        // Deducir Placa y Cliente de los documentos originales vinculados a esta ruta
+        const meta = await client.query(`
                     SELECT dl.vehicle_plate, dl.client_id 
                     FROM route_invoices ri
                     JOIN documents_l dl ON dl.id::text = SPLIT_PART(ri.invoice_id, '_', 1)
                     WHERE ri.route_id = $1
                     LIMIT 1
                 `, [rid]);
-                
-                const plate = meta.rows[0]?.vehicle_plate || 'SIN PLACA';
-                const clientId = meta.rows[0]?.client_id || 'CLIENTE-GENERICO';
 
-                await client.query(`
+        const plate = meta.rows[0]?.vehicle_plate || 'SIN PLACA';
+        const clientId = meta.rows[0]?.client_id || 'CLIENTE-GENERICO';
+
+        await client.query(`
                     INSERT INTO routes (id, name, description, vehicle_id, client_id, status_id, created_by, created_at)
                     VALUES ($1, $2, 'Rescatada automáticamente', $3, $4, 'EST-10', 'SYSTEM_RECOVERY', NOW())
                     ON CONFLICT (id) DO UPDATE SET 
@@ -2321,10 +2321,10 @@ async function recoverOrphanedRoutes(client: any) {
                         client_id = EXCLUDED.client_id,
                         name = EXCLUDED.name
                 `, [rid, `RUTA ${plate}`, plate, clientId]);
-            }
-        }
-        console.log('[M7-RECOVERY] Reconstrucción inteligente finalizada.');
-    } catch (err: any) {
-        console.error('[M7-RECOVERY-ERROR]', err.message);
+      }
     }
+    console.log('[M7-RECOVERY] Reconstrucción inteligente finalizada.');
+  } catch (err: any) {
+    console.error('[M7-RECOVERY-ERROR]', err.message);
+  }
 }

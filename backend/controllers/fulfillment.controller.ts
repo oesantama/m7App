@@ -263,8 +263,8 @@ export const getRegistros = async (req: Request, res: Response) => {
     const conds: string[] = [];
     const vals: any[] = [];
     if (cliente_id) { vals.push(cliente_id); conds.push(`r.cliente_id = $${vals.length}`); }
-    if (anio)       { vals.push(anio);       conds.push(`r.anio = $${vals.length}`); }
-    if (mes)        { vals.push(mes);        conds.push(`r.mes = $${vals.length}`); }
+    if (anio) { vals.push(anio); conds.push(`r.anio = $${vals.length}`); }
+    if (mes) { vals.push(mes); conds.push(`r.mes = $${vals.length}`); }
 
     // Vista por defecto de "Consulta": solo el período (año+mes) más reciente que exista,
     // sin necesidad de que el usuario aplique filtros primero.
@@ -272,7 +272,7 @@ export const getRegistros = async (req: Request, res: Response) => {
       const latestPeriod = await resolveLatestPeriod(cliente_id);
       if (latestPeriod) {
         vals.push(latestPeriod.anio); conds.push(`r.anio = $${vals.length}`);
-        vals.push(latestPeriod.mes);  conds.push(`r.mes = $${vals.length}`);
+        vals.push(latestPeriod.mes); conds.push(`r.mes = $${vals.length}`);
       }
     }
 
@@ -329,13 +329,13 @@ export const getResumenGerencial = async (req: Request, res: Response) => {
     const conds: string[] = [];
     const vals: any[] = [];
     if (cliente_id) { vals.push(cliente_id); conds.push(`r.cliente_id = $${vals.length}`); }
-    if (anio)       { vals.push(anio);       conds.push(`r.anio = $${vals.length}`); }
-    if (mes)        { vals.push(mes);        conds.push(`r.mes = $${vals.length}`); }
+    if (anio) { vals.push(anio); conds.push(`r.anio = $${vals.length}`); }
+    if (mes) { vals.push(mes); conds.push(`r.mes = $${vals.length}`); }
     if (latest === 'true' && !anio && !mes) {
       const latestPeriod = await resolveLatestPeriod(cliente_id);
       if (latestPeriod) {
         vals.push(latestPeriod.anio); conds.push(`r.anio = $${vals.length}`);
-        vals.push(latestPeriod.mes);  conds.push(`r.mes = $${vals.length}`);
+        vals.push(latestPeriod.mes); conds.push(`r.mes = $${vals.length}`);
       }
     }
     const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
@@ -798,7 +798,7 @@ export const importFulfillmentXlsx = async (req: Request, res: Response) => {
           : 'El archivo no tiene hojas para importar.';
       return res.status(400).json({
         success: false,
-        error: `El archivo no corresponde a la plantilla de Fullfilment. ${motivo} Descarga la plantilla e intenta de nuevo.`,
+        error: `El archivo no corresponde a la plantilla de FULFILLMENT. ${motivo} Descarga la plantilla e intenta de nuevo.`,
       });
     }
 

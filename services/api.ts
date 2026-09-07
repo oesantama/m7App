@@ -5,16 +5,16 @@ export const API_URL = import.meta.env.VITE_API_URL || (isDev ? 'http://localhos
 
 export const getStoredToken = (): string => {
   const sessionStr = localStorage.getItem('m7_user_session');
-  let token = localStorage.getItem('token') || 
-              localStorage.getItem('m7_token') || 
-              localStorage.getItem('m7_auth_token') || 
-              localStorage.getItem('m7_client_token');
-  
+  let token = localStorage.getItem('token') ||
+    localStorage.getItem('m7_token') ||
+    localStorage.getItem('m7_auth_token') ||
+    localStorage.getItem('m7_client_token');
+
   if (!token && sessionStr) {
     try {
       const session = JSON.parse(sessionStr);
       token = session.token || session.accessToken || session.auth_token;
-    } catch (e) {}
+    } catch (e) { }
   }
   return token || '';
 };
@@ -35,8 +35,8 @@ export const fetchJson = async (url: string, options?: any) => {
     const customHeaders: any = { ...options?.headers };
     if (token) {
       if (import.meta.env.DEV) {
-          console.log('%c [API-AUTH-DIAGNOSTIC] 🔑 TOKEN ENCONTRADO', 'background: #059669; color: white; padding: 4px; border-radius: 4px;');
-          console.table({ token_preview: token.substring(0, 30) + '...', length: token.length });
+        console.log('%c [API-AUTH-DIAGNOSTIC] 🔑 TOKEN ENCONTRADO', 'background: #059669; color: white; padding: 4px; border-radius: 4px;');
+        console.table({ token_preview: token.substring(0, 30) + '...', length: token.length });
       }
       localStorage.setItem('token', token);
       customHeaders['Authorization'] = `Bearer ${token.trim()}`;
@@ -58,13 +58,13 @@ export const fetchJson = async (url: string, options?: any) => {
     };
 
     if (import.meta.env.DEV) {
-        console.log(`[API-DEBUG] Petición: ${options?.method || 'GET'} ${url}`);
-        console.log(`[API-DEBUG] Headers Finales:`, fetchOptions.headers);
+      console.log(`[API-DEBUG] Petición: ${options?.method || 'GET'} ${url}`);
+      console.log(`[API-DEBUG] Headers Finales:`, fetchOptions.headers);
     }
 
     try {
       const res = await fetch(url, fetchOptions);
-      
+
       const isJson = res.headers.get('content-type')?.includes('application/json');
       const data = isJson ? await res.json().catch(() => ({})) : await res.text();
 
@@ -274,7 +274,7 @@ export const api = {
     fetchJson(`${API_URL}/conciliation/invoice-value`, { method: 'PATCH', body: JSON.stringify(data) }),
   adjustPayment: (data: { documentId: string; invoiceNumber: string; newValor?: number; newComprobante?: string; userId: string }) =>
     fetchJson(`${API_URL}/conciliation/adjust-payment`, { method: 'POST', body: JSON.stringify(data) }),
-  addMissingInvoice: (data: { 
+  addMissingInvoice: (data: {
     documentId: string; invoiceNumber: string; valor: number; metodoPago: string; targetRouteId?: string; userId: string;
     customerName?: string; city?: string; address?: string; unCode?: string; clientRef?: string;
     items?: { articleId: string; expectedQty: number; peso?: number; volume?: number; orderNumber?: string }[];
@@ -377,7 +377,7 @@ export const api = {
     const qs = new URLSearchParams();
     if (params?.clientId) qs.set('clientId', params.clientId);
     if (params?.dateFrom) qs.set('dateFrom', params.dateFrom);
-    if (params?.dateTo)   qs.set('dateTo',   params.dateTo);
+    if (params?.dateTo) qs.set('dateTo', params.dateTo);
     return fetchJson(`${API_URL}/dispatch/bodega-returns-history${qs.toString() ? '?' + qs : ''}`);
   },
   confirmReturnConciliation: (id: number | string, data: { confirmedBy: string; observaciones?: string }) =>
@@ -398,11 +398,11 @@ export const api = {
   // ── Consulta de Inventario / Kardex ───────────────────────────────────────
   getInventoryStock: (params?: { clientId?: string; articleId?: string; location?: string; dateFrom?: string; dateTo?: string }) => {
     const qs = new URLSearchParams();
-    if (params?.clientId)   qs.set('clientId',   params.clientId);
-    if (params?.articleId)  qs.set('articleId',  params.articleId);
-    if (params?.location)   qs.set('location',   params.location);
-    if (params?.dateFrom)   qs.set('dateFrom',   params.dateFrom);
-    if (params?.dateTo)     qs.set('dateTo',     params.dateTo);
+    if (params?.clientId) qs.set('clientId', params.clientId);
+    if (params?.articleId) qs.set('articleId', params.articleId);
+    if (params?.location) qs.set('location', params.location);
+    if (params?.dateFrom) qs.set('dateFrom', params.dateFrom);
+    if (params?.dateTo) qs.set('dateTo', params.dateTo);
     return fetchJson(`${API_URL}/inventory/stock?${qs}`);
   },
   getInventoryMovements: (params?: {
@@ -411,15 +411,15 @@ export const api = {
     dateFrom?: string; dateTo?: string; page?: number; limit?: number;
   }) => {
     const qs = new URLSearchParams();
-    if (params?.clientId)     qs.set('clientId',     params.clientId);
-    if (params?.articleId)    qs.set('articleId',    params.articleId);
+    if (params?.clientId) qs.set('clientId', params.clientId);
+    if (params?.articleId) qs.set('articleId', params.articleId);
     if (params?.movementType) qs.set('movementType', params.movementType);
     if (params?.vehiclePlate) qs.set('vehiclePlate', params.vehiclePlate);
-    if (params?.invoice)      qs.set('invoice',      params.invoice);
-    if (params?.dateFrom)     qs.set('dateFrom',     params.dateFrom);
-    if (params?.dateTo)       qs.set('dateTo',       params.dateTo);
-    if (params?.page)         qs.set('page',         String(params.page));
-    if (params?.limit)        qs.set('limit',        String(params.limit));
+    if (params?.invoice) qs.set('invoice', params.invoice);
+    if (params?.dateFrom) qs.set('dateFrom', params.dateFrom);
+    if (params?.dateTo) qs.set('dateTo', params.dateTo);
+    if (params?.page) qs.set('page', String(params.page));
+    if (params?.limit) qs.set('limit', String(params.limit));
     return fetchJson(`${API_URL}/inventory/movements?${qs}`);
   },
   getArticleDashboardSummary: (articleId: string) => fetchJson(`${API_URL}/inventory/dashboard-summary?articleId=${encodeURIComponent(articleId)}`),
@@ -427,7 +427,7 @@ export const api = {
   getSupplierReturns: (params?: { clientId?: string; status?: string }) => {
     const qs = new URLSearchParams();
     if (params?.clientId) qs.set('clientId', params.clientId);
-    if (params?.status)   qs.set('status',   params.status);
+    if (params?.status) qs.set('status', params.status);
     return fetchJson(`${API_URL}/inventory/supplier-returns?${qs}`);
   },
   createSupplierReturn: (data: {
@@ -631,11 +631,11 @@ export const api = {
   getEncuestaDetail: (id: number | string) => fetchJson(`${API_URL}/gh-personal/resultados/${id}`),
   exportEncuestasExcel: async (params?: { from?: string, to?: string, search?: string, areaId?: number }) => {
     const qs = params ? '?' + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([, v]) => v != null) as [string, string][])).toString() : '';
-    const token = localStorage.getItem('token') || 
-                 localStorage.getItem('m7_token') || 
-                 localStorage.getItem('m7_auth_token') || 
-                 localStorage.getItem('m7_client_token');
-    
+    const token = localStorage.getItem('token') ||
+      localStorage.getItem('m7_token') ||
+      localStorage.getItem('m7_auth_token') ||
+      localStorage.getItem('m7_client_token');
+
     const response = await fetch(`${API_URL}/gh-personal/resultados/excel${qs}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -650,11 +650,11 @@ export const api = {
     a.remove();
   },
   downloadSurveyPDF: async (id: number | string) => {
-    const token = localStorage.getItem('token') || 
-                 localStorage.getItem('m7_token') || 
-                 localStorage.getItem('m7_auth_token') || 
-                 localStorage.getItem('m7_client_token');
-    
+    const token = localStorage.getItem('token') ||
+      localStorage.getItem('m7_token') ||
+      localStorage.getItem('m7_auth_token') ||
+      localStorage.getItem('m7_client_token');
+
     const response = await fetch(`${API_URL}/gh-personal/pdf/${id}`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -812,11 +812,11 @@ export const api = {
       body: JSON.stringify(data),
     }),
   downloadAsignacionPDF: async (id: number | string) => {
-    const token = localStorage.getItem('token') || 
-                 localStorage.getItem('m7_token') || 
-                 localStorage.getItem('m7_auth_token') || 
-                 localStorage.getItem('m7_client_token');
-    
+    const token = localStorage.getItem('token') ||
+      localStorage.getItem('m7_token') ||
+      localStorage.getItem('m7_auth_token') ||
+      localStorage.getItem('m7_client_token');
+
     const response = await fetch(`${API_URL}/gh-entradas-salidas/asignaciones/${id}/acta`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -831,11 +831,11 @@ export const api = {
     a.remove();
   },
   downloadDevolucionPDF: async (id: number | string) => {
-    const token = localStorage.getItem('token') || 
-                 localStorage.getItem('m7_token') || 
-                 localStorage.getItem('m7_auth_token') || 
-                 localStorage.getItem('m7_client_token');
-    
+    const token = localStorage.getItem('token') ||
+      localStorage.getItem('m7_token') ||
+      localStorage.getItem('m7_auth_token') ||
+      localStorage.getItem('m7_client_token');
+
     const response = await fetch(`${API_URL}/gh-entradas-salidas/devoluciones/${id}/acta`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -871,9 +871,9 @@ export const api = {
     },
     downloadScript: async () => {
       const token = localStorage.getItem('token') ||
-                   localStorage.getItem('m7_token') ||
-                   localStorage.getItem('m7_auth_token') ||
-                   localStorage.getItem('m7_client_token');
+        localStorage.getItem('m7_token') ||
+        localStorage.getItem('m7_auth_token') ||
+        localStorage.getItem('m7_client_token');
 
       const os = api.itActivos.detectOs();
       const response = await fetch(`${API_URL}/it-activos/script?os=${os}`, {
@@ -899,9 +899,9 @@ export const api = {
     },
     downloadActaPdf: async (id: string, serial: string) => {
       const token = localStorage.getItem('token') ||
-                   localStorage.getItem('m7_token') ||
-                   localStorage.getItem('m7_auth_token') ||
-                   localStorage.getItem('m7_client_token');
+        localStorage.getItem('m7_token') ||
+        localStorage.getItem('m7_auth_token') ||
+        localStorage.getItem('m7_client_token');
 
       const response = await fetch(`${API_URL}/it-activos/${id}/acta-pdf`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -1118,7 +1118,7 @@ export const api = {
   }),
   deleteUserPermission: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/user-permissions/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
   deleteRolePermission: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/permissions/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
-  
+
   getArticles: () => fetchJson(`${API_URL}/articles`),
   saveArticle: (data: any) => fetchJson(`${API_URL}/articles`, {
     method: 'POST',
@@ -1302,20 +1302,20 @@ export const api = {
     if (data instanceof FormData) {
       return fetchJson(`${API_URL}/ajover-b36/upload`, { method: 'POST', body: data });
     }
-    return fetchJson(`${API_URL}/ajover-b36/upload`, { 
-      method: 'POST', 
+    return fetchJson(`${API_URL}/ajover-b36/upload`, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data) 
+      body: JSON.stringify(data)
     });
   },
 
   getAuditoriaB36Encabezados: (params?: { clientId?: string; from?: string; to?: string; placa?: string; os?: string }) => {
     const qs = new URLSearchParams();
     if (params?.clientId) qs.set('clientId', params.clientId);
-    if (params?.from)     qs.set('from',     params.from);
-    if (params?.to)       qs.set('to',       params.to);
-    if (params?.placa)    qs.set('placa',    params.placa);
-    if (params?.os)       qs.set('os',       params.os);
+    if (params?.from) qs.set('from', params.from);
+    if (params?.to) qs.set('to', params.to);
+    if (params?.placa) qs.set('placa', params.placa);
+    if (params?.os) qs.set('os', params.os);
     return fetchJson(`${API_URL}/ajover-b36/encabezados?${qs.toString()}`);
   },
 
@@ -1354,10 +1354,10 @@ export const api = {
   getAuditoriaB36Conciliacion: (params?: { clientId?: string; from?: string; to?: string; placa?: string; factura?: string }) => {
     const qs = new URLSearchParams();
     if (params?.clientId) qs.set('clientId', params.clientId);
-    if (params?.from)     qs.set('from', params.from);
-    if (params?.to)       qs.set('to', params.to);
-    if (params?.placa)    qs.set('placa', params.placa);
-    if (params?.factura)  qs.set('factura', params.factura);
+    if (params?.from) qs.set('from', params.from);
+    if (params?.to) qs.set('to', params.to);
+    if (params?.placa) qs.set('placa', params.placa);
+    if (params?.factura) qs.set('factura', params.factura);
     return fetchJson(`${API_URL}/ajover-b36/conciliacion?${qs.toString()}`);
   },
 
@@ -1393,9 +1393,9 @@ export const api = {
     const qs = new URLSearchParams();
     if (params?.estado) qs.set('estado', params.estado);
     if (params?.search) qs.set('search', params.search);
-    if (params?.from)   qs.set('from', params.from);
-    if (params?.to)     qs.set('to', params.to);
-    if (params?.placa)  qs.set('placa', params.placa);
+    if (params?.from) qs.set('from', params.from);
+    if (params?.to) qs.set('to', params.to);
+    if (params?.placa) qs.set('placa', params.placa);
     return fetchJson(`${API_URL}/dicorp-legalizacion/encabezados?${qs.toString()}`);
   },
 
@@ -1698,7 +1698,7 @@ export const api = {
 
   // Firma Digital
   getAllSignatures: () => fetchJson(`${API_URL}/signatures`),
-  
+
   saveSignature: async (data: any) => {
     return await fetchJson(`${API_URL}/signatures`, {
       method: 'POST',
@@ -1794,12 +1794,12 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ tableName })
   }),
-  getAdminData: (params: { 
-    tableName: string, 
-    page?: number, 
-    limit?: number, 
-    search?: string, 
-    sortBy?: string, 
+  getAdminData: (params: {
+    tableName: string,
+    page?: number,
+    limit?: number,
+    search?: string,
+    sortBy?: string,
     sortOrder?: string,
     conditions?: any[]
   }) => fetchJson(`${API_URL}/admin/data`, {
@@ -1864,7 +1864,7 @@ export const api = {
     fetchJson(`${API_URL}/inventory-news/save-to-drive`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data)
     }),
-  
+
   // --- GRUPO INTER ---
   getGrupoInterOrders: (params: { search?: string, status?: string, client?: string, manifiesto?: string } = {}) => {
     const qs = new URLSearchParams(params as any).toString();
@@ -1935,7 +1935,7 @@ export const api = {
     const formData = new FormData();
     formData.append('file', file);
     if (planilla) formData.append('planilla', planilla);
-    
+
     // Adjuntamos el usuario actual para auditoría (update_by)
     const sessionStr = localStorage.getItem('m7_user_session');
     let username = 'System OCR';
@@ -1943,14 +1943,14 @@ export const api = {
       try {
         const session = JSON.parse(sessionStr);
         username = session.name || session.user?.name || 'Admin';
-      } catch (e) {}
+      } catch (e) { }
     }
     formData.append('username', username);
 
     // Obtenemos el token manualmente para el fetch directo
-    const token = localStorage.getItem('token') || 
-                  localStorage.getItem('m7_token') || 
-                  localStorage.getItem('m7_auth_token');
+    const token = localStorage.getItem('token') ||
+      localStorage.getItem('m7_token') ||
+      localStorage.getItem('m7_auth_token');
 
     const response = await fetch(`${API_URL}/grupo-inter/process-pdf`, {
       method: 'POST',
@@ -2086,7 +2086,7 @@ export const api = {
   capGetDashboard: (capacitacion_id?: number, cedula?: string) => {
     const p = new URLSearchParams();
     if (capacitacion_id) p.set('capacitacion_id', String(capacitacion_id));
-    if (cedula)          p.set('cedula', cedula);
+    if (cedula) p.set('cedula', cedula);
     const qs = p.toString() ? `?${p.toString()}` : '';
     return fetchJson(`${API_URL}/cap/dashboard${qs}`);
   },
@@ -2205,8 +2205,8 @@ export const api = {
   // ── Planillas Historial ─────────────────────────────────────────────────────
   dogamaGetPlanillasHistorial: (filters?: { placa?: string; fecha?: string; confeccionista?: string }) => {
     const p = new URLSearchParams();
-    if (filters?.placa)         p.set('placa', filters.placa);
-    if (filters?.fecha)         p.set('fecha', filters.fecha);
+    if (filters?.placa) p.set('placa', filters.placa);
+    if (filters?.fecha) p.set('fecha', filters.fecha);
     if (filters?.confeccionista) p.set('confeccionista', filters.confeccionista);
     const qs = p.toString();
     return fetchJson(`${API_URL}/dogama/planillas${qs ? '?' + qs : ''}`);
@@ -2376,9 +2376,9 @@ export const api = {
 
   dogamaImportOrdenesServicio: async (file: File, tipo_os: 'ida' | 'recogida') => {
     const token = localStorage.getItem('token') ||
-                  localStorage.getItem('m7_token') ||
-                  localStorage.getItem('m7_auth_token') ||
-                  localStorage.getItem('m7_client_token');
+      localStorage.getItem('m7_token') ||
+      localStorage.getItem('m7_auth_token') ||
+      localStorage.getItem('m7_client_token');
     const formData = new FormData();
     formData.append('file', file);
     formData.append('tipo_os', tipo_os);
@@ -2393,9 +2393,9 @@ export const api = {
 
   dogamaValidateOrdenesServicioXlsx: async (file: File, modo?: 'ida' | 'regreso') => {
     const token = localStorage.getItem('token') ||
-                  localStorage.getItem('m7_token') ||
-                  localStorage.getItem('m7_auth_token') ||
-                  localStorage.getItem('m7_client_token');
+      localStorage.getItem('m7_token') ||
+      localStorage.getItem('m7_auth_token') ||
+      localStorage.getItem('m7_client_token');
     const formData = new FormData();
     formData.append('file', file);
     if (modo) formData.append('modo', modo);
@@ -2415,9 +2415,9 @@ export const api = {
     selectedIndices?: number[]
   ) => {
     const token = localStorage.getItem('token') ||
-                  localStorage.getItem('m7_token') ||
-                  localStorage.getItem('m7_auth_token') ||
-                  localStorage.getItem('m7_client_token');
+      localStorage.getItem('m7_token') ||
+      localStorage.getItem('m7_auth_token') ||
+      localStorage.getItem('m7_client_token');
     const formData = new FormData();
     formData.append('file', file);
     if (modo) formData.append('modo', modo);
@@ -2508,7 +2508,7 @@ export const api = {
 
   dogamaGetNotifCorreos: (filters?: { estado?: string; fecha_desde?: string; fecha_hasta?: string; enc_id?: number }) => {
     const params = new URLSearchParams();
-    if (filters?.estado)      params.set('estado', filters.estado);
+    if (filters?.estado) params.set('estado', filters.estado);
     if (filters?.fecha_desde) params.set('fecha_desde', filters.fecha_desde);
     if (filters?.fecha_hasta) params.set('fecha_hasta', filters.fecha_hasta);
     if (filters?.enc_id != null) params.set('enc_id', String(filters.enc_id));
@@ -2627,7 +2627,7 @@ export const api = {
     fetchJson(`${API_URL}/validation/sources/${id}`, { method: 'DELETE' }),
 
   validationGetRecords: (params?: { entity_type?: string; entity_id?: string; limit?: number }) => {
-    const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([,v]) => v !== undefined).map(([k,v]) => [k, String(v)])).toString() : '';
+    const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : '';
     return fetchJson(`${API_URL}/validation/records${qs}`);
   },
 
@@ -2650,7 +2650,7 @@ export const api = {
       formData.append('notes', notes);
     }
     formData.append('isBaseFile', String(isBaseFile));
-    
+
     return fetchJson(`${API_URL}/basc/upload`, {
       method: 'POST',
       body: formData
@@ -2677,11 +2677,11 @@ export const api = {
     }
   },
   bascDownloadReport: async () => {
-    const token = localStorage.getItem('token') || 
-                 localStorage.getItem('m7_token') || 
-                 localStorage.getItem('m7_auth_token') || 
-                 localStorage.getItem('m7_client_token');
-    
+    const token = localStorage.getItem('token') ||
+      localStorage.getItem('m7_token') ||
+      localStorage.getItem('m7_auth_token') ||
+      localStorage.getItem('m7_client_token');
+
     const response = await fetch(`${API_URL}/basc/reports/download`, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -2704,7 +2704,7 @@ export const api = {
   sendCyberCampaign: (id: number) => fetchJson(`${API_URL}/cybersecurity/phishing/campaigns/${id}/send`, { method: 'POST' }),
   getCyberCampaignStats: (id: number) => fetchJson(`${API_URL}/cybersecurity/phishing/campaigns/${id}/stats`),
 
-  // ── Operación Fullfilment ────────────────────────────────────────────────
+  // ── Operación FULFILLMENT ────────────────────────────────────────────────
   getFulfillmentClientes: () => fetchJson(`${API_URL}/fulfillment/clientes`),
   createFulfillmentCliente: (data: { codigo: string; nombre: string; pais?: string; moneda: 'USD' | 'COP'; notas_tarifas?: string }) =>
     fetchJson(`${API_URL}/fulfillment/clientes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
