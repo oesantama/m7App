@@ -2192,12 +2192,12 @@ export const restoreSystem = async () => {
       WHERE NOT EXISTS (SELECT 1 FROM modules WHERE id = 'MOD-19');
 
       INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
-      VALUES ('PAG-76', 'MAESTRAS FULFILLMENT', 'maestras-FULFILLMENT', 'MOD-19', 'MOD-19', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET name = 'MAESTRAS FULFILLMENT', route = 'maestras-FULFILLMENT', module_id = 'MOD-19', parent_id = 'MOD-19';
+      VALUES ('PAG-76', 'MAESTRAS FULFILLMENT', 'maestras-fulfillment', 'MOD-19', 'MOD-19', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = 'MAESTRAS FULFILLMENT', route = 'maestras-fulfillment', module_id = 'MOD-19', parent_id = 'MOD-19';
 
       INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
-      VALUES ('PAG-77', 'REGISTRO Y LEGALIZACION', 'registro-legalizacion-FULFILLMENT', 'MOD-19', 'MOD-19', 'EST-01')
-      ON CONFLICT (id) DO UPDATE SET name = 'REGISTRO Y LEGALIZACION', route = 'registro-legalizacion-FULFILLMENT', module_id = 'MOD-19', parent_id = 'MOD-19';
+      VALUES ('PAG-77', 'REGISTRO Y LEGALIZACION', 'registro-legalizacion-fulfillment', 'MOD-19', 'MOD-19', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = 'REGISTRO Y LEGALIZACION', route = 'registro-legalizacion-fulfillment', module_id = 'MOD-19', parent_id = 'MOD-19';
     `);
 
     // RESCATE DE DATOS: Recupera rutas huérfanas y repara fechas nulas

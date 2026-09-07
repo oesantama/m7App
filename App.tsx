@@ -1160,13 +1160,13 @@ const App: React.FC = () => {
             <ConciliacionJhonUribe user={user!} />
           </React.Suspense>
         );
-      case 'maestras-FULFILLMENT':
+      case 'maestras-fulfillment':
         return (
           <React.Suspense fallback={<div className="p-10">Cargando Maestras FULFILLMENT...</div>}>
             <MaestrasFulfillment user={user!} />
           </React.Suspense>
         );
-      case 'registro-legalizacion-FULFILLMENT':
+      case 'registro-legalizacion-fulfillment':
         return (
           <React.Suspense fallback={<div className="p-10">Cargando Registro y Legalización...</div>}>
             <RegistroLegalizacionFulfillment user={user!} />
