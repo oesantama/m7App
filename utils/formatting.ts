@@ -28,6 +28,16 @@ export const formatCurrency = (value: number | string | null | undefined): strin
  */
 export const formatDate = (date: Date | string | number | null | undefined, includeTime: boolean = false): string => {
   if (!date) return 'S/I';
+
+  // Fechas "solo día" (columnas DATE, ej. "2026-09-07") no llevan hora ni zona horaria.
+  // Parsearlas con `new Date()` las interpreta como medianoche UTC y, al formatear en un
+  // huso detrás de UTC (Bogotá, UTC-5), retroceden un día — se formatean directo del string,
+  // sin pasar nunca por el constructor Date, para no depender de ninguna zona horaria.
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) && !includeTime) {
+    const [y, m, d] = date.split('-');
+    return `${d}/${m}/${y}`;
+  }
+
   const d = new Date(date);
   if (isNaN(d.getTime())) return 'S/I';
 
@@ -35,6 +45,7 @@ export const formatDate = (date: Date | string | number | null | undefined, incl
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
+    timeZone: 'America/Bogota',
   };
 
   if (includeTime) {

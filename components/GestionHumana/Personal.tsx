@@ -7,6 +7,7 @@ import { Icons } from '../../constants';
 import SearchableSelect from '../common/SearchableSelect';
 import { DataTable, ColumnDef } from '../shared/DataTable';
 import { hasPermission } from '../../utils/permissions';
+import { formatDate } from '../../utils/formatting';
 
 interface PersonalRecord {
   id: number;
@@ -203,7 +204,7 @@ const Personal: React.FC<Props> = ({ user }) => {
       key: 'fecha_ingreso',
       render: (p) => (
         <span className="text-slate-400">
-          {p.fecha_ingreso ? new Date(p.fecha_ingreso).toLocaleDateString() : '—'}
+          {p.fecha_ingreso ? formatDate(p.fecha_ingreso) : '—'}
         </span>
       )
     },
@@ -697,7 +698,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                   </h4>
                   <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100 space-y-3">
                     <DetailItem label="Cargo" value={showDetail.cargo_enc_nombre || showDetail.cargo_actual} />
-                    <DetailItem label="Fecha Ingreso" value={showDetail.fecha_ingreso ? new Date(showDetail.fecha_ingreso).toLocaleDateString() : 'N/A'} />
+                    <DetailItem label="Fecha Ingreso" value={showDetail.fecha_ingreso ? formatDate(showDetail.fecha_ingreso) : 'N/A'} />
                     <DetailItem label="Tipo Contrato" value={showDetail.contrato_nombre} />
                     <DetailItem label="Turno Laboral" value={showDetail.turno_nombre} />
                     <DetailItem label="Ingresos" value={showDetail.ingresos_nombre} />
@@ -776,7 +777,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                           {showDetail.familia.map((f: any, idx: number) => (
                             <tr key={idx} className="hover:bg-white transition-all">
                               <td className="px-6 py-3 font-black text-slate-900 uppercase text-left">{f.nombre}</td>
-                              <td className="px-6 py-3 text-right text-slate-600">{f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—'}</td>
+                              <td className="px-6 py-3 text-right text-slate-600">{f.fecha_nacimiento ? formatDate(f.fecha_nacimiento) : '—'}</td>
                             </tr>
                           ))}
                         </tbody>

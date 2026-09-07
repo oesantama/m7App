@@ -4,6 +4,7 @@ import { api } from '../../services/api';
 import { toast } from 'sonner';
 import { DataTable, ColumnDef } from '../shared/DataTable';
 import { hasPermission } from '../../utils/permissions';
+import { formatDate } from '../../utils/formatting';
 import { 
   Plus, Trash2, Save, Search, Calendar, X, FileText, 
   Package, RefreshCw, AlertCircle, Eye, ShoppingCart, 
@@ -138,7 +139,7 @@ const EntregasSalidas: React.FC<Props> = ({ user }) => {
     {
       header: 'Fecha Operación',
       key: 'fecha',
-      render: (row) => <span className="font-medium text-slate-500">{new Date(row.fecha).toLocaleDateString('es-CO')}</span>
+      render: (row) => <span className="font-medium text-slate-500">{formatDate(row.fecha)}</span>
     },
     {
       header: 'Estado OC',
@@ -195,7 +196,7 @@ const EntregasSalidas: React.FC<Props> = ({ user }) => {
     {
       header: 'Fecha Operación',
       key: 'fecha',
-      render: (row) => <span className="font-medium text-slate-500">{new Date(row.fecha).toLocaleDateString('es-CO')}</span>
+      render: (row) => <span className="font-medium text-slate-500">{formatDate(row.fecha)}</span>
     },
     {
       header: 'Origen OC',
@@ -251,7 +252,7 @@ const EntregasSalidas: React.FC<Props> = ({ user }) => {
     {
       header: 'Fecha Operación',
       key: 'fecha',
-      render: (row) => <span className="font-medium text-slate-500">{new Date(row.fecha).toLocaleDateString('es-CO')}</span>
+      render: (row) => <span className="font-medium text-slate-500">{formatDate(row.fecha)}</span>
     },
     {
       header: 'Registrado Por',
@@ -1606,7 +1607,7 @@ const EntregasSalidas: React.FC<Props> = ({ user }) => {
                 </div>
                 <div>
                   <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Fecha Operación</span>
-                  <span className="text-xs font-bold text-slate-800">{new Date(viewTransactionDetails.fecha).toLocaleDateString('es-CO')}</span>
+                  <span className="text-xs font-bold text-slate-800">{formatDate(viewTransactionDetails.fecha)}</span>
                 </div>
                 {viewTransactionDetails.orden_numero && (
                   <div>

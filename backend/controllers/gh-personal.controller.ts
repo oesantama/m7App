@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { formatDateCO } from '../utils/date.util.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -610,9 +611,9 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
       'CARGO ACTUAL': e.cargo_actual || '—',
       'CARGO EN ENCUESTA': e.cargo_enc_nombre || '—',
       'FECHA REALIZACIÓN': e.fecha_realizacion ? new Date(e.fecha_realizacion).toLocaleString() : '—',
-      'FECHA INGRESO': e.fecha_ingreso ? new Date(e.fecha_ingreso).toLocaleDateString() : '—',
+      'FECHA INGRESO': formatDateCO(e.fecha_ingreso) || '—',
       'LUGAR NACIMIENTO': `${e.mun_nac_nombre || '—'}, ${e.dep_nac_nombre || '—'}`,
-      'FECHA NACIMIENTO': e.fecha_nacimiento ? new Date(e.fecha_nacimiento).toLocaleDateString() : '—',
+      'FECHA NACIMIENTO': formatDateCO(e.fecha_nacimiento) || '—',
       'TIPO SANGRE': e.sangre_nombre || '—',
       'ESTADO CIVIL': e.civil_nombre || '—',
       'NIVEL EDUCATIVO': e.edu_nombre || '—',
@@ -648,7 +649,7 @@ export const exportEncuestasExcel = async (req: Request, res: Response) => {
       'CÉDULA COLABORADOR': f.cedula_personal,
       'NOMBRE COLABORADOR': f.nombre_personal,
       'NOMBRE FAMILIAR': f.nombre,
-      'FECHA NACIMIENTO': f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : 'N/A'
+      'FECHA NACIMIENTO': formatDateCO(f.fecha_nacimiento) || 'N/A'
     }));
 
     const wb = XLSX.utils.book_new();
@@ -886,18 +887,24 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
 
     const calculateAge = (birthDate: any) => {
       if (!birthDate) return '—';
+      // birthDate es una columna DATE ("YYYY-MM-DD") — se extraen los componentes directo del
+      // string en vez de pasar por `new Date(birthDate)`, que la interpretaría como medianoche
+      // UTC y podría restar un día al comparar contra la fecha local (Bogotá).
+      const match = String(birthDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (!match) return '—';
+      const [, yStr, mStr, dStr] = match;
+      const birthYear = Number(yStr), birthMonth = Number(mStr) - 1, birthDay = Number(dStr);
       const today = new Date();
-      const birth = new Date(birthDate);
-      let age = today.getFullYear() - birth.getFullYear();
-      const m = today.getMonth() - birth.getMonth();
-      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+      let age = today.getFullYear() - birthYear;
+      const m = today.getMonth() - birthMonth;
+      if (m < 0 || (m === 0 && today.getDate() < birthDay)) age--;
       return age;
     };
 
-    y = drawFormRow("1. DOCUMENTO IDENTIDAD", enc.cedula, "2. LUGAR Y FECHA NAC.", `${enc.mun_nac_nombre} / ${enc.fecha_nacimiento ? new Date(enc.fecha_nacimiento).toLocaleDateString() : '—'}`, y);
+    y = drawFormRow("1. DOCUMENTO IDENTIDAD", enc.cedula, "2. LUGAR Y FECHA NAC.", `${enc.mun_nac_nombre} / ${formatDateCO(enc.fecha_nacimiento) || '—'}`, y);
     y = drawFormRow("3. TIPO DE SANGRE", enc.sangre_nombre, "4. ESTADO CIVIL", enc.civil_nombre, y);
     y = drawFormRow("5. EDAD", calculateAge(enc.fecha_nacimiento), "6. NIVEL EDUCATIVO", enc.edu_nombre, y);
-    y = drawFormRow("7. FECHA DE INGRESO", enc.fecha_ingreso ? new Date(enc.fecha_ingreso).toLocaleDateString() : '—', "8. CARGO", enc.cargo_enc_nombre || enc.cargo_original, y);
+    y = drawFormRow("7. FECHA DE INGRESO", formatDateCO(enc.fecha_ingreso) || '—', "8. CARGO", enc.cargo_enc_nombre || enc.cargo_original, y);
     y = drawFormRow("9. TIPO DE CONTRATO", enc.contrato_nombre, "10. INGRESOS MENSUALES", enc.ingresos_nombre, y);
     y = drawFormRow("11. AFP", enc.afp_nombre, "12. EPS", enc.eps_nombre, y);
     y = drawFormRow("13. TURNO LABORAL", enc.turno_nombre, "14. TIPO DE VIVIENDA", enc.vivienda_nombre, y);
@@ -910,7 +917,7 @@ export const generateEncuestaPDF = async (req: Request, res: Response) => {
     y += 2;
     const numHijos = enc.cuantos_hijos === null || enc.cuantos_hijos === undefined ? '—' : enc.cuantos_hijos;
     const hijosText = familia.length > 0 
-      ? familia.map(f => `${f.nombre} (${f.fecha_nacimiento ? new Date(f.fecha_nacimiento).toLocaleDateString() : '—'})`).join('\n')
+      ? familia.map(f => `${f.nombre} (${formatDateCO(f.fecha_nacimiento) || '—'})`).join('\n')
       : (enc.cuantos_hijos > 0 ? "Información no disponible" : "Ninguno");
     
     y = drawFormRow("25. CUANTOS HIJOS TIENE", numHijos, "26. HIJOS MENORES DE 18 (Nombre y Fecha Nacimiento)", hijosText, y);

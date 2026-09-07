@@ -54,6 +54,12 @@ const ensureTables = async () => {
       estado      TEXT DEFAULT 'PENDIENTE'
     )
   `);
+  // Asocia el sobrecosto a una factura puntual de la planilla — nullable porque un sobrecosto
+  // también puede aplicar a toda la planilla en general (sin factura específica).
+  await pool.query(`
+    ALTER TABLE ajover_b36_sobrecostos ADD COLUMN IF NOT EXISTS id_detalle INTEGER REFERENCES ajover_b36_detalle(id) ON DELETE CASCADE;
+    CREATE INDEX IF NOT EXISTS idx_b36_sc_id_detalle ON ajover_b36_sobrecostos (id_detalle);
+  `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS ajover_b36_log (
       id           SERIAL PRIMARY KEY,
@@ -542,20 +548,22 @@ export const updatePlanilla = async (req: Request, res: Response) => {
         );
       }
 
-      // Insertar o actualizar cada sobrecosto
+      // Insertar o actualizar cada sobrecosto — id_detalle asocia el sobrecosto a una factura
+      // puntual de la planilla; null significa que aplica a la planilla en general.
       for (const s of sobrecostos) {
+        const idDetalle = s.id_detalle || null;
         if (s.id) {
           await client.query(
-            `UPDATE ajover_b36_sobrecostos 
-             SET valor = $1, observacion = $2, estado = $3 
-             WHERE id = $4 AND id_enca = $5`,
-            [s.valor, s.observacion, s.estado, s.id, id]
+            `UPDATE ajover_b36_sobrecostos
+             SET valor = $1, observacion = $2, estado = $3, id_detalle = $4
+             WHERE id = $5 AND id_enca = $6`,
+            [s.valor, s.observacion, s.estado, idDetalle, s.id, id]
           );
         } else {
           await client.query(
-            `INSERT INTO ajover_b36_sobrecostos (id_enca, valor, observacion, estado)
-             VALUES ($1, $2, $3, $4)`,
-            [id, s.valor, s.observacion, s.estado || 'PENDIENTE']
+            `INSERT INTO ajover_b36_sobrecostos (id_enca, valor, observacion, estado, id_detalle)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [id, s.valor, s.observacion, s.estado || 'PENDIENTE', idDetalle]
           );
         }
       }

@@ -3,6 +3,7 @@ import { User } from '../../types';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
 import { DataTable, ColumnDef } from '../shared/DataTable';
+import { formatDate } from '../../utils/formatting';
 import * as XLSX from 'xlsx';
 import {
   Package, Users, Search, RefreshCw, Barcode,
@@ -223,7 +224,7 @@ const ConsultasInventario: React.FC<Props> = ({ user }) => {
     {
       header: 'Fecha',
       key: 'fecha',
-      render: (row) => <span className="text-slate-500 font-bold">{new Date(row.fecha).toLocaleDateString('es-CO')}</span>
+      render: (row) => <span className="text-slate-500 font-bold">{formatDate(row.fecha)}</span>
     },
     {
       header: 'Colaborador',
@@ -491,7 +492,7 @@ const ConsultasInventario: React.FC<Props> = ({ user }) => {
     const rows = historialData.flatMap(mov => {
       if (mov.details && mov.details.length > 0) {
         return mov.details.map((d: any) => ({
-          'Fecha': new Date(mov.fecha).toLocaleDateString('es-CO'),
+          'Fecha': formatDate(mov.fecha),
           'Documento Nro': mov.numero,
           'Tipo de Movimiento': mov.tipo,
           'Funcionario': mov.personal_nombre,
@@ -505,7 +506,7 @@ const ConsultasInventario: React.FC<Props> = ({ user }) => {
         }));
       } else {
         return [{
-          'Fecha': new Date(mov.fecha).toLocaleDateString('es-CO'),
+          'Fecha': formatDate(mov.fecha),
           'Documento Nro': mov.numero,
           'Tipo de Movimiento': mov.tipo,
           'Funcionario': mov.personal_nombre,

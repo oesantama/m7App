@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { LOGO_MILLA_SIETE } from './gh-personal.controller.js';
+import { formatDateCO } from '../utils/date.util.js';
 
 // Get elements list (for dropdowns, including es_serializado)
 export const getElementosDropdown = async (req: Request, res: Response) => {
@@ -1070,7 +1071,7 @@ export const generateAsignacionActaPDF = async (req: Request, res: Response) => 
         doc.text("FECHA: 21/11/2020", 158, 31);
 
         // --- STEP 2: USER DETAILS TABLE ---
-        const fechaFormatted = asig.fecha ? new Date(asig.fecha).toLocaleDateString('es-CO') : '';
+        const fechaFormatted = formatDateCO(asig.fecha);
         const personalDataRows = [
             ['FECHA', fechaFormatted],
             ['NOMBRE COMPLETO', (asig.personal_nombre || '').toUpperCase()],
@@ -1308,7 +1309,7 @@ export const generateDevolucionActaPDF = async (req: Request, res: Response) => 
         doc.text("FECHA: 21/11/2020", 158, 31);
 
         // --- STEP 2: USER DETAILS TABLE ---
-        const fechaFormatted = dev.fecha ? new Date(dev.fecha).toLocaleDateString('es-CO') : '';
+        const fechaFormatted = formatDateCO(dev.fecha);
         const personalDataRows = [
             ['FECHA', fechaFormatted],
             ['NOMBRE COMPLETO', (dev.personal_nombre || '').toUpperCase()],

@@ -806,7 +806,8 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
   const [editingPlaca, setEditingPlaca] = useState<string>('');
   const [editingConductor, setEditingConductor] = useState<string>('');
   const [editChangeNotes, setEditChangeNotes] = useState<string>('');
-  const [editingSobrecostos, setEditingSobrecostos] = useState<Array<{ id?: number, valor: number, observacion: string, estado: string }>>([]);
+  const [editingSobrecostos, setEditingSobrecostos] = useState<Array<{ id?: number, id_detalle?: number | null, valor: number, observacion: string, estado: string }>>([]);
+  const [editingDetalles, setEditingDetalles] = useState<any[]>([]);
   const [loadingEditData, setLoadingEditData] = useState(false);
   const [savingPlanilla, setSavingPlanilla] = useState(false);
 
@@ -866,10 +867,15 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
     setEditChangeNotes('');
     setLoadingEditData(true);
     try {
-      const data = await (api as any).getAuditoriaB36Sobrecostos(row.id);
-      setEditingSobrecostos(Array.isArray(data) ? data : []);
+      const [sobrecostosData, detallesData] = await Promise.all([
+        (api as any).getAuditoriaB36Sobrecostos(row.id),
+        expanded[row.id] ? Promise.resolve(expanded[row.id]) : (api as any).getAuditoriaB36Detalle(row.id),
+      ]);
+      setEditingSobrecostos(Array.isArray(sobrecostosData) ? sobrecostosData : []);
+      setEditingDetalles(Array.isArray(detallesData) ? detallesData : []);
     } catch {
       setEditingSobrecostos([]);
+      setEditingDetalles([]);
     } finally {
       setLoadingEditData(false);
     }
@@ -1014,31 +1020,57 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
       startY += rh + 5;
       
       const columns = [
+        { header: '#', dataKey: 'num' },
         { header: '', dataKey: 'factura' },
         { header: '', dataKey: 'c2' },
         { header: '', dataKey: 'c3' },
         { header: '', dataKey: 'c4' },
         { header: 'F PAGO', dataKey: 'fpago' },
+        { header: 'SOBRECOSTO', dataKey: 'sobrecosto' },
         { header: '', dataKey: 'c6' },
         { header: '', dataKey: 'c7' },
         { header: 'VALOR', dataKey: 'valor' }
       ];
-      
-      const tableData = details.map((d: any) => ({
-        factura: d.factura || '',
-        c2: '',
-        c3: '',
-        c4: '',
-        fpago: 'CR',
-        c6: '',
-        c7: '',
-        valor: ''
-      }));
-      
-      while (tableData.length < 9) {
-        tableData.push({ factura: '', c2: '', c3: '', c4: '', fpago: '', c6: '', c7: '', valor: '' });
+
+      const fmtCurrency = (num: number) => {
+        return new Intl.NumberFormat('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
+      };
+
+      // Suma de sobrecostos asociados a cada factura puntual (id_detalle) — los sobrecostos
+      // "generales" (id_detalle nulo, aplican a toda la planilla) no se reparten por fila, solo
+      // cuentan en el total de la fila "SOBRECOSTOS" de más abajo.
+      const sobrecostoPorDetalle = new Map<number, number>();
+      if (Array.isArray(overcosts)) {
+        for (const item of overcosts) {
+          if (item.id_detalle) {
+            const prev = sobrecostoPorDetalle.get(item.id_detalle) || 0;
+            sobrecostoPorDetalle.set(item.id_detalle, prev + parseFloat(String(item.valor || '0')));
+          }
+        }
       }
-      
+
+      // Se numeran solo las filas con dato real (1, 2, 3... según cuántas facturas traiga
+      // el detalle) — las filas de relleno hasta completar el mínimo de 9 quedan sin numerar.
+      const tableData = details.map((d: any, i: number) => {
+        const scDetalle = sobrecostoPorDetalle.get(d.id);
+        return {
+          num: String(i + 1),
+          factura: d.factura || '',
+          c2: '',
+          c3: '',
+          c4: '',
+          fpago: 'CR',
+          sobrecosto: scDetalle ? fmtCurrency(scDetalle) : '',
+          c6: '',
+          c7: '',
+          valor: ''
+        };
+      });
+
+      while (tableData.length < 9) {
+        tableData.push({ num: '', factura: '', c2: '', c3: '', c4: '', fpago: '', sobrecosto: '', c6: '', c7: '', valor: '' });
+      }
+
       autoTable(doc, {
         columns: columns,
         body: tableData,
@@ -1061,28 +1093,26 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
           valign: 'middle',
         },
         columnStyles: {
-          factura: { cellWidth: 45, halign: 'center' },
-          c2: { cellWidth: 20 },
-          c3: { cellWidth: 20 },
-          c4: { cellWidth: 20 },
-          fpago: { cellWidth: 20, halign: 'center' },
-          c6: { cellWidth: 20 },
-          c7: { cellWidth: 15 },
-          valor: { cellWidth: 25, halign: 'right' }
+          num: { cellWidth: 9, halign: 'center' },
+          factura: { cellWidth: 38, halign: 'center' },
+          c2: { cellWidth: 16 },
+          c3: { cellWidth: 16 },
+          c4: { cellWidth: 16 },
+          fpago: { cellWidth: 18, halign: 'center' },
+          sobrecosto: { cellWidth: 24, halign: 'right' },
+          c6: { cellWidth: 16 },
+          c7: { cellWidth: 12 },
+          valor: { cellWidth: 20, halign: 'right' }
         },
         didDrawPage: (data) => {
           startY = data.cursor?.y || startY + 50;
         }
       });
-      
+
       const fleteVal = parseFloat(String(row.valor_flete || '0'));
       const scVal = Array.isArray(overcosts) ? overcosts.reduce((acc: number, item: any) => acc + parseFloat(String(item.valor || '0')), 0) : 0;
       const totalVal = fleteVal + scVal;
-      
-      const fmtCurrency = (num: number) => {
-        return new Intl.NumberFormat('es-CO', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
-      };
-      
+
       const rowHeight = rh;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.5);
@@ -1536,7 +1566,7 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">Sobrecostos Asociados</label>
                       <button
-                        onClick={() => setEditingSobrecostos(prev => [...prev, { valor: 0, observacion: '', estado: 'PENDIENTE' }])}
+                        onClick={() => setEditingSobrecostos(prev => [...prev, { id_detalle: null, valor: 0, observacion: '', estado: 'PENDIENTE' }])}
                         className="flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-[10px] font-black uppercase hover:bg-emerald-200 transition-colors"
                       >
                         <Plus size={10} /> Adicionar Sobrecosto
@@ -1547,6 +1577,7 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
                       <table className="w-full text-[10px]">
                         <thead className="bg-slate-50 sticky top-0">
                           <tr className="text-slate-500 font-black uppercase tracking-wider border-b border-slate-200">
+                            <th className="py-2 px-3 text-left">Factura</th>
                             <th className="py-2 px-3 text-left">Valor ($)</th>
                             <th className="py-2 px-3 text-left">Observación</th>
                             <th className="py-2 px-3 text-left">Estado</th>
@@ -1556,11 +1587,26 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
                         <tbody className="divide-y divide-slate-100">
                           {editingSobrecostos.length === 0 ? (
                             <tr>
-                              <td colSpan={4} className="py-6 text-center text-slate-400 italic">No hay sobrecostos registrados para esta planilla.</td>
+                              <td colSpan={5} className="py-6 text-center text-slate-400 italic">No hay sobrecostos registrados para esta planilla.</td>
                             </tr>
                           ) : (
                             editingSobrecostos.map((s, idx) => (
                               <tr key={idx}>
+                                <td className="py-2 px-3 w-40">
+                                  <select
+                                    value={s.id_detalle ?? ''}
+                                    onChange={e => {
+                                      const val = e.target.value ? Number(e.target.value) : null;
+                                      setEditingSobrecostos(prev => prev.map((item, i) => i === idx ? { ...item, id_detalle: val } : item));
+                                    }}
+                                    className="w-full px-2 py-1 border border-slate-200 rounded text-[10px] font-bold bg-white focus:outline-none focus:border-emerald-400"
+                                  >
+                                    <option value="">— General (planilla) —</option>
+                                    {editingDetalles.map((d: any) => (
+                                      <option key={d.id} value={d.id}>{d.factura}</option>
+                                    ))}
+                                  </select>
+                                </td>
                                 <td className="py-2 px-3 w-32">
                                   <input
                                     type="number"

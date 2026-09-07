@@ -4,6 +4,7 @@ import { api } from '../../services/api';
 import { toast } from 'sonner';
 import { DataTable, ColumnDef } from '../shared/DataTable';
 import { hasPermission } from '../../utils/permissions';
+import { formatDate } from '../../utils/formatting';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -201,7 +202,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
     {
       header: 'Fecha Operación',
       key: 'fecha',
-      render: (asig) => <span>{new Date(asig.fecha).toLocaleDateString()}</span>
+      render: (asig) => <span>{formatDate(asig.fecha)}</span>
     },
     {
       header: 'Autorizado Por',
@@ -301,7 +302,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
     {
       header: 'Fecha Operación',
       key: 'fecha',
-      render: (dev) => <span>{new Date(dev.fecha).toLocaleDateString()}</span>
+      render: (dev) => <span>{formatDate(dev.fecha)}</span>
     },
     {
       header: 'Motivo Devolución',
@@ -769,7 +770,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
         'Identificador': activeTab === 'asignaciones' ? r.numero_asignacion : r.numero_devolucion,
         'Funcionario': r.personal_nombre || '',
         'Documento': r.personal_documento || '',
-        'Fecha Operación': new Date(r.fecha).toLocaleDateString('es-CO'),
+        'Fecha Operación': formatDate(r.fecha),
       };
       if (activeTab === 'asignaciones') {
         base['Autorizado Por'] = r.autorizado_por || '';
