@@ -27,6 +27,15 @@ const ensureTablesImpl = async () => {
     )
   `);
 
+  // Sede del cliente (CAF = Caribbean American Freight / USA, M7 = Milla Siete / Colombia) —
+  // determina formato de fecha/moneda al presentar información, nunca se segmentan las tablas
+  // maestras en sí. Se infiere de la moneda para los clientes ya existentes.
+  await pool.query(`ALTER TABLE fulfillment_clientes ADD COLUMN IF NOT EXISTS sede TEXT CHECK (sede IN ('CAF','M7'))`);
+  await pool.query(`
+    UPDATE fulfillment_clientes SET sede = CASE WHEN moneda = 'USD' THEN 'CAF' WHEN moneda = 'COP' THEN 'M7' ELSE sede END
+    WHERE sede IS NULL
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS fulfillment_transportistas (
       id                SERIAL PRIMARY KEY,
@@ -94,12 +103,16 @@ const ensureTablesImpl = async () => {
       fecha_creacion        TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'America/Bogota')
     )
   `);
+  // Canal de origen del pedido (Shipstation, Website, Envia, Courier, Mensajero...) — siempre
+  // informativo/interno, nunca parte de lo que ve el cliente.
+  await pool.query(`ALTER TABLE fulfillment_detalle ADD COLUMN IF NOT EXISTS nota TEXT`);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_fulfillment_reg_cliente ON fulfillment_registros (cliente_id);
     CREATE INDEX IF NOT EXISTS idx_fulfillment_det_reg     ON fulfillment_detalle (registro_id);
     CREATE INDEX IF NOT EXISTS idx_fulfillment_det_transp  ON fulfillment_detalle (transportista_id);
     CREATE INDEX IF NOT EXISTS idx_fulfillment_det_prod    ON fulfillment_detalle (producto_servicio_id);
+    CREATE INDEX IF NOT EXISTS idx_fulfillment_det_orden   ON fulfillment_detalle (orden);
   `);
 };
 
@@ -123,14 +136,15 @@ export const getClientes = async (req: Request, res: Response) => {
 
 export const createCliente = async (req: Request, res: Response) => {
   await ensureTables();
-  const { codigo, nombre, pais, moneda, notas_tarifas } = req.body || {};
+  const { codigo, nombre, pais, moneda, notas_tarifas, sede } = req.body || {};
   if (!codigo?.trim() || !nombre?.trim()) return res.status(400).json({ success: false, error: 'Código y nombre son obligatorios.' });
   if (!['USD', 'COP'].includes(moneda)) return res.status(400).json({ success: false, error: 'La moneda debe ser USD o COP.' });
+  if (sede && !['CAF', 'M7'].includes(sede)) return res.status(400).json({ success: false, error: 'La sede debe ser CAF o M7.' });
   try {
     const r = await pool.query(
-      `INSERT INTO fulfillment_clientes (codigo, nombre, pais, moneda, notas_tarifas, usuario_creacion)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-      [codigo.trim().toUpperCase(), nombre.trim(), pais?.trim() || null, moneda, notas_tarifas?.trim() || null, getUser(req)]
+      `INSERT INTO fulfillment_clientes (codigo, nombre, pais, moneda, notas_tarifas, sede, usuario_creacion)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+      [codigo.trim().toUpperCase(), nombre.trim(), pais?.trim() || null, moneda, notas_tarifas?.trim() || null, sede || (moneda === 'USD' ? 'CAF' : 'M7'), getUser(req)]
     );
     res.status(201).json({ success: true, data: r.rows[0] });
   } catch (e: any) {
@@ -142,15 +156,16 @@ export const createCliente = async (req: Request, res: Response) => {
 export const updateCliente = async (req: Request, res: Response) => {
   await ensureTables();
   const { id } = req.params;
-  const { nombre, pais, moneda, notas_tarifas, estado_id } = req.body || {};
+  const { nombre, pais, moneda, notas_tarifas, estado_id, sede } = req.body || {};
+  if (sede && !['CAF', 'M7'].includes(sede)) return res.status(400).json({ success: false, error: 'La sede debe ser CAF o M7.' });
   try {
     const r = await pool.query(
       `UPDATE fulfillment_clientes SET
          nombre = COALESCE($1, nombre), pais = $2, moneda = COALESCE($3, moneda),
-         notas_tarifas = $4, estado_id = COALESCE($5, estado_id),
-         usuario_actualizacion = $6, fecha_actualizacion = (NOW() AT TIME ZONE 'America/Bogota')
-       WHERE id = $7 RETURNING *`,
-      [nombre?.trim() || null, pais?.trim() || null, moneda || null, notas_tarifas?.trim() || null, estado_id || null, getUser(req), id]
+         notas_tarifas = $4, estado_id = COALESCE($5, estado_id), sede = COALESCE($6, sede),
+         usuario_actualizacion = $7, fecha_actualizacion = (NOW() AT TIME ZONE 'America/Bogota')
+       WHERE id = $8 RETURNING *`,
+      [nombre?.trim() || null, pais?.trim() || null, moneda || null, notas_tarifas?.trim() || null, estado_id || null, sede || null, getUser(req), id]
     );
     if (!r.rows.length) return res.status(404).json({ success: false, error: 'Cliente no encontrado.' });
     res.json({ success: true, data: r.rows[0] });
@@ -321,6 +336,53 @@ export const deleteRegistro = async (req: Request, res: Response) => {
   } catch (e: any) { res.status(500).json({ success: false, error: e.message }); }
 };
 
+// Crea el período (Cliente + Año + Mes + Subtipo) SIN ningún ítem — el primer ítem se agrega
+// después desde "Ver Detalle". Distinto de createDetalleManual, que crea el registro implícito
+// al agregar la primera línea; este endpoint es la vía explícita para armar el mes vacío primero.
+export const createRegistroVacio = async (req: Request, res: Response) => {
+  await ensureTables();
+  const usuario = getUser(req);
+  const { cliente_id, anio, mes, subtipo } = req.body || {};
+  if (!cliente_id) return res.status(400).json({ success: false, error: 'El cliente es obligatorio.' });
+  if (!anio || !mes) return res.status(400).json({ success: false, error: 'El año y el mes son obligatorios.' });
+  try {
+    const cliRes = await pool.query(`SELECT moneda FROM fulfillment_clientes WHERE id = $1`, [cliente_id]);
+    if (!cliRes.rows.length) return res.status(404).json({ success: false, error: 'Cliente no encontrado.' });
+    const r = await pool.query(
+      `INSERT INTO fulfillment_registros (cliente_id, anio, mes, subtipo, moneda, usuario_creacion)
+       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+      [cliente_id, anio, normName(mes), subtipo?.trim() || null, cliRes.rows[0].moneda, usuario]
+    );
+    res.status(201).json({ success: true, data: r.rows[0] });
+  } catch (e: any) {
+    if (e.code === '23505') return res.status(409).json({ success: false, error: 'Ya existe un registro para ese cliente, año, mes y subtipo.' });
+    res.status(500).json({ success: false, error: e.message });
+  }
+};
+
+// Edita el período de un registro ya existente (por si la facturación debe tomar otro nombre
+// de subtipo y/o pasar a otro mes) — no toca las líneas de detalle ni sus totales.
+export const updateRegistro = async (req: Request, res: Response) => {
+  await ensureTables();
+  const { id } = req.params;
+  const { anio, mes, subtipo } = req.body || {};
+  if (!anio || !mes) return res.status(400).json({ success: false, error: 'El año y el mes son obligatorios.' });
+  try {
+    const r = await pool.query(
+      `UPDATE fulfillment_registros SET
+         anio = $1, mes = $2, subtipo = $3,
+         usuario_actualizacion = $4, fecha_actualizacion = (NOW() AT TIME ZONE 'America/Bogota')
+       WHERE id = $5 RETURNING *`,
+      [anio, normName(mes), subtipo?.trim() || null, getUser(req), id]
+    );
+    if (!r.rows.length) return res.status(404).json({ success: false, error: 'Registro no encontrado.' });
+    res.json({ success: true, data: r.rows[0] });
+  } catch (e: any) {
+    if (e.code === '23505') return res.status(409).json({ success: false, error: 'Ya existe otro registro para ese cliente, año, mes y subtipo.' });
+    res.status(500).json({ success: false, error: e.message });
+  }
+};
+
 // KPIs gerenciales — consolidado por moneda + top transportistas/productos.
 export const getResumenGerencial = async (req: Request, res: Response) => {
   try {
@@ -398,7 +460,7 @@ export const createDetalleManual = async (req: Request, res: Response) => {
   const {
     cliente_id, anio, mes, subtipo,
     fecha, producto, descripcion, orden, cantidad, tarifa, monto,
-    costo_transportista, transportista, seguimiento, comprado_en, destinatario,
+    costo_transportista, transportista, seguimiento, comprado_en, destinatario, nota,
   } = req.body || {};
 
   if (!cliente_id) return res.status(400).json({ success: false, error: 'El cliente es obligatorio.' });
@@ -451,13 +513,13 @@ export const createDetalleManual = async (req: Request, res: Response) => {
     const detRes = await client.query(
       `INSERT INTO fulfillment_detalle
          (registro_id, fecha, producto_servicio_id, descripcion, orden, cantidad, tarifa, monto,
-          costo_transportista, transportista_id, seguimiento, comprado_en, destinatario, usuario_creacion)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+          costo_transportista, transportista_id, seguimiento, comprado_en, destinatario, nota, usuario_creacion)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
       [
         registroId, fecha || null, productoId, descripcion?.trim() || null, orden?.trim() || null,
         toNum(cantidad), toNum(tarifa), toNum(monto),
         costo_transportista !== undefined && costo_transportista !== '' ? toNum(costo_transportista) : null,
-        transportistaId, seguimiento?.trim() || null, comprado_en?.trim() || null, destinatario?.trim() || null, usuario,
+        transportistaId, seguimiento?.trim() || null, comprado_en?.trim() || null, destinatario?.trim() || null, nota?.trim() || null, usuario,
       ]
     );
 
@@ -469,6 +531,96 @@ export const createDetalleManual = async (req: Request, res: Response) => {
 
     await client.query('COMMIT');
     res.status(201).json({ success: true, registroId, detalle: detRes.rows[0] });
+  } catch (e: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ success: false, error: e.message });
+  } finally { client.release(); }
+};
+
+// Edita una línea de detalle ya creada (surgen adicionales que alteran el registro, o el cliente
+// solicita corregirlo) — recalcula los totales del registro luego de guardar.
+export const updateDetalleManual = async (req: Request, res: Response) => {
+  await ensureTables();
+  const usuario = getUser(req);
+  const { id } = req.params;
+  const {
+    fecha, producto, descripcion, orden, cantidad, tarifa, monto,
+    costo_transportista, transportista, seguimiento, comprado_en, destinatario, nota,
+  } = req.body || {};
+
+  if (!producto?.trim()) return res.status(400).json({ success: false, error: 'El producto/servicio es obligatorio.' });
+  if (monto === undefined || monto === null || monto === '') return res.status(400).json({ success: false, error: 'El monto es obligatorio.' });
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const detRow = await client.query(`SELECT registro_id FROM fulfillment_detalle WHERE id = $1`, [id]);
+    if (!detRow.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ success: false, error: 'Línea no encontrada.' }); }
+    const registroId = detRow.rows[0].registro_id;
+
+    const pRes = await client.query(
+      `INSERT INTO fulfillment_productos_servicios (nombre, usuario_creacion) VALUES ($1,$2)
+       ON CONFLICT (nombre) DO UPDATE SET nombre = EXCLUDED.nombre RETURNING id`,
+      [producto.trim(), usuario]
+    );
+    const productoId = pRes.rows[0].id;
+
+    let transportistaId: number | null = null;
+    if (transportista?.trim()) {
+      const tRes = await client.query(
+        `INSERT INTO fulfillment_transportistas (nombre, usuario_creacion) VALUES ($1,$2)
+         ON CONFLICT (nombre) DO UPDATE SET nombre = EXCLUDED.nombre RETURNING id`,
+        [transportista.trim().toUpperCase(), usuario]
+      );
+      transportistaId = tRes.rows[0].id;
+    }
+
+    const upd = await client.query(
+      `UPDATE fulfillment_detalle SET
+         fecha = $1, producto_servicio_id = $2, descripcion = $3, orden = $4, cantidad = $5, tarifa = $6, monto = $7,
+         costo_transportista = $8, transportista_id = $9, seguimiento = $10, comprado_en = $11, destinatario = $12, nota = $13
+       WHERE id = $14 RETURNING *`,
+      [
+        fecha || null, productoId, descripcion?.trim() || null, orden?.trim() || null,
+        toNum(cantidad), toNum(tarifa), toNum(monto),
+        costo_transportista !== undefined && costo_transportista !== '' ? toNum(costo_transportista) : null,
+        transportistaId, seguimiento?.trim() || null, comprado_en?.trim() || null, destinatario?.trim() || null, nota?.trim() || null, id,
+      ]
+    );
+
+    await recalcRegistroTotales(client, registroId);
+    await client.query(
+      `UPDATE fulfillment_registros SET usuario_actualizacion = $1, fecha_actualizacion = (NOW() AT TIME ZONE 'America/Bogota') WHERE id = $2`,
+      [usuario, registroId]
+    );
+
+    await client.query('COMMIT');
+    res.json({ success: true, registroId, detalle: upd.rows[0] });
+  } catch (e: any) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ success: false, error: e.message });
+  } finally { client.release(); }
+};
+
+// Elimina una línea individual (el cliente solicita cancelar esa operación puntual) — recalcula
+// los totales del registro luego de borrar.
+export const deleteDetalleManual = async (req: Request, res: Response) => {
+  await ensureTables();
+  const { id } = req.params;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const r = await client.query(`DELETE FROM fulfillment_detalle WHERE id = $1 RETURNING registro_id`, [id]);
+    if (!r.rowCount) { await client.query('ROLLBACK'); return res.status(404).json({ success: false, error: 'Línea no encontrada.' }); }
+    const registroId = r.rows[0].registro_id;
+    await recalcRegistroTotales(client, registroId);
+    await client.query(
+      `UPDATE fulfillment_registros SET usuario_actualizacion = $1, fecha_actualizacion = (NOW() AT TIME ZONE 'America/Bogota') WHERE id = $2`,
+      [getUser(req), registroId]
+    );
+    await client.query('COMMIT');
+    res.json({ success: true });
   } catch (e: any) {
     await client.query('ROLLBACK');
     res.status(500).json({ success: false, error: e.message });

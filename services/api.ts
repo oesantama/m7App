@@ -2706,7 +2706,7 @@ export const api = {
 
   // ── Operación FULFILLMENT ────────────────────────────────────────────────
   getFulfillmentClientes: () => fetchJson(`${API_URL}/fulfillment/clientes`),
-  createFulfillmentCliente: (data: { codigo: string; nombre: string; pais?: string; moneda: 'USD' | 'COP'; notas_tarifas?: string }) =>
+  createFulfillmentCliente: (data: { codigo: string; nombre: string; pais?: string; moneda: 'USD' | 'COP'; notas_tarifas?: string; sede?: 'CAF' | 'M7' }) =>
     fetchJson(`${API_URL}/fulfillment/clientes`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
   updateFulfillmentCliente: (id: number, data: Record<string, any>) =>
     fetchJson(`${API_URL}/fulfillment/clientes/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
@@ -2734,6 +2734,10 @@ export const api = {
   },
   getFulfillmentRegistroDetalle: (id: number) => fetchJson(`${API_URL}/fulfillment/registros/${id}`),
   deleteFulfillmentRegistro: (id: number) => fetchJson(`${API_URL}/fulfillment/registros/${id}`, { method: 'DELETE' }),
+  createFulfillmentRegistro: (data: { cliente_id: number; anio: number | string; mes: string; subtipo?: string }) =>
+    fetchJson(`${API_URL}/fulfillment/registros`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
+  updateFulfillmentRegistro: (id: number, data: { anio: number | string; mes: string; subtipo?: string }) =>
+    fetchJson(`${API_URL}/fulfillment/registros/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }),
 
   getFulfillmentResumenGerencial: (filters?: { cliente_id?: number | string; anio?: number | string; mes?: string; latest?: boolean }) => {
     const params = new URLSearchParams();
@@ -2779,9 +2783,21 @@ export const api = {
     fecha?: string; producto: string; descripcion?: string; orden?: string;
     cantidad?: number | string; tarifa?: number | string; monto: number | string;
     costo_transportista?: number | string; transportista?: string; seguimiento?: string;
-    comprado_en?: string; destinatario?: string;
+    comprado_en?: string; destinatario?: string; nota?: string;
   }) =>
     fetchJson(`${API_URL}/fulfillment/detalle-manual`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
     }),
+
+  updateFulfillmentDetalleManual: (id: number, data: {
+    fecha?: string; producto: string; descripcion?: string; orden?: string;
+    cantidad?: number | string; tarifa?: number | string; monto: number | string;
+    costo_transportista?: number | string; transportista?: string; seguimiento?: string;
+    comprado_en?: string; destinatario?: string; nota?: string;
+  }) =>
+    fetchJson(`${API_URL}/fulfillment/detalle/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
+    }),
+
+  deleteFulfillmentDetalleManual: (id: number) => fetchJson(`${API_URL}/fulfillment/detalle/${id}`, { method: 'DELETE' }),
 };

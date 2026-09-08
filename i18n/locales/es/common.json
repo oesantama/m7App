@@ -1,0 +1,63 @@
+{
+  "actions": {
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "search": "Buscar",
+    "searchPlaceholder": "Buscar...",
+    "export": "Exportar",
+    "import": "Importar",
+    "close": "Cerrar",
+    "confirm": "Confirmar",
+    "back": "Regresar",
+    "clear": "Limpiar",
+    "consult": "Consultar",
+    "consulting": "Consultando…",
+    "download": "Descargar",
+    "downloadTemplate": "Descargar Plantilla",
+    "viewDetail": "Ver Detalle",
+    "approve": "Aprobar",
+    "approving": "Aprobando…",
+    "add": "Adicionar",
+    "select": "Seleccionar",
+    "selectPlaceholder": "— Seleccionar —",
+    "nonePlaceholder": "— Ninguno —",
+    "yes": "Sí",
+    "no": "No"
+  },
+  "status": {
+    "active": "ACTIVO",
+    "inactive": "INACTIVO",
+    "pending": "PENDIENTE",
+    "approved": "APROBADO",
+    "reconciled": "CONCILIADO",
+    "deleted": "ELIMINADO"
+  },
+  "table": {
+    "total": "Total",
+    "noRecords": "No se encontraron registros.",
+    "rowsPerPage": "Ver",
+    "all": "Todos",
+    "page": "Página {{current}} de {{total}}"
+  },
+  "fields": {
+    "client": "Cliente",
+    "date": "Fecha",
+    "state": "Estado",
+    "actions": "Acciones",
+    "value": "Valor",
+    "currency": "Moneda"
+  },
+  "toast": {
+    "saveError": "No se pudo guardar",
+    "loadError": "Error al cargar",
+    "deleteConfirmTitle": "¿Estás seguro?"
+  },
+  "months": {
+    "ENERO": "ENERO", "FEBRERO": "FEBRERO", "MARZO": "MARZO", "ABRIL": "ABRIL",
+    "MAYO": "MAYO", "JUNIO": "JUNIO", "JULIO": "JULIO", "AGOSTO": "AGOSTO",
+    "SEPTIEMBRE": "SEPTIEMBRE", "OCTUBRE": "OCTUBRE", "NOVIEMBRE": "NOVIEMBRE", "DICIEMBRE": "DICIEMBRE"
+  }
+}

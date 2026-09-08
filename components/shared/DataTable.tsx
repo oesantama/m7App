@@ -11,6 +11,10 @@ export interface ColumnDef<T> {
   maxWidth?: string;
   render?: (row: T) => React.ReactNode;
   exportRender?: (row: T) => any;
+  // Clases extra en el <th>/<td> de esta columna — usado para diferenciar visualmente un grupo
+  // de columnas (ej. "información interna" vs. lo que sí ve el cliente).
+  headerClassName?: string;
+  cellClassName?: string;
 }
 
 interface DataTableProps<T> {
@@ -43,6 +47,9 @@ interface DataTableProps<T> {
   onSelectionChange?: (ids: Set<string | number>) => void;
   // Acciones extra junto al botón "Exportar" (ej: "Aprobar seleccionados").
   toolbarActions?: React.ReactNode;
+  // Tamaño de página inicial — por defecto 5, pero vistas con muchos registros (ej. hasta 1000
+  // líneas/mes) deben arrancar con más filas visibles.
+  defaultPageSize?: number | 'all';
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -69,6 +76,7 @@ export function DataTable<T extends Record<string, any>>({
   selectedIds,
   onSelectionChange,
   toolbarActions,
+  defaultPageSize = 5,
 }: DataTableProps<T>) {
   // Búsqueda
   const [searchTerm, setSearchTerm] = useState('');
@@ -78,7 +86,7 @@ export function DataTable<T extends Record<string, any>>({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Paginación
-  const [pageSize, setPageSize] = useState<number | 'all'>(5);
+  const [pageSize, setPageSize] = useState<number | 'all'>(defaultPageSize);
   const [currentPage, setCurrentPage] = useState(1);
 
   // Estado real usando props externos si existen
@@ -338,7 +346,7 @@ export function DataTable<T extends Record<string, any>>({
                     onClick={() => isSortable && handleSort(col.key as string)}
                     className={`px-6 py-4.5 text-xs font-black tracking-widest uppercase border-b border-slate-800 whitespace-nowrap ${
                       isSortable ? 'cursor-pointer hover:bg-slate-800/55 transition-colors' : ''
-                    }`}
+                    } ${col.headerClassName || ''}`}
                     style={col.minWidth ? { minWidth: col.minWidth } : undefined}
                   >
                     <div className="flex items-center gap-1.5">
@@ -396,7 +404,7 @@ export function DataTable<T extends Record<string, any>>({
                         return (
                           <td
                             key={String(col.key)}
-                            className={`px-6 py-4 text-sm text-slate-600 font-medium align-top ${col.noWrap ? 'whitespace-nowrap' : 'break-words'}`}
+                            className={`px-6 py-4 text-sm text-slate-600 font-medium align-top ${col.noWrap ? 'whitespace-nowrap' : 'break-words'} ${col.cellClassName || ''}`}
                             style={{
                               ...(col.minWidth ? { minWidth: col.minWidth } : {}),
                               ...(col.maxWidth ? { maxWidth: col.maxWidth, wordBreak: 'break-word' } : {}),

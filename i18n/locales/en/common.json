@@ -1,0 +1,63 @@
+{
+  "actions": {
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "searchPlaceholder": "Search...",
+    "export": "Export",
+    "import": "Import",
+    "close": "Close",
+    "confirm": "Confirm",
+    "back": "Back",
+    "clear": "Clear",
+    "consult": "Search",
+    "consulting": "Searching…",
+    "download": "Download",
+    "downloadTemplate": "Download Template",
+    "viewDetail": "View Detail",
+    "approve": "Approve",
+    "approving": "Approving…",
+    "add": "Add",
+    "select": "Select",
+    "selectPlaceholder": "— Select —",
+    "nonePlaceholder": "— None —",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "status": {
+    "active": "ACTIVE",
+    "inactive": "INACTIVE",
+    "pending": "PENDING",
+    "approved": "APPROVED",
+    "reconciled": "RECONCILED",
+    "deleted": "DELETED"
+  },
+  "table": {
+    "total": "Total",
+    "noRecords": "No records found.",
+    "rowsPerPage": "Show",
+    "all": "All",
+    "page": "Page {{current}} of {{total}}"
+  },
+  "fields": {
+    "client": "Client",
+    "date": "Date",
+    "state": "Status",
+    "actions": "Actions",
+    "value": "Value",
+    "currency": "Currency"
+  },
+  "toast": {
+    "saveError": "Could not save",
+    "loadError": "Error loading data",
+    "deleteConfirmTitle": "Are you sure?"
+  },
+  "months": {
+    "ENERO": "January", "FEBRERO": "February", "MARZO": "March", "ABRIL": "April",
+    "MAYO": "May", "JUNIO": "June", "JULIO": "July", "AGOSTO": "August",
+    "SEPTIEMBRE": "September", "OCTUBRE": "October", "NOVIEMBRE": "November", "DICIEMBRE": "December"
+  }
+}

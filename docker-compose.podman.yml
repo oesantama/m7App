@@ -87,6 +87,7 @@ services:
       - ./utils:/app/utils:z
       - ./config:/app/config:z
       - ./hooks:/app/hooks:z
+      - ./i18n:/app/i18n:z
       - ./types.ts:/app/types.ts:z
       - ./constants.tsx:/app/constants.tsx:z
       - ./vite.config.ts:/app/vite.config.ts:z
