@@ -7,6 +7,7 @@ import pool from '../config/database.js';
 import { sendEmail } from '../services/notification.service.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { logMovement } from '../utils/kardex.js';
+import { resolveDaneCity } from '../utils/daneCities.js';
 
 // ─── Caché en memoria para getInvoices ───────────────────────────────────────
 // TTL de 45 segundos: reduce carga en Postgres en refrescos frecuentes
@@ -690,7 +691,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
               validatedUnit,
               item.volume || 0,
               item.unitVolume || '0',
-              item.city || 'S/D',
+              resolveDaneCity(item.city) || 'S/D',
               item.address || 'S/D',
               item.observation || item.driverNote || '',
               item.batch || 'S/L',
@@ -717,7 +718,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
               invoice,
               item.volume || 0,
               item.unitVolume || '0',
-              item.city || 'S/D',
+              resolveDaneCity(item.city) || 'S/D',
               item.address || 'S/D',
               item.observation || item.driverNote || '',
               item.batch || 'S/L',
