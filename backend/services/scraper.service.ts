@@ -34,22 +34,27 @@ export const scrapeTransportandoReports = async (
     log(`[${new Date().toLocaleString()}] Iniciando bot de Scraping de Transportando para tipo: ${reportType}...`);
 
     let browser;
+    let downloadPath: string | null = null;
     try {
         browser = await puppeteer.launch({
             headless: true, // Funciona en servidor Coolify
             executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
+            timeout: 90000, // Aumentar timeout de inicio del navegador de 30s (default) a 90s
+            protocolTimeout: 180000, // Aumentar timeout de respuestas CDP/protocolo a 3 minutos
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-                '--disable-gpu'
+                '--disable-gpu',
+                '--no-zygote',
+                '--disable-extensions'
             ]
         });
 
         const page = await browser.newPage();
         
         // Carpeta temporal de descargas
-        const downloadPath = path.join(os.tmpdir(), `transportando_downloads_${Date.now()}`);
+        downloadPath = path.join(os.tmpdir(), `transportando_downloads_${Date.now()}`);
         if (!fs.existsSync(downloadPath)) fs.mkdirSync(downloadPath, { recursive: true });
 
         // Configurar Puppeteer para descargar en esta carpeta temporal automáticamente
@@ -549,14 +554,19 @@ export const scrapeTransportandoReports = async (
         }
 
         log(`[${new Date().toLocaleString()}] Tarea de Scraping finalizada correctamente.`);
-        
-        // Limpiar directorio temporal
-        fs.rmdirSync(downloadPath, { recursive: true });
 
     } catch (err: any) {
         log(`ERROR CRÍTICO EN SCRAPER: ${err.message}`);
         console.error('[CRON-SCRAPER-ERR]', err);
+        throw err;
     } finally {
+        if (downloadPath && fs.existsSync(downloadPath)) {
+            try {
+                fs.rmSync(downloadPath, { recursive: true, force: true });
+            } catch (rmErr: any) {
+                console.error('[SCRAPER-CLEANUP-ERR]', rmErr);
+            }
+        }
         if (browser) await browser.close();
     }
 
