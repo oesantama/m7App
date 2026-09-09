@@ -13,7 +13,7 @@ interface LegalizacionesDicorpProps { user: UserType; }
 
 interface ConsolidadoRow {
   placa: string; fecha: string; conductor_nombre: string; cargues: number; cargue_numeros: string;
-  valor_total: string | number; pagado_individual: string | number; pagado_pool: string | number; pendiente: string | number;
+  valor_total: string | number; pagado_individual: string | number; pendiente: string | number;
   pagado_grupal: string | number; sobrecosto_aprobado: string | number; sobrecosto_pendiente: string | number;
   devolucion_total: string | number; tipo_descuadre: string | null; comentario_descuadre: string | null;
   banco_reciente: string | null; fecha_consignacion_reciente: string | null;
@@ -923,7 +923,8 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {consolidadoFiltrado.map(row => {
-                const pct = Number(row.valor_total) > 0 ? Math.min(100, Math.round(((Number(row.pagado_individual) + Number(row.pagado_pool)) / Number(row.valor_total)) * 100)) : 0;
+                const pagadoTotal = Number(row.pagado_individual) + Number(row.pagado_grupal) + Number(row.sobrecosto_aprobado) + Number(row.devolucion_total);
+                const pct = Number(row.valor_total) > 0 ? Math.min(100, Math.round((pagadoTotal / Number(row.valor_total)) * 100)) : 0;
                 return (
                   <div key={`${row.placa}-${row.fecha}`} className="rounded-2xl border-2 border-slate-100 bg-white overflow-hidden hover:border-slate-200 transition-all">
                     <div className="px-4 py-3">
@@ -955,8 +956,8 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                           <p className="text-[10px] font-black text-slate-800">{fmtCOP(row.valor_total)}</p>
                         </div>
                         <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl px-2 py-1.5">
-                          <p className="text-[7px] font-black text-emerald-600 uppercase">Pagado</p>
-                          <p className="text-[10px] font-black text-emerald-800">{fmtCOP(Number(row.pagado_individual) + Number(row.pagado_pool))}</p>
+                          <p className="text-[7px] font-black text-emerald-600 uppercase">Pagado Individual</p>
+                          <p className="text-[10px] font-black text-emerald-800">{fmtCOP(row.pagado_individual)}</p>
                         </div>
                         <div className={`border rounded-xl px-2 py-1.5 ${Number(row.pendiente) > 1 ? 'bg-amber-500 border-amber-600' : 'bg-emerald-500 border-emerald-600'}`}>
                           <p className="text-[7px] font-black text-white/80 uppercase">Pendiente</p>

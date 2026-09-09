@@ -1130,9 +1130,11 @@ export const getResumenPlacas = async (req: Request, res: Response) => {
 };
 
 // ─── GET /dicorp-legalizacion/consolidado-pendientes ──────────────────────────
-// Consolidado por PLACA + FECHA de todos los cargues aún pendientes, con el saldo
-// ya neteado (pagos individuales de cada cargue + reparto FIFO de pagos grupales
-// y sobrecostos aprobados de la placa, más antiguos primero).
+// Consolidado por PLACA + FECHA de todos los cargues aún pendientes.
+// El descuadre es la resta directa: Total - Pagado Individual - Pagado Grupal
+// - Sobrecosto Aprobado - Devolución (todos estos tres últimos son acumulados de
+// TODA la placa, no solo de esta fecha, porque así se pagan/consignan en la práctica).
+// El sobrecosto PENDIENTE de aprobar nunca se resta.
 export const getConsolidadoPendientes = async (req: Request, res: Response) => {
   try {
     await ensureTables();
@@ -1150,9 +1152,7 @@ export const getConsolidadoPendientes = async (req: Request, res: Response) => {
         GROUP BY d.id_encabezado
       ),
       saldo AS (
-        SELECT c.*, COALESCE(i.pagado, 0) AS pagado_individual,
-          (c.valor_total - COALESCE(i.pagado, 0)) AS saldo_individual,
-          SUM(c.valor_total - COALESCE(i.pagado, 0)) OVER (PARTITION BY c.placa ORDER BY c.fecha, c.id ROWS UNBOUNDED PRECEDING) AS running_saldo
+        SELECT c.*, COALESCE(i.pagado, 0) AS pagado_individual
         FROM cargues c
         LEFT JOIN individual i ON i.id_encabezado = c.id
       ),
@@ -1165,17 +1165,15 @@ export const getConsolidadoPendientes = async (req: Request, res: Response) => {
         FROM (SELECT DISTINCT placa FROM cargues) c
       ),
       detalle AS (
-        SELECT s.*, p.grupal_total, p.sobrecosto_aprobado, p.sobrecosto_pendiente, p.devolucion_total,
-          (p.grupal_total + p.sobrecosto_aprobado + p.devolucion_total) AS pool_total,
-          LEAST(s.saldo_individual, GREATEST((p.grupal_total + p.sobrecosto_aprobado + p.devolucion_total) - (s.running_saldo - s.saldo_individual), 0)) AS pagado_pool
+        SELECT s.*, p.grupal_total, p.sobrecosto_aprobado, p.sobrecosto_pendiente, p.devolucion_total
         FROM saldo s JOIN pool p ON p.placa = s.placa
       )
       SELECT d.placa, d.fecha, MAX(d.conductor_nombre) AS conductor_nombre, COUNT(*) AS cargues,
         string_agg(DISTINCT d.cargue_numero, ', ' ORDER BY d.cargue_numero) AS cargue_numeros,
         SUM(d.valor_total) AS valor_total, SUM(d.pagado_individual) AS pagado_individual,
-        SUM(d.pagado_pool) AS pagado_pool, SUM(d.saldo_individual - d.pagado_pool) AS pendiente,
         MAX(d.grupal_total) AS pagado_grupal, MAX(d.sobrecosto_aprobado) AS sobrecosto_aprobado,
         MAX(d.sobrecosto_pendiente) AS sobrecosto_pendiente, MAX(d.devolucion_total) AS devolucion_total,
+        SUM(d.valor_total) - SUM(d.pagado_individual) - MAX(d.grupal_total) - MAX(d.sobrecosto_aprobado) - MAX(d.devolucion_total) AS pendiente,
         NULL::text AS tipo_descuadre, NULL::text AS comentario_descuadre,
         (SELECT banco FROM (
           SELECT mb3.name AS banco, pi3.fecha_pago FROM dicorp_pagos_individuales pi3
@@ -1242,9 +1240,7 @@ export const getConsolidadoPorFecha = async (req: Request, res: Response) => {
         GROUP BY d.id_encabezado
       ),
       saldo AS (
-        SELECT c.*, COALESCE(i.pagado, 0) AS pagado_individual,
-          (c.valor_total - COALESCE(i.pagado, 0)) AS saldo_individual,
-          SUM(c.valor_total - COALESCE(i.pagado, 0)) OVER (PARTITION BY c.placa ORDER BY c.fecha, c.id ROWS UNBOUNDED PRECEDING) AS running_saldo
+        SELECT c.*, COALESCE(i.pagado, 0) AS pagado_individual
         FROM cargues c
         LEFT JOIN individual i ON i.id_encabezado = c.id
       ),
@@ -1257,15 +1253,14 @@ export const getConsolidadoPorFecha = async (req: Request, res: Response) => {
         FROM (SELECT DISTINCT placa FROM cargues) c
       ),
       detalle AS (
-        SELECT s.*, p.grupal_total, p.sobrecosto_aprobado, p.sobrecosto_pendiente, p.devolucion_total,
-          LEAST(s.saldo_individual, GREATEST((p.grupal_total + p.sobrecosto_aprobado + p.devolucion_total) - (s.running_saldo - s.saldo_individual), 0)) AS pagado_pool
+        SELECT s.*, p.grupal_total, p.sobrecosto_aprobado, p.sobrecosto_pendiente, p.devolucion_total
         FROM saldo s JOIN pool p ON p.placa = s.placa
       )
       SELECT d.placa, d.fecha, MAX(d.conductor_nombre) AS conductor_nombre, COUNT(*) AS cargues,
         string_agg(DISTINCT d.cargue_numero, ', ' ORDER BY d.cargue_numero) AS cargue_numeros,
         CASE WHEN COUNT(DISTINCT d.estado) = 1 THEN MAX(d.estado) ELSE 'MIXTO' END AS estado,
         SUM(d.valor_total) AS valor_total, SUM(d.pagado_individual) AS pagado_individual,
-        SUM(d.pagado_pool) AS pagado_pool, SUM(d.saldo_individual - d.pagado_pool) AS pendiente,
+        SUM(d.valor_total) - SUM(d.pagado_individual) - MAX(d.grupal_total) - MAX(d.sobrecosto_aprobado) - MAX(d.devolucion_total) AS pendiente,
         MAX(d.grupal_total) AS pagado_grupal, MAX(d.sobrecosto_aprobado) AS sobrecosto_aprobado,
         MAX(d.sobrecosto_pendiente) AS sobrecosto_pendiente, MAX(d.devolucion_total) AS devolucion_total,
         string_agg(DISTINCT d.tipo_descuadre, ', ') AS tipo_descuadre,
