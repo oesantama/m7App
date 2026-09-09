@@ -1433,17 +1433,22 @@ export const processDocumentLPayment = async (req: Request, res: Response) => {
 
 export const deleteDocument = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { user } = req.query; // Quien elimina
+  const { user, reason } = req.query; // Quien elimina y el motivo
+
+  if (!reason || !String(reason).trim()) {
+    return res.status(400).json({ success: false, error: 'El motivo de eliminación es obligatorio.' });
+  }
 
   try {
     await pool.query(`
-      UPDATE documents_l 
+      UPDATE documents_l
       SET status = 'EST-16',
           external_doc_id = external_doc_id || '_DEL_' || extract(epoch from now()),
-          inventory_user = $1, 
-          inventory_date = CURRENT_TIMESTAMP 
+          inventory_user = $1,
+          inventory_date = CURRENT_TIMESTAMP,
+          delete_reason = $3
       WHERE id = $2
-    `, [user, id]);
+    `, [user, id, String(reason).trim()]);
 
     // Opcional: También actualizar el item_status de los items para consistencia en ruteo
     await pool.query(`

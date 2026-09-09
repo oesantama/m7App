@@ -1174,7 +1174,7 @@ export const api = {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   }),
-  deleteDocument: (id: string, user: string) => fetchJson(`${API_URL}/documents/${id}?user=${encodeURIComponent(user)}`, { method: 'DELETE' }),
+  deleteDocument: (id: string, user: string, reason: string) => fetchJson(`${API_URL}/documents/${id}?user=${encodeURIComponent(user)}&reason=${encodeURIComponent(reason)}`, { method: 'DELETE' }),
   updateDocumentStatus: (id: string, status: string, user: string, planType?: string) => fetchJson(`${API_URL}/documents/status/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },

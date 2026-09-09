@@ -61,6 +61,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
   // una elección implícita al hacer clic en una de dos zonas de arrastre parecidas).
   const [uploadPlanType, setUploadPlanType] = useState<'' | 'Plan Normal' | 'Plan R'>('');
   const [docToDelete, setDocToDelete] = useState<string | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
 
   // Estados para Modal de Detalle (Recepción/Auditoría)
   const [modalSearch, setModalSearch] = useState('');
@@ -279,17 +280,23 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
   const handleDeleteDocument = (docId: string) => {
     setDocToDelete(docId);
+    setDeleteReason('');
   };
 
   const confirmDelete = async () => {
     if (!docToDelete) return;
-    
+    if (!deleteReason.trim()) {
+      toast.error('El motivo de eliminación es obligatorio.');
+      return;
+    }
+
     try {
-        const res = await api.deleteDocument(docToDelete, user.name);
+        const res = await api.deleteDocument(docToDelete, user.name, deleteReason.trim());
         if (res.success) {
             toast.success("Documento eliminado correctamente");
             if (onDocumentsChange) onDocumentsChange(documents.filter(d => d.id !== docToDelete));
             setDocToDelete(null);
+            setDeleteReason('');
         } else {
             toast.error("Error al eliminar: " + (res.error || "Desconocido"));
         }
@@ -927,10 +934,10 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
     if (!preview) return [];
     const allItems = preview.mapped.flatMap(doc => doc.items.map(it => ({ ...it, docId: doc.externalDocId, docVehicle: doc.vehicleData, isDuplicate: doc.isDuplicate })));
     if (!previewSearch) return allItems;
-    return allItems.filter(it => 
-      it.articleId.toLowerCase().includes(previewSearch.toLowerCase()) ||
-      it.docId.toLowerCase().includes(previewSearch.toLowerCase()) ||
-      it.docVehicle.toLowerCase().includes(previewSearch.toLowerCase())
+    return allItems.filter(it =>
+      String(it.articleId || '').toLowerCase().includes(previewSearch.toLowerCase()) ||
+      String(it.docId || '').toLowerCase().includes(previewSearch.toLowerCase()) ||
+      String(it.docVehicle || '').toLowerCase().includes(previewSearch.toLowerCase())
     );
   }, [preview, previewSearch]);
 
@@ -1881,16 +1888,28 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
                      Este documento operativo será marcado como <span className="text-rose-600 font-black">ELIMINADO</span>. Esta acción quedará registrada para auditoría de <span className="text-slate-900">OrbitM7 (Milla Siete)</span>.
                   </p>
 
-                  <div className="grid grid-cols-2 gap-4 w-full mt-10">
-                     <button 
+                  <div className="w-full mt-6 text-left">
+                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Motivo de eliminación *</label>
+                     <textarea
+                        value={deleteReason}
+                        onChange={e => setDeleteReason(e.target.value)}
+                        rows={3}
+                        placeholder="Explica por qué se elimina este documento..."
+                        className="mt-1.5 w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 focus:outline-none focus:border-rose-400 focus:ring-1 focus:ring-rose-100 resize-none"
+                     />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 w-full mt-6">
+                     <button
                         onClick={() => setDocToDelete(null)}
                         className="py-5 bg-slate-100 text-slate-500 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all active:scale-95"
                      >
                         Mantener
                      </button>
-                     <button 
+                     <button
                         onClick={confirmDelete}
-                        className="py-5 bg-rose-600 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest shadow-xl shadow-rose-200 hover:bg-rose-700 hover:shadow-rose-300 transition-all active:scale-95 flex items-center justify-center gap-2"
+                        disabled={!deleteReason.trim()}
+                        className="py-5 bg-rose-600 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest shadow-xl shadow-rose-200 hover:bg-rose-700 hover:shadow-rose-300 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                      >
                         Confirmar
                      </button>

@@ -354,6 +354,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   }>({ isOpen: false, type: 'warning', message: '' });
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<{ isOpen: boolean; id: string } | null>(null);
+  const [deleteDocReason, setDeleteDocReason] = useState('');
   const [routeMapModal, setRouteMapModal] = useState<{ isOpen: boolean; route: SuggestedRoute | null }>({ isOpen: false, route: null });
   const [allRoutesMapOpen, setAllRoutesMapOpen] = useState(false);
   const allRoutesMapRef = useRef<L.Map | null>(null);
@@ -397,14 +398,19 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
   const handleDeleteDocument = async (id: string) => {
     setShowDeleteConfirm({ isOpen: true, id });
+    setDeleteDocReason('');
   };
 
   const confirmDeleteDocument = async () => {
     if (!showDeleteConfirm) return;
+    if (!deleteDocReason.trim()) {
+      toast.error('El motivo de eliminación es obligatorio.');
+      return;
+    }
     const { id } = showDeleteConfirm;
     setShowDeleteConfirm(null);
     try {
-      const res = await api.deleteDocument(id, user.name);
+      const res = await api.deleteDocument(id, user.name, deleteDocReason.trim());
       if (res.success) {
         toast.success('Documento eliminado correctamente');
         if (onRefresh) onRefresh(selectedClient || undefined);
@@ -5031,10 +5037,22 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
               </p>
             </div>
 
+            <div className="text-left">
+              <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Motivo de eliminación *</label>
+              <textarea
+                value={deleteDocReason}
+                onChange={e => setDeleteDocReason(e.target.value)}
+                rows={3}
+                placeholder="Explica por qué se elimina este documento..."
+                className="mt-1.5 w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs font-medium text-white placeholder-slate-500 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/30 resize-none"
+              />
+            </div>
+
             <div className="flex flex-col gap-3 pt-4">
               <button
                 onClick={confirmDeleteDocument}
-                className="w-full bg-red-500 hover:bg-red-400 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all shadow-xl shadow-red-500/20 active:scale-95"
+                disabled={!deleteDocReason.trim()}
+                className="w-full bg-red-500 hover:bg-red-400 text-white py-5 rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all shadow-xl shadow-red-500/20 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Confirmar Eliminación
               </button>
