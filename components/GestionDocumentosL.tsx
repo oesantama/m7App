@@ -11,6 +11,7 @@ import * as XLSX from 'xlsx';
 import TableControls from './shared/TableControls';
 import { DataTable } from './shared/DataTable';
 import { formatCurrency } from '../utils/formatting';
+import { hasPermission } from '../utils/permissions';
 
 // Extendemos DocumentL localmente para manejar el estado de duplicado en la UI
 interface PreviewDocument extends DocumentL {
@@ -307,10 +308,7 @@ const GestionDocumentosL: React.FC<GestionDocumentosLProps> = ({ documents, invo
 
   const isAuthorizedToDelete = useMemo(() => {
     if (user.role === UserRole.ADMIN || user.roleId === 'ROL-01') return true;
-    return user.permissions?.some(p => 
-      (p.module === 'inventory' || p.module === 'routing' || p.module === 'PAG-11' || (p.module as any) === 'masterPaginas') && 
-      p.actions.includes('delete')
-    );
+    return hasPermission(user, 'DOCUMENTOS_L', 'delete');
   }, [user]);
   
   const handleUpdateStatus = () => {

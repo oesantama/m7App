@@ -9,6 +9,7 @@ import * as XLSX from 'xlsx';
 import TableControls from './shared/TableControls';
 import { formatCurrency, formatDate } from '../utils/formatting';
 import { DataTable, ColumnDef } from './shared/DataTable';
+import { hasPermission } from '../utils/permissions';
 
 interface ConsultasDocumentosLProps {
   documents: DocumentL[];
@@ -203,10 +204,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
 
   const isAuthorizedToDelete = useMemo(() => {
     if (user.roleId === 'ROL-01' || user.id === 'USR-01') return true;
-    return user.permissions?.some(p =>
-      (p.module === 'inventory' || p.module === 'routing' || p.module === 'PAG-11' || (p.module as any) === 'masterPaginas') &&
-      p.actions.includes('delete')
-    );
+    return hasPermission(user, 'DOCUMENTOS_L', 'delete');
   }, [user]);
 
   const handleDeleteDocument = (docId: string) => {

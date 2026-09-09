@@ -990,6 +990,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }),
+  addInventarioFisicoItem: (id: number | string, data: { elemento_id?: number; nombre_nuevo?: string }) =>
+    fetchJson(`${API_URL}/gh-inventario-fisico/${id}/items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
   saveConteos: (id: number | string, conteos: { elemento_id: number; cantidad_fisica: number }[]) =>
     fetchJson(`${API_URL}/gh-inventario-fisico/${id}/items`, {
       method: 'PUT',

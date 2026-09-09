@@ -102,6 +102,14 @@ export default function InventarioFisico({ user }: Props) {
     const [motivoAnular, setMotivoAnular] = useState('');
     const [anulando, setAnulando] = useState(false);
 
+    // ── Módal agregar referencia a la sesión ──────────────────────────────────
+    const [showAgregarItem, setShowAgregarItem] = useState(false);
+    const [agregarModo, setAgregarModo] = useState<'existente' | 'nueva'>('existente');
+    const [agregarElementoId, setAgregarElementoId] = useState<number | ''>('');
+    const [agregarBusqueda, setAgregarBusqueda] = useState('');
+    const [agregarNombreNuevo, setAgregarNombreNuevo] = useState('');
+    const [agregandoItem, setAgregandoItem] = useState(false);
+
     // ── Cargar lista de sesiones ──────────────────────────────────────────────
     const cargarSesiones = async () => {
         setCargando(true);
@@ -163,6 +171,43 @@ export default function InventarioFisico({ user }: Props) {
     };
 
     const refrescarDetalle = () => { if (sesionActiva) abrirDetalle(sesionActiva); };
+
+    // ── Agregar referencia a la sesión activa (existente o nueva encontrada en físico) ──
+    const abrirAgregarItem = () => {
+        setAgregarModo('existente');
+        setAgregarElementoId('');
+        setAgregarBusqueda('');
+        setAgregarNombreNuevo('');
+        setShowAgregarItem(true);
+    };
+
+    const handleAgregarItem = async () => {
+        if (!sesionActiva) return;
+        if (agregarModo === 'existente' && !agregarElementoId) {
+            return toast.error('Selecciona la referencia a agregar');
+        }
+        if (agregarModo === 'nueva' && !agregarNombreNuevo.trim()) {
+            return toast.error('Escribe el nombre de la referencia nueva');
+        }
+        setAgregandoItem(true);
+        try {
+            const res = await api.addInventarioFisicoItem(sesionActiva.id, agregarModo === 'existente'
+                ? { elemento_id: Number(agregarElementoId) }
+                : { nombre_nuevo: agregarNombreNuevo.trim() });
+            if (res.success) {
+                toast.success('Referencia agregada al conteo');
+                setShowAgregarItem(false);
+                await cargarElementos();
+                await refrescarDetalle();
+            } else {
+                toast.error(res.error || 'No se pudo agregar la referencia');
+            }
+        } catch (e: any) {
+            toast.error(e?.message || 'No se pudo agregar la referencia');
+        } finally {
+            setAgregandoItem(false);
+        }
+    };
 
     // ── Crear nueva sesión ────────────────────────────────────────────────────
     const handleCrear = async () => {
@@ -489,6 +534,11 @@ export default function InventarioFisico({ user }: Props) {
     const cfg = ESTADO_CONFIG[sesionActiva.estado];
     const puedeContar = sesionActiva.estado === 'ABIERTO';
     const puedeVerConteo = ['ABIERTO', 'EN_CONTEO'].includes(sesionActiva.estado);
+    const puedeAgregarItem = ['ABIERTO', 'EN_CONTEO', 'PENDIENTE_AUTORIZACION'].includes(sesionActiva.estado);
+    const elementosDisponibles = elementos.filter(e => !items.some(it => it.elemento_id === e.id));
+    const elementosFiltradosModal = agregarBusqueda.trim()
+        ? elementosDisponibles.filter(e => e.nombre.toLowerCase().includes(agregarBusqueda.toLowerCase()))
+        : elementosDisponibles;
     const puedeJustificar = ['EN_CONTEO', 'PENDIENTE_AUTORIZACION'].includes(sesionActiva.estado);
     const puedeGenCodigo = sesionActiva.estado === 'PENDIENTE_AUTORIZACION' && canCreate;
     const puedeCerrar = sesionActiva.estado === 'PENDIENTE_AUTORIZACION';
@@ -567,11 +617,19 @@ export default function InventarioFisico({ user }: Props) {
                                 <h3 className="font-black text-slate-800 uppercase flex items-center gap-2">
                                     <ClipboardList size={18} className="text-indigo-500" /> Registro de Conteo Físico
                                 </h3>
-                                <div className="relative">
-                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                                    <input value={searchConteo} onChange={e => setSearchConteo(e.target.value)}
-                                        placeholder="Buscar elemento..."
-                                        className="pl-8 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-400 w-52" />
+                                <div className="flex items-center gap-2">
+                                    {puedeAgregarItem && (
+                                        <button onClick={abrirAgregarItem}
+                                            className="px-3 py-2 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-all flex items-center gap-1.5 text-xs font-black">
+                                            <Plus size={14} /> Agregar Referencia
+                                        </button>
+                                    )}
+                                    <div className="relative">
+                                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                        <input value={searchConteo} onChange={e => setSearchConteo(e.target.value)}
+                                            placeholder="Buscar elemento..."
+                                            className="pl-8 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-400 w-52" />
+                                    </div>
                                 </div>
                             </div>
                             <div className="overflow-x-auto">
@@ -948,6 +1006,73 @@ export default function InventarioFisico({ user }: Props) {
                                     className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-black text-sm hover:bg-rose-500 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
                                     {anulando ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
                                     Confirmar Anulación
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showAgregarItem && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md border border-slate-100">
+                        <div className="p-8 space-y-5">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-xl font-black text-slate-800 uppercase flex items-center gap-2">
+                                    <Plus size={20} className="text-indigo-500" /> Agregar Referencia
+                                </h2>
+                                <button onClick={() => setShowAgregarItem(false)} className="p-2 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+                            </div>
+
+                            <div className="flex gap-2 bg-slate-50 p-1 rounded-xl">
+                                <button onClick={() => setAgregarModo('existente')}
+                                    className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${agregarModo === 'existente' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}>
+                                    Ya existe en Maestro
+                                </button>
+                                <button onClick={() => setAgregarModo('nueva')}
+                                    className={`flex-1 py-2 rounded-lg text-xs font-black uppercase transition-all ${agregarModo === 'nueva' ? 'bg-white shadow text-indigo-600' : 'text-slate-400'}`}>
+                                    Nueva (no está en sistema)
+                                </button>
+                            </div>
+
+                            {agregarModo === 'existente' ? (
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Referencia *</label>
+                                    <input value={agregarBusqueda} onChange={e => { setAgregarBusqueda(e.target.value); setAgregarElementoId(''); }}
+                                        placeholder="Buscar referencia..."
+                                        className="mt-2 w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl text-sm font-bold outline-none focus:border-indigo-500" />
+                                    <div className="mt-2 max-h-48 overflow-y-auto border border-slate-100 rounded-xl divide-y divide-slate-50">
+                                        {elementosFiltradosModal.length === 0 ? (
+                                            <p className="p-3 text-xs text-slate-400 font-bold text-center">
+                                                {elementosDisponibles.length === 0 ? 'Todas las referencias del Maestro ya están en esta sesión.' : 'Sin resultados'}
+                                            </p>
+                                        ) : elementosFiltradosModal.map(e => (
+                                            <button key={e.id} onClick={() => setAgregarElementoId(e.id)}
+                                                className={`w-full text-left px-4 py-2.5 text-sm font-bold transition-all ${agregarElementoId === e.id ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-700'}`}>
+                                                {e.nombre} <span className="text-[10px] text-slate-400 font-normal">(stock: {e.stock})</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nombre de la referencia *</label>
+                                    <input value={agregarNombreNuevo} onChange={e => setAgregarNombreNuevo(e.target.value)}
+                                        placeholder="Ej: BOTAS KONDOR 42"
+                                        className="mt-2 w-full px-4 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl text-sm font-bold outline-none focus:border-indigo-500" />
+                                    <p className="mt-2 text-[10px] text-slate-400 font-bold leading-relaxed">
+                                        Se creará en el Maestro de Elementos con cantidad de sistema en 0 — cualquier cantidad física que cuentes quedará marcada como <span className="text-amber-600">SOBRANTE</span> para justificar.
+                                    </p>
+                                </div>
+                            )}
+
+                            <div className="flex gap-3">
+                                <button onClick={() => setShowAgregarItem(false)}
+                                    className="flex-1 py-3 bg-white border-2 border-slate-200 rounded-xl text-sm font-black text-slate-500 hover:bg-slate-100">Cancelar</button>
+                                <button onClick={handleAgregarItem} disabled={agregandoItem}
+                                    className="flex-1 py-3 bg-indigo-600 text-white rounded-xl font-black text-sm hover:bg-indigo-500 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+                                    {agregandoItem ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                                    Agregar
                                 </button>
                             </div>
                         </div>

@@ -3,6 +3,7 @@ import {
     getInventariosFisicos,
     getInventarioFisicoById,
     createInventarioFisico,
+    addItemInventario,
     saveConteos,
     saveJustificaciones,
     generarCodigo,
@@ -15,6 +16,7 @@ const router = Router();
 router.get('/', getInventariosFisicos);
 router.get('/:id', getInventarioFisicoById);
 router.post('/', createInventarioFisico);
+router.post('/:id/items', addItemInventario);
 router.put('/:id/items', saveConteos);
 router.put('/:id/justificar', saveJustificaciones);
 router.post('/:id/generar-codigo', generarCodigo);

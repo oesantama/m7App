@@ -115,6 +115,95 @@ export const createInventarioFisico = async (req: Request, res: Response) => {
     }
 };
 
+// ─── POST /inventarios-fisicos/:id/items ─────────────────────────────────────
+// Agrega una referencia a una sesión ya abierta: una existente en Maestro (elemento_id)
+// o una nueva que se encontró físicamente y aún no existe en el sistema (nombre_nuevo,
+// se crea en gh_elementos con cantidad_sistema = 0, así cualquier conteo queda SOBRANTE).
+export const addItemInventario = async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const { elemento_id, nombre_nuevo } = req.body;
+
+    if (!elemento_id && !String(nombre_nuevo || '').trim()) {
+        return res.status(400).json({ success: false, error: 'Selecciona una referencia existente o escribe el nombre de la nueva.' });
+    }
+
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+
+        const sesion = await client.query(`SELECT estado FROM gh_inventarios_fisicos WHERE id = $1 FOR UPDATE`, [id]);
+        if (sesion.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ success: false, error: 'Sesión no encontrada' });
+        }
+        if (!['ABIERTO', 'EN_CONTEO', 'PENDIENTE_AUTORIZACION'].includes(sesion.rows[0].estado)) {
+            await client.query('ROLLBACK');
+            return res.status(400).json({ success: false, error: 'La sesión ya está cerrada o anulada — no se pueden agregar referencias.' });
+        }
+
+        let elId = elemento_id;
+        let elNombre = '';
+        let stock = 0;
+
+        if (elId) {
+            const el = await client.query(
+                `SELECT e.id, e.nombre, COALESCE(i.stock,0) as stock
+                 FROM gh_elementos e LEFT JOIN gh_inventario_elemento i ON i.elemento_id = e.id
+                 WHERE e.id = $1`,
+                [elId]
+            );
+            if (el.rows.length === 0) {
+                await client.query('ROLLBACK');
+                return res.status(404).json({ success: false, error: 'La referencia seleccionada no existe.' });
+            }
+            elNombre = el.rows[0].nombre;
+            stock = Number(el.rows[0].stock);
+        } else {
+            const nombreTrim = String(nombre_nuevo).trim();
+            const existing = await client.query(`SELECT id, nombre FROM gh_elementos WHERE LOWER(nombre) = LOWER($1)`, [nombreTrim]);
+            if (existing.rows.length > 0) {
+                elId = existing.rows[0].id;
+                elNombre = existing.rows[0].nombre;
+                const stockRes = await client.query(`SELECT COALESCE(stock,0) as stock FROM gh_inventario_elemento WHERE elemento_id = $1`, [elId]);
+                stock = stockRes.rows.length > 0 ? Number(stockRes.rows[0].stock) : 0;
+            } else {
+                const created = await client.query(
+                    `INSERT INTO gh_elementos (nombre, estado_id) VALUES ($1, 'EST-01') RETURNING id, nombre`,
+                    [nombreTrim]
+                );
+                elId = created.rows[0].id;
+                elNombre = created.rows[0].nombre;
+                stock = 0;
+            }
+        }
+
+        let item;
+        try {
+            item = await client.query(
+                `INSERT INTO gh_inventarios_fisicos_items
+                 (inventario_id, elemento_id, elemento_nombre, cantidad_sistema, estado_justificacion)
+                 VALUES ($1, $2, $3, $4, 'PENDIENTE') RETURNING *`,
+                [id, elId, elNombre, stock]
+            );
+        } catch (e: any) {
+            if (e.code === '23505') {
+                await client.query('ROLLBACK');
+                return res.status(409).json({ success: false, error: `"${elNombre}" ya está incluido en esta sesión de conteo.` });
+            }
+            throw e;
+        }
+
+        await client.query('COMMIT');
+        res.json({ success: true, data: item.rows[0] });
+    } catch (error: any) {
+        await client.query('ROLLBACK');
+        console.error('Error addItemInventario:', error);
+        res.status(500).json({ success: false, error: 'Error al agregar la referencia' });
+    } finally {
+        client.release();
+    }
+};
+
 // ─── PUT /inventarios-fisicos/:id/items ──────────────────────────────────────
 // Guarda conteos físicos (guardado progresivo)
 export const saveConteos = async (req: Request, res: Response) => {
