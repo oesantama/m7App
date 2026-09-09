@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { DataTable, ColumnDef } from '../shared/DataTable';
 
 type Tab = 'subir' | 'consultar' | 'conciliar';
 
@@ -43,6 +44,169 @@ const fmtDate = (d?: string) =>
 
 const fmtMoney = (v?: number) =>
   v != null ? `$${Number(v).toLocaleString('es-CO')}` : '—';
+
+// ─── Panel expandido de facturas de detalle (usado como renderExpandedRow del DataTable) ──
+// Carga perezosa: la primera vez que se expande una fila hace el fetch y lo cachea en
+// `expanded[row.id]`; expansiones posteriores reusan el caché sin volver a pedirlo.
+const DetalleFacturasExpand: React.FC<{
+  row: Encabezado;
+  expanded: Record<number, Detalle[]>;
+  setExpanded: React.Dispatch<React.SetStateAction<Record<number, Detalle[]>>>;
+  addingDetToEncId: number | null;
+  setAddingDetToEncId: (id: number | null) => void;
+  newDetForm: { factura: string; volumen: string; peso: string; cubicaje: string; notas: string };
+  setNewDetForm: (f: { factura: string; volumen: string; peso: string; cubicaje: string; notas: string }) => void;
+  handleSaveDetalleRow: (encId: number) => void;
+  setDeletingDet: (d: { id: number; encId: number; factura: string } | null) => void;
+  setDeleteReason: (r: string) => void;
+}> = ({ row, expanded, setExpanded, addingDetToEncId, setAddingDetToEncId, newDetForm, setNewDetForm, handleSaveDetalleRow, setDeletingDet, setDeleteReason }) => {
+  const [loading, setLoading] = useState(false);
+  const detalles = expanded[row.id];
+
+  useEffect(() => {
+    if (detalles !== undefined) return;
+    let cancelled = false;
+    setLoading(true);
+    (api as any).getAuditoriaB36Detalle(row.id)
+      .then((det: any) => { if (!cancelled) setExpanded(prev => ({ ...prev, [row.id]: Array.isArray(det) ? det : [] })); })
+      .catch(() => { if (!cancelled) setExpanded(prev => ({ ...prev, [row.id]: [] })); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row.id, detalles]);
+
+  if (loading || detalles === undefined) {
+    return (
+      <div className="px-8 py-6 flex items-center justify-center">
+        <RefreshCw size={16} className="animate-spin text-slate-300" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-8 py-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+          Facturas de Detalle ({detalles.length})
+        </span>
+        {addingDetToEncId !== row.id && (
+          <button
+            onClick={() => {
+              setAddingDetToEncId(row.id);
+              setNewDetForm({ factura: '', volumen: '', peso: '', cubicaje: '', notas: '' });
+            }}
+            className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors text-[9px] font-black uppercase tracking-wider rounded-lg border border-emerald-200 shadow-sm"
+          >
+            <Plus size={10} /> Adicionar Factura
+          </button>
+        )}
+      </div>
+
+      <table className="w-full text-[10px] bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+        <thead className="bg-slate-100 border-b border-slate-200">
+          <tr className="text-slate-500 font-black uppercase tracking-wider">
+            <th className="py-2 px-3 text-left w-8">#</th>
+            <th className="py-2 px-3 text-left">Factura</th>
+            <th className="py-2 px-3 text-left">Volumen</th>
+            <th className="py-2 px-3 text-left">Peso</th>
+            <th className="py-2 px-3 text-left">Cubicaje</th>
+            <th className="py-2 px-3 text-left">Notas</th>
+            <th className="py-2 px-3 text-center w-24">Acciones</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {detalles.map((d, i) => (
+            <tr key={d.id} className="hover:bg-slate-50/50 transition-colors">
+              <td className="py-2 px-3 text-slate-400 font-bold">{i + 1}</td>
+              <td className="py-2 px-3 font-black text-slate-800">{d.factura || '—'}</td>
+              <td className="py-2 px-3 font-bold text-slate-600">{d.volumen || 0}</td>
+              <td className="py-2 px-3 font-bold text-slate-600">{d.peso || 0}</td>
+              <td className="py-2 px-3 font-bold text-slate-600">{d.cubicaje || 0}</td>
+              <td className="py-2 px-3 text-slate-500">{d.notas || '—'}</td>
+              <td className="py-2 px-3 text-center">
+                <button
+                  onClick={() => { setDeletingDet({ id: d.id, encId: row.id, factura: d.factura || '' }); setDeleteReason(''); }}
+                  className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors inline-flex items-center"
+                  title="Eliminar factura"
+                >
+                  <Trash2 size={11} />
+                </button>
+              </td>
+            </tr>
+          ))}
+
+          {addingDetToEncId === row.id && (
+            <tr className="bg-emerald-50/30">
+              <td className="py-2 px-3 text-emerald-600 font-black">+</td>
+              <td className="py-2 px-3">
+                <input
+                  type="text"
+                  placeholder="Número Factura"
+                  value={newDetForm.factura}
+                  onChange={e => setNewDetForm({ ...newDetForm, factura: e.target.value })}
+                  className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full font-black text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                />
+              </td>
+              <td className="py-2 px-3">
+                <input
+                  type="number"
+                  placeholder="Volumen"
+                  value={newDetForm.volumen}
+                  onChange={e => setNewDetForm({ ...newDetForm, volumen: e.target.value })}
+                  className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full font-bold text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                />
+              </td>
+              <td className="py-2 px-3">
+                <input
+                  type="number"
+                  placeholder="Peso"
+                  value={newDetForm.peso}
+                  onChange={e => setNewDetForm({ ...newDetForm, peso: e.target.value })}
+                  className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full font-bold text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                />
+              </td>
+              <td className="py-2 px-3">
+                <input
+                  type="number"
+                  placeholder="Cubicaje"
+                  value={newDetForm.cubicaje}
+                  onChange={e => setNewDetForm({ ...newDetForm, cubicaje: e.target.value })}
+                  className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full font-bold text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                />
+              </td>
+              <td className="py-2 px-3">
+                <input
+                  type="text"
+                  placeholder="Notas..."
+                  value={newDetForm.notas}
+                  onChange={e => setNewDetForm({ ...newDetForm, notas: e.target.value })}
+                  className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                />
+              </td>
+              <td className="py-2 px-3 text-center whitespace-nowrap space-x-1.5">
+                <button
+                  onClick={() => handleSaveDetalleRow(row.id)}
+                  className="px-2 py-0.5 bg-emerald-600 text-white font-black text-[9px] uppercase tracking-wider rounded shadow-sm hover:bg-emerald-700 transition-colors"
+                >
+                  Guardar
+                </button>
+                <button
+                  onClick={() => setAddingDetToEncId(null)}
+                  className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold text-[9px] uppercase rounded transition-colors"
+                >
+                  Cancelar
+                </button>
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+      {detalles.length === 0 && addingDetToEncId !== row.id && (
+        <p className="text-[10px] text-slate-400 italic">Sin facturas de detalle registradas.</p>
+      )}
+    </div>
+  );
+};
 
 // ─── Tab 1: Subir planilla ────────────────────────────────────────────────────
 const TabSubir: React.FC<{ user: User; clients: Client[] }> = ({ user, clients }) => {
@@ -723,7 +887,6 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
   const [rows, setRows]             = useState<Encabezado[]>([]);
   const [loading, setLoading]       = useState(false);
   const [expanded, setExpanded]     = useState<Record<number, Detalle[]>>({});
-  const [loadingDet, setLoadingDet] = useState<number | null>(null);
 
   // Estados para adicionar factura manual
   const [addingDetToEncId, setAddingDetToEncId] = useState<number | null>(null);
@@ -813,15 +976,6 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
 
   // Lista de usuarios e inhouse
   const [users, setUsers] = useState<any[]>([]);
-  
-  // Paginación
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number | 'Todos'>(5);
-
-  const totalPages = pageSize === 'Todos' ? 1 : Math.ceil(rows.length / (pageSize as number));
-  const paginatedRows = pageSize === 'Todos'
-    ? rows
-    : rows.slice((currentPage - 1) * (pageSize as number), currentPage * (pageSize as number));
 
   useEffect(() => {
     api.getUsers().then(res => setUsers(Array.isArray(res) ? res : [])).catch(() => {});
@@ -835,27 +989,10 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
       const data = await (api as any).getAuditoriaB36Encabezados({ clientId, from: dateFrom, to: dateTo, placa: searchPlaca, os: searchOs });
       setRows(Array.isArray(data) ? data : []);
       setExpanded({});
-      setCurrentPage(1);
     } catch {
       setRows([]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const toggleDetalle = async (id: number) => {
-    if (expanded[id]) {
-      setExpanded(prev => { const n = { ...prev }; delete n[id]; return n; });
-      return;
-    }
-    setLoadingDet(id);
-    try {
-      const det = await (api as any).getAuditoriaB36Detalle(id);
-      setExpanded(prev => ({ ...prev, [id]: Array.isArray(det) ? det : [] }));
-    } catch {
-      setExpanded(prev => ({ ...prev, [id]: [] }));
-    } finally {
-      setLoadingDet(null);
     }
   };
 
@@ -1110,29 +1247,45 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
       });
 
       const fleteVal = parseFloat(String(row.valor_flete || '0'));
-      const scVal = Array.isArray(overcosts) ? overcosts.reduce((acc: number, item: any) => acc + parseFloat(String(item.valor || '0')), 0) : 0;
-      const totalVal = fleteVal + scVal;
+      // Sobrecosto Asociado Factura: viene ligado a una factura puntual (id_detalle presente).
+      // Sobrecosto Autorizado (correo): sin factura asociada — se autoriza por correo y se acumula.
+      const scAsociadoVal = Array.isArray(overcosts)
+        ? overcosts.filter((item: any) => item.id_detalle).reduce((acc: number, item: any) => acc + parseFloat(String(item.valor || '0')), 0)
+        : 0;
+      const scAutorizadoVal = Array.isArray(overcosts)
+        ? overcosts.filter((item: any) => !item.id_detalle).reduce((acc: number, item: any) => acc + parseFloat(String(item.valor || '0')), 0)
+        : 0;
+      const totalVal = fleteVal + scAsociadoVal + scAutorizadoVal;
 
       const rowHeight = rh;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8.5);
-      
+
       // Fila totales: Flete principal
       doc.rect(15, startY, 145, rowHeight);
       doc.rect(160, startY, 15, rowHeight);
       doc.text("$", 160 + 7.5, startY + 4.2, { align: 'center' });
       doc.rect(175, startY, 25, rowHeight);
       doc.text(fmtCurrency(fleteVal), 175 + 23, startY + 4.2, { align: 'right' });
-      
+
       startY += rowHeight;
-      // Fila totales: SOBRECOSTOS
+      // Fila totales: SOBRECOSTO ASOCIADO FACTURA
       doc.rect(15, startY, 145, rowHeight);
-      doc.text("SOBRECOSTOS", 15 + 145/2, startY + 4.2, { align: 'center' });
+      doc.text("SOBRECOSTO ASOCIADO FACTURA", 15 + 145/2, startY + 4.2, { align: 'center' });
       doc.rect(160, startY, 15, rowHeight);
       doc.text("$", 160 + 7.5, startY + 4.2, { align: 'center' });
       doc.rect(175, startY, 25, rowHeight);
-      doc.text(fmtCurrency(scVal), 175 + 23, startY + 4.2, { align: 'right' });
-      
+      doc.text(fmtCurrency(scAsociadoVal), 175 + 23, startY + 4.2, { align: 'right' });
+
+      startY += rowHeight;
+      // Fila totales: SOBRECOSTO AUTORIZADO (CORREO)
+      doc.rect(15, startY, 145, rowHeight);
+      doc.text("SOBRECOSTO AUTORIZADO (CORREO)", 15 + 145/2, startY + 4.2, { align: 'center' });
+      doc.rect(160, startY, 15, rowHeight);
+      doc.text("$", 160 + 7.5, startY + 4.2, { align: 'center' });
+      doc.rect(175, startY, 25, rowHeight);
+      doc.text(fmtCurrency(scAutorizadoVal), 175 + 23, startY + 4.2, { align: 'right' });
+
       startY += rowHeight;
       // Fila totales: TOTAL PAGAR
       doc.rect(15, startY, 145, rowHeight);
@@ -1165,6 +1318,38 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
         a.click();
       });
   };
+
+  const auditoriaColumns: ColumnDef<Encabezado>[] = [
+    { header: 'OS', key: 'os', sortable: true, render: r => <span className="font-black text-slate-900">{r.os || '—'}</span> },
+    { header: 'Fecha Carge', key: 'fecha_carge', sortable: true, render: r => fmtDate(r.fecha_carge), exportRender: r => fmtDate(r.fecha_carge) },
+    { header: 'Placa', key: 'placa', sortable: true, render: r => <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-lg font-black text-xs">{r.placa || '—'}</span> },
+    { header: 'Conductor', key: 'conductor', sortable: true },
+    { header: 'Ruta', key: 'nombre_ruta', sortable: true },
+    { header: 'F. Programado', key: 'fecha_programado', sortable: true, render: r => fmtDate(r.fecha_programado), exportRender: r => fmtDate(r.fecha_programado) },
+    { header: 'Clientes', key: 'cant_clientes', sortable: true, render: r => <span className="font-bold text-slate-700">{r.cant_clientes ?? '—'}</span> },
+    { header: 'Valor Flete', key: 'valor_flete', sortable: true, render: r => <span className="font-black text-emerald-700">{fmtMoney(r.valor_flete)}</span>, exportRender: r => Number(r.valor_flete) || 0 },
+    { header: 'Facturas', key: 'cant_facturas', sortable: true, render: r => <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black text-[10px]">{r.cant_facturas ?? 0}</span> },
+    { header: 'Cargado', key: 'uploaded_at', sortable: true, render: r => <span className="text-slate-400 text-[10px]">{fmtDate(r.uploaded_at)}</span>, exportRender: r => fmtDate(r.uploaded_at) },
+    {
+      header: 'Acciones', key: 'acciones', sortable: false,
+      render: r => (
+        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+          <button onClick={() => handleDownloadPDF(r)} title="Descargar PDF"
+            className="p-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-colors">
+            <Download size={12} />
+          </button>
+          <button onClick={() => openEditModal(r)} title="Editar Flete y Sobrecostos"
+            className="p-1.5 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors">
+            <Pencil size={12} />
+          </button>
+          <button onClick={() => openLogsModal(r)} title="Ver Historial de Movimientos"
+            className="p-1.5 rounded-lg bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors">
+            <History size={12} />
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-4">
@@ -1205,287 +1390,35 @@ const TabConsultar: React.FC<{ user: User; clients: Client[] }> = ({ user, clien
       </div>
 
       {/* Tabla */}
-      <div className="border border-slate-200 rounded-2xl overflow-hidden bg-white">
-        <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-          <span className="text-[11px] font-black uppercase tracking-widest text-slate-600">
-            Planillas — {rows.length} registro{rows.length !== 1 ? 's' : ''}
-          </span>
-          {rows.length > 0 && (
-             <button onClick={handleExportAll} className="flex items-center gap-1.5 px-3 py-1 bg-emerald-100 text-emerald-800 rounded-lg hover:bg-emerald-200 text-[10px] font-black uppercase transition-all">
-                <FileSpreadsheet size={12} />
-                Exportar Todo lo Consultado
-             </button>
-          )}
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-[11px]">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="w-8 px-3 py-3"></th>
-                {['OS', 'Fecha Carge', 'Placa', 'Conductor', 'Ruta', 'F. Programado', 'Clientes', 'Valor Flete', 'Facturas', 'Cargado', 'Acciones'].map(h => (
-                  <th key={h} className="px-3 py-3 text-left font-black uppercase tracking-wider text-slate-500 whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr><td colSpan={12} className="py-16 text-center">
-                  <RefreshCw size={20} className="animate-spin text-slate-300 mx-auto" />
-                </td></tr>
-              ) : paginatedRows.length === 0 ? (
-                <tr><td colSpan={12} className="py-16 text-center">
-                  <div className="flex flex-col items-center gap-2">
-                    <FileSpreadsheet size={28} className="text-slate-300" />
-                    <p className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Sin planillas</p>
-                    <p className="text-[10px] text-slate-300">Seleccione filtros y presione Consultar</p>
-                  </div>
-                </td></tr>
-              ) : paginatedRows.map(row => (
-                <React.Fragment key={row.id}>
-                  <tr className="hover:bg-slate-50 transition-colors">
-                    {/* Expandir detalle */}
-                    <td className="px-3 py-2.5">
-                      <button onClick={() => toggleDetalle(row.id)}
-                        className="text-slate-400 hover:text-emerald-600 transition-colors">
-                        {loadingDet === row.id
-                          ? <RefreshCw size={13} className="animate-spin" />
-                          : expanded[row.id] ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-                      </button>
-                    </td>
-                    <td className="px-3 py-2.5 font-black text-slate-900">{row.os || '—'}</td>
-                    <td className="px-3 py-2.5 text-slate-600">{fmtDate(row.fecha_carge)}</td>
-                    <td className="px-3 py-2.5">
-                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-lg font-black">{row.placa || '—'}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-600">{row.conductor || '—'}</td>
-                    <td className="px-3 py-2.5 text-slate-600 font-medium">{row.nombre_ruta || '—'}</td>
-                    <td className="px-3 py-2.5 text-slate-600">{fmtDate(row.fecha_programado)}</td>
-                    <td className="px-3 py-2.5 text-center text-slate-700 font-bold">{row.cant_clientes ?? '—'}</td>
-                    <td className="px-3 py-2.5 text-right font-black text-emerald-700">{fmtMoney(row.valor_flete)}</td>
-                    <td className="px-3 py-2.5 text-center">
-                      <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-black text-[10px]">{row.cant_facturas ?? 0}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-slate-400 whitespace-nowrap text-[10px]">{fmtDate(row.uploaded_at)}</td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => handleDownloadPDF(row)} title="Descargar PDF"
-                          className="p-1.5 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-colors">
-                          <Download size={12} />
-                        </button>
-                        <button onClick={() => openEditModal(row)} title="Editar Flete y Sobrecostos"
-                          className="p-1.5 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200 transition-colors">
-                          <Pencil size={12} />
-                        </button>
-                        <button onClick={() => openLogsModal(row)} title="Ver Historial de Movimientos"
-                          className="p-1.5 rounded-lg bg-purple-100 text-purple-700 hover:bg-purple-200 transition-colors">
-                          <History size={12} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  {/* Detalle expandido */}
-                  {expanded[row.id] && (
-                    <tr>
-                      <td colSpan={12} className="bg-slate-50 px-8 py-4 border-b border-slate-200">
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                              Facturas de Detalle ({expanded[row.id].length})
-                            </span>
-                            {addingDetToEncId !== row.id && (
-                              <button
-                                onClick={() => {
-                                  setAddingDetToEncId(row.id);
-                                  setNewDetForm({ factura: '', volumen: '', peso: '', cubicaje: '', notas: '' });
-                                }}
-                                className="flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors text-[9px] font-black uppercase tracking-wider rounded-lg border border-emerald-200 shadow-sm"
-                              >
-                                <Plus size={10} /> Adicionar Factura
-                              </button>
-                            )}
-                          </div>
-
-                          <table className="w-full text-[10px] bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
-                            <thead className="bg-slate-100 border-b border-slate-200">
-                              <tr className="text-slate-500 font-black uppercase tracking-wider">
-                                <th className="py-2 px-3 text-left w-8">#</th>
-                                <th className="py-2 px-3 text-left">Factura</th>
-                                <th className="py-2 px-3 text-left">Volumen</th>
-                                <th className="py-2 px-3 text-left">Peso</th>
-                                <th className="py-2 px-3 text-left">Cubicaje</th>
-                                <th className="py-2 px-3 text-left">Notas</th>
-                                <th className="py-2 px-3 text-center w-24">Acciones</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                              {expanded[row.id].map((d, i) => (
-                                <tr key={d.id} className="hover:bg-slate-50/50 transition-colors">
-                                  <td className="py-2 px-3 text-slate-400 font-bold">{i + 1}</td>
-                                  <td className="py-2 px-3 font-black text-slate-800">{d.factura || '—'}</td>
-                                  <td className="py-2 px-3 font-bold text-slate-600">{d.volumen || 0}</td>
-                                  <td className="py-2 px-3 font-bold text-slate-600">{d.peso || 0}</td>
-                                  <td className="py-2 px-3 font-bold text-slate-600">{d.cubicaje || 0}</td>
-                                  <td className="py-2 px-3 text-slate-500">{d.notas || '—'}</td>
-                                  <td className="py-2 px-3 text-center">
-                                    <button
-                                      onClick={() => { setDeletingDet({ id: d.id, encId: row.id, factura: d.factura || '' }); setDeleteReason(''); }}
-                                      className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-600 transition-colors inline-flex items-center"
-                                      title="Eliminar factura"
-                                    >
-                                      <Trash2 size={11} />
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-
-                              {addingDetToEncId === row.id && (
-                                <tr className="bg-emerald-50/30">
-                                  <td className="py-2 px-3 text-emerald-600 font-black">+</td>
-                                  <td className="py-2 px-3">
-                                    <input
-                                      type="text"
-                                      placeholder="Número Factura"
-                                      value={newDetForm.factura}
-                                      onChange={e => setNewDetForm({ ...newDetForm, factura: e.target.value })}
-                                      className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full font-black text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
-                                    />
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    <input
-                                      type="number"
-                                      placeholder="Volumen"
-                                      value={newDetForm.volumen}
-                                      onChange={e => setNewDetForm({ ...newDetForm, volumen: e.target.value })}
-                                      className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full font-bold text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
-                                    />
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    <input
-                                      type="number"
-                                      placeholder="Peso"
-                                      value={newDetForm.peso}
-                                      onChange={e => setNewDetForm({ ...newDetForm, peso: e.target.value })}
-                                      className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full font-bold text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
-                                    />
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    <input
-                                      type="number"
-                                      placeholder="Cubicaje"
-                                      value={newDetForm.cubicaje}
-                                      onChange={e => setNewDetForm({ ...newDetForm, cubicaje: e.target.value })}
-                                      className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full font-bold text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
-                                    />
-                                  </td>
-                                  <td className="py-2 px-3">
-                                    <input
-                                      type="text"
-                                      placeholder="Notas..."
-                                      value={newDetForm.notas}
-                                      onChange={e => setNewDetForm({ ...newDetForm, notas: e.target.value })}
-                                      className="px-2 py-1 border border-emerald-200 rounded text-[10px] w-full text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
-                                    />
-                                  </td>
-                                  <td className="py-2 px-3 text-center whitespace-nowrap space-x-1.5">
-                                    <button
-                                      onClick={() => handleSaveDetalleRow(row.id)}
-                                      className="px-2 py-0.5 bg-emerald-600 text-white font-black text-[9px] uppercase tracking-wider rounded shadow-sm hover:bg-emerald-700 transition-colors"
-                                    >
-                                      Guardar
-                                    </button>
-                                    <button
-                                      onClick={() => setAddingDetToEncId(null)}
-                                      className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold text-[9px] uppercase rounded transition-colors"
-                                    >
-                                      Cancelar
-                                    </button>
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                          {expanded[row.id].length === 0 && addingDetToEncId !== row.id && (
-                            <p className="text-[10px] text-slate-400 italic">Sin facturas de detalle registradas.</p>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </React.Fragment>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Paginación */}
-        {rows.length > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mostrar</span>
-              <div className="relative">
-                <select
-                  value={pageSize}
-                  onChange={e => {
-                    const val = e.target.value;
-                    setPageSize(val === 'Todos' ? 'Todos' : parseInt(val));
-                    setCurrentPage(1);
-                  }}
-                  className="appearance-none pl-3 pr-8 py-1.5 border border-slate-200 rounded-xl text-[11px] font-bold bg-white focus:outline-none focus:border-emerald-400 transition-colors cursor-pointer text-slate-700"
-                >
-                  <option value={5}>5</option>
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                  <option value="Todos">Todos</option>
-                </select>
-                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              </div>
-              <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold ml-1">
-                de {rows.length} registros (Mostrando {paginatedRows.length})
-              </span>
-            </div>
-
-            {pageSize !== 'Todos' && totalPages > 1 && (
-              <div className="flex items-center gap-1.5">
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white transition-all shadow-sm active:scale-95"
-                >
-                  Anterior
-                </button>
-                
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }).map((_, idx) => {
-                    const p = idx + 1;
-                    return (
-                      <button
-                        key={p}
-                        onClick={() => setCurrentPage(p)}
-                        className={`w-8 h-8 flex items-center justify-center text-[11px] font-black rounded-xl transition-all shadow-sm active:scale-95 ${
-                          currentPage === p
-                            ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200'
-                            : 'text-slate-600 bg-white border border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white transition-all shadow-sm active:scale-95"
-                >
-                  Siguiente
-                </button>
-              </div>
-            )}
-          </div>
+      <DataTable
+        data={rows}
+        columns={auditoriaColumns}
+        loading={loading}
+        searchPlaceholder="Buscar OS, placa, conductor..."
+        excelFileName={`auditoria_planillas_${new Date().toISOString().slice(0, 10)}.xlsx`}
+        excelSheetName="Planillas"
+        defaultPageSize={5}
+        toolbarActions={rows.length > 0 && (
+          <button onClick={handleExportAll} className="flex items-center gap-2.5 px-4 py-3.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-2xl font-black text-xs uppercase tracking-widest transition-all">
+            <FileSpreadsheet size={14} />
+            Exportar Todo lo Consultado
+          </button>
         )}
-      </div>
+        renderExpandedRow={row => (
+          <DetalleFacturasExpand
+            row={row}
+            expanded={expanded}
+            setExpanded={setExpanded}
+            addingDetToEncId={addingDetToEncId}
+            setAddingDetToEncId={setAddingDetToEncId}
+            newDetForm={newDetForm}
+            setNewDetForm={setNewDetForm}
+            handleSaveDetalleRow={handleSaveDetalleRow}
+            setDeletingDet={setDeletingDet}
+            setDeleteReason={setDeleteReason}
+          />
+        )}
+      />
 
       {/* Modal de edición de flete y sobrecostos */}
       {editingPlanilla && (
