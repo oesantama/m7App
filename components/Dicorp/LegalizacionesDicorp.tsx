@@ -967,7 +967,7 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                 const pagadoTotal = Number(row.pagado_individual) + Number(row.pagado_grupal) + Number(row.sobrecosto_aprobado) + Number(row.devolucion_total);
                 const pct = Number(row.valor_total) > 0 ? Math.min(100, Math.round((pagadoTotal / Number(row.valor_total)) * 100)) : 0;
                 return (
-                  <div key={`${row.placa}-${row.fecha}`} className="rounded-2xl border-2 border-slate-100 bg-white overflow-hidden hover:border-slate-200 transition-all">
+                  <div key={`${row.placa}-${row.fecha}-${row.cargue_numero}`} className="rounded-2xl border-2 border-slate-100 bg-white overflow-hidden hover:border-slate-200 transition-all">
                     <div className="px-4 py-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
