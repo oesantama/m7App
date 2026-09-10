@@ -12,7 +12,7 @@ import { DataTable, ColumnDef } from '../shared/DataTable';
 interface LegalizacionesDicorpProps { user: UserType; }
 
 interface ConsolidadoRow {
-  placa: string; fecha: string; conductor_nombre: string; cargues: number; cargue_numeros: string;
+  placa: string; fecha: string; cargue_numero: string; conductor_nombre: string; cargues: number; cargue_numeros: string;
   valor_total: string | number; pagado_individual: string | number; pendiente: string | number;
   pagado_grupal: string | number; sobrecosto_aprobado: string | number; sobrecosto_pendiente: string | number;
   devolucion_total: string | number; tipo_descuadre: string | null; comentario_descuadre: string | null;
@@ -33,7 +33,7 @@ interface PagoIndividual {
   anulado?: boolean; anulado_motivo?: string | null; anulado_por?: string | null; anulado_at?: string | null;
 }
 interface PagoGrupal {
-  id: number; placa: string; banco: string | null; comprobante: string; valor: string | number;
+  id: number; placa: string; id_encabezado: number | null; banco: string | null; comprobante: string; valor: string | number;
   fecha_pago: string | null; metodo_pago: string; observacion: string | null; usuario: string | null;
   anulado?: boolean; anulado_motivo?: string | null; anulado_por?: string | null; anulado_at?: string | null;
 }
@@ -43,7 +43,7 @@ interface Sobrecosto {
   anulado?: boolean; anulado_motivo?: string | null; anulado_por?: string | null; anulado_at?: string | null;
 }
 interface Devolucion {
-  id: number; placa: string; valor: string | number; fecha: string | null; observacion: string | null; usuario: string | null;
+  id: number; placa: string; id_encabezado: number | null; valor: string | number; fecha: string | null; observacion: string | null; usuario: string | null;
   anulado?: boolean; anulado_motivo?: string | null; anulado_por?: string | null; anulado_at?: string | null;
 }
 interface MasterRecord { id: string; category: string; name: string; }
@@ -324,6 +324,10 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
   const [pagosGrupales, setPagosGrupales] = useState<PagoGrupal[]>([]);
   const [sobrecostos, setSobrecostos] = useState<Sobrecosto[]>([]);
   const [devoluciones, setDevoluciones] = useState<Devolucion[]>([]);
+  // Registros de antes de exigir cargue (placa+fecha+planilla) — quedaron "sin asignar".
+  const [pagosGrupalesSinAsignar, setPagosGrupalesSinAsignar] = useState<PagoGrupal[]>([]);
+  const [devolucionesSinAsignar, setDevolucionesSinAsignar] = useState<Devolucion[]>([]);
+  const [reasignando, setReasignando] = useState<{ tipo: 'grupal' | 'devolucion'; id: number } | null>(null);
 
   const [duplicado, setDuplicado] = useState<DuplicadoInfo[] | null>(null);
   const [alertInfo, setAlertInfo] = useState<{ title: string; message: string } | null>(null);
@@ -349,14 +353,25 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
     setLoadingCargues(true);
     try {
       const encRes = await api.getDicorpEncabezados({ placa: row.placa, from: row.fecha, to: row.fecha });
-      const encRows: Encabezado[] = encRes.success ? encRes.data : [];
+      const todasEseDia: Encabezado[] = encRes.success ? encRes.data : [];
+      // Cada tarjeta es una placa+fecha+planilla puntual — si esa fecha tiene más de un
+      // cargue, esta vista solo trabaja con el de ESTA tarjeta, nunca con los demás.
+      const encRows = row.cargue_numero ? todasEseDia.filter(e => e.cargue_numero === row.cargue_numero) : todasEseDia;
       setCargues(encRows);
+      // Se autoasigna siempre al cargue de esta tarjeta — nunca se le pregunta al usuario,
+      // ya entró desde ahí y eso es lo que ya eligió.
+      if (encRows.length > 0) {
+        setFormGru(f => ({ ...f, idEncabezado: String(encRows[0].id) }));
+        setFormDevo(f => ({ ...f, idEncabezado: String(encRows[0].id) }));
+      }
 
       const allPedidos: DetalleRow[] = [];
       const pagosMap: Record<number, PagoIndividual[]> = {};
-      let grupales: PagoGrupal[] = [];
-      let sob: Sobrecosto[] = [];
-      let devs: Devolucion[] = [];
+      const grupales: PagoGrupal[] = [];
+      const sob: Sobrecosto[] = [];
+      const devs: Devolucion[] = [];
+      let grupalesSinAsignar: PagoGrupal[] = [];
+      let devsSinAsignar: Devolucion[] = [];
       for (const enc of encRows) {
         const det = await api.getDicorpEncabezadoDetalle(enc.id);
         if (det.success) {
@@ -365,13 +380,18 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
             if (!pagosMap[p.id_detalle]) pagosMap[p.id_detalle] = [];
             pagosMap[p.id_detalle].push(p);
           });
-          grupales = det.pagosGrupales;
-          sob = det.sobrecostos;
-          devs = det.devoluciones;
+          grupales.push(...det.pagosGrupales);
+          sob.push(...det.sobrecostos);
+          devs.push(...det.devoluciones);
+          // Es la misma lista (por placa) en cada vuelta — basta con tomarla una vez.
+          grupalesSinAsignar = det.pagosGrupalesSinAsignar || [];
+          devsSinAsignar = det.devolucionesSinAsignar || [];
         }
       }
       setPedidos(allPedidos);
       setPagosIndividuales(pagosMap);
+      setPagosGrupalesSinAsignar(grupalesSinAsignar);
+      setDevolucionesSinAsignar(devsSinAsignar);
       setPagosGrupales(grupales);
       setSobrecostos(sob);
       setDevoluciones(devs);
@@ -386,17 +406,18 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
     setDuplicado(null);
     setEditingSobId(null);
     setFormSob(EMPTY_SOB_FORM);
-    setFormDevo({ valor: '', fecha: '', observacion: '' });
+    setFormGru(f => ({ ...f, idEncabezado: '', comprobante: '', valor: '', fechaPago: todayCO(), observacion: '' }));
+    setFormDevo({ idEncabezado: '', valor: '', fecha: todayCO(), observacion: '' });
     loadGroupDetail(row);
   };
 
   const closeGroupModal = () => {
     setSelectedGroup(null); setEditingSobId(null); setFormSob(EMPTY_SOB_FORM);
-    setFormDevo({ valor: '', fecha: '', observacion: '' }); loadConsolidado();
+    setFormDevo({ idEncabezado: '', valor: '', fecha: todayCO(), observacion: '' }); loadConsolidado();
   };
 
-  // ── Formularios de captura ──────────────────────────────────────────────
-  const [formGru, setFormGru] = useState({ bancoId: DEFAULT_BANCO_ID, comprobante: '', valor: '', fechaPago: '', metodoPagoId: DEFAULT_METODO_PAGO_ID, observacion: '' });
+  // ── Formularios de captura — la fecha del pago/devolución arranca en hoy, editable ──
+  const [formGru, setFormGru] = useState({ idEncabezado: '', bancoId: DEFAULT_BANCO_ID, comprobante: '', valor: '', fechaPago: todayCO(), metodoPagoId: DEFAULT_METODO_PAGO_ID, observacion: '' });
   const [formSob, setFormSob] = useState({ idEncabezado: '', valor: '', referencia: '', fecha: '', tipo: 'EFECTIVO', observaciones: '' });
   const [editingSobId, setEditingSobId] = useState<number | null>(null);
   const EMPTY_SOB_FORM = { idEncabezado: '', valor: '', referencia: '', fecha: '', tipo: 'EFECTIVO', observaciones: '' };
@@ -454,6 +475,7 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
   const handleSaveGrupal = async () => {
     if (!selectedGroup) return;
     const ref = formGru.comprobante.trim();
+    if (!formGru.idEncabezado) { setAlertInfo({ title: 'Cargue requerido', message: 'Selecciona a qué cargue (placa + fecha + planilla) aplica este pago.' }); return; }
     if (!ref) { setAlertInfo({ title: 'Comprobante requerido', message: 'Ingresa el número de comprobante de la consignación o transferencia.' }); return; }
     if (!formGru.valor || Number(formGru.valor) <= 0) { setAlertInfo({ title: 'Valor requerido', message: 'Ingresa el valor del pago grupal.' }); return; }
     if (!formGru.fechaPago) { setAlertInfo({ title: 'Fecha requerida', message: 'Ingresa la fecha del pago.' }); return; }
@@ -467,13 +489,13 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
     setSavingGru(true);
     try {
       const res = await api.saveDicorpPagoGrupal({
-        placa: selectedGroup.placa, bancoId: formGru.bancoId || undefined, comprobante: formGru.comprobante.trim(),
+        placa: selectedGroup.placa, idEncabezado: Number(formGru.idEncabezado), bancoId: formGru.bancoId || undefined, comprobante: formGru.comprobante.trim(),
         valor: Number(formGru.valor) || 0, fechaPago: formGru.fechaPago || undefined,
         metodoPagoId: formGru.metodoPagoId, observacion: formGru.observacion || undefined,
       });
       if (res.success) {
         toast.success(`Consignación grupal registrada para la placa ${selectedGroup.placa}.`);
-        setFormGru({ bancoId: DEFAULT_BANCO_ID, comprobante: '', valor: '', fechaPago: '', metodoPagoId: DEFAULT_METODO_PAGO_ID, observacion: '' });
+        setFormGru({ idEncabezado: cargues[0] ? String(cargues[0].id) : '', bancoId: DEFAULT_BANCO_ID, comprobante: '', valor: '', fechaPago: todayCO(), metodoPagoId: DEFAULT_METODO_PAGO_ID, observacion: '' });
         loadGroupDetail(selectedGroup);
         refreshAfterChange();
       } else if (res.duplicado) setDuplicado(res.duplicado);
@@ -519,26 +541,45 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
     } catch (err: any) { setAlertInfo({ title: 'Error', message: err.message || String(err) }); }
   };
 
-  const [formDevo, setFormDevo] = useState({ valor: '', fecha: '', observacion: '' });
+  const [formDevo, setFormDevo] = useState({ idEncabezado: '', valor: '', fecha: todayCO(), observacion: '' });
   const [savingDevo, setSavingDevo] = useState(false);
   const handleSaveDevolucion = async () => {
     if (!selectedGroup) return;
+    if (!formDevo.idEncabezado) { setAlertInfo({ title: 'Cargue requerido', message: 'Selecciona a qué cargue (placa + fecha + planilla) aplica esta devolución.' }); return; }
     if (!formDevo.valor || Number(formDevo.valor) <= 0) { setAlertInfo({ title: 'Valor requerido', message: 'Ingresa el valor de la devolución.' }); return; }
     if (!formDevo.fecha) { setAlertInfo({ title: 'Fecha requerida', message: 'Ingresa la fecha de la devolución.' }); return; }
     if (formDevo.fecha > todayCO()) { setAlertInfo({ title: 'Fecha inválida', message: 'La fecha no puede ser posterior al día de hoy.' }); return; }
     setSavingDevo(true);
     try {
       const res = await api.saveDicorpDevolucion({
-        placa: selectedGroup.placa, valor: Number(formDevo.valor), fecha: formDevo.fecha, observacion: formDevo.observacion || undefined,
+        placa: selectedGroup.placa, idEncabezado: Number(formDevo.idEncabezado), valor: Number(formDevo.valor), fecha: formDevo.fecha, observacion: formDevo.observacion || undefined,
       });
       if (res.success) {
         toast.success(`Devolución registrada para la placa ${selectedGroup.placa}.`);
-        setFormDevo({ valor: '', fecha: '', observacion: '' });
+        setFormDevo({ idEncabezado: cargues[0] ? String(cargues[0].id) : '', valor: '', fecha: todayCO(), observacion: '' });
         loadGroupDetail(selectedGroup);
         refreshAfterChange();
       } else setAlertInfo({ title: 'No se pudo guardar la devolución', message: res.error || 'Ocurrió un error al guardar la devolución.' });
     } catch (err: any) { toast.error(`Error: ${err.message || err}`); }
     finally { setSavingDevo(false); }
+  };
+
+  // Asigna un cargue puntual a un pago grupal / devolución viejo que quedó "sin asignar"
+  // (registrado antes de que esto fuera obligatorio).
+  const handleReasignarCargue = async (tipo: 'grupal' | 'devolucion', id: number, idEncabezado: string) => {
+    if (!idEncabezado) { setAlertInfo({ title: 'Cargue requerido', message: 'Selecciona a qué cargue asignarlo.' }); return; }
+    setReasignando({ tipo, id });
+    try {
+      const res = tipo === 'grupal'
+        ? await api.reasignarCargueDicorpPagoGrupal(id, Number(idEncabezado))
+        : await api.reasignarCargueDicorpDevolucion(id, Number(idEncabezado));
+      if (res.success) {
+        toast.success('Reasignado al cargue seleccionado.');
+        if (selectedGroup) loadGroupDetail(selectedGroup);
+        refreshAfterChange();
+      } else setAlertInfo({ title: 'No se pudo reasignar', message: res.error || 'Ocurrió un error al reasignar.' });
+    } catch (err: any) { toast.error(`Error: ${err.message || err}`); }
+    finally { setReasignando(null); }
   };
 
   const confirmAnular = async () => {
@@ -601,7 +642,7 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
     setClosing(true);
     try {
       const res = await api.cerrarDicorpPlacaDia({
-        placa: row.placa, fecha: row.fecha,
+        placa: row.placa, fecha: row.fecha, cargueNumero: row.cargue_numero,
         tipoDescuadre: tipoDescuadreCierre || undefined, comentarioDescuadre: comentarioDescuadreCierre || undefined,
       });
       if (res.success) {
@@ -1113,8 +1154,13 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                 </div>
               ) : modalTab === 'grupal' ? (
                 <div className="space-y-3">
-                  <p className="text-[10px] text-slate-500 font-bold">Este recaudo se asocia a la placa <span className="font-mono text-slate-800">{selectedGroup.placa}</span> y suma al acumulado de todos sus cargues, no solo a los de esta fecha.</p>
+                  <p className="text-[10px] text-slate-500 font-bold">Este recaudo se asocia a un cargue puntual (placa + fecha + planilla) de <span className="font-mono text-slate-800">{selectedGroup.placa}</span> — no se mezcla con otras fechas.</p>
                   <div className="grid grid-cols-3 gap-3">
+                    <div><label className={labelCls}>Cargue</label>
+                      <div className={`${inputCls} bg-slate-50 text-slate-500 flex items-center`}>
+                        {cargues[0] ? `${cargues[0].cargue_numero} · ${fmtDate(cargues[0].fecha)}` : '—'}
+                      </div>
+                    </div>
                     <div><label className={labelCls}>Banco</label>
                       <select className={inputCls} value={formGru.bancoId} onChange={e => setFormGru(f => ({ ...f, bancoId: e.target.value }))}>
                         {bancos.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -1152,6 +1198,32 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                                   <button onClick={() => setAnularTarget({ tipo: 'grupal', id: p.id, label: `Comprobante ${p.comprobante} — ${fmtCOP(p.valor)}` })}
                                     className="text-rose-500 hover:text-rose-700 font-black text-[9px] uppercase">Anular</button>
                                 )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {pagosGrupalesSinAsignar.length > 0 && (
+                    <div className="rounded-xl border-2 border-dashed border-amber-300 bg-amber-50/50 overflow-hidden">
+                      <p className="px-3 pt-2 text-[9px] font-black text-amber-700 uppercase tracking-widest">Sin cargue asignado (histórico) — no cuentan en el descuadre de ninguna fecha hasta reasignarlos</p>
+                      <table className="w-full text-[10px] text-left mt-1">
+                        <thead className="bg-amber-100/60 text-amber-700 uppercase font-black"><tr><th className="px-3 py-1.5">Comprobante</th><th className="px-3 py-1.5">Banco</th><th className="px-3 py-1.5">Fecha</th><th className="px-3 py-1.5 text-right">Valor</th><th className="px-3 py-1.5">Asignar a</th></tr></thead>
+                        <tbody className="divide-y divide-amber-100">
+                          {pagosGrupalesSinAsignar.map(p => (
+                            <tr key={p.id}>
+                              <td className="px-3 py-1.5 font-mono">{p.comprobante}</td>
+                              <td className="px-3 py-1.5">{p.banco || '—'}</td>
+                              <td className="px-3 py-1.5">{fmtDate(p.fecha_pago)}</td>
+                              <td className="px-3 py-1.5 text-right font-black text-amber-700">{fmtCOP(p.valor)}</td>
+                              <td className="px-3 py-1.5">
+                                <select className="px-2 py-1 border border-amber-300 rounded-lg text-[9px] bg-white"
+                                  disabled={reasignando?.tipo === 'grupal' && reasignando.id === p.id}
+                                  defaultValue="" onChange={e => handleReasignarCargue('grupal', p.id, e.target.value)}>
+                                  <option value="">— elegir cargue —</option>
+                                  {cargues.map(c => <option key={c.id} value={c.id}>{c.cargue_numero} · {fmtDate(c.fecha)}</option>)}
+                                </select>
                               </td>
                             </tr>
                           ))}
@@ -1245,8 +1317,13 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-[10px] text-slate-500 font-bold">Devolución de mercancía o dinero de la placa <span className="font-mono text-slate-800">{selectedGroup.placa}</span> — se descuenta del descuadre general junto con lo consignado.</p>
+                  <p className="text-[10px] text-slate-500 font-bold">Devolución de mercancía o dinero de un cargue puntual (placa + fecha + planilla) de <span className="font-mono text-slate-800">{selectedGroup.placa}</span> — se descuenta solo del descuadre de ese cargue.</p>
                   <div className="grid grid-cols-3 gap-3">
+                    <div><label className={labelCls}>Cargue</label>
+                      <div className={`${inputCls} bg-slate-50 text-slate-500 flex items-center`}>
+                        {cargues[0] ? `${cargues[0].cargue_numero} · ${fmtDate(cargues[0].fecha)}` : '—'}
+                      </div>
+                    </div>
                     <div><label className={labelCls}>Valor</label><input type="number" className={inputCls} value={formDevo.valor} onChange={e => setFormDevo(f => ({ ...f, valor: e.target.value }))} /></div>
                     <div><label className={labelCls}>Fecha</label><input type="date" max={todayCO()} className={inputCls} value={formDevo.fecha} onChange={e => setFormDevo(f => ({ ...f, fecha: e.target.value }))} /></div>
                     <div><label className={labelCls}>Observación</label><input className={inputCls} value={formDevo.observacion} onChange={e => setFormDevo(f => ({ ...f, observacion: e.target.value }))} /></div>
@@ -1273,6 +1350,31 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                                   <button onClick={() => setAnularTarget({ tipo: 'devolucion', id: dv.id, label: `Devolución — ${fmtCOP(dv.valor)}` })}
                                     className="text-rose-500 hover:text-rose-700 font-black text-[9px] uppercase">Anular</button>
                                 )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {devolucionesSinAsignar.length > 0 && (
+                    <div className="rounded-xl border-2 border-dashed border-amber-300 bg-amber-50/50 overflow-hidden">
+                      <p className="px-3 pt-2 text-[9px] font-black text-amber-700 uppercase tracking-widest">Sin cargue asignado (histórico) — no cuentan en el descuadre de ninguna fecha hasta reasignarlas</p>
+                      <table className="w-full text-[10px] text-left mt-1">
+                        <thead className="bg-amber-100/60 text-amber-700 uppercase font-black"><tr><th className="px-3 py-1.5">Fecha</th><th className="px-3 py-1.5 text-right">Valor</th><th className="px-3 py-1.5">Observación</th><th className="px-3 py-1.5">Asignar a</th></tr></thead>
+                        <tbody className="divide-y divide-amber-100">
+                          {devolucionesSinAsignar.map(dv => (
+                            <tr key={dv.id}>
+                              <td className="px-3 py-1.5">{fmtDate(dv.fecha)}</td>
+                              <td className="px-3 py-1.5 text-right font-black text-amber-700">{fmtCOP(dv.valor)}</td>
+                              <td className="px-3 py-1.5 text-slate-600 max-w-[160px] truncate" title={dv.observacion || ''}>{dv.observacion || '—'}</td>
+                              <td className="px-3 py-1.5">
+                                <select className="px-2 py-1 border border-amber-300 rounded-lg text-[9px] bg-white"
+                                  disabled={reasignando?.tipo === 'devolucion' && reasignando.id === dv.id}
+                                  defaultValue="" onChange={e => handleReasignarCargue('devolucion', dv.id, e.target.value)}>
+                                  <option value="">— elegir cargue —</option>
+                                  {cargues.map(c => <option key={c.id} value={c.id}>{c.cargue_numero} · {fmtDate(c.fecha)}</option>)}
+                                </select>
                               </td>
                             </tr>
                           ))}

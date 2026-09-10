@@ -1439,12 +1439,19 @@ export const api = {
     }),
 
   saveDicorpPagoGrupal: (data: {
-    placa: string; bancoId?: string; comprobante: string; valor: number; fechaPago?: string; metodoPagoId?: string; observacion?: string;
+    placa: string; idEncabezado: number; bancoId?: string; comprobante: string; valor: number; fechaPago?: string; metodoPagoId?: string; observacion?: string;
   }) =>
     fetchJson(`${API_URL}/dicorp-legalizacion/pagos-grupales`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+    }),
+
+  reasignarCargueDicorpPagoGrupal: (id: number, idEncabezado: number) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/pagos-grupales/${id}/cargue`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idEncabezado }),
     }),
 
   anularDicorpPagoGrupal: (id: number, motivo: string) =>
@@ -1454,11 +1461,18 @@ export const api = {
       body: JSON.stringify({ motivo }),
     }),
 
-  saveDicorpDevolucion: (data: { placa: string; valor: number; fecha: string; observacion?: string }) =>
+  saveDicorpDevolucion: (data: { placa: string; idEncabezado: number; valor: number; fecha: string; observacion?: string }) =>
     fetchJson(`${API_URL}/dicorp-legalizacion/devoluciones`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+    }),
+
+  reasignarCargueDicorpDevolucion: (id: number, idEncabezado: number) =>
+    fetchJson(`${API_URL}/dicorp-legalizacion/devoluciones/${id}/cargue`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idEncabezado }),
     }),
 
   anularDicorpDevolucion: (id: number, motivo: string) =>
@@ -1509,7 +1523,7 @@ export const api = {
     return fetchJson(`${API_URL}/dicorp-legalizacion/consolidado-por-fecha?${qs.toString()}`);
   },
 
-  cerrarDicorpPlacaDia: (data: { placa: string; fecha: string; observacion?: string; tipoDescuadre?: string; comentarioDescuadre?: string }) =>
+  cerrarDicorpPlacaDia: (data: { placa: string; fecha: string; cargueNumero?: string; observacion?: string; tipoDescuadre?: string; comentarioDescuadre?: string }) =>
     fetchJson(`${API_URL}/dicorp-legalizacion/cerrar-placa-dia`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },

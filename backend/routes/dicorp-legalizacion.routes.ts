@@ -9,7 +9,9 @@ import {
   checkComprobante,
   savePagoIndividual,
   savePagoGrupal,
+  reasignarCarguePagoGrupal,
   saveDevolucion,
+  reasignarCargueDevolucion,
   saveSobrecosto,
   updateSobrecosto,
   aprobarSobrecosto,
@@ -38,8 +40,10 @@ router.get('/check-comprobante/:reference',   checkComprobante);
 router.post('/pagos-individuales',            savePagoIndividual);
 router.put('/pagos-individuales/:id/anular',  anularPagoIndividual);
 router.post('/pagos-grupales',                savePagoGrupal);
+router.put('/pagos-grupales/:id/cargue',      reasignarCarguePagoGrupal);
 router.put('/pagos-grupales/:id/anular',      anularPagoGrupal);
 router.post('/devoluciones',                  saveDevolucion);
+router.put('/devoluciones/:id/cargue',        reasignarCargueDevolucion);
 router.put('/devoluciones/:id/anular',        anularDevolucion);
 router.post('/sobrecostos',                   saveSobrecosto);
 router.put('/sobrecostos/:id',                updateSobrecosto);

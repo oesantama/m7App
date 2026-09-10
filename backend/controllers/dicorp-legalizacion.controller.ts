@@ -301,6 +301,26 @@ const ensureTablesImpl = async () => {
     ALTER TABLE dicorp_sobrecostos ADD COLUMN IF NOT EXISTS anulado_por    TEXT;
     ALTER TABLE dicorp_sobrecostos ADD COLUMN IF NOT EXISTS anulado_at     TIMESTAMP WITH TIME ZONE;
   `);
+  // El cargue (id_encabezado) ya se asigna solo desde el contexto — lo que sí es opcional
+  // y elige el usuario es a cuál PEDIDO puntual de esa planilla aplica el sobrecosto
+  // (si no elige ninguno, queda general de la planilla).
+  await pool.query(`
+    ALTER TABLE dicorp_sobrecostos ADD COLUMN IF NOT EXISTS id_detalle INTEGER REFERENCES dicorp_legalizacion_detalle(id) ON DELETE SET NULL;
+    CREATE INDEX IF NOT EXISTS idx_dicorp_sobrecostos_det ON dicorp_sobrecostos (id_detalle);
+  `);
+
+  // ── Asociar Grupal y Devolución a un cargue puntual (placa+fecha+planilla) ──────
+  // Antes "grupal" cubría varios cargues acumulados de la placa sin distinción, lo que
+  // hacía que el mismo monto apareciera repetido en cada tarjeta de fecha. Ahora, igual
+  // que ya funcionaba en Sobrecosto, cada pago grupal y cada devolución se registra
+  // contra UN cargue específico — los registros viejos quedan con id_encabezado NULL
+  // ("sin asignar") y se pueden reasignar desde la UI sin perder el histórico.
+  await pool.query(`
+    ALTER TABLE dicorp_pagos_grupales ADD COLUMN IF NOT EXISTS id_encabezado INTEGER REFERENCES dicorp_legalizacion_encabezado(id) ON DELETE SET NULL;
+    ALTER TABLE dicorp_devoluciones ADD COLUMN IF NOT EXISTS id_encabezado INTEGER REFERENCES dicorp_legalizacion_encabezado(id) ON DELETE SET NULL;
+    CREATE INDEX IF NOT EXISTS idx_dicorp_pgru_enc ON dicorp_pagos_grupales (id_encabezado);
+    CREATE INDEX IF NOT EXISTS idx_dicorp_devo_enc ON dicorp_devoluciones (id_encabezado);
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS dicorp_legalizacion_log (
@@ -578,6 +598,19 @@ export const uploadEntregas = async (req: Request, res: Response) => {
         if (existing.rows.length) {
           encId = existing.rows[0].id;
           encExistentes++;
+          // "Editar Información Cargada" también corrige placa/conductor/transportador
+          // del encabezado — antes solo se actualizaban los pedidos, dejando el
+          // conductor viejo aunque el Excel trajera uno corregido.
+          if (modo === 'editar') {
+            await client.query(`
+              UPDATE dicorp_legalizacion_encabezado SET
+                placa = COALESCE($2, placa),
+                conductor_cedula = COALESCE($3, conductor_cedula),
+                conductor_nombre = COALESCE($4, conductor_nombre),
+                transportador = COALESCE($5, transportador)
+              WHERE id = $1
+            `, [encId, first.placa || null, first.cedula_conductor || null, first.nombre_conductor || null, first.transportador || null]);
+          }
         } else {
           const ins = await client.query(`
             INSERT INTO dicorp_legalizacion_encabezado
@@ -730,7 +763,7 @@ export const getEncabezadoDetalle = async (req: Request, res: Response) => {
     if (!enc.rows.length) return res.status(404).json({ success: false, error: 'Encabezado no encontrado.' });
     const placa = enc.rows[0].placa;
 
-    const [detalle, logs, pagosIndividuales, pagosGrupales, sobrecostos, devoluciones] = await Promise.all([
+    const [detalle, logs, pagosIndividuales, pagosGrupales, sobrecostos, devoluciones, pagosGrupalesSinAsignar, devolucionesSinAsignar] = await Promise.all([
       pool.query(`
         SELECT d.*, c.nombre_cliente, c.direccion, c.ciudad, c.barrio, c.vendedor, c.canal
         FROM dicorp_legalizacion_detalle d
@@ -753,10 +786,26 @@ export const getEncabezadoDetalle = async (req: Request, res: Response) => {
         FROM dicorp_pagos_grupales pg
         LEFT JOIN master_records mb ON mb.id = pg.banco_id
         LEFT JOIN master_records mp ON mp.id = pg.metodo_pago_id
-        WHERE pg.placa = $1 ORDER BY pg.created_at DESC
+        WHERE pg.id_encabezado = $1 ORDER BY pg.created_at DESC
+      `, [id]),
+      pool.query(`
+        SELECT s.*, d.pedido_sap
+        FROM dicorp_sobrecostos s
+        LEFT JOIN dicorp_legalizacion_detalle d ON d.id = s.id_detalle
+        WHERE s.placa = $1 ORDER BY s.created_at DESC
       `, [placa]),
-      pool.query(`SELECT * FROM dicorp_sobrecostos WHERE placa = $1 ORDER BY created_at DESC`, [placa]),
-      pool.query(`SELECT * FROM dicorp_devoluciones WHERE placa = $1 ORDER BY created_at DESC`, [placa]),
+      pool.query(`SELECT * FROM dicorp_devoluciones WHERE id_encabezado = $1 ORDER BY created_at DESC`, [id]),
+      // Registros de ANTES de exigir cargue — quedaron "sin asignar" (id_encabezado NULL).
+      // Se muestran aparte para poder reasignarlos a un cargue puntual sin perder el histórico.
+      pool.query(`
+        SELECT pg.*, mb.name AS banco, mp.name AS metodo_pago
+        FROM dicorp_pagos_grupales pg
+        LEFT JOIN master_records mb ON mb.id = pg.banco_id
+        LEFT JOIN master_records mp ON mp.id = pg.metodo_pago_id
+        WHERE pg.placa = $1 AND pg.id_encabezado IS NULL AND NOT pg.anulado
+        ORDER BY pg.created_at DESC
+      `, [placa]),
+      pool.query(`SELECT * FROM dicorp_devoluciones WHERE placa = $1 AND id_encabezado IS NULL AND NOT anulado ORDER BY created_at DESC`, [placa]),
     ]);
 
     res.json({
@@ -768,6 +817,8 @@ export const getEncabezadoDetalle = async (req: Request, res: Response) => {
       pagosGrupales: pagosGrupales.rows,
       sobrecostos: sobrecostos.rows,
       devoluciones: devoluciones.rows,
+      pagosGrupalesSinAsignar: pagosGrupalesSinAsignar.rows,
+      devolucionesSinAsignar: devolucionesSinAsignar.rows,
     });
   } catch (err: any) {
     console.error('[DICORP-LEGALIZACION-DETALLE]', err.message);
@@ -907,14 +958,15 @@ export const savePagoIndividual = async (req: Request, res: Response) => {
 };
 
 // ─── POST /dicorp-legalizacion/pagos-grupales ─────────────────────────────────
-// Consignación de la placa que acumula/cubre varios cargues (no se amarra a uno solo).
+// Consignación que cubre varios pedidos de UN cargue puntual (placa+fecha+planilla).
 export const savePagoGrupal = async (req: Request, res: Response) => {
   try {
     await ensureTables();
     const usuario = getUser(req);
-    const { placa, bancoId, comprobante, valor, fechaPago, metodoPagoId, observacion } = req.body || {};
+    const { placa, idEncabezado, bancoId, comprobante, valor, fechaPago, metodoPagoId, observacion } = req.body || {};
 
     if (!placa) return res.status(400).json({ success: false, error: 'La placa es requerida.' });
+    if (!idEncabezado) return res.status(400).json({ success: false, error: 'Selecciona a qué cargue (placa + fecha + planilla) aplica este pago.' });
     if (!comprobante || String(comprobante).trim() === '') {
       return res.status(400).json({ success: false, error: 'El número de comprobante es requerido.' });
     }
@@ -926,16 +978,24 @@ export const savePagoGrupal = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'La fecha de pago no puede ser posterior al día de hoy.' });
     }
 
+    const enc = await pool.query(`SELECT id FROM dicorp_legalizacion_encabezado WHERE id = $1 AND placa = $2`, [idEncabezado, placa]);
+    if (!enc.rows.length) return res.status(404).json({ success: false, error: 'El cargue seleccionado no corresponde a esta placa.' });
+
     const dup = await checkComprobanteConflict(comprobante, 'grupal', null);
     if (dup.length) {
       return res.status(409).json({ success: false, error: 'Este comprobante ya fue reportado en otra legalización.', duplicado: dup });
     }
 
     const ins = await pool.query(`
-      INSERT INTO dicorp_pagos_grupales (placa, banco_id, comprobante, valor, fecha_pago, metodo_pago_id, observacion, usuario)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      INSERT INTO dicorp_pagos_grupales (placa, id_encabezado, banco_id, comprobante, valor, fecha_pago, metodo_pago_id, observacion, usuario)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
       RETURNING *
-    `, [placa, bancoId || null, String(comprobante).trim(), parseNum(valor), fechaPago || null, metodoPagoId || METODO_PAGO_DEFAULT_ID, observacion || null, usuario]);
+    `, [placa, idEncabezado, bancoId || null, String(comprobante).trim(), parseNum(valor), fechaPago || null, metodoPagoId || METODO_PAGO_DEFAULT_ID, observacion || null, usuario]);
+
+    await pool.query(`
+      INSERT INTO dicorp_legalizacion_log (id_encabezado, accion, observacion, usuario)
+      VALUES ($1, 'PAGO_GRUPAL', $2, $3)
+    `, [idEncabezado, `Comprobante ${comprobante} — ${fmtLog(valor)}`, usuario]);
 
     res.json({ success: true, pago: ins.rows[0] });
   } catch (err: any) {
@@ -944,15 +1004,45 @@ export const savePagoGrupal = async (req: Request, res: Response) => {
   }
 };
 
+// ─── PUT /dicorp-legalizacion/pagos-grupales/:id/cargue ───────────────────────
+// Reasigna el cargue de un pago grupal viejo (registrado antes de exigir id_encabezado).
+export const reasignarCarguePagoGrupal = async (req: Request, res: Response) => {
+  try {
+    await ensureTables();
+    const { id } = req.params;
+    const { idEncabezado } = req.body || {};
+    const usuario = getUser(req);
+    if (!idEncabezado) return res.status(400).json({ success: false, error: 'Selecciona el cargue a asignar.' });
+
+    const pago = await pool.query(`SELECT placa FROM dicorp_pagos_grupales WHERE id = $1`, [id]);
+    if (!pago.rows.length) return res.status(404).json({ success: false, error: 'Pago grupal no encontrado.' });
+
+    const enc = await pool.query(`SELECT id FROM dicorp_legalizacion_encabezado WHERE id = $1 AND placa = $2`, [idEncabezado, pago.rows[0].placa]);
+    if (!enc.rows.length) return res.status(404).json({ success: false, error: 'El cargue seleccionado no corresponde a la placa de este pago.' });
+
+    const upd = await pool.query(`UPDATE dicorp_pagos_grupales SET id_encabezado = $1 WHERE id = $2 RETURNING *`, [idEncabezado, id]);
+    await pool.query(`
+      INSERT INTO dicorp_legalizacion_log (id_encabezado, accion, observacion, usuario)
+      VALUES ($1, 'PAGO_GRUPAL_REASIGNADO', $2, $3)
+    `, [idEncabezado, `Pago grupal #${id} reasignado a este cargue`, usuario]);
+
+    res.json({ success: true, pago: upd.rows[0] });
+  } catch (err: any) {
+    console.error('[DICORP-PAGO-GRUPAL-REASIGNAR]', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
 // ─── POST /dicorp-legalizacion/devoluciones ───────────────────────────────────
-// Devolución de mercancía/dinero de la placa — valor general, no atado a un cargue puntual.
+// Devolución de mercancía/dinero de UN cargue puntual (placa+fecha+planilla).
 export const saveDevolucion = async (req: Request, res: Response) => {
   try {
     await ensureTables();
     const usuario = getUser(req);
-    const { placa, valor, fecha, observacion } = req.body || {};
+    const { placa, idEncabezado, valor, fecha, observacion } = req.body || {};
 
     if (!placa) return res.status(400).json({ success: false, error: 'La placa es requerida.' });
+    if (!idEncabezado) return res.status(400).json({ success: false, error: 'Selecciona a qué cargue (placa + fecha + planilla) aplica esta devolución.' });
     if (!valor || parseNum(valor) <= 0) {
       return res.status(400).json({ success: false, error: 'El valor de la devolución es requerido.' });
     }
@@ -961,15 +1051,52 @@ export const saveDevolucion = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'La fecha no puede ser posterior al día de hoy.' });
     }
 
+    const enc = await pool.query(`SELECT id FROM dicorp_legalizacion_encabezado WHERE id = $1 AND placa = $2`, [idEncabezado, placa]);
+    if (!enc.rows.length) return res.status(404).json({ success: false, error: 'El cargue seleccionado no corresponde a esta placa.' });
+
     const ins = await pool.query(`
-      INSERT INTO dicorp_devoluciones (placa, valor, fecha, observacion, usuario)
-      VALUES ($1,$2,$3,$4,$5)
+      INSERT INTO dicorp_devoluciones (placa, id_encabezado, valor, fecha, observacion, usuario)
+      VALUES ($1,$2,$3,$4,$5,$6)
       RETURNING *
-    `, [placa, parseNum(valor), fecha, observacion || null, usuario]);
+    `, [placa, idEncabezado, parseNum(valor), fecha, observacion || null, usuario]);
+
+    await pool.query(`
+      INSERT INTO dicorp_legalizacion_log (id_encabezado, accion, observacion, usuario)
+      VALUES ($1, 'DEVOLUCION', $2, $3)
+    `, [idEncabezado, `Devolución registrada — ${fmtLog(valor)}`, usuario]);
 
     res.json({ success: true, devolucion: ins.rows[0] });
   } catch (err: any) {
     console.error('[DICORP-DEVOLUCION]', err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
+
+// ─── PUT /dicorp-legalizacion/devoluciones/:id/cargue ─────────────────────────
+// Reasigna el cargue de una devolución vieja (registrada antes de exigir id_encabezado).
+export const reasignarCargueDevolucion = async (req: Request, res: Response) => {
+  try {
+    await ensureTables();
+    const { id } = req.params;
+    const { idEncabezado } = req.body || {};
+    const usuario = getUser(req);
+    if (!idEncabezado) return res.status(400).json({ success: false, error: 'Selecciona el cargue a asignar.' });
+
+    const devo = await pool.query(`SELECT placa FROM dicorp_devoluciones WHERE id = $1`, [id]);
+    if (!devo.rows.length) return res.status(404).json({ success: false, error: 'Devolución no encontrada.' });
+
+    const enc = await pool.query(`SELECT id FROM dicorp_legalizacion_encabezado WHERE id = $1 AND placa = $2`, [idEncabezado, devo.rows[0].placa]);
+    if (!enc.rows.length) return res.status(404).json({ success: false, error: 'El cargue seleccionado no corresponde a la placa de esta devolución.' });
+
+    const upd = await pool.query(`UPDATE dicorp_devoluciones SET id_encabezado = $1 WHERE id = $2 RETURNING *`, [idEncabezado, id]);
+    await pool.query(`
+      INSERT INTO dicorp_legalizacion_log (id_encabezado, accion, observacion, usuario)
+      VALUES ($1, 'DEVOLUCION_REASIGNADA', $2, $3)
+    `, [idEncabezado, `Devolución #${id} reasignada a este cargue`, usuario]);
+
+    res.json({ success: true, devolucion: upd.rows[0] });
+  } catch (err: any) {
+    console.error('[DICORP-DEVOLUCION-REASIGNAR]', err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 };
@@ -979,7 +1106,7 @@ export const saveSobrecosto = async (req: Request, res: Response) => {
   try {
     await ensureTables();
     const usuario = getUser(req);
-    const { placa, idEncabezado, valor, referencia, fecha, tipo, observaciones } = req.body || {};
+    const { placa, idEncabezado, idDetalle, valor, referencia, fecha, tipo, observaciones } = req.body || {};
     if (!placa) return res.status(400).json({ success: false, error: 'La placa es requerida.' });
     if (!valor || parseNum(valor) <= 0) {
       return res.status(400).json({ success: false, error: 'El valor del sobrecosto es requerido.' });
@@ -988,12 +1115,16 @@ export const saveSobrecosto = async (req: Request, res: Response) => {
     if (isFutureDateCO(fecha)) {
       return res.status(400).json({ success: false, error: 'La fecha no puede ser posterior al día de hoy.' });
     }
+    if (idDetalle && idEncabezado) {
+      const det = await pool.query(`SELECT id FROM dicorp_legalizacion_detalle WHERE id = $1 AND id_encabezado = $2`, [idDetalle, idEncabezado]);
+      if (!det.rows.length) return res.status(404).json({ success: false, error: 'El pedido seleccionado no corresponde a este cargue.' });
+    }
 
     const ins = await pool.query(`
-      INSERT INTO dicorp_sobrecostos (placa, id_encabezado, valor, referencia, fecha, tipo, status, observaciones, usuario)
-      VALUES ($1,$2,$3,$4,$5,$6,'PENDIENTE',$7,$8)
+      INSERT INTO dicorp_sobrecostos (placa, id_encabezado, id_detalle, valor, referencia, fecha, tipo, status, observaciones, usuario)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,'PENDIENTE',$8,$9)
       RETURNING *
-    `, [placa, idEncabezado || null, parseNum(valor), referencia || null, fecha || null, tipo || 'EFECTIVO', observaciones || null, usuario]);
+    `, [placa, idEncabezado || null, idDetalle || null, parseNum(valor), referencia || null, fecha || null, tipo || 'EFECTIVO', observaciones || null, usuario]);
 
     if (idEncabezado) {
       await pool.query(`
@@ -1017,7 +1148,7 @@ export const updateSobrecosto = async (req: Request, res: Response) => {
     await ensureTables();
     const usuario = getUser(req);
     const { id } = req.params;
-    const { idEncabezado, valor, referencia, fecha, tipo, observaciones } = req.body || {};
+    const { idEncabezado, idDetalle, valor, referencia, fecha, tipo, observaciones } = req.body || {};
 
     if (!valor || parseNum(valor) <= 0) {
       return res.status(400).json({ success: false, error: 'El valor del sobrecosto es requerido.' });
@@ -1025,6 +1156,10 @@ export const updateSobrecosto = async (req: Request, res: Response) => {
     if (!fecha) return res.status(400).json({ success: false, error: 'La fecha del sobrecosto es requerida.' });
     if (isFutureDateCO(fecha)) {
       return res.status(400).json({ success: false, error: 'La fecha no puede ser posterior al día de hoy.' });
+    }
+    if (idDetalle && idEncabezado) {
+      const det = await pool.query(`SELECT id FROM dicorp_legalizacion_detalle WHERE id = $1 AND id_encabezado = $2`, [idDetalle, idEncabezado]);
+      if (!det.rows.length) return res.status(404).json({ success: false, error: 'El pedido seleccionado no corresponde a este cargue.' });
     }
 
     const cur = await pool.query(`SELECT * FROM dicorp_sobrecostos WHERE id = $1`, [id]);
@@ -1035,10 +1170,10 @@ export const updateSobrecosto = async (req: Request, res: Response) => {
 
     const result = await pool.query(`
       UPDATE dicorp_sobrecostos SET
-        id_encabezado = $1, valor = $2, referencia = $3, fecha = $4, tipo = $5, observaciones = $6
-      WHERE id = $7
+        id_encabezado = $1, id_detalle = $2, valor = $3, referencia = $4, fecha = $5, tipo = $6, observaciones = $7
+      WHERE id = $8
       RETURNING *
-    `, [idEncabezado || null, parseNum(valor), referencia || null, fecha, tipo || 'EFECTIVO', observaciones || null, id]);
+    `, [idEncabezado || null, idDetalle || null, parseNum(valor), referencia || null, fecha, tipo || 'EFECTIVO', observaciones || null, id]);
 
     const idEnc = result.rows[0].id_encabezado;
     if (idEnc) {
@@ -1156,49 +1291,54 @@ export const getConsolidadoPendientes = async (req: Request, res: Response) => {
         FROM cargues c
         LEFT JOIN individual i ON i.id_encabezado = c.id
       ),
+      -- Grupal, sobrecosto y devolución ahora se registran contra UN cargue puntual
+      -- (id_encabezado) en vez de sumarse por toda la placa — así cada tarjeta de
+      -- fecha/planilla muestra solo lo que realmente le corresponde a ese cargue.
       pool AS (
-        SELECT c.placa,
-          COALESCE((SELECT SUM(valor) FROM dicorp_pagos_grupales g WHERE g.placa = c.placa AND NOT g.anulado), 0) AS grupal_total,
-          COALESCE((SELECT SUM(valor) FROM dicorp_sobrecostos s WHERE s.placa = c.placa AND s.status = 'APROBADO' AND NOT s.anulado), 0) AS sobrecosto_aprobado,
-          COALESCE((SELECT SUM(valor) FROM dicorp_sobrecostos s WHERE s.placa = c.placa AND s.status = 'PENDIENTE' AND NOT s.anulado), 0) AS sobrecosto_pendiente,
-          COALESCE((SELECT SUM(valor) FROM dicorp_devoluciones dv WHERE dv.placa = c.placa AND NOT dv.anulado), 0) AS devolucion_total
-        FROM (SELECT DISTINCT placa FROM cargues) c
+        SELECT c.id,
+          COALESCE((SELECT SUM(valor) FROM dicorp_pagos_grupales g WHERE g.id_encabezado = c.id AND NOT g.anulado), 0) AS grupal_total,
+          COALESCE((SELECT SUM(valor) FROM dicorp_sobrecostos s WHERE s.id_encabezado = c.id AND s.status = 'APROBADO' AND NOT s.anulado), 0) AS sobrecosto_aprobado,
+          COALESCE((SELECT SUM(valor) FROM dicorp_sobrecostos s WHERE s.id_encabezado = c.id AND s.status = 'PENDIENTE' AND NOT s.anulado), 0) AS sobrecosto_pendiente,
+          COALESCE((SELECT SUM(valor) FROM dicorp_devoluciones dv WHERE dv.id_encabezado = c.id AND NOT dv.anulado), 0) AS devolucion_total
+        FROM cargues c
       ),
       detalle AS (
         SELECT s.*, p.grupal_total, p.sobrecosto_aprobado, p.sobrecosto_pendiente, p.devolucion_total
-        FROM saldo s JOIN pool p ON p.placa = s.placa
+        FROM saldo s JOIN pool p ON p.id = s.id
       )
-      SELECT d.placa, d.fecha, MAX(d.conductor_nombre) AS conductor_nombre, COUNT(*) AS cargues,
-        string_agg(DISTINCT d.cargue_numero, ', ' ORDER BY d.cargue_numero) AS cargue_numeros,
+      SELECT d.placa, d.fecha, d.cargue_numero, MAX(d.conductor_nombre) AS conductor_nombre, COUNT(*) AS cargues,
+        d.cargue_numero AS cargue_numeros,
         SUM(d.valor_total) AS valor_total, SUM(d.pagado_individual) AS pagado_individual,
-        MAX(d.grupal_total) AS pagado_grupal, MAX(d.sobrecosto_aprobado) AS sobrecosto_aprobado,
-        MAX(d.sobrecosto_pendiente) AS sobrecosto_pendiente, MAX(d.devolucion_total) AS devolucion_total,
-        SUM(d.valor_total) - SUM(d.pagado_individual) - MAX(d.grupal_total) - MAX(d.sobrecosto_aprobado) - MAX(d.devolucion_total) AS pendiente,
+        SUM(d.grupal_total) AS pagado_grupal, SUM(d.sobrecosto_aprobado) AS sobrecosto_aprobado,
+        SUM(d.sobrecosto_pendiente) AS sobrecosto_pendiente, SUM(d.devolucion_total) AS devolucion_total,
+        SUM(d.valor_total) - SUM(d.pagado_individual) - SUM(d.grupal_total) - SUM(d.sobrecosto_aprobado) - SUM(d.devolucion_total) AS pendiente,
         NULL::text AS tipo_descuadre, NULL::text AS comentario_descuadre,
         (SELECT banco FROM (
           SELECT mb3.name AS banco, pi3.fecha_pago FROM dicorp_pagos_individuales pi3
             JOIN dicorp_legalizacion_detalle d3 ON d3.id = pi3.id_detalle
             JOIN dicorp_legalizacion_encabezado e3 ON e3.id = d3.id_encabezado
             LEFT JOIN master_records mb3 ON mb3.id = pi3.banco_id
-            WHERE e3.placa = d.placa AND e3.fecha = d.fecha AND NOT pi3.anulado
+            WHERE e3.placa = d.placa AND e3.fecha = d.fecha AND e3.cargue_numero = d.cargue_numero AND NOT pi3.anulado
           UNION ALL
           SELECT mb4.name AS banco, pg3.fecha_pago FROM dicorp_pagos_grupales pg3
+            JOIN dicorp_legalizacion_encabezado e4 ON e4.id = pg3.id_encabezado
             LEFT JOIN master_records mb4 ON mb4.id = pg3.banco_id
-            WHERE pg3.placa = d.placa AND NOT pg3.anulado
+            WHERE e4.placa = d.placa AND e4.fecha = d.fecha AND e4.cargue_numero = d.cargue_numero AND NOT pg3.anulado
         ) t ORDER BY fecha_pago DESC NULLS LAST LIMIT 1) AS banco_reciente,
         (SELECT fecha_pago FROM (
           SELECT mb3.name AS banco, pi3.fecha_pago FROM dicorp_pagos_individuales pi3
             JOIN dicorp_legalizacion_detalle d3 ON d3.id = pi3.id_detalle
             JOIN dicorp_legalizacion_encabezado e3 ON e3.id = d3.id_encabezado
             LEFT JOIN master_records mb3 ON mb3.id = pi3.banco_id
-            WHERE e3.placa = d.placa AND e3.fecha = d.fecha AND NOT pi3.anulado
+            WHERE e3.placa = d.placa AND e3.fecha = d.fecha AND e3.cargue_numero = d.cargue_numero AND NOT pi3.anulado
           UNION ALL
           SELECT mb4.name AS banco, pg3.fecha_pago FROM dicorp_pagos_grupales pg3
+            JOIN dicorp_legalizacion_encabezado e4 ON e4.id = pg3.id_encabezado
             LEFT JOIN master_records mb4 ON mb4.id = pg3.banco_id
-            WHERE pg3.placa = d.placa AND NOT pg3.anulado
+            WHERE e4.placa = d.placa AND e4.fecha = d.fecha AND e4.cargue_numero = d.cargue_numero AND NOT pg3.anulado
         ) t ORDER BY fecha_pago DESC NULLS LAST LIMIT 1) AS fecha_consignacion_reciente
       FROM detalle d
-      GROUP BY d.placa, d.fecha
+      GROUP BY d.placa, d.fecha, d.cargue_numero
       ORDER BY d.fecha DESC, pendiente DESC
     `);
     res.json({ success: true, data: result.rows });
@@ -1245,24 +1385,24 @@ export const getConsolidadoPorFecha = async (req: Request, res: Response) => {
         LEFT JOIN individual i ON i.id_encabezado = c.id
       ),
       pool AS (
-        SELECT c.placa,
-          COALESCE((SELECT SUM(valor) FROM dicorp_pagos_grupales g WHERE g.placa = c.placa AND NOT g.anulado), 0) AS grupal_total,
-          COALESCE((SELECT SUM(valor) FROM dicorp_sobrecostos s WHERE s.placa = c.placa AND s.status = 'APROBADO' AND NOT s.anulado), 0) AS sobrecosto_aprobado,
-          COALESCE((SELECT SUM(valor) FROM dicorp_sobrecostos s WHERE s.placa = c.placa AND s.status = 'PENDIENTE' AND NOT s.anulado), 0) AS sobrecosto_pendiente,
-          COALESCE((SELECT SUM(valor) FROM dicorp_devoluciones dv WHERE dv.placa = c.placa AND NOT dv.anulado), 0) AS devolucion_total
-        FROM (SELECT DISTINCT placa FROM cargues) c
+        SELECT c.id,
+          COALESCE((SELECT SUM(valor) FROM dicorp_pagos_grupales g WHERE g.id_encabezado = c.id AND NOT g.anulado), 0) AS grupal_total,
+          COALESCE((SELECT SUM(valor) FROM dicorp_sobrecostos s WHERE s.id_encabezado = c.id AND s.status = 'APROBADO' AND NOT s.anulado), 0) AS sobrecosto_aprobado,
+          COALESCE((SELECT SUM(valor) FROM dicorp_sobrecostos s WHERE s.id_encabezado = c.id AND s.status = 'PENDIENTE' AND NOT s.anulado), 0) AS sobrecosto_pendiente,
+          COALESCE((SELECT SUM(valor) FROM dicorp_devoluciones dv WHERE dv.id_encabezado = c.id AND NOT dv.anulado), 0) AS devolucion_total
+        FROM cargues c
       ),
       detalle AS (
         SELECT s.*, p.grupal_total, p.sobrecosto_aprobado, p.sobrecosto_pendiente, p.devolucion_total
-        FROM saldo s JOIN pool p ON p.placa = s.placa
+        FROM saldo s JOIN pool p ON p.id = s.id
       )
-      SELECT d.placa, d.fecha, MAX(d.conductor_nombre) AS conductor_nombre, COUNT(*) AS cargues,
-        string_agg(DISTINCT d.cargue_numero, ', ' ORDER BY d.cargue_numero) AS cargue_numeros,
+      SELECT d.placa, d.fecha, d.cargue_numero, MAX(d.conductor_nombre) AS conductor_nombre, COUNT(*) AS cargues,
+        d.cargue_numero AS cargue_numeros,
         CASE WHEN COUNT(DISTINCT d.estado) = 1 THEN MAX(d.estado) ELSE 'MIXTO' END AS estado,
         SUM(d.valor_total) AS valor_total, SUM(d.pagado_individual) AS pagado_individual,
-        SUM(d.valor_total) - SUM(d.pagado_individual) - MAX(d.grupal_total) - MAX(d.sobrecosto_aprobado) - MAX(d.devolucion_total) AS pendiente,
-        MAX(d.grupal_total) AS pagado_grupal, MAX(d.sobrecosto_aprobado) AS sobrecosto_aprobado,
-        MAX(d.sobrecosto_pendiente) AS sobrecosto_pendiente, MAX(d.devolucion_total) AS devolucion_total,
+        SUM(d.valor_total) - SUM(d.pagado_individual) - SUM(d.grupal_total) - SUM(d.sobrecosto_aprobado) - SUM(d.devolucion_total) AS pendiente,
+        SUM(d.grupal_total) AS pagado_grupal, SUM(d.sobrecosto_aprobado) AS sobrecosto_aprobado,
+        SUM(d.sobrecosto_pendiente) AS sobrecosto_pendiente, SUM(d.devolucion_total) AS devolucion_total,
         string_agg(DISTINCT d.tipo_descuadre, ', ') AS tipo_descuadre,
         string_agg(DISTINCT d.comentario_descuadre, ' | ') AS comentario_descuadre,
         (SELECT banco FROM (
@@ -1270,25 +1410,27 @@ export const getConsolidadoPorFecha = async (req: Request, res: Response) => {
             JOIN dicorp_legalizacion_detalle d3 ON d3.id = pi3.id_detalle
             JOIN dicorp_legalizacion_encabezado e3 ON e3.id = d3.id_encabezado
             LEFT JOIN master_records mb3 ON mb3.id = pi3.banco_id
-            WHERE e3.placa = d.placa AND e3.fecha = d.fecha AND NOT pi3.anulado
+            WHERE e3.placa = d.placa AND e3.fecha = d.fecha AND e3.cargue_numero = d.cargue_numero AND NOT pi3.anulado
           UNION ALL
           SELECT mb4.name AS banco, pg3.fecha_pago FROM dicorp_pagos_grupales pg3
+            JOIN dicorp_legalizacion_encabezado e4 ON e4.id = pg3.id_encabezado
             LEFT JOIN master_records mb4 ON mb4.id = pg3.banco_id
-            WHERE pg3.placa = d.placa AND NOT pg3.anulado
+            WHERE e4.placa = d.placa AND e4.fecha = d.fecha AND e4.cargue_numero = d.cargue_numero AND NOT pg3.anulado
         ) t ORDER BY fecha_pago DESC NULLS LAST LIMIT 1) AS banco_reciente,
         (SELECT fecha_pago FROM (
           SELECT mb3.name AS banco, pi3.fecha_pago FROM dicorp_pagos_individuales pi3
             JOIN dicorp_legalizacion_detalle d3 ON d3.id = pi3.id_detalle
             JOIN dicorp_legalizacion_encabezado e3 ON e3.id = d3.id_encabezado
             LEFT JOIN master_records mb3 ON mb3.id = pi3.banco_id
-            WHERE e3.placa = d.placa AND e3.fecha = d.fecha AND NOT pi3.anulado
+            WHERE e3.placa = d.placa AND e3.fecha = d.fecha AND e3.cargue_numero = d.cargue_numero AND NOT pi3.anulado
           UNION ALL
           SELECT mb4.name AS banco, pg3.fecha_pago FROM dicorp_pagos_grupales pg3
+            JOIN dicorp_legalizacion_encabezado e4 ON e4.id = pg3.id_encabezado
             LEFT JOIN master_records mb4 ON mb4.id = pg3.banco_id
-            WHERE pg3.placa = d.placa AND NOT pg3.anulado
+            WHERE e4.placa = d.placa AND e4.fecha = d.fecha AND e4.cargue_numero = d.cargue_numero AND NOT pg3.anulado
         ) t ORDER BY fecha_pago DESC NULLS LAST LIMIT 1) AS fecha_consignacion_reciente
       FROM detalle d
-      GROUP BY d.placa, d.fecha
+      GROUP BY d.placa, d.fecha, d.cargue_numero
       ORDER BY d.fecha DESC, pendiente DESC
     `, params);
     res.json({ success: true, data: result.rows });
@@ -1304,22 +1446,27 @@ export const cerrarPlacaDia = async (req: Request, res: Response) => {
   try {
     await ensureTables();
     const usuario = getUser(req);
-    const { placa, fecha, observacion, tipoDescuadre, comentarioDescuadre } = req.body || {};
+    const { placa, fecha, cargueNumero, observacion, tipoDescuadre, comentarioDescuadre } = req.body || {};
     if (!placa || !fecha) return res.status(400).json({ success: false, error: 'La placa y la fecha son requeridas.' });
 
-    // Si al momento de cerrar aún queda saldo pendiente, es obligatorio clasificar el descuadre.
+    // Cada tarjeta es una placa+fecha+planilla puntual — si viene cargueNumero, cerrar
+    // solo esa planilla (nunca las demás que caigan en la misma fecha para esa placa).
     const pend = await pool.query(`
       SELECT e.id, e.valor_total,
         COALESCE((SELECT SUM(pi.valor) FROM dicorp_pagos_individuales pi
                   JOIN dicorp_legalizacion_detalle d ON d.id = pi.id_detalle WHERE d.id_encabezado = e.id AND NOT pi.anulado), 0) AS pagado_individual
       FROM dicorp_legalizacion_encabezado e
       WHERE e.placa = $1 AND e.fecha = $2 AND e.estado_id = '${ESTADO_PENDIENTE_ID}'
-    `, [placa, fecha]);
+        ${cargueNumero ? 'AND e.cargue_numero = $3' : ''}
+    `, cargueNumero ? [placa, fecha, cargueNumero] : [placa, fecha]);
     if (!pend.rows.length) return res.status(404).json({ success: false, error: 'No hay cargues pendientes para esa placa y fecha.' });
 
-    const grupalTotal = await pool.query(`SELECT COALESCE(SUM(valor),0) AS v FROM dicorp_pagos_grupales WHERE placa = $1 AND NOT anulado`, [placa]);
-    const sobrecostoAprobado = await pool.query(`SELECT COALESCE(SUM(valor),0) AS v FROM dicorp_sobrecostos WHERE placa = $1 AND status = 'APROBADO' AND NOT anulado`, [placa]);
-    const devolucionTotal = await pool.query(`SELECT COALESCE(SUM(valor),0) AS v FROM dicorp_devoluciones WHERE placa = $1 AND NOT anulado`, [placa]);
+    // Solo se cuenta lo que quedó asociado a ESTOS cargues (esta placa+fecha+planilla),
+    // no todo lo que se ha registrado históricamente para la placa.
+    const encIds = pend.rows.map(r => r.id);
+    const grupalTotal = await pool.query(`SELECT COALESCE(SUM(valor),0) AS v FROM dicorp_pagos_grupales WHERE id_encabezado = ANY($1) AND NOT anulado`, [encIds]);
+    const sobrecostoAprobado = await pool.query(`SELECT COALESCE(SUM(valor),0) AS v FROM dicorp_sobrecostos WHERE id_encabezado = ANY($1) AND status = 'APROBADO' AND NOT anulado`, [encIds]);
+    const devolucionTotal = await pool.query(`SELECT COALESCE(SUM(valor),0) AS v FROM dicorp_devoluciones WHERE id_encabezado = ANY($1) AND NOT anulado`, [encIds]);
     const valorTotal = pend.rows.reduce((s, r) => s + parseNum(r.valor_total), 0);
     const pagadoIndividual = pend.rows.reduce((s, r) => s + parseNum(r.pagado_individual), 0);
     const pool_ = parseNum(grupalTotal.rows[0].v) + parseNum(sobrecostoAprobado.rows[0].v) + parseNum(devolucionTotal.rows[0].v);
@@ -1336,10 +1483,10 @@ export const cerrarPlacaDia = async (req: Request, res: Response) => {
 
     const result = await pool.query(`
       UPDATE dicorp_legalizacion_encabezado SET
-        estado_id = '${ESTADO_LEGALIZADO_ID}', tipo_descuadre = $3, comentario_descuadre = $4, cerrado_por = $5, cerrado_at = NOW()
-      WHERE placa = $1 AND fecha = $2 AND estado_id = '${ESTADO_PENDIENTE_ID}'
+        estado_id = '${ESTADO_LEGALIZADO_ID}', tipo_descuadre = $2, comentario_descuadre = $3, cerrado_por = $4, cerrado_at = NOW()
+      WHERE id = ANY($1) AND estado_id = '${ESTADO_PENDIENTE_ID}'
       RETURNING id
-    `, [placa, fecha, saldoPendiente > 1 ? (tipoDescuadre || null) : null, comentarioDescuadre || null, usuario]);
+    `, [encIds, saldoPendiente > 1 ? (tipoDescuadre || null) : null, comentarioDescuadre || null, usuario]);
 
     for (const row of result.rows) {
       await pool.query(`

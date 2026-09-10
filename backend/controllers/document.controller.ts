@@ -684,7 +684,7 @@ export const bulkCreateDocuments = async (req: Request, res: Response) => {
                 customer_name = $12, neighborhood = COALESCE($13, neighborhood),
                 latitude  = COALESCE($14, latitude),
                 longitude = COALESCE($15, longitude),
-                item_status = COALESCE(item_status, 'EST-03')
+                item_status = CASE WHEN item_status = 'EST-16' THEN 'EST-03' ELSE COALESCE(item_status, 'EST-03') END
               WHERE document_id = $16 AND article_id = $17 AND invoice = $18
             `, [
               item.expectedQty || 0,

@@ -21,13 +21,28 @@ import { authenticateToken } from './middleware/auth.middleware.js';
 import fs from 'fs';
 
 // ── CLUSTER: if primary in production, fork 2 workers and stop here ──────────
+// M7-FIX: la identidad de "líder" (el único worker que corre migraciones y cron)
+// NO puede depender de cluster.worker.id — Node nunca reutiliza IDs de workers
+// muertos, así que si el worker líder (id 1) llegaba a morir, el reemplazo
+// recibía un id nuevo (3, 4...) y ningún worker volvía a cumplir "id === 1"
+// nunca más — el scheduler quedaba muerto en silencio hasta el próximo deploy
+// completo. Ahora el rol de líder se marca explícitamente vía env al hacer
+// fork, y se conserva al re-forkear un worker líder que murió.
 if (cluster.isPrimary && process.env.NODE_ENV === 'production') {
   const numCPUs = Math.min(os.cpus().length, 2);
   console.log(`[ORBIT-CLUSTER] Primary ${process.pid} — forking ${numCPUs} workers`);
-  for (let i = 0; i < numCPUs; i++) cluster.fork();
+  const leaderWorkerIds = new Map<number, boolean>();
+  const forkWorker = (isLeader: boolean) => {
+    const w = cluster.fork({ M7_LEADER: isLeader ? '1' : '' });
+    leaderWorkerIds.set(w.id, isLeader);
+    return w;
+  };
+  for (let i = 0; i < numCPUs; i++) forkWorker(i === 0);
   cluster.on('exit', (worker, code) => {
-    console.warn(`[ORBIT-CLUSTER] Worker ${worker.process.pid} died (code ${code}) — restarting`);
-    cluster.fork();
+    const wasLeader = leaderWorkerIds.get(worker.id) || false;
+    leaderWorkerIds.delete(worker.id);
+    console.warn(`[ORBIT-CLUSTER] Worker ${worker.process.pid} died (code ${code}, líder=${wasLeader}) — restarting`);
+    forkWorker(wasLeader);
   });
   // Primary process stops here — workers run the Express app below
 } else {
@@ -212,9 +227,11 @@ app.use((err: any, req: any, res: any, _next: any) => {
 
 const PORT = process.env.PORT || 8080;
 
-// En modo cluster solo el Worker 1 corre migraciones para evitar que dos workers
-// intenten CREATE INDEX al mismo tiempo (genera duplicate key en pg_class).
-const isLeaderWorker = !cluster.worker || cluster.worker.id === 1;
+// En modo cluster solo el worker líder corre migraciones y el scheduler, para
+// evitar que dos workers intenten CREATE INDEX al mismo tiempo (duplicate key
+// en pg_class) o registren los mismos cron dos veces. El liderazgo viaja por
+// env (M7_LEADER), no por cluster.worker.id — ver el fork() de arriba.
+const isLeaderWorker = !cluster.worker || process.env.M7_LEADER === '1';
 
 app.listen(PORT, () => {
   console.log('--------------------------------------------------');
