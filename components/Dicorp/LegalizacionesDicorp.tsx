@@ -318,6 +318,10 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
   const [selectedGroup, setSelectedGroup] = useState<ConsolidadoRow | null>(null);
   const [modalTab, setModalTab] = useState<'individual' | 'grupal' | 'sobrecosto' | 'devolucion'>('individual');
   const [cargues, setCargues] = useState<Encabezado[]>([]);
+  // Todos los cargues pendientes de esta placa (todas las fechas) — se usa solo para
+  // reasignar un pago/devolución/sobrecosto a OTRO cargue cuando quedó mal repartido
+  // (ej. por el backfill automático), no para el autoasignado normal de "cargues".
+  const [carguesPlaca, setCarguesPlaca] = useState<Encabezado[]>([]);
   const [pedidos, setPedidos] = useState<DetalleRow[]>([]);
   const [loadingCargues, setLoadingCargues] = useState(false);
   const [pagosIndividuales, setPagosIndividuales] = useState<Record<number, PagoIndividual[]>>({});
@@ -364,6 +368,11 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
         setFormGru(f => ({ ...f, idEncabezado: String(encRows[0].id) }));
         setFormDevo(f => ({ ...f, idEncabezado: String(encRows[0].id) }));
       }
+
+      // Lista amplia (toda la placa, todas las fechas) para poder mover un registro
+      // a otro cargue cuando quedó mal repartido.
+      const carguesPlacaRes = await api.getDicorpEncabezados({ placa: row.placa, estado: 'pendientes' });
+      setCarguesPlaca(carguesPlacaRes.success ? carguesPlacaRes.data : []);
 
       const allPedidos: DetalleRow[] = [];
       const pagosMap: Record<number, PagoIndividual[]> = {};
@@ -1183,7 +1192,7 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                   {pagosGrupales.length > 0 && (
                     <div className="rounded-xl border border-slate-200 overflow-hidden">
                       <table className="w-full text-[10px] text-left">
-                        <thead className="bg-slate-100 text-slate-500 uppercase font-black"><tr><th className="px-3 py-1.5">Comprobante</th><th className="px-3 py-1.5">Banco</th><th className="px-3 py-1.5">Fecha</th><th className="px-3 py-1.5 text-right">Valor</th><th></th></tr></thead>
+                        <thead className="bg-slate-100 text-slate-500 uppercase font-black"><tr><th className="px-3 py-1.5">Comprobante</th><th className="px-3 py-1.5">Banco</th><th className="px-3 py-1.5">Fecha</th><th className="px-3 py-1.5 text-right">Valor</th><th className="px-3 py-1.5">Mover a otro cargue</th><th></th></tr></thead>
                         <tbody className="divide-y divide-slate-100">
                           {pagosGrupales.map(p => (
                             <tr key={p.id} className={p.anulado ? 'opacity-50' : ''}>
@@ -1191,6 +1200,16 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                               <td className="px-3 py-1.5">{p.banco || '—'}</td>
                               <td className="px-3 py-1.5">{fmtDate(p.fecha_pago)}</td>
                               <td className={`px-3 py-1.5 text-right font-black text-violet-700 ${p.anulado ? 'line-through' : ''}`}>{fmtCOP(p.valor)}</td>
+                              <td className="px-3 py-1.5">
+                                {!p.anulado && (
+                                  <select className="px-2 py-1 border border-slate-200 rounded-lg text-[9px] bg-white"
+                                    disabled={reasignando?.tipo === 'grupal' && reasignando.id === p.id}
+                                    defaultValue="" onChange={e => handleReasignarCargue('grupal', p.id, e.target.value)}>
+                                    <option value="">— este cargue —</option>
+                                    {carguesPlaca.filter(c => c.id !== p.id_encabezado).map(c => <option key={c.id} value={c.id}>{c.cargue_numero} · {fmtDate(c.fecha)}</option>)}
+                                  </select>
+                                )}
+                              </td>
                               <td className="px-3 py-1.5 text-right">
                                 {p.anulado ? (
                                   <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase bg-rose-100 text-rose-700" title={p.anulado_motivo || ''}>Anulado</span>
@@ -1222,7 +1241,7 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                                   disabled={reasignando?.tipo === 'grupal' && reasignando.id === p.id}
                                   defaultValue="" onChange={e => handleReasignarCargue('grupal', p.id, e.target.value)}>
                                   <option value="">— elegir cargue —</option>
-                                  {cargues.map(c => <option key={c.id} value={c.id}>{c.cargue_numero} · {fmtDate(c.fecha)}</option>)}
+                                  {carguesPlaca.map(c => <option key={c.id} value={c.id}>{c.cargue_numero} · {fmtDate(c.fecha)}</option>)}
                                 </select>
                               </td>
                             </tr>
@@ -1245,7 +1264,7 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                     <div><label className={labelCls}>Cargue (opcional)</label>
                       <select className={inputCls} value={formSob.idEncabezado} onChange={e => setFormSob(f => ({ ...f, idEncabezado: e.target.value }))}>
                         <option value="">— General de la placa —</option>
-                        {cargues.map(c => <option key={c.id} value={c.id}>{c.cargue_numero}</option>)}
+                        {carguesPlaca.map(c => <option key={c.id} value={c.id}>{c.cargue_numero} · {fmtDate(c.fecha)}</option>)}
                       </select>
                     </div>
                     <div><label className={labelCls}>Valor</label><input type="number" className={inputCls} value={formSob.valor} onChange={e => setFormSob(f => ({ ...f, valor: e.target.value }))} /></div>
@@ -1335,7 +1354,7 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                   {devoluciones.length > 0 && (
                     <div className="rounded-xl border border-slate-200 overflow-hidden">
                       <table className="w-full text-[10px] text-left">
-                        <thead className="bg-slate-100 text-slate-500 uppercase font-black"><tr><th className="px-3 py-1.5">Fecha</th><th className="px-3 py-1.5 text-right">Valor</th><th className="px-3 py-1.5">Observación</th><th className="px-3 py-1.5">Usuario</th><th></th></tr></thead>
+                        <thead className="bg-slate-100 text-slate-500 uppercase font-black"><tr><th className="px-3 py-1.5">Fecha</th><th className="px-3 py-1.5 text-right">Valor</th><th className="px-3 py-1.5">Observación</th><th className="px-3 py-1.5">Usuario</th><th className="px-3 py-1.5">Mover a otro cargue</th><th></th></tr></thead>
                         <tbody className="divide-y divide-slate-100">
                           {devoluciones.map(dv => (
                             <tr key={dv.id} className={dv.anulado ? 'opacity-50' : ''}>
@@ -1343,6 +1362,16 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                               <td className={`px-3 py-1.5 text-right font-black text-blue-700 ${dv.anulado ? 'line-through' : ''}`}>{fmtCOP(dv.valor)}</td>
                               <td className="px-3 py-1.5 text-slate-600 max-w-[200px] truncate" title={dv.observacion || ''}>{dv.observacion || '—'}</td>
                               <td className="px-3 py-1.5">{dv.usuario || '—'}</td>
+                              <td className="px-3 py-1.5">
+                                {!dv.anulado && (
+                                  <select className="px-2 py-1 border border-slate-200 rounded-lg text-[9px] bg-white"
+                                    disabled={reasignando?.tipo === 'devolucion' && reasignando.id === dv.id}
+                                    defaultValue="" onChange={e => handleReasignarCargue('devolucion', dv.id, e.target.value)}>
+                                    <option value="">— este cargue —</option>
+                                    {carguesPlaca.filter(c => c.id !== dv.id_encabezado).map(c => <option key={c.id} value={c.id}>{c.cargue_numero} · {fmtDate(c.fecha)}</option>)}
+                                  </select>
+                                )}
+                              </td>
                               <td className="px-3 py-1.5 text-right">
                                 {dv.anulado ? (
                                   <span className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase bg-rose-100 text-rose-700" title={dv.anulado_motivo || ''}>Anulado</span>
@@ -1373,7 +1402,7 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
                                   disabled={reasignando?.tipo === 'devolucion' && reasignando.id === dv.id}
                                   defaultValue="" onChange={e => handleReasignarCargue('devolucion', dv.id, e.target.value)}>
                                   <option value="">— elegir cargue —</option>
-                                  {cargues.map(c => <option key={c.id} value={c.id}>{c.cargue_numero} · {fmtDate(c.fecha)}</option>)}
+                                  {carguesPlaca.map(c => <option key={c.id} value={c.id}>{c.cargue_numero} · {fmtDate(c.fecha)}</option>)}
                                 </select>
                               </td>
                             </tr>
