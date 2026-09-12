@@ -215,11 +215,13 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
   // ── CERRADOS: gateado por filtros — mismo consolidado por placa+fecha+planilla
   // que la pestaña Pendientes, filtrado a solo lo ya legalizado ──────────────
   const [filtros, setFiltros] = useState({ from: '', to: '', placa: '', conductor: '' });
+  const [buscarEnResultados, setBuscarEnResultados] = useState('');
   const [buscado, setBuscado] = useState(false);
   const [cerrados, setCerrados] = useState<ConsolidadoRow[]>([]);
   const [loadingCerrados, setLoadingCerrados] = useState(false);
 
   const buscarCerrados = async () => {
+    setBuscarEnResultados('');
     if (!filtros.from || !filtros.to) {
       setAlertInfo({ title: 'Fechas requeridas', message: 'Selecciona "Desde" y "Hasta" para consultar las legalizaciones cerradas.' });
       return;
@@ -249,6 +251,15 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
   );
   const hayFiltroPendientes = !!(filtroPendFecha || filtroPendPlaca);
   const limpiarFiltroPendientes = () => { setFiltroPendFecha(''); setFiltroPendPlaca(''); };
+
+  // Búsqueda dentro de lo ya traído por el filtro de fechas de Consultas (placa, conductor, planilla).
+  const cerradosFiltrados = cerrados.filter(r => {
+    const t = buscarEnResultados.trim().toUpperCase();
+    if (!t) return true;
+    return r.placa.toUpperCase().includes(t)
+      || (r.conductor_nombre || '').toUpperCase().includes(t)
+      || (r.cargue_numeros || '').toUpperCase().includes(t);
+  });
 
   // ── KPIs generales ────────────────────────────────────────────────────────
   const totalPlacas = consolidado.length;
@@ -866,9 +877,18 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
 
   // Tarjeta de consolidado por placa+fecha+planilla — compartida entre Pendientes y Cerrados,
   // solo cambian las acciones del pie (Cerrar Placa del Día no aplica a lo ya legalizado).
+  // Estado financiero del saldo (distinto del estado de la placa/cargue en sí):
+  // > 0 aún deben plata (Pendiente) · < 0 se pagó de más (Sobrante) · ~0 cuadra (Conciliado).
+  const saldoInfo = (pendiente: number) => {
+    if (pendiente > 1) return { label: 'Pendiente', bg: 'bg-amber-500 border-amber-600' };
+    if (pendiente < -1) return { label: 'Sobrante', bg: 'bg-violet-500 border-violet-600' };
+    return { label: 'Conciliado', bg: 'bg-emerald-500 border-emerald-600' };
+  };
+
   const renderConsolidadoCard = (row: ConsolidadoRow, opts: { cerrable: boolean }) => {
     const pagadoTotal = Number(row.pagado_individual) + Number(row.pagado_grupal) + Number(row.sobrecosto_aprobado) + Number(row.devolucion_total);
     const pct = Number(row.valor_total) > 0 ? Math.min(100, Math.round((pagadoTotal / Number(row.valor_total)) * 100)) : 0;
+    const saldo = saldoInfo(Number(row.pendiente));
     return (
       <div key={`${row.placa}-${row.fecha}-${row.cargue_numero}`} className="rounded-2xl border-2 border-slate-100 bg-white overflow-hidden hover:border-slate-200 transition-all">
         <div className="px-4 py-3">
@@ -908,9 +928,9 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
               <p className="text-[7px] font-black text-emerald-600 uppercase">Pagado Individual</p>
               <p className="text-[10px] font-black text-emerald-800">{fmtCOP(row.pagado_individual)}</p>
             </div>
-            <div className={`border rounded-xl px-2 py-1.5 ${Number(row.pendiente) > 1 ? 'bg-amber-500 border-amber-600' : 'bg-emerald-500 border-emerald-600'}`}>
-              <p className="text-[7px] font-black text-white/80 uppercase">Pendiente</p>
-              <p className="text-[10px] font-black text-white">{fmtCOP(row.pendiente)}</p>
+            <div className={`border rounded-xl px-2 py-1.5 ${saldo.bg}`}>
+              <p className="text-[7px] font-black text-white/80 uppercase">{saldo.label}</p>
+              <p className="text-[10px] font-black text-white">{fmtCOP(Math.abs(Number(row.pendiente)))}</p>
             </div>
           </div>
           <div className="grid grid-cols-4 gap-2">
@@ -1107,9 +1127,28 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
               <p className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Sin resultados para ese filtro</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {cerrados.map(row => renderConsolidadoCard(row, { cerrable: false }))}
-            </div>
+            <>
+              <div className="flex items-center justify-between">
+                <div className="relative w-72">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input value={buscarEnResultados} onChange={e => setBuscarEnResultados(e.target.value)}
+                    placeholder="Buscar en resultados... (placa, conductor, planilla)"
+                    className={`${inputCls} pl-8`} />
+                </div>
+                <span className="text-[9px] text-slate-400 font-bold">{cerradosFiltrados.length} de {cerrados.length} resultado{cerrados.length !== 1 ? 's' : ''}</span>
+              </div>
+              {cerradosFiltrados.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-24 gap-2">
+                  <Search className="w-10 h-10 text-slate-300" />
+                  <p className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Sin resultados para esa búsqueda</p>
+                  <button onClick={() => setBuscarEnResultados('')} className="text-[10px] font-black text-cyan-600 hover:text-cyan-800 uppercase tracking-widest">Limpiar búsqueda</button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {cerradosFiltrados.map(row => renderConsolidadoCard(row, { cerrable: false }))}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
