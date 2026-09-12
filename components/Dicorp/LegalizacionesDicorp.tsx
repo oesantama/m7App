@@ -231,7 +231,9 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
         from: filtros.from, to: filtros.to,
         placa: filtros.placa || undefined, conductor: filtros.conductor || undefined,
       });
-      if (res.success) setCerrados(res.data.filter((r: ConsolidadoRow) => r.estado === 'LEGALIZADO'));
+      // Esta pestaña es de solo consulta — muestra cualquier estado (pendiente o
+      // legalizado), la diferencia con "Pendientes" es que acá nunca se puede legalizar.
+      if (res.success) setCerrados(res.data);
       else setAlertInfo({ title: 'No se pudo buscar', message: res.error || 'Ocurrió un error al buscar.' });
     } catch (err: any) {
       toast.error(`Error al buscar: ${err.message || err}`);
@@ -874,7 +876,11 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
             <div className="min-w-0">
               <p className="text-base font-black text-slate-900 uppercase tracking-tight leading-none flex items-center gap-1.5">
                 <Truck className="w-4 h-4 text-slate-400" />{row.placa}
-                {!opts.cerrable && <span className="px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase bg-emerald-100 text-emerald-700">Legalizado</span>}
+                {!opts.cerrable && (
+                  <span className={`px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase ${row.estado === 'LEGALIZADO' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {row.estado === 'LEGALIZADO' ? 'Legalizado' : 'Pendiente'}
+                  </span>
+                )}
               </p>
               <p className="text-[9px] text-slate-500 font-bold mt-1">👤 {row.conductor_nombre} · 📅 {fmtDate(row.fecha)}</p>
               <p className="text-[9px] text-slate-400 font-bold mt-0.5">No. Planilla: <span className="font-mono text-slate-600">{row.cargue_numeros}</span></p>
@@ -980,7 +986,7 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
 
         {/* Tabs */}
         <div className="flex gap-1">
-          {([{ id: 'pendientes', label: 'Pendientes', icon: '⏳', badge: totalPlacas }, { id: 'cerrados', label: 'Cerrados', icon: '✅', badge: 0 }] as const).map(t => (
+          {([{ id: 'pendientes', label: 'Pendientes', icon: '⏳', badge: totalPlacas }, { id: 'cerrados', label: 'Consultas', icon: '🔍', badge: 0 }] as const).map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-t-xl text-[10px] font-black uppercase tracking-wide border-b-2 transition-all
                 ${tab === t.id ? 'border-cyan-500 text-cyan-700 bg-cyan-50/60' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}>
@@ -1091,7 +1097,7 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
             <div className="flex flex-col items-center justify-center py-24 gap-2">
               <Search className="w-10 h-10 text-slate-300" />
               <p className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Consulta Histórica</p>
-              <p className="text-[10px] text-slate-400">Aplica un filtro y presiona Buscar para ver las legalizaciones cerradas</p>
+              <p className="text-[10px] text-slate-400">Aplica un filtro y presiona Buscar para ver el histórico — pendientes y legalizadas, es solo consulta</p>
             </div>
           ) : loadingCerrados ? (
             <div className="flex items-center justify-center py-24"><Loader2 className="w-6 h-6 animate-spin text-cyan-500" /></div>
