@@ -17,6 +17,7 @@ interface ConsolidadoRow {
   pagado_grupal: string | number; sobrecosto_aprobado: string | number; sobrecosto_pendiente: string | number;
   devolucion_total: string | number; tipo_descuadre: string | null; comentario_descuadre: string | null;
   banco_reciente: string | null; fecha_consignacion_reciente: string | null;
+  estado?: string;
 }
 interface Encabezado {
   id: number; cargue_numero: string; fecha: string; placa: string; conductor_nombre: string;
@@ -211,23 +212,27 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
 
   useEffect(() => { if (tab === 'pendientes') loadConsolidado(); }, [tab, loadConsolidado]);
 
-  // ── CERRADOS: gateado por filtros ────────────────────────────────────────
+  // ── CERRADOS: gateado por filtros — mismo consolidado por placa+fecha+planilla
+  // que la pestaña Pendientes, filtrado a solo lo ya legalizado ──────────────
   const [filtros, setFiltros] = useState({ from: '', to: '', placa: '', conductor: '' });
   const [buscado, setBuscado] = useState(false);
-  const [cerrados, setCerrados] = useState<Encabezado[]>([]);
+  const [cerrados, setCerrados] = useState<ConsolidadoRow[]>([]);
   const [loadingCerrados, setLoadingCerrados] = useState(false);
 
   const buscarCerrados = async () => {
+    if (!filtros.from || !filtros.to) {
+      setAlertInfo({ title: 'Fechas requeridas', message: 'Selecciona "Desde" y "Hasta" para consultar las legalizaciones cerradas.' });
+      return;
+    }
     setLoadingCerrados(true);
     setBuscado(true);
     try {
-      const res = await api.getDicorpEncabezados({
-        estado: 'cerrados',
-        from: filtros.from || undefined,
-        to: filtros.to || undefined,
-        search: filtros.placa || filtros.conductor || undefined,
+      const res = await api.getDicorpConsolidadoPorFecha({
+        from: filtros.from, to: filtros.to,
+        placa: filtros.placa || undefined, conductor: filtros.conductor || undefined,
       });
-      if (res.success) setCerrados(res.data);
+      if (res.success) setCerrados(res.data.filter((r: ConsolidadoRow) => r.estado === 'LEGALIZADO'));
+      else setAlertInfo({ title: 'No se pudo buscar', message: res.error || 'Ocurrió un error al buscar.' });
     } catch (err: any) {
       toast.error(`Error al buscar: ${err.message || err}`);
     } finally { setLoadingCerrados(false); }
@@ -819,9 +824,19 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
     applyCurrencyFormat(wsConsolidado, CONSOLIDADO_MONEY_COLS, 1, rows.length);
     XLSX.utils.book_append_sheet(wb, wsConsolidado, 'Consolidado');
 
+    // Una placa puede tener varias planillas la misma fecha — el nombre de hoja debe incluir
+    // el cargue para no chocar, y si aun así se repite (nombre truncado a 31 chars), se le
+    // agrega un sufijo numérico en vez de que la librería reviente por nombre duplicado.
+    const nombresUsados = new Set<string>();
     rows.forEach((row, i) => {
       const wsPlaca = buildPlacaSheet(placaData[i].pedidos, placaData[i].movimientos);
-      XLSX.utils.book_append_sheet(wb, wsPlaca, safeSheetName(`${row.placa}_${row.fecha}`));
+      let nombre = safeSheetName(`${row.placa}_${row.fecha}_${row.cargue_numero}`);
+      let sufijo = 2;
+      while (nombresUsados.has(nombre)) {
+        nombre = safeSheetName(`${row.placa}_${row.fecha}_${row.cargue_numero}`).slice(0, 28) + `-${sufijo++}`;
+      }
+      nombresUsados.add(nombre);
+      XLSX.utils.book_append_sheet(wb, wsPlaca, nombre);
     });
 
     XLSX.writeFile(wb, filename);
@@ -847,17 +862,88 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
     } finally { setExportingPorFecha(false); }
   };
 
-  const cerradosColumns: ColumnDef<Encabezado>[] = [
-    { header: 'Cargue #', key: 'cargue_numero', sortable: true, render: r => <span className="font-mono font-black text-slate-900">{r.cargue_numero}</span> },
-    { header: 'Fecha', key: 'fecha', sortable: true, render: r => <span className="text-slate-500 font-bold">{fmtDate(r.fecha)}</span> },
-    { header: 'Placa', key: 'placa', sortable: true, render: r => <span className="font-mono font-black text-slate-900">{r.placa}</span> },
-    { header: 'Conductor', key: 'conductor_nombre', sortable: true },
-    { header: 'Pedidos', key: 'pedidos_total', sortable: true },
-    { header: 'Kilos', key: 'kilos_total', sortable: true, render: r => fmtKilos(r.kilos_total) },
-    { header: 'Valor', key: 'valor_total', sortable: true, render: r => <span className="font-black text-slate-900">{fmtCOP(r.valor_total)}</span> },
-    { header: 'Pagado Ind.', key: 'pagado_individual', sortable: true, render: r => <span className="font-black text-emerald-700">{fmtCOP(r.pagado_individual)}</span> },
-    { header: 'Estado', key: 'estado', sortable: true, render: r => <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-100 text-emerald-700">{r.estado}</span> },
-  ];
+  // Tarjeta de consolidado por placa+fecha+planilla — compartida entre Pendientes y Cerrados,
+  // solo cambian las acciones del pie (Cerrar Placa del Día no aplica a lo ya legalizado).
+  const renderConsolidadoCard = (row: ConsolidadoRow, opts: { cerrable: boolean }) => {
+    const pagadoTotal = Number(row.pagado_individual) + Number(row.pagado_grupal) + Number(row.sobrecosto_aprobado) + Number(row.devolucion_total);
+    const pct = Number(row.valor_total) > 0 ? Math.min(100, Math.round((pagadoTotal / Number(row.valor_total)) * 100)) : 0;
+    return (
+      <div key={`${row.placa}-${row.fecha}-${row.cargue_numero}`} className="rounded-2xl border-2 border-slate-100 bg-white overflow-hidden hover:border-slate-200 transition-all">
+        <div className="px-4 py-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-base font-black text-slate-900 uppercase tracking-tight leading-none flex items-center gap-1.5">
+                <Truck className="w-4 h-4 text-slate-400" />{row.placa}
+                {!opts.cerrable && <span className="px-1.5 py-0.5 rounded-full text-[7px] font-black uppercase bg-emerald-100 text-emerald-700">Legalizado</span>}
+              </p>
+              <p className="text-[9px] text-slate-500 font-bold mt-1">👤 {row.conductor_nombre} · 📅 {fmtDate(row.fecha)}</p>
+              <p className="text-[9px] text-slate-400 font-bold mt-0.5">No. Planilla: <span className="font-mono text-slate-600">{row.cargue_numeros}</span></p>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-lg font-black text-slate-900 leading-none">{row.cargues}</p>
+              <p className="text-[8px] font-bold text-slate-400 uppercase">cargue{row.cargues !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-4 py-2 border-t border-slate-100 bg-slate-50/50">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+              <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+            </div>
+            <span className="text-[8px] font-black text-emerald-700 shrink-0">{pct}% pagado</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-2">
+            <div className="bg-white border border-slate-200 rounded-xl px-2 py-1.5">
+              <p className="text-[7px] font-black text-slate-400 uppercase">Total</p>
+              <p className="text-[10px] font-black text-slate-800">{fmtCOP(row.valor_total)}</p>
+            </div>
+            <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl px-2 py-1.5">
+              <p className="text-[7px] font-black text-emerald-600 uppercase">Pagado Individual</p>
+              <p className="text-[10px] font-black text-emerald-800">{fmtCOP(row.pagado_individual)}</p>
+            </div>
+            <div className={`border rounded-xl px-2 py-1.5 ${Number(row.pendiente) > 1 ? 'bg-amber-500 border-amber-600' : 'bg-emerald-500 border-emerald-600'}`}>
+              <p className="text-[7px] font-black text-white/80 uppercase">Pendiente</p>
+              <p className="text-[10px] font-black text-white">{fmtCOP(row.pendiente)}</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            <div className="bg-violet-50/50 border border-violet-100 rounded-xl px-2 py-1.5">
+              <p className="text-[7px] font-black text-violet-600 uppercase">Grupal</p>
+              <p className="text-[10px] font-black text-violet-800">{fmtCOP(row.pagado_grupal)}</p>
+            </div>
+            <div className="bg-blue-50/50 border border-blue-100 rounded-xl px-2 py-1.5">
+              <p className="text-[7px] font-black text-blue-600 uppercase">Devolución</p>
+              <p className="text-[10px] font-black text-blue-800">{fmtCOP(row.devolucion_total)}</p>
+            </div>
+            <div className="bg-orange-50/50 border border-orange-100 rounded-xl px-2 py-1.5">
+              <p className="text-[7px] font-black text-orange-600 uppercase">Sobrec. Aprob.</p>
+              <p className="text-[10px] font-black text-orange-800">{fmtCOP(row.sobrecosto_aprobado)}</p>
+            </div>
+            <div className="bg-slate-100 border border-slate-200 rounded-xl px-2 py-1.5">
+              <p className="text-[7px] font-black text-slate-500 uppercase">Sobrec. Pend.</p>
+              <p className="text-[10px] font-black text-slate-700">{fmtCOP(row.sobrecosto_pendiente)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-4 pb-3 pt-2 flex gap-2">
+          <button onClick={() => exportPlaca(row)} title="Exportar esta placa"
+            className="p-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all"><Download className="w-3.5 h-3.5" /></button>
+          {opts.cerrable && (
+            <button onClick={() => requestCerrarPlaca(row)}
+              className="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-amber-500 hover:bg-amber-600 text-white transition-all flex items-center gap-1.5">
+              <Lock className="w-3 h-3" /> Cerrar Placa del Día
+            </button>
+          )}
+          <button onClick={() => openGroup(row)}
+            className="flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-cyan-600 transition-all">
+            {opts.cerrable ? 'Legalizar →' : 'Ver Detalle →'}
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
@@ -972,83 +1058,7 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {consolidadoFiltrado.map(row => {
-                const pagadoTotal = Number(row.pagado_individual) + Number(row.pagado_grupal) + Number(row.sobrecosto_aprobado) + Number(row.devolucion_total);
-                const pct = Number(row.valor_total) > 0 ? Math.min(100, Math.round((pagadoTotal / Number(row.valor_total)) * 100)) : 0;
-                return (
-                  <div key={`${row.placa}-${row.fecha}-${row.cargue_numero}`} className="rounded-2xl border-2 border-slate-100 bg-white overflow-hidden hover:border-slate-200 transition-all">
-                    <div className="px-4 py-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-base font-black text-slate-900 uppercase tracking-tight leading-none flex items-center gap-1.5">
-                            <Truck className="w-4 h-4 text-slate-400" />{row.placa}
-                          </p>
-                          <p className="text-[9px] text-slate-500 font-bold mt-1">👤 {row.conductor_nombre} · 📅 {fmtDate(row.fecha)}</p>
-                          <p className="text-[9px] text-slate-400 font-bold mt-0.5">No. Planilla: <span className="font-mono text-slate-600">{row.cargue_numeros}</span></p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-lg font-black text-slate-900 leading-none">{row.cargues}</p>
-                          <p className="text-[8px] font-bold text-slate-400 uppercase">cargue{row.cargues !== 1 ? 's' : ''}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="px-4 py-2 border-t border-slate-100 bg-slate-50/50">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                          <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                        </div>
-                        <span className="text-[8px] font-black text-emerald-700 shrink-0">{pct}% pagado</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 mb-2">
-                        <div className="bg-white border border-slate-200 rounded-xl px-2 py-1.5">
-                          <p className="text-[7px] font-black text-slate-400 uppercase">Total</p>
-                          <p className="text-[10px] font-black text-slate-800">{fmtCOP(row.valor_total)}</p>
-                        </div>
-                        <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl px-2 py-1.5">
-                          <p className="text-[7px] font-black text-emerald-600 uppercase">Pagado Individual</p>
-                          <p className="text-[10px] font-black text-emerald-800">{fmtCOP(row.pagado_individual)}</p>
-                        </div>
-                        <div className={`border rounded-xl px-2 py-1.5 ${Number(row.pendiente) > 1 ? 'bg-amber-500 border-amber-600' : 'bg-emerald-500 border-emerald-600'}`}>
-                          <p className="text-[7px] font-black text-white/80 uppercase">Pendiente</p>
-                          <p className="text-[10px] font-black text-white">{fmtCOP(row.pendiente)}</p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-4 gap-2">
-                        <div className="bg-violet-50/50 border border-violet-100 rounded-xl px-2 py-1.5">
-                          <p className="text-[7px] font-black text-violet-600 uppercase">Grupal</p>
-                          <p className="text-[10px] font-black text-violet-800">{fmtCOP(row.pagado_grupal)}</p>
-                        </div>
-                        <div className="bg-blue-50/50 border border-blue-100 rounded-xl px-2 py-1.5">
-                          <p className="text-[7px] font-black text-blue-600 uppercase">Devolución</p>
-                          <p className="text-[10px] font-black text-blue-800">{fmtCOP(row.devolucion_total)}</p>
-                        </div>
-                        <div className="bg-orange-50/50 border border-orange-100 rounded-xl px-2 py-1.5">
-                          <p className="text-[7px] font-black text-orange-600 uppercase">Sobrec. Aprob.</p>
-                          <p className="text-[10px] font-black text-orange-800">{fmtCOP(row.sobrecosto_aprobado)}</p>
-                        </div>
-                        <div className="bg-slate-100 border border-slate-200 rounded-xl px-2 py-1.5">
-                          <p className="text-[7px] font-black text-slate-500 uppercase">Sobrec. Pend.</p>
-                          <p className="text-[10px] font-black text-slate-700">{fmtCOP(row.sobrecosto_pendiente)}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="px-4 pb-3 pt-2 flex gap-2">
-                      <button onClick={() => exportPlaca(row)} title="Exportar esta placa"
-                        className="p-2 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 transition-all"><Download className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => requestCerrarPlaca(row)}
-                        className="px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-amber-500 hover:bg-amber-600 text-white transition-all flex items-center gap-1.5">
-                        <Lock className="w-3 h-3" /> Cerrar Placa del Día
-                      </button>
-                      <button onClick={() => openGroup(row)}
-                        className="flex-1 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-900 text-white hover:bg-cyan-600 transition-all">
-                        Legalizar →
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+              {consolidadoFiltrado.map(row => renderConsolidadoCard(row, { cerrable: true }))}
             </div>
           )}
         </div>
@@ -1083,15 +1093,17 @@ export const LegalizacionesDicorp: React.FC<LegalizacionesDicorpProps> = ({ user
               <p className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Consulta Histórica</p>
               <p className="text-[10px] text-slate-400">Aplica un filtro y presiona Buscar para ver las legalizaciones cerradas</p>
             </div>
+          ) : loadingCerrados ? (
+            <div className="flex items-center justify-center py-24"><Loader2 className="w-6 h-6 animate-spin text-cyan-500" /></div>
+          ) : cerrados.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 gap-2">
+              <Search className="w-10 h-10 text-slate-300" />
+              <p className="text-[12px] font-black text-slate-400 uppercase tracking-widest">Sin resultados para ese filtro</p>
+            </div>
           ) : (
-            <DataTable
-              data={cerrados}
-              columns={cerradosColumns}
-              searchPlaceholder="Buscar en resultados..."
-              excelFileName="dicorp_legalizaciones_cerradas.xlsx"
-              excelSheetName="Cerrados"
-              loading={loadingCerrados}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {cerrados.map(row => renderConsolidadoCard(row, { cerrable: false }))}
+            </div>
           )}
         </div>
       )}
