@@ -4,7 +4,11 @@ import * as XLSX from 'xlsx';
 
 // Estados del catálogo compartido `estados` usados por la legalización Dicorp.
 const ESTADO_PENDIENTE_ID = 'EST-03';   // ya existe en el catálogo (name = 'PENDIENTE')
-const ESTADO_LEGALIZADO_ID = 'EST-18';  // agregado por este módulo (name = 'LEGALIZADO')
+// M7-FIX: EST-18 ya existía en el catálogo compartido `estados` desde otro módulo
+// ("ENTREGADO SIN SISTEMA", creado 14/4/2026) — el INSERT de abajo con ON CONFLICT
+// DO NOTHING nunca lo sobrescribió, así que todo cierre de placa quedaba etiquetado
+// como "Entregado sin sistema" en vez de "Legalizado". Se movió a EST-21 (libre).
+const ESTADO_LEGALIZADO_ID = 'EST-21';  // agregado por este módulo (name = 'LEGALIZADO')
 // Catálogo compartido `master_records` (mismo mecanismo genérico de maestros de toda la app).
 const METODO_PAGO_DEFAULT_ID = 'MPAGO-CONSIGNACION';
 
@@ -95,7 +99,7 @@ const ensureTablesImpl = async () => {
       IF EXISTS (SELECT 1 FROM information_schema.columns
                  WHERE table_name = 'dicorp_legalizacion_encabezado' AND column_name = 'estado') THEN
         UPDATE dicorp_legalizacion_encabezado
-          SET estado_id = CASE estado WHEN 'LEGALIZADO' THEN 'EST-18' ELSE 'EST-03' END
+          SET estado_id = CASE estado WHEN 'LEGALIZADO' THEN '${ESTADO_LEGALIZADO_ID}' ELSE '${ESTADO_PENDIENTE_ID}' END
           WHERE estado_id IS NULL;
         ALTER TABLE dicorp_legalizacion_encabezado DROP COLUMN estado;
       END IF;
