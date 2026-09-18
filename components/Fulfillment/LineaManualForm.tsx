@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
-import { Loader2, Lock } from 'lucide-react';
+import { Loader2, Lock, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../services/api';
 
@@ -24,6 +24,12 @@ export interface DetalleEditable {
   orden: string | null; cantidad: string | number; tarifa: string | number; monto: string | number;
   costo_transportista: string | number | null; transportista_nombre: string | null; seguimiento: string | null;
   nota?: string | null;
+  monto_final?: string | number | null;
+  diferencia_monto?: string | number | null;
+  factura_transportista?: string | null;
+  fecha_factura_transportista?: string | null;
+  estado_id?: string | null;
+  estado_nombre?: string | null;
 }
 
 // Select "creatable": siempre se elige de lo que ya existe en Maestras (por id, sin riesgo de
@@ -84,12 +90,20 @@ export const LineaManualForm: React.FC<{
     transportista: transportistaInit.value, transportistaNuevo: transportistaInit.nuevo,
     seguimiento: editDetalle?.seguimiento || '',
     nota: editDetalle?.nota || '',
+    monto_final: editDetalle?.monto_final != null ? String(editDetalle.monto_final) : '',
+    factura_transportista: editDetalle?.factura_transportista || '',
+    fecha_factura_transportista: editDetalle?.fecha_factura_transportista ? String(editDetalle.fecha_factura_transportista).slice(0, 10) : '',
   };
   const [linea, setLinea] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const [errorModalMsg, setErrorModalMsg] = useState<string | null>(null);
 
   const productoFinal = linea.producto === NUEVO ? linea.productoNuevo.trim() : linea.producto;
   const transportistaFinal = linea.transportista === NUEVO ? linea.transportistaNuevo.trim() : linea.transportista;
+
+  const numMontoInicial = linea.monto !== '' && !isNaN(Number(linea.monto)) ? Number(linea.monto) : null;
+  const numMontoFinal = linea.monto_final !== '' && !isNaN(Number(linea.monto_final)) ? Number(linea.monto_final) : null;
+  const calcDiferencia = numMontoFinal !== null && numMontoInicial !== null ? (numMontoFinal - numMontoInicial) : null;
 
   // Monto = Cantidad × Tarifa, recalculado en vivo — pero el usuario puede sobrescribirlo a mano
   // en cualquier momento (ej. para dejarlo en 0, o un valor negociado distinto al cálculo).
@@ -104,6 +118,18 @@ export const LineaManualForm: React.FC<{
     if (!linea.anio || !linea.mes) { toast.error(t('fulfillment:lineaManualForm.toastPeriodRequired')); return; }
     if (!productoFinal) { toast.error(t('fulfillment:lineaManualForm.toastProductRequired')); return; }
     if (linea.monto === '' || Number(linea.monto) < 0) { toast.error(t('fulfillment:lineaManualForm.toastAmountRequired')); return; }
+
+    const hasMontoFinal = linea.monto_final !== '' && linea.monto_final !== null && linea.monto_final !== undefined;
+    const hasFactura = !!linea.factura_transportista?.trim();
+    const hasFechaFactura = !!linea.fecha_factura_transportista;
+
+    const hasAnyFinal = hasMontoFinal || hasFactura || hasFechaFactura;
+    const hasAllFinal = hasMontoFinal && hasFactura && hasFechaFactura;
+
+    if (hasAnyFinal && !hasAllFinal) {
+      setErrorModalMsg('Si diligencia la liquidación final (Monto Final, Factura Transportista o Fecha Factura), es obligatorio ingresar los 3 campos completos.');
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -112,6 +138,9 @@ export const LineaManualForm: React.FC<{
         cantidad: linea.cantidad || undefined, tarifa: linea.tarifa || undefined, monto: linea.monto,
         costo_transportista: linea.costo_transportista || undefined, transportista: transportistaFinal || undefined,
         seguimiento: linea.seguimiento || undefined, nota: linea.nota || undefined,
+        monto_final: linea.monto_final || undefined,
+        factura_transportista: linea.factura_transportista || undefined,
+        fecha_factura_transportista: linea.fecha_factura_transportista || undefined,
       };
       const res = editDetalle
         ? await api.updateFulfillmentDetalleManual(editDetalle.id, payload)
@@ -170,7 +199,7 @@ export const LineaManualForm: React.FC<{
           <input type="number" className={inputCls} value={linea.tarifa}
             onChange={e => setLinea(l => ({ ...l, tarifa: e.target.value, monto: l.montoTocado ? l.monto : aplicarCalculo(l.cantidad, e.target.value) }))} />
         </div>
-        <div><label className={labelCls}>{t('fulfillment:lineaManualForm.amountLabel')}</label>
+        <div><label className={labelCls}>Monto Inicial *</label>
           <input type="number" step="0.01" className={inputCls} value={linea.monto}
             onChange={e => setLinea(l => ({ ...l, monto: e.target.value, montoTocado: true }))} />
         </div>
@@ -182,7 +211,7 @@ export const LineaManualForm: React.FC<{
         <p className="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-slate-400 mb-3">
           <Lock className="w-3 h-3" /> {t('fulfillment:lineaManualForm.internalBlockLabel')}
         </p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
           <div><label className={labelCls}>{t('fulfillment:lineaManualForm.carrierCostLabel')}</label><input type="number" className={inputCls} value={linea.costo_transportista} onChange={e => setLinea(l => ({ ...l, costo_transportista: e.target.value }))} /></div>
           <CreatableSelect
             label={t('fulfillment:lineaManualForm.carrierLabel')} placeholder={t('fulfillment:lineaManualForm.carrierPlaceholder')}
@@ -192,12 +221,38 @@ export const LineaManualForm: React.FC<{
           <div><label className={labelCls}>{t('fulfillment:lineaManualForm.trackingLabel')}</label><input className={inputCls} value={linea.seguimiento} onChange={e => setLinea(l => ({ ...l, seguimiento: e.target.value }))} /></div>
           <div><label className={labelCls}>{t('fulfillment:lineaManualForm.noteLabel')}</label><input className={inputCls} value={linea.nota} onChange={e => setLinea(l => ({ ...l, nota: e.target.value }))} placeholder={t('fulfillment:lineaManualForm.notePlaceholder')} /></div>
         </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-200">
+          <div><label className={labelCls}>Monto Final</label><input type="number" step="0.01" className={inputCls} value={linea.monto_final} onChange={e => setLinea(l => ({ ...l, monto_final: e.target.value }))} placeholder="Monto final liquidación" /></div>
+          <div><label className={labelCls}>Diferencia Monto</label><input readOnly className={`${inputCls} bg-slate-100 font-bold ${calcDiferencia && calcDiferencia < 0 ? 'text-red-600' : 'text-emerald-700'}`} value={calcDiferencia !== null ? calcDiferencia.toFixed(2) : '—'} /></div>
+          <div><label className={labelCls}>Factura Transportista</label><input className={inputCls} value={linea.factura_transportista} onChange={e => setLinea(l => ({ ...l, factura_transportista: e.target.value }))} placeholder="Nº Factura" /></div>
+          <div><label className={labelCls}>Fecha Factura Transportista</label><input type="date" className={inputCls} value={linea.fecha_factura_transportista} onChange={e => setLinea(l => ({ ...l, fecha_factura_transportista: e.target.value }))} /></div>
+        </div>
       </div>
 
       <button onClick={handleGuardar} disabled={saving}
         className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-[10px] font-black uppercase tracking-widest rounded-xl">
         {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />} {saving ? t('fulfillment:lineaManualForm.saving') : t('fulfillment:lineaManualForm.save')}
       </button>
+
+      {errorModalMsg && (
+        <div className="fixed inset-0 bg-black/60 z-[99999] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-slate-100 flex flex-col items-center text-center">
+            <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mb-3">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h3 className="text-xs font-black text-slate-800 mb-2 uppercase tracking-widest">Validación de Liquidación Final</h3>
+            <p className="text-xs text-slate-600 mb-6 font-semibold leading-relaxed">{errorModalMsg}</p>
+            <button
+              type="button"
+              onClick={() => setErrorModalMsg(null)}
+              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-600/30"
+            >
+              Aceptar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

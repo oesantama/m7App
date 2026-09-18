@@ -1,4 +1,5 @@
 import os from 'os';
+import v8 from 'v8';
 import pool from '../config/database.js';
 import { sendEmail } from './notification.service.js';
 
@@ -82,8 +83,13 @@ function collectProcessMemory() {
   const heapUsedMB = Math.round(mem.heapUsed / 1024 / 1024);
   const heapTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
   const rssMB = Math.round(mem.rss / 1024 / 1024);
-  const pct = Math.round((mem.heapUsed / mem.heapTotal) * 100);
-  return { heapUsedMB, heapTotalMB, rssMB, pct };
+  // M7-FIX: heapUsed/heapTotal da falsos positivos — heapTotal es elástico (V8 lo
+  // agranda de a poco según necesita) y suele andar cerca del 90% aunque el proceso
+  // esté lejos de quedarse sin memoria real. La comparación correcta es contra el
+  // techo real de V8 (heap_size_limit, que sí respeta --max-old-space-size).
+  const heapLimitMB = Math.round(v8.getHeapStatistics().heap_size_limit / 1024 / 1024);
+  const pct = heapLimitMB > 0 ? Math.round((heapUsedMB / heapLimitMB) * 100) : 0;
+  return { heapUsedMB, heapTotalMB, rssMB, heapLimitMB, pct };
 }
 
 function collectSystemMemory() {
@@ -99,7 +105,7 @@ function buildFindings(data: {
   connUsage: { active: number; max: number };
   tableSizes: any[];
   cronErrors: any[];
-  procMem: { heapUsedMB: number; heapTotalMB: number; rssMB: number; pct: number };
+  procMem: { heapUsedMB: number; heapTotalMB: number; rssMB: number; heapLimitMB: number; pct: number };
   sysMem: { totalMB: number; freeMB: number; usedPct: number };
   poolMax: number;
 }): Finding[] {
@@ -137,9 +143,9 @@ function buildFindings(data: {
   if (data.procMem.pct > 85) {
     findings.push({
       severity: 'WARNING',
-      title: 'Heap de Node.js (worker líder) por encima del 85%',
-      detail: `${data.procMem.heapUsedMB}/${data.procMem.heapTotalMB} MB (${data.procMem.pct}%) | RSS: ${data.procMem.rssMB} MB`,
-      suggestion: 'Node ya fuerza GC automáticamente vía el keep-alive. Si esto persiste, revisar posibles fugas de memoria en el worker líder.',
+      title: 'Heap de Node.js (worker líder) cerca del límite real (--max-old-space-size)',
+      detail: `${data.procMem.heapUsedMB}/${data.procMem.heapLimitMB} MB del límite configurado (${data.procMem.pct}%) | heapTotal actual: ${data.procMem.heapTotalMB} MB | RSS: ${data.procMem.rssMB} MB`,
+      suggestion: 'Esto ahora compara contra el techo real de V8 (heap_size_limit), no contra heapTotal — si aparece, sí está cerca de quedarse sin memoria de verdad. Revisar posibles fugas de memoria en el worker líder o subir --max-old-space-size si el droplet tiene margen.',
     });
   }
 
@@ -170,7 +176,7 @@ function renderHtmlReport(findings: Finding[], data: {
   poolStats: { total: number; idle: number; waiting: number };
   connUsage: { active: number; max: number };
   tableSizes: any[];
-  procMem: { heapUsedMB: number; heapTotalMB: number; rssMB: number; pct: number };
+  procMem: { heapUsedMB: number; heapTotalMB: number; rssMB: number; heapLimitMB: number; pct: number };
   sysMem: { totalMB: number; freeMB: number; usedPct: number };
   poolMax: number;
 }): string {
@@ -201,7 +207,7 @@ function renderHtmlReport(findings: Finding[], data: {
     <ul style="font-size:13px;">
       <li>Pool Postgres (worker líder): ${data.poolStats.total} conexiones (idle: ${data.poolStats.idle}, esperando: ${data.poolStats.waiting}) / máx ${data.poolMax}</li>
       <li>Conexiones totales al servidor Postgres: ${data.connUsage.active}/${data.connUsage.max}</li>
-      <li>Memoria Node.js (worker líder): ${data.procMem.heapUsedMB}/${data.procMem.heapTotalMB} MB heap (${data.procMem.pct}%), RSS ${data.procMem.rssMB} MB</li>
+      <li>Memoria Node.js (worker líder): ${data.procMem.heapUsedMB}/${data.procMem.heapLimitMB} MB del límite (${data.procMem.pct}%), heapTotal actual ${data.procMem.heapTotalMB} MB, RSS ${data.procMem.rssMB} MB</li>
       <li>Memoria del droplet: ${data.sysMem.usedPct}% usado (${data.sysMem.freeMB} MB libres de ${data.sysMem.totalMB} MB)</li>
     </ul>
 

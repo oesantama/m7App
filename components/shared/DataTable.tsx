@@ -93,16 +93,23 @@ export function DataTable<T extends Record<string, any>>({
   const actualCurrentPage = serverSide && externalCurrentPage !== undefined ? externalCurrentPage : currentPage;
   const actualPageSize = serverSide && externalPageSize !== undefined ? externalPageSize : pageSize;
 
-  // 1. Filtrar los datos basados en la búsqueda
+  // 1. Filtrar los datos basados en la búsqueda (permite buscar con o sin guion/espacios)
   const filteredData = useMemo(() => {
     if (serverSide) return data; // Si es serverSide, los datos ya vienen filtrados
     if (!searchTerm.trim()) return data;
     const lowerSearch = searchTerm.toLowerCase();
+    const cleanSearch = lowerSearch.replace(/[\s\-]/g, '');
 
     return data.filter((row) => {
       return Object.values(row).some((val) => {
         if (val === null || val === undefined) return false;
-        return String(val).toLowerCase().includes(lowerSearch);
+        const valStr = String(val).toLowerCase();
+        if (valStr.includes(lowerSearch)) return true;
+        if (cleanSearch.length > 0) {
+          const cleanVal = valStr.replace(/[\s\-]/g, '');
+          if (cleanVal.includes(cleanSearch)) return true;
+        }
+        return false;
       });
     });
   }, [data, searchTerm, serverSide]);
@@ -392,10 +399,13 @@ export function DataTable<T extends Record<string, any>>({
                     >
                       {selectable && (
                         <td className="px-4 py-4 align-top" onClick={e => e.stopPropagation()}>
-                          {(!isRowSelectable || isRowSelectable(row)) && (
-                            <input type="checkbox" className="w-4 h-4 accent-indigo-600"
+                          {!isRowSelectable || isRowSelectable(row) ? (
+                            <input type="checkbox" className="w-4 h-4 accent-indigo-600 cursor-pointer"
                               checked={(selectedIds || new Set()).has(rowId)}
                               onChange={() => toggleRowSelected(rowId)} />
+                          ) : (
+                            <input type="checkbox" className="w-4 h-4 text-slate-300 opacity-40 cursor-not-allowed"
+                              disabled checked={false} title="No seleccionable (Ya Conciliado)" />
                           )}
                         </td>
                       )}

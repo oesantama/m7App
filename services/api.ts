@@ -62,8 +62,14 @@ export const fetchJson = async (url: string, options?: any) => {
       console.log(`[API-DEBUG] Headers Finales:`, fetchOptions.headers);
     }
 
+    // Sin esto, una conexión colgada (celular con mala señal, servidor sin responder)
+    // dejaba el fetch esperando indefinidamente — la pantalla quedaba en "Cargando..."
+    // para siempre, sin error ni forma de reintentar.
+    const timeoutController = new AbortController();
+    const timeoutId = setTimeout(() => timeoutController.abort(), 40_000);
+
     try {
-      const res = await fetch(url, fetchOptions);
+      const res = await fetch(url, { ...fetchOptions, signal: options?.signal || timeoutController.signal });
 
       const isJson = res.headers.get('content-type')?.includes('application/json');
       const data = isJson ? await res.json().catch(() => ({})) : await res.text();
@@ -95,11 +101,18 @@ export const fetchJson = async (url: string, options?: any) => {
 
       return data;
     } catch (err: any) {
-      // Reintento en caso de error de red (TypeError)
-      if (err instanceof TypeError && retryCount < 1) {
+      // Reintento en caso de error de red (TypeError) o de tiempo agotado (AbortError) —
+      // cubre el caso típico de señal mala en celular, no solo servidor caído.
+      const isTimeout = err?.name === 'AbortError';
+      if ((err instanceof TypeError || isTimeout) && retryCount < 1) {
         return executeFetch(retryCount + 1);
       }
+      if (isTimeout) {
+        throw new Error('La solicitud tardó demasiado en responder. Verifica tu conexión e intenta de nuevo.');
+      }
       throw err;
+    } finally {
+      clearTimeout(timeoutId);
     }
   };
 
@@ -2784,6 +2797,21 @@ export const api = {
     window.URL.revokeObjectURL(url);
   },
 
+  downloadConciliacionPlantillaExcel: async () => {
+    const token = getStoredToken();
+    const res = await fetch(`${API_URL}/fulfillment/conciliacion/plantilla`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) throw new Error('No se pudo descargar la plantilla de conciliación');
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'plantilla_conciliacion_fulfillment.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
   importFulfillmentXlsx: async (file: File, cliente_id: number) => {
     const token = getStoredToken();
     const formData = new FormData();
@@ -2804,6 +2832,7 @@ export const api = {
     cantidad?: number | string; tarifa?: number | string; monto: number | string;
     costo_transportista?: number | string; transportista?: string; seguimiento?: string;
     comprado_en?: string; destinatario?: string; nota?: string;
+    monto_final?: number | string; factura_transportista?: string; fecha_factura_transportista?: string;
   }) =>
     fetchJson(`${API_URL}/fulfillment/detalle-manual`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
@@ -2814,10 +2843,74 @@ export const api = {
     cantidad?: number | string; tarifa?: number | string; monto: number | string;
     costo_transportista?: number | string; transportista?: string; seguimiento?: string;
     comprado_en?: string; destinatario?: string; nota?: string;
+    monto_final?: number | string; factura_transportista?: string; fecha_factura_transportista?: string;
   }) =>
     fetchJson(`${API_URL}/fulfillment/detalle/${id}`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data),
     }),
 
   deleteFulfillmentDetalleManual: (id: number) => fetchJson(`${API_URL}/fulfillment/detalle/${id}`, { method: 'DELETE' }),
+
+  getFulfillmentConciliacionRegistros: (filters?: {
+    factura_transportista?: string;
+    fecha_factura_transportista?: string;
+    referencia_factura?: string;
+    transportista_id?: number | string;
+    estado_id?: string;
+    cliente_id?: number | string;
+    anio?: number | string;
+    mes?: string;
+    busqueda?: string;
+  }) => {
+    const params = new URLSearchParams();
+    if (filters?.factura_transportista) params.set('factura_transportista', filters.factura_transportista);
+    if (filters?.fecha_factura_transportista) params.set('fecha_factura_transportista', filters.fecha_factura_transportista);
+    if (filters?.referencia_factura) params.set('referencia_factura', filters.referencia_factura);
+    if (filters?.transportista_id) params.set('transportista_id', String(filters.transportista_id));
+    if (filters?.estado_id) params.set('estado_id', filters.estado_id);
+    if (filters?.cliente_id) params.set('cliente_id', String(filters.cliente_id));
+    if (filters?.anio) params.set('anio', String(filters.anio));
+    if (filters?.mes) params.set('mes', filters.mes);
+    if (filters?.busqueda) params.set('busqueda', filters.busqueda);
+    const qs = params.toString();
+    return fetchJson(`${API_URL}/fulfillment/conciliacion/registros${qs ? '?' + qs : ''}`);
+  },
+
+
+  searchFulfillmentRegistroDetalleGlobal: (busqueda: string, cliente_id?: number | string) => {
+    const params = new URLSearchParams();
+    if (busqueda) params.set('busqueda', busqueda);
+    if (cliente_id) params.set('cliente_id', String(cliente_id));
+    return fetchJson(`${API_URL}/fulfillment/detalle/buscar?${params.toString()}`);
+  },
+
+  analizarFulfillmentConciliacionFile: async (file: File, formato: string = 'FEDEX_USA') => {
+    const token = getStoredToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('formato', formato);
+    const res = await fetch(`${API_URL}/fulfillment/conciliacion/analizar`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error || res.statusText);
+    }
+    return res.json();
+  },
+
+  confirmarFulfillmentConciliacion: (items: Array<{
+    detalle_id: number;
+    factura_transportista?: string;
+    fecha_factura_transportista?: string;
+    monto_final?: number;
+  }>) =>
+    fetchJson(`${API_URL}/fulfillment/conciliacion/confirmar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    }),
 };
+

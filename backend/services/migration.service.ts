@@ -2198,6 +2198,10 @@ export const restoreSystem = async () => {
       INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
       VALUES ('PAG-77', 'REGISTRO Y LEGALIZACION', 'registro-legalizacion-fulfillment', 'MOD-19', 'MOD-19', 'EST-01')
       ON CONFLICT (id) DO UPDATE SET name = 'REGISTRO Y LEGALIZACION', route = 'registro-legalizacion-fulfillment', module_id = 'MOD-19', parent_id = 'MOD-19';
+
+      INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
+      VALUES ('PAG-78', 'CONCILIACION FULFILLMENT', 'conciliacion-fulfillment', 'MOD-19', 'MOD-19', 'EST-01')
+      ON CONFLICT (id) DO UPDATE SET name = 'CONCILIACION FULFILLMENT', route = 'conciliacion-fulfillment', module_id = 'MOD-19', parent_id = 'MOD-19';
     `);
 
     // RESCATE DE DATOS: Recupera rutas huérfanas y repara fechas nulas

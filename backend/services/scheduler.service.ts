@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import v8 from 'v8';
 import pool from '../config/database.js';
 import { syncDriveCumplidos } from './drive-gemini.service.js';
 import { scrapeTransportandoReports } from './scraper.service.js';
@@ -403,15 +404,17 @@ export const initScheduler = () => {
             // 1. Ping a la BD — mantiene al menos 1 conexión viva en el pool
             await pool.query('SELECT 1');
 
-            // 2. Monitoreo de memoria — si supera 85% del heap, fuerza GC o avisa
+            // 2. Monitoreo de memoria — comparado contra el techo real de V8
+            // (heap_size_limit, respeta --max-old-space-size), no contra heapTotal
+            // (que es elástico y ronda 85-90% en operación normal — daba falsos avisos).
             const mem = process.memoryUsage();
             const heapUsedMB  = Math.round(mem.heapUsed  / 1024 / 1024);
-            const heapTotalMB = Math.round(mem.heapTotal / 1024 / 1024);
             const rssMB       = Math.round(mem.rss       / 1024 / 1024);
-            const pct = Math.round((mem.heapUsed / mem.heapTotal) * 100);
+            const heapLimitMB = Math.round(v8.getHeapStatistics().heap_size_limit / 1024 / 1024);
+            const pct = heapLimitMB > 0 ? Math.round((heapUsedMB / heapLimitMB) * 100) : 0;
 
             if (pct > 85) {
-                console.warn(`[M7-KEEPALIVE] ⚠ Heap alto: ${heapUsedMB}/${heapTotalMB}MB (${pct}%) RSS:${rssMB}MB — forzando GC`);
+                console.warn(`[M7-KEEPALIVE] ⚠ Heap cerca del límite real: ${heapUsedMB}/${heapLimitMB}MB (${pct}%) RSS:${rssMB}MB`);
                 if (global.gc) global.gc();
             }
         } catch (err: any) {

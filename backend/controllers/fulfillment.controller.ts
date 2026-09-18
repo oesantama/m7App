@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
 import * as XLSX from 'xlsx';
+import { pdfParse } from '../utils/pdfParser.js';
 
 // ─── Garantizar tablas (memoizado — evita DDL concurrente / deadlocks bajo carga) ──
 let ensureTablesPromise: Promise<void> | null = null;
@@ -103,9 +104,23 @@ const ensureTablesImpl = async () => {
       fecha_creacion        TIMESTAMPTZ NOT NULL DEFAULT (NOW() AT TIME ZONE 'America/Bogota')
     )
   `);
+  await pool.query(`
+    INSERT INTO estados (id, name, status_id) VALUES
+      ('EST-19', 'CONCILIADO', 'EST-01'),
+      ('EST-22', 'PREAPROBADO', 'EST-01'),
+      ('EST-23', 'APROBADO', 'EST-01')
+    ON CONFLICT (id) DO NOTHING
+  `);
+
   // Canal de origen del pedido (Shipstation, Website, Envia, Courier, Mensajero...) — siempre
   // informativo/interno, nunca parte de lo que ve el cliente.
   await pool.query(`ALTER TABLE fulfillment_detalle ADD COLUMN IF NOT EXISTS nota TEXT`);
+  await pool.query(`ALTER TABLE fulfillment_detalle ADD COLUMN IF NOT EXISTS monto_final NUMERIC(14,2)`);
+  await pool.query(`ALTER TABLE fulfillment_detalle ADD COLUMN IF NOT EXISTS diferencia_monto NUMERIC(14,2)`);
+  await pool.query(`ALTER TABLE fulfillment_detalle ADD COLUMN IF NOT EXISTS factura_transportista TEXT`);
+  await pool.query(`ALTER TABLE fulfillment_detalle ADD COLUMN IF NOT EXISTS fecha_factura_transportista DATE`);
+  await pool.query(`ALTER TABLE fulfillment_detalle ADD COLUMN IF NOT EXISTS estado_id TEXT DEFAULT 'EST-22' REFERENCES estados(id)`);
+  await pool.query(`UPDATE fulfillment_detalle SET estado_id = 'EST-22' WHERE estado_id IS NULL`);
 
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_fulfillment_reg_cliente ON fulfillment_registros (cliente_id);
@@ -314,10 +329,11 @@ export const getRegistroDetalle = async (req: Request, res: Response) => {
         FROM fulfillment_registros r JOIN fulfillment_clientes c ON c.id = r.cliente_id WHERE r.id = $1
       `, [id]),
       pool.query(`
-        SELECT d.*, p.nombre AS producto_servicio_nombre, t.nombre AS transportista_nombre
+        SELECT d.*, TO_CHAR(d.fecha, 'YYYY-MM-DD') AS fecha, p.nombre AS producto_servicio_nombre, t.nombre AS transportista_nombre, e.name AS estado_nombre
         FROM fulfillment_detalle d
         LEFT JOIN fulfillment_productos_servicios p ON p.id = d.producto_servicio_id
         LEFT JOIN fulfillment_transportistas t ON t.id = d.transportista_id
+        LEFT JOIN estados e ON e.id = d.estado_id
         WHERE d.registro_id = $1
         ORDER BY d.fecha NULLS LAST, d.id
       `, [id]),
@@ -325,6 +341,65 @@ export const getRegistroDetalle = async (req: Request, res: Response) => {
     if (!reg.rows.length) return res.status(404).json({ success: false, error: 'Registro no encontrado.' });
     res.json({ success: true, registro: reg.rows[0], detalle: det.rows });
   } catch (e: any) { res.status(500).json({ success: false, error: e.message }); }
+};
+
+export const searchRegistroDetalleGlobal = async (req: Request, res: Response) => {
+  try {
+    await ensureTables();
+    const { busqueda, cliente_id } = req.query as Record<string, string>;
+    if (!busqueda?.trim() || busqueda.trim().length < 2) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const rawTerm = busqueda.trim();
+    const cleanTerm = `%${rawTerm.replace(/[\s\-]/g, '')}%`;
+    const likeTerm = `%${rawTerm}%`;
+
+    const conds: string[] = [
+      `(
+         REPLACE(REPLACE(COALESCE(d.seguimiento,''), '-', ''), ' ', '') ILIKE $1 OR
+         REPLACE(REPLACE(COALESCE(d.orden,''), '-', ''), ' ', '') ILIKE $1 OR
+         REPLACE(REPLACE(COALESCE(d.factura_transportista,''), '-', ''), ' ', '') ILIKE $1 OR
+         d.descripcion ILIKE $2
+       )`
+    ];
+    const vals: any[] = [cleanTerm, likeTerm];
+
+    if (cliente_id) {
+      vals.push(cliente_id);
+      conds.push(`r.cliente_id = $${vals.length}`);
+    }
+
+    const r = await pool.query(`
+      SELECT 
+        d.*,
+        TO_CHAR(d.fecha, 'YYYY-MM-DD') AS fecha,
+        p.nombre AS producto_servicio_nombre,
+        t.nombre AS transportista_nombre,
+        COALESCE(e.name, d.estado_id) AS estado_nombre,
+        r.id AS registro_id,
+        r.anio,
+        r.mes,
+        r.subtipo,
+        c.id AS cliente_id,
+        c.nombre AS cliente_nombre,
+        c.codigo AS cliente_codigo,
+        c.moneda AS cliente_moneda
+      FROM fulfillment_detalle d
+      JOIN fulfillment_registros r ON r.id = d.registro_id
+      JOIN fulfillment_clientes c ON c.id = r.cliente_id
+      LEFT JOIN fulfillment_productos_servicios p ON p.id = d.producto_servicio_id
+      LEFT JOIN fulfillment_transportistas t ON t.id = d.transportista_id
+      LEFT JOIN estados e ON e.id = d.estado_id
+      WHERE ${conds.join(' AND ')}
+      ORDER BY r.anio DESC, ${MES_ORDEN_SQL} DESC, d.fecha DESC NULLS LAST
+      LIMIT 100
+    `, vals);
+
+    res.json({ success: true, data: r.rows });
+  } catch (e: any) {
+    res.status(500).json({ success: false, error: e.message });
+  }
 };
 
 export const deleteRegistro = async (req: Request, res: Response) => {
@@ -461,6 +536,7 @@ export const createDetalleManual = async (req: Request, res: Response) => {
     cliente_id, anio, mes, subtipo,
     fecha, producto, descripcion, orden, cantidad, tarifa, monto,
     costo_transportista, transportista, seguimiento, comprado_en, destinatario, nota,
+    monto_final, factura_transportista, fecha_factura_transportista,
   } = req.body || {};
 
   if (!cliente_id) return res.status(400).json({ success: false, error: 'El cliente es obligatorio.' });
@@ -510,16 +586,34 @@ export const createDetalleManual = async (req: Request, res: Response) => {
       transportistaId = tRes.rows[0].id;
     }
 
+    const numMontoInicial = toNum(monto);
+    const numMontoFinal = monto_final !== undefined && monto_final !== null && monto_final !== '' ? toNum(monto_final) : null;
+    const numCostoTransp = costo_transportista !== undefined && costo_transportista !== null && costo_transportista !== '' ? toNum(costo_transportista) : null;
+    const calcDiferencia = numMontoFinal !== null ? (numMontoFinal - numMontoInicial) : null;
+    const textFactura = factura_transportista?.trim() || null;
+    const textFechaFactura = fecha_factura_transportista || null;
+
+    const hasAnyFinal = numMontoFinal !== null || textFactura !== null || textFechaFactura !== null;
+    const hasAllFinal = numMontoFinal !== null && textFactura !== null && textFechaFactura !== null;
+
+    if (hasAnyFinal && !hasAllFinal) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, error: 'Si diligencia la liquidación final (Monto Final, Factura Transportista o Fecha Factura), es obligatorio ingresar los 3 campos completos.' });
+    }
+
+    const estadoId = hasAllFinal ? 'EST-23' : 'EST-22';
+
     const detRes = await client.query(
       `INSERT INTO fulfillment_detalle
          (registro_id, fecha, producto_servicio_id, descripcion, orden, cantidad, tarifa, monto,
-          costo_transportista, transportista_id, seguimiento, comprado_en, destinatario, nota, usuario_creacion)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+          costo_transportista, transportista_id, seguimiento, comprado_en, destinatario, nota,
+          monto_final, diferencia_monto, factura_transportista, fecha_factura_transportista, estado_id, usuario_creacion)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
       [
         registroId, fecha || null, productoId, descripcion?.trim() || null, orden?.trim() || null,
         toNum(cantidad), toNum(tarifa), toNum(monto),
-        costo_transportista !== undefined && costo_transportista !== '' ? toNum(costo_transportista) : null,
-        transportistaId, seguimiento?.trim() || null, comprado_en?.trim() || null, destinatario?.trim() || null, nota?.trim() || null, usuario,
+        numCostoTransp, transportistaId, seguimiento?.trim() || null, comprado_en?.trim() || null, destinatario?.trim() || null, nota?.trim() || null,
+        numMontoFinal, calcDiferencia, textFactura, textFechaFactura, estadoId, usuario,
       ]
     );
 
@@ -546,6 +640,7 @@ export const updateDetalleManual = async (req: Request, res: Response) => {
   const {
     fecha, producto, descripcion, orden, cantidad, tarifa, monto,
     costo_transportista, transportista, seguimiento, comprado_en, destinatario, nota,
+    monto_final, factura_transportista, fecha_factura_transportista,
   } = req.body || {};
 
   if (!producto?.trim()) return res.status(400).json({ success: false, error: 'El producto/servicio es obligatorio.' });
@@ -576,16 +671,34 @@ export const updateDetalleManual = async (req: Request, res: Response) => {
       transportistaId = tRes.rows[0].id;
     }
 
+    const numMontoInicial = toNum(monto);
+    const numMontoFinal = monto_final !== undefined && monto_final !== null && monto_final !== '' ? toNum(monto_final) : null;
+    const numCostoTransp = costo_transportista !== undefined && costo_transportista !== null && costo_transportista !== '' ? toNum(costo_transportista) : null;
+    const calcDiferencia = numMontoFinal !== null ? (numMontoFinal - numMontoInicial) : null;
+    const textFactura = factura_transportista?.trim() || null;
+    const textFechaFactura = fecha_factura_transportista || null;
+
+    const hasAnyFinal = numMontoFinal !== null || textFactura !== null || textFechaFactura !== null;
+    const hasAllFinal = numMontoFinal !== null && textFactura !== null && textFechaFactura !== null;
+
+    if (hasAnyFinal && !hasAllFinal) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, error: 'Si diligencia la liquidación final (Monto Final, Factura Transportista o Fecha Factura), es obligatorio ingresar los 3 campos completos.' });
+    }
+
+    const estadoId = hasAllFinal ? 'EST-23' : 'EST-22';
+
     const upd = await client.query(
       `UPDATE fulfillment_detalle SET
          fecha = $1, producto_servicio_id = $2, descripcion = $3, orden = $4, cantidad = $5, tarifa = $6, monto = $7,
-         costo_transportista = $8, transportista_id = $9, seguimiento = $10, comprado_en = $11, destinatario = $12, nota = $13
-       WHERE id = $14 RETURNING *`,
+         costo_transportista = $8, transportista_id = $9, seguimiento = $10, comprado_en = $11, destinatario = $12, nota = $13,
+         monto_final = $14, diferencia_monto = $15, factura_transportista = $16, fecha_factura_transportista = $17, estado_id = $18
+       WHERE id = $19 RETURNING *`,
       [
         fecha || null, productoId, descripcion?.trim() || null, orden?.trim() || null,
         toNum(cantidad), toNum(tarifa), toNum(monto),
-        costo_transportista !== undefined && costo_transportista !== '' ? toNum(costo_transportista) : null,
-        transportistaId, seguimiento?.trim() || null, comprado_en?.trim() || null, destinatario?.trim() || null, nota?.trim() || null, id,
+        numCostoTransp, transportistaId, seguimiento?.trim() || null, comprado_en?.trim() || null, destinatario?.trim() || null, nota?.trim() || null,
+        numMontoFinal, calcDiferencia, textFactura, textFechaFactura, estadoId, id,
       ]
     );
 
@@ -723,8 +836,9 @@ function parseSheetRowsFallback(rows: any[][]): ParsedLine[] {
         break;
       }
     }
+    const fecha = excelDateToISO(row[0]);
     out.push({
-      fecha: null, producto: producto || 'Sin clasificar', descripcion, orden: null,
+      fecha, producto: producto || 'Sin clasificar', descripcion, orden: null,
       cantidad, tarifa: toNum(row[4]), monto, costoTransportista, transportista, seguimiento,
       compradoEn: null, destinatario: null,
     });
@@ -829,6 +943,22 @@ export const getPlantillaFulfillment = async (_req: Request, res: Response) => {
   res.send(buf);
 };
 
+export const getPlantillaConciliacionFulfillment = async (_req: Request, res: Response) => {
+  const headers = ['GUIA / SEGUIMIENTO', 'MONTO TOTAL', 'FACTURA TRANSPORTISTA', 'FECHA FACTURA'];
+  const ejemplo = [
+    ['2-608-61692', 45000, 'SFX-746929', '2026-08-15'],
+    ['548036655', 133554, 'SFX-746930', '2026-08-16'],
+  ];
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...ejemplo]);
+  ws['!cols'] = headers.map(() => ({ wch: 25 }));
+  XLSX.utils.book_append_sheet(wb, ws, 'Conciliacion_Generica');
+  const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="plantilla_conciliacion_fulfillment.xlsx"');
+  res.send(buf);
+};
+
 export const importFulfillmentXlsx = async (req: Request, res: Response) => {
   await ensureTables();
   const { cliente_id } = req.body || {};
@@ -918,13 +1048,17 @@ export const importFulfillmentXlsx = async (req: Request, res: Response) => {
             }
           }
 
+          const mesIdx = MESES_ES.indexOf(parsed.mes);
+          const monthNum = mesIdx >= 0 ? String(mesIdx + 1).padStart(2, '0') : '01';
+          const fechaDefecto = l.fecha || `${parsed.anio}-${monthNum}-01`;
+
           await client.query(
             `INSERT INTO fulfillment_detalle
                (registro_id, fecha, producto_servicio_id, descripcion, orden, cantidad, tarifa, monto,
                 costo_transportista, transportista_id, seguimiento, comprado_en, destinatario, usuario_creacion)
              VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
             [
-              registroId, l.fecha, productoId, l.descripcion || null, l.orden, l.cantidad, l.tarifa, l.monto,
+              registroId, fechaDefecto, productoId, l.descripcion || null, l.orden, l.cantidad, l.tarifa, l.monto,
               l.costoTransportista, transportistaId, l.seguimiento, l.compradoEn, l.destinatario, usuario,
             ]
           );
@@ -960,3 +1094,421 @@ export const importFulfillmentXlsx = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: e.message });
   }
 };
+
+// ══════════════════════════════ CONCILIACIÓN FULFILLMENT ══════════════════════════════
+
+const parseFechaString = (str: string): string | null => {
+  if (!str) return null;
+  const s = str.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+  const engMatch = s.match(/([A-Za-z]{3,9})\s*(\d{1,2}),?\s*(\d{4})/);
+  if (engMatch) {
+    const monthStr = engMatch[1].toLowerCase().slice(0, 3);
+    const day = parseInt(engMatch[2], 10);
+    const year = parseInt(engMatch[3], 10);
+    const months: Record<string, string> = {
+      jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+      jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+    };
+    if (months[monthStr]) {
+      return `${year}-${months[monthStr]}-${String(day).padStart(2, '0')}`;
+    }
+  }
+
+  const slashMatch = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (slashMatch) {
+    const part1 = parseInt(slashMatch[1], 10);
+    const part2 = parseInt(slashMatch[2], 10);
+    const year = parseInt(slashMatch[3], 10);
+    if (part1 > 12) {
+      return `${year}-${String(part2).padStart(2, '0')}-${String(part1).padStart(2, '0')}`;
+    } else {
+      return `${year}-${String(part2).padStart(2, '0')}-${String(part1).padStart(2, '0')}`;
+    }
+  }
+
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    return d.toISOString().split('T')[0];
+  }
+  return null;
+};
+
+export const getConciliacionRegistros = async (req: Request, res: Response) => {
+  await ensureTables();
+  try {
+    const {
+      factura_transportista,
+      fecha_factura_transportista,
+      referencia_factura,
+      transportista_id,
+      estado_id,
+      cliente_id,
+      anio,
+      mes,
+      busqueda
+    } = req.query;
+
+    let query = `
+      SELECT 
+        fd.id,
+        fd.registro_id,
+        fd.fecha,
+        fd.orden,
+        fd.seguimiento,
+        fd.descripcion,
+        fd.monto AS monto_inicial,
+        fd.monto_final,
+        fd.diferencia_monto,
+        fd.factura_transportista,
+        TO_CHAR(fd.fecha_factura_transportista, 'YYYY-MM-DD') AS fecha_factura_transportista,
+        fd.estado_id,
+        COALESCE(e.name, fd.estado_id) AS estado_nombre,
+        fd.transportista_id,
+        ft.nombre AS transportista_nombre,
+        fr.cliente_id,
+        fc.nombre AS cliente_nombre,
+        fc.codigo AS cliente_codigo,
+        fr.referencia_factura,
+        fr.anio,
+        fr.mes
+      FROM fulfillment_detalle fd
+      JOIN fulfillment_registros fr ON fr.id = fd.registro_id
+      JOIN fulfillment_clientes fc ON fc.id = fr.cliente_id
+      LEFT JOIN fulfillment_transportistas ft ON ft.id = fd.transportista_id
+      LEFT JOIN estados e ON e.id = fd.estado_id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+    let pIdx = 1;
+
+    const hasAnyFilter = Boolean(
+      factura_transportista ||
+      fecha_factura_transportista ||
+      referencia_factura ||
+      transportista_id ||
+      estado_id ||
+      cliente_id ||
+      anio ||
+      mes ||
+      busqueda
+    );
+
+    if (factura_transportista) {
+      const cleanFactura = `%${String(factura_transportista).replace(/[\s\-]/g, '')}%`;
+      query += ` AND REPLACE(REPLACE(COALESCE(fd.factura_transportista,''), '-', ''), ' ', '') ILIKE $${pIdx++}`;
+      params.push(cleanFactura);
+    }
+    if (fecha_factura_transportista) {
+      query += ` AND fd.fecha_factura_transportista = $${pIdx++}::date`;
+      params.push(fecha_factura_transportista);
+    }
+    if (referencia_factura) {
+      query += ` AND fr.referencia_factura ILIKE $${pIdx++}`;
+      params.push(`%${referencia_factura}%`);
+    }
+    if (transportista_id) {
+      query += ` AND fd.transportista_id = $${pIdx++}`;
+      params.push(Number(transportista_id));
+    }
+    if (estado_id) {
+      query += ` AND fd.estado_id = $${pIdx++}`;
+      params.push(estado_id);
+    }
+    if (cliente_id) {
+      query += ` AND fr.cliente_id = $${pIdx++}`;
+      params.push(Number(cliente_id));
+    }
+    if (anio) {
+      query += ` AND fr.anio = $${pIdx++}`;
+      params.push(Number(anio));
+    }
+    if (mes) {
+      query += ` AND fr.mes = $${pIdx++}`;
+      params.push(mes);
+    }
+    if (busqueda) {
+      const cleanBusqueda = `%${String(busqueda).replace(/[\s\-]/g, '')}%`;
+      const likeBusqueda = `%${busqueda}%`;
+      query += ` AND (
+        REPLACE(REPLACE(COALESCE(fd.orden,''), '-', ''), ' ', '') ILIKE $${pIdx} OR 
+        REPLACE(REPLACE(COALESCE(fd.seguimiento,''), '-', ''), ' ', '') ILIKE $${pIdx} OR 
+        fd.descripcion ILIKE $${pIdx + 1}
+      )`;
+      params.push(cleanBusqueda, likeBusqueda);
+      pIdx += 2;
+    }
+
+    if (!hasAnyFilter) {
+      const latestPeriod = await resolveLatestPeriod();
+      if (latestPeriod) {
+        query += ` AND fr.anio = $${pIdx++} AND fr.mes = $${pIdx++}`;
+        params.push(latestPeriod.anio, latestPeriod.mes);
+      }
+    }
+
+    query += ` ORDER BY fd.id DESC LIMIT 500`;
+
+    const result = await pool.query(query, params);
+    res.json({ success: true, registros: result.rows });
+
+  } catch (e: any) {
+    console.error('[FULFILLMENT-CONCILIACION-GET]', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
+};
+
+export const analizarArchivoConciliacion = async (req: Request, res: Response) => {
+  await ensureTables();
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'No se ha adjuntado ningún archivo.' });
+    }
+
+    const filename = (req.file.originalname || '').toLowerCase();
+    const mimetype = (req.file.mimetype || '').toLowerCase();
+    const isPdf = filename.endsWith('.pdf') || mimetype.includes('pdf');
+    const isExcel = filename.endsWith('.xlsx') || filename.endsWith('.xls') || mimetype.includes('excel') || mimetype.includes('spreadsheet');
+
+    if (!isPdf && !isExcel) {
+      return res.status(400).json({ success: false, error: 'Formato de archivo no soportado. Debe ser PDF o Excel (.xlsx, .xls).' });
+    }
+
+    const formato = (req.body.formato || 'FEDEX_USA').toUpperCase();
+    let facturaTransportista = '';
+    let fechaFacturaTransportista = '';
+    let transportista = 'FEDEX USA';
+    if (formato === 'FEDEX_COL') transportista = 'FEDEX COLOMBIA';
+    else if (formato === 'GENERIC_EXCEL') transportista = 'TRANSPORTISTA EXCEL';
+    const itemsFile: Array<{ tracking: string; amount: number | null; rowFactura?: string; rowFecha?: string }> = [];
+
+    if (isPdf) {
+      const parsedPdf = await pdfParse(req.file.buffer);
+      const fullText: string = parsedPdf.text || '';
+
+      const invMatch = fullText.match(/SFX-?\s*(\d{6,10})/i)
+                    || fullText.match(/Invoice\s*Number[:\s\n]+([A-Z0-9\-]+)/i)
+                    || fullText.match(/Factura[:\s\n]+([A-Z0-9\-]+)/i)
+                    || fullText.match(/Invoice[:\s\n]+([A-Z0-9\-]+)/i);
+      if (invMatch) {
+        facturaTransportista = invMatch[0].toUpperCase().includes('SFX') && !invMatch[1].startsWith('SFX')
+          ? `SFX-${invMatch[1].trim()}`
+          : invMatch[1].trim();
+      }
+
+      const dateMatch = fullText.match(/Invoice\s*Date[:\s\n]+([A-Za-z]{3,9}\s*\d{1,2},?\s*\d{4})/i)
+                     || fullText.match(/Fecha\s*Factura[:\s\n]+([\d\/\-]+)/i)
+                     || fullText.match(/(\d{2}[\/\-]\d{2}[\/\-]\d{4})/);
+      if (dateMatch) {
+        fechaFacturaTransportista = parseFechaString(dateMatch[1]) || '';
+      }
+
+      // Extraer números de guía (9 a 15 dígitos) de todas las páginas del PDF
+      const genericTrackingRegex = /\b(\d{9,15})\b/g;
+      let match: RegExpExecArray | null;
+      const seen = new Set<string>();
+
+      while ((match = genericTrackingRegex.exec(fullText)) !== null) {
+        const tr = match[1];
+        if (!seen.has(tr)) {
+          seen.add(tr);
+
+          const pos = match.index;
+          const blockText = fullText.substring(pos, Math.min(fullText.length, pos + 1200));
+
+          let amount: number | null = null;
+          if (formato === 'FEDEX_COL') {
+            const colMatch = blockText.match(/\$\s*([\d\.\,]+)/);
+            if (colMatch) {
+              const rawVal = colMatch[1].replace(/\./g, '').replace(',', '.');
+              const pVal = parseFloat(rawVal);
+              if (!isNaN(pVal)) amount = pVal;
+            }
+          } else {
+            const amountMatch = blockText.match(/Shipment Total[\s\S]*?\$?\s*([\d,]+\.\d{2})/i)
+                             || blockText.match(/Net Charge[\s\S]*?\$?\s*([\d,]+\.\d{2})/i)
+                             || blockText.match(/Total[\s\S]*?\$?\s*([\d,]+\.\d{2})/i)
+                             || blockText.match(/\$\s*([\d,]+\.\d{2})/);
+            if (amountMatch) {
+              amount = parseFloat(amountMatch[1].replace(/,/g, ''));
+            }
+          }
+          itemsFile.push({ tracking: tr, amount });
+        }
+      }
+    } else if (isExcel) {
+      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+      const firstSheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[firstSheetName];
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      for (const row of rows) {
+        let tracking = '';
+        let amount: number | null = null;
+        let rowFactura = '';
+        let rowFecha = '';
+
+        for (const [key, val] of Object.entries(row)) {
+          const k = key.toLowerCase().trim();
+          const vStr = String(val).trim();
+
+          if (k.includes('seguimiento') || k.includes('tracking') || k.includes('guia') || k.includes('orden')) {
+            if (vStr && !tracking) tracking = vStr;
+          }
+          if (k.includes('monto') || k.includes('total') || k.includes('valor') || k.includes('costo') || k.includes('net charge')) {
+            const parsedVal = parseFloat(vStr.replace(/[\$,]/g, ''));
+            if (!isNaN(parsedVal) && amount === null) amount = parsedVal;
+          }
+          if (k.includes('factura') || k.includes('invoice')) {
+            if (vStr && !rowFactura) rowFactura = vStr;
+          }
+          if (k.includes('fecha') || k.includes('date')) {
+            if (vStr && !rowFecha) rowFecha = parseFechaString(vStr) || vStr;
+          }
+        }
+
+        if (rowFactura && !facturaTransportista) facturaTransportista = rowFactura;
+        if (rowFecha && !fechaFacturaTransportista) fechaFacturaTransportista = rowFecha;
+
+        if (tracking) {
+          itemsFile.push({ tracking, amount, rowFactura, rowFecha });
+        }
+      }
+    }
+
+    const coincidencias: any[] = [];
+    const sinCoincidencia: any[] = [];
+    const cleanItems = itemsFile.filter(it => Boolean(it.tracking));
+
+    for (const item of cleanItems) {
+      const cleanTrackParam = item.tracking.replace(/[\s\-]/g, '');
+      const dbRes = await pool.query(
+        `SELECT 
+           fd.id,
+           fd.orden,
+           fd.seguimiento,
+           fd.monto,
+           fd.monto_final,
+           fd.diferencia_monto,
+           fd.factura_transportista,
+           TO_CHAR(fd.fecha_factura_transportista, 'YYYY-MM-DD') AS fecha_factura_transportista,
+           fd.estado_id,
+           COALESCE(e.name, fd.estado_id) AS estado_nombre,
+           fc.nombre AS cliente_nombre,
+           ft.nombre AS transportista_nombre
+         FROM fulfillment_detalle fd
+         JOIN fulfillment_registros fr ON fr.id = fd.registro_id
+         JOIN fulfillment_clientes fc ON fc.id = fr.cliente_id
+         LEFT JOIN fulfillment_transportistas ft ON ft.id = fd.transportista_id
+         LEFT JOIN estados e ON e.id = fd.estado_id
+         WHERE REPLACE(REPLACE(COALESCE(fd.seguimiento,''), '-', ''), ' ', '') = $1
+            OR REPLACE(REPLACE(COALESCE(fd.orden,''), '-', ''), ' ', '') = $1
+            OR REPLACE(REPLACE(COALESCE(fd.seguimiento,''), '-', ''), ' ', '') ILIKE '%' || $1 || '%'
+            OR REPLACE(REPLACE(COALESCE(fd.orden,''), '-', ''), ' ', '') ILIKE '%' || $1 || '%'
+         LIMIT 1`,
+        [cleanTrackParam]
+      );
+
+      if (dbRes.rows.length > 0) {
+        const row = dbRes.rows[0];
+        const montoInicial = Number(row.monto || 0);
+        const montoFinalBD = row.monto_final !== null ? Number(row.monto_final) : null;
+        const montoExtraido = item.amount !== null ? Number(item.amount) : null;
+
+        const montoComparar = montoFinalBD !== null ? montoFinalBD : montoInicial;
+        const montoFinalGuardar = montoExtraido !== null ? montoExtraido : montoComparar;
+        const diferenciaCalculada = montoExtraido !== null ? (montoExtraido - montoComparar) : (montoFinalBD !== null ? (montoFinalBD - montoInicial) : 0);
+        const isYaConciliado = row.estado_id === 'EST-19';
+
+        coincidencias.push({
+          id: row.id,
+          detalle_id: row.id,
+          orden: row.orden,
+          seguimiento: row.seguimiento,
+          cliente_nombre: row.cliente_nombre,
+          transportista_nombre: row.transportista_nombre || transportista,
+          monto_inicial: montoInicial,
+          monto_final_bd: montoFinalBD,
+          monto_extraido: montoExtraido,
+          monto_final: montoFinalGuardar,
+          diferencia_monto: Number(diferenciaCalculada.toFixed(2)),
+          factura_transportista: item.rowFactura || facturaTransportista,
+          fecha_factura_transportista: item.rowFecha || fechaFacturaTransportista,
+          estado_actual_id: row.estado_id,
+          estado_actual_nombre: row.estado_nombre,
+          ya_conciliado: isYaConciliado
+        });
+      } else {
+        sinCoincidencia.push({
+          seguimiento_o_ref: item.tracking,
+          monto_file: item.amount,
+          motivo: 'No se encontró registro coincidente en BD'
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      facturaTransportista,
+      fechaFacturaTransportista,
+      transportista,
+      coincidencias,
+      sinCoincidencia
+    });
+
+  } catch (e: any) {
+    console.error('[FULFILLMENT-CONCILIACION-ANALIZAR]', e.message);
+    res.status(500).json({ success: false, error: e.message });
+  }
+};
+
+export const confirmarConciliacion = async (req: Request, res: Response) => {
+  await ensureTables();
+  const { items } = req.body;
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ success: false, error: 'No se enviaron ítems para conciliar.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    let count = 0;
+
+    for (const item of items) {
+      const { detalle_id, factura_transportista, fecha_factura_transportista, monto_final } = item;
+
+      const query = `
+        UPDATE fulfillment_detalle
+        SET
+          estado_id = 'EST-19',
+          factura_transportista = COALESCE($1, factura_transportista),
+          fecha_factura_transportista = CASE WHEN $2::text IS NOT NULL AND $2::text <> '' THEN $2::date ELSE fecha_factura_transportista END,
+          monto_final = COALESCE($3::numeric, monto_final),
+          diferencia_monto = CASE WHEN $3::numeric IS NOT NULL THEN ($3::numeric - monto) ELSE diferencia_monto END
+        WHERE id = $4
+      `;
+      await client.query(query, [
+        factura_transportista || null,
+        fecha_factura_transportista || null,
+        monto_final !== undefined && monto_final !== null ? monto_final : null,
+        detalle_id
+      ]);
+      count++;
+    }
+
+    await client.query('COMMIT');
+    res.json({
+      success: true,
+      actualizados: count,
+      message: `${count} registros conciliados exitosamente con estado CONCILIADO.`
+    });
+  } catch (e: any) {
+    await client.query('ROLLBACK');
+    console.error('[CONFIRMAR-CONCILIACION-ERROR]', e);
+    res.status(500).json({ success: false, error: e.message });
+  } finally {
+    client.release();
+  }
+};
+

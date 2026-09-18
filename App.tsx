@@ -98,6 +98,7 @@ const CitasDespachosCarga = lazyWithRetry(() => import('./components/Dogama/Cita
 const ConciliacionJhonUribe = lazyWithRetry(() => import('./components/Dogama/ConciliacionJhonUribe'));
 const MaestrasFulfillment = lazyWithRetry(() => import('./components/Fulfillment/MaestrasFulfillment'));
 const RegistroLegalizacionFulfillment = lazyWithRetry(() => import('./components/Fulfillment/RegistroLegalizacionFulfillment'));
+const ConciliacionFulfillment = lazyWithRetry(() => import('./components/Fulfillment/ConciliacionFulfillment').then(m => ({ default: m.ConciliacionFulfillment })));
 const HelpDesk = lazyWithRetry(() => import('./components/HelpDesk'));
 const ValidadorDocumentos = lazyWithRetry(() => import('./components/RRHH/ValidadorDocumentos'));
 const HojasDeVidaMain = lazyWithRetry(() => import('./components/HojasDeVida/HojasDeVidaMain'));
@@ -1172,6 +1173,13 @@ const App: React.FC = () => {
             <RegistroLegalizacionFulfillment user={user!} />
           </React.Suspense>
         );
+      case 'conciliacion-fulfillment':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Conciliación FULFILLMENT...</div>}>
+            <ConciliacionFulfillment user={user!} />
+          </React.Suspense>
+        );
+
       case 'validacion-conciliaciones':
         return <ValidacionConciliaciones user={user!} />;
       case 'fletes-conciliacion':

@@ -23,6 +23,12 @@ interface DetalleRow {
   orden: string | null; cantidad: string; tarifa: string; monto: string;
   costo_transportista: string | null; transportista_nombre: string | null; seguimiento: string | null;
   nota: string | null;
+  monto_final: string | null;
+  diferencia_monto: string | null;
+  factura_transportista: string | null;
+  fecha_factura_transportista: string | null;
+  estado_id: string | null;
+  estado_nombre: string | null;
 }
 
 // COP no maneja centavos en la práctica (convención del país); USD sí — y ahí es donde antes se
@@ -37,10 +43,20 @@ const fmt = (v: any, moneda: string) => {
 // Fecha por sede del cliente — CAF (USA) en MM/DD/AAAA, M7 (Colombia) en DD/MM/AAAA. Se opera
 // directo sobre el string "YYYY-MM-DD" (nunca con `new Date()`) para no arrastrar el problema de
 // interpretación UTC ya conocido en este proyecto.
-const fmtFechaPorSede = (fecha: string | null, sede: 'CAF' | 'M7' | null | undefined) => {
-  if (!fecha) return '—';
-  const [y, m, d] = fecha.slice(0, 10).split('-');
-  if (!y || !m || !d) return fecha;
+const MESES_MAP: Record<string, string> = {
+  ENERO: '01', FEBRERO: '02', MARZO: '03', ABRIL: '04', MAYO: '05', JUNIO: '06',
+  JULIO: '07', AGOSTO: '08', SEPTIEMBRE: '09', OCTUBRE: '10', NOVIEMBRE: '11', DICIEMBRE: '12'
+};
+
+const fmtFechaPorSede = (fecha: string | null, sede: 'CAF' | 'M7' | null | undefined, mesFallback?: string, anioFallback?: number) => {
+  let targetFecha = fecha;
+  if (!targetFecha && mesFallback && anioFallback) {
+    const mNum = MESES_MAP[mesFallback.toUpperCase()] || '01';
+    targetFecha = `${anioFallback}-${mNum}-01`;
+  }
+  if (!targetFecha) return '—';
+  const [y, m, d] = targetFecha.slice(0, 10).split('-');
+  if (!y || !m || !d) return targetFecha;
   return sede === 'CAF' ? `${m}/${d}/${y}` : `${d}/${m}/${y}`;
 };
 
@@ -112,16 +128,15 @@ const DetalleModal: React.FC<{
   };
 
   // Columnas visibles al cliente (Fecha→Monto) primero; las internas (Costo Transportista,
-  // Transportista, Seguimiento, Nota) van marcadas aparte con un estilo de fondo distinto, para
-  // que quede claro a simple vista que esa información nunca se comparte con el cliente.
+  // Transportista, Seguimiento, Nota, Monto Final, Diferencia, Factura, Fecha Factura, Estado) van marcadas aparte.
   const columns: ColumnDef<DetalleRow>[] = [
-    { header: t('fulfillment:registro.colDate'), key: 'fecha', sortable: true, render: r => fmtFechaPorSede(r.fecha, cliente?.sede) },
+    { header: `${t('fulfillment:registro.colDate')} (${cliente?.sede === 'CAF' ? 'MM/DD/AAAA' : 'DD/MM/AAAA'})`, key: 'fecha', sortable: true, render: r => fmtFechaPorSede(r.fecha, cliente?.sede, registro.mes, registro.anio) },
     { header: t('fulfillment:registro.colProduct'), key: 'producto_servicio_nombre', sortable: true },
     { header: t('fulfillment:registro.colDescription'), key: 'descripcion', sortable: false },
     { header: t('fulfillment:registro.colOrder'), key: 'orden', sortable: true, render: r => r.orden || '—' },
     { header: t('fulfillment:registro.colQuantity'), key: 'cantidad', sortable: true },
     { header: t('fulfillment:registro.colRate'), key: 'tarifa', sortable: true, render: r => fmt(r.tarifa, registro.moneda) },
-    { header: t('fulfillment:registro.colAmount'), key: 'monto', sortable: true, render: r => <span className="font-black">{fmt(r.monto, registro.moneda)}</span> },
+    { header: 'Monto Inicial', key: 'monto', sortable: true, render: r => <span className="font-black">{fmt(r.monto, registro.moneda)}</span> },
     {
       header: t('fulfillment:registro.colCarrierCost'), key: 'costo_transportista', sortable: true,
       headerClassName: 'bg-slate-800', cellClassName: 'bg-slate-50/70',
@@ -131,13 +146,46 @@ const DetalleModal: React.FC<{
     { header: t('fulfillment:registro.colTracking'), key: 'seguimiento', sortable: true, cellClassName: 'bg-slate-50/70', render: r => r.seguimiento || '—' },
     { header: t('fulfillment:registro.colNote'), key: 'nota', sortable: true, cellClassName: 'bg-slate-50/70', render: r => r.nota || '—' },
     {
+      header: 'Monto Final', key: 'monto_final', sortable: true, cellClassName: 'bg-slate-50/70 font-bold',
+      render: r => r.monto_final ? fmt(r.monto_final, registro.moneda) : '—',
+    },
+    {
+      header: 'Diferencia', key: 'diferencia_monto', sortable: true, cellClassName: 'bg-slate-50/70',
+      render: r => {
+        if (r.diferencia_monto === null || r.diferencia_monto === undefined) return '—';
+        const val = Number(r.diferencia_monto);
+        const isNeg = val < 0;
+        return <span className={`font-black ${isNeg ? 'text-red-600' : 'text-emerald-700'}`}>{fmt(val, registro.moneda)}</span>;
+      },
+    },
+    { header: 'Factura Transp.', key: 'factura_transportista', sortable: true, cellClassName: 'bg-slate-50/70', render: r => r.factura_transportista || '—' },
+    { header: `Fecha Factura (${cliente?.sede === 'CAF' ? 'MM/DD/AAAA' : 'DD/MM/AAAA'})`, key: 'fecha_factura_transportista', sortable: true, cellClassName: 'bg-slate-50/70', render: r => fmtFechaPorSede(r.fecha_factura_transportista, cliente?.sede) },
+    {
+      header: 'Estado', key: 'estado_id', sortable: true, cellClassName: 'bg-slate-50/70',
+      render: r => {
+        const isApproved = r.estado_id === 'EST-23';
+        const label = r.estado_nombre || (isApproved ? 'APROBADO' : 'PREAPROBADO');
+        return (
+          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+            isApproved ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'bg-amber-100 text-amber-800 border border-amber-300'
+          }`}>
+            {label}
+          </span>
+        );
+      },
+    },
+    {
       header: t('common:fields.actions'), key: 'id', sortable: false,
-      render: r => (
-        <div className="flex gap-2 items-center">
-          <button onClick={() => setEditLinea(r)} title={t('common:actions.edit')} className="text-indigo-600 hover:text-indigo-800"><Pencil className="w-3.5 h-3.5" /></button>
-          <button onClick={() => setDelLinea(r)} title={t('common:actions.delete')} className="text-red-500 hover:text-red-700"><Trash2 className="w-3.5 h-3.5" /></button>
-        </div>
-      ),
+      render: r => {
+        const isAllowed = !r.estado_id || r.estado_id === 'EST-22' || r.estado_id === 'EST-23';
+        if (!isAllowed) return null;
+        return (
+          <div className="flex gap-2 items-center">
+            <button onClick={() => setEditLinea(r)} title={t('common:actions.edit')} className="text-indigo-600 hover:text-indigo-800"><Pencil className="w-3.5 h-3.5" /></button>
+            <button onClick={() => setDelLinea(r)} title={t('common:actions.delete')} className="text-red-500 hover:text-red-700"><Trash2 className="w-3.5 h-3.5" /></button>
+          </div>
+        );
+      },
     },
   ];
 
@@ -160,6 +208,13 @@ const DetalleModal: React.FC<{
   };
 
   const periodosDelCliente = registros.filter(r => r.cliente_id === registro.cliente_id);
+
+  const [estadoFilterModal, setEstadoFilterModal] = useState<string>('');
+
+  const filteredRows = React.useMemo(() => {
+    if (!estadoFilterModal) return rows;
+    return rows.filter(r => (r.estado_id || 'EST-22') === estadoFilterModal);
+  }, [rows, estadoFilterModal]);
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center p-4 overflow-y-auto">
@@ -210,14 +265,33 @@ const DetalleModal: React.FC<{
               onSaved={handleLineaAgregada}
             />
           </div>
-          <div className="flex justify-end mb-3">
-            <button onClick={exportarCliente} className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-emerald-200 hover:bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest rounded-xl">
-              <Download className="w-3.5 h-3.5" /> {t('fulfillment:registro.exportClient')}
-            </button>
+
+          {/* Barra de Filtro de Estado y Exportación */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+            <div className="flex items-center space-x-3 text-xs">
+              <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">Estado:</span>
+              <select
+                value={estadoFilterModal}
+                onChange={(e) => setEstadoFilterModal(e.target.value)}
+                className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-indigo-500"
+              >
+                <option value="">Todos los Estados ({rows.length})</option>
+                <option value="EST-19">CONCILIADO ({rows.filter(r => r.estado_id === 'EST-19').length})</option>
+                <option value="EST-22">PREAPROBADO ({rows.filter(r => r.estado_id === 'EST-22' || !r.estado_id).length})</option>
+                <option value="EST-23">APROBADO ({rows.filter(r => r.estado_id === 'EST-23').length})</option>
+              </select>
+            </div>
+
+            <div className="flex items-center space-x-3 text-xs">
+              <span className="text-slate-500 font-medium">
+                Conciliados: <strong className="text-emerald-700 font-black">{rows.filter(r => r.estado_id === 'EST-19').length}</strong> de {rows.length}
+              </span>
+            </div>
           </div>
+
           {loading
             ? <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-indigo-500" /></div>
-            : <DataTable<DetalleRow> data={rows} columns={columns} defaultPageSize={100} searchPlaceholder={t('common:actions.searchPlaceholder')}
+            : <DataTable<DetalleRow> data={filteredRows} columns={columns} defaultPageSize={100} searchPlaceholder="Buscar por guía, orden, descripción, factura..."
                 excelFileName={`fulfillment_${registro.cliente_codigo}_${registro.mes}_${registro.anio}_interno.xlsx`} excelSheetName="Detalle" />
           }
         </div>
@@ -326,6 +400,34 @@ function ConsultaTab({ clientes }: { clientes: Cliente[] }) {
     buscar({ latest: true });
   };
 
+  const [busquedaGlobal, setBusquedaGlobal] = useState('');
+  const [searchingGlobal, setSearchingGlobal] = useState(false);
+  const [resultadosGlobales, setResultadosGlobales] = useState<any[]>([]);
+
+  const handleBusquedaGlobal = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!busquedaGlobal.trim()) {
+      setResultadosGlobales([]);
+      return;
+    }
+    setSearchingGlobal(true);
+    try {
+      const res = await api.searchFulfillmentRegistroDetalleGlobal(busquedaGlobal, filtroCliente || undefined);
+      if (res.success) {
+        setResultadosGlobales(res.data || []);
+        if ((res.data || []).length === 0) {
+          toast.info(`No se encontraron registros para "${busquedaGlobal}"`);
+        } else {
+          toast.success(`${res.data.length} registros encontrados`);
+        }
+      }
+    } catch {
+      toast.error('Error al realizar la búsqueda global');
+    } finally {
+      setSearchingGlobal(false);
+    }
+  };
+
   const usd = resumen?.porMoneda.find(m => m.moneda === 'USD');
   const cop = resumen?.porMoneda.find(m => m.moneda === 'COP');
 
@@ -346,6 +448,120 @@ function ConsultaTab({ clientes }: { clientes: Cliente[] }) {
 
   return (
     <div>
+      {/* ── Buscador Global por Guía / Tracking / Orden / Factura ────────── */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-2xl shadow-lg border border-slate-800 mb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-sm font-black tracking-wider uppercase flex items-center gap-2 text-indigo-300">
+              <Search className="w-4 h-4 text-indigo-400" />
+              Buscador Global de Guía / Tracking / Orden / Factura
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5 font-medium">
+              Busca cualquier número de guía o seguimiento en todos los meses e históricos del cliente.
+            </p>
+          </div>
+
+          <form onSubmit={handleBusquedaGlobal} className="flex items-center gap-2 w-full md:w-auto">
+            <input
+              type="text"
+              placeholder="Ej: 381229558418, 381692300832, 2-608-61692..."
+              className="w-full md:w-80 px-4 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-xs font-bold text-white placeholder-slate-400 outline-none focus:border-indigo-400 transition-all"
+              value={busquedaGlobal}
+              onChange={(e) => setBusquedaGlobal(e.target.value)}
+            />
+            <button
+              type="submit"
+              disabled={searchingGlobal}
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2"
+            >
+              {searchingGlobal ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              <span>Buscar</span>
+            </button>
+            {busquedaGlobal && (
+              <button
+                type="button"
+                onClick={() => { setBusquedaGlobal(''); setResultadosGlobales([]); }}
+                className="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all"
+              >
+                Limpiar
+              </button>
+            )}
+          </form>
+        </div>
+
+        {/* Resultados de búsqueda global */}
+        {resultadosGlobales.length > 0 && (
+          <div className="mt-5 pt-4 border-t border-slate-800/80 space-y-3">
+            <p className="text-xs font-bold text-emerald-400">
+              Se encontraron {resultadosGlobales.length} resultado(s) para "{busquedaGlobal}":
+            </p>
+            <div className="overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 max-h-72 overflow-y-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-slate-800/90 text-slate-400 text-[10px] font-black uppercase tracking-wider">
+                    <th className="p-3">Cliente</th>
+                    <th className="p-3">Período (Mes/Año)</th>
+                    <th className="p-3">Seguimiento / Guía</th>
+                    <th className="p-3">Orden</th>
+                    <th className="p-3">Monto Inicial</th>
+                    <th className="p-3">Monto Final</th>
+                    <th className="p-3">Factura Transp.</th>
+                    <th className="p-3">Estado</th>
+                    <th className="p-3 text-right">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                  {resultadosGlobales.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-800/40 transition-all">
+                      <td className="p-3 font-bold text-white">{r.cliente_nombre}</td>
+                      <td className="p-3 font-semibold text-indigo-300">{r.mes} {r.anio} {r.subtipo ? `· ${r.subtipo}` : ''}</td>
+                      <td className="p-3 font-mono font-bold text-amber-300">{r.seguimiento || '—'}</td>
+                      <td className="p-3 text-slate-300">{r.orden || '—'}</td>
+                      <td className="p-3 font-mono text-slate-300">{fmt(r.monto, r.cliente_moneda)}</td>
+                      <td className="p-3 font-mono font-bold text-emerald-400">{r.monto_final ? fmt(r.monto_final, r.cliente_moneda) : '—'}</td>
+                      <td className="p-3 font-mono text-amber-200">{r.factura_transportista || '—'}</td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${r.estado_id === 'EST-19' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
+                          {r.estado_nombre || (r.estado_id === 'EST-19' ? 'CONCILIADO' : 'PREAPROBADO')}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => {
+                            const targetReg: Registro = {
+                              id: r.registro_id,
+                              cliente_id: r.cliente_id,
+                              cliente_nombre: r.cliente_nombre,
+                              cliente_codigo: r.cliente_codigo,
+                              cliente_moneda: r.cliente_moneda,
+                              anio: r.anio,
+                              mes: r.mes,
+                              subtipo: r.subtipo,
+                              hoja_origen: null,
+                              moneda: r.cliente_moneda,
+                              valor_total: '0',
+                              costo_transporte_total: '0',
+                              utilidad: '0',
+                              num_lineas: 0,
+                              referencia_factura: null,
+                              fecha_creacion: ''
+                            };
+                            setDetalleReg(targetReg);
+                          }}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider transition-all"
+                        >
+                          Abrir Período ({r.mes} {r.anio})
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
         <KpiCard label={t('fulfillment:registro.kpiInvoicedUsd')} value={fmt(usd?.valor_total || 0, 'USD')} icon={<DollarSign className="w-4 h-4" />} color="bg-emerald-50 border-emerald-100 text-emerald-800" />
         <KpiCard label={t('fulfillment:registro.kpiInvoicedCop')} value={fmt(cop?.valor_total || 0, 'COP')} icon={<DollarSign className="w-4 h-4" />} color="bg-blue-50 border-blue-100 text-blue-800" />

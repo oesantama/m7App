@@ -33,7 +33,15 @@ router.get('/resumen-gerencial',   requirePermission('REGISTRO_LEGALIZACION_FULF
 router.get('/plantilla', requirePermission('REGISTRO_LEGALIZACION_FULFILLMENT', 'view'), fulfillment.getPlantillaFulfillment);
 router.post('/importar', requirePermission('REGISTRO_LEGALIZACION_FULFILLMENT', 'create'), upload.single('file'), fulfillment.importFulfillmentXlsx);
 router.post('/detalle-manual', requirePermission('REGISTRO_LEGALIZACION_FULFILLMENT', 'create'), fulfillment.createDetalleManual);
+router.get('/detalle/buscar', requirePermission('REGISTRO_LEGALIZACION_FULFILLMENT', 'view'), fulfillment.searchRegistroDetalleGlobal);
 router.put('/detalle/:id',    requirePermission('REGISTRO_LEGALIZACION_FULFILLMENT', 'edit'),   fulfillment.updateDetalleManual);
 router.delete('/detalle/:id', requirePermission('REGISTRO_LEGALIZACION_FULFILLMENT', 'delete'), fulfillment.deleteDetalleManual);
 
+// ── Conciliación Fulfillment ────────────────────────────────────────────────
+router.get('/conciliacion/plantilla', requirePermission('CONCILIACION_FULFILLMENT', 'view'), fulfillment.getPlantillaConciliacionFulfillment);
+router.get('/conciliacion/registros', requirePermission('CONCILIACION_FULFILLMENT', 'view'), fulfillment.getConciliacionRegistros);
+router.post('/conciliacion/analizar', requirePermission('CONCILIACION_FULFILLMENT', 'create'), upload.single('file'), fulfillment.analizarArchivoConciliacion);
+router.post('/conciliacion/confirmar', requirePermission('CONCILIACION_FULFILLMENT', 'edit'), fulfillment.confirmarConciliacion);
+
 export default router;
+
