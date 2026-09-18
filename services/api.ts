@@ -1129,7 +1129,7 @@ export const api = {
     body: JSON.stringify(data)
   }),
 
-  getUserPermissions: (userId: string) => fetchJson(`${API_URL}/user-permissions/${userId}?_t=${Date.now()}`),
+  getUserPermissions: (userId: string, options?: any) => fetchJson(`${API_URL}/user-permissions/${userId}?_t=${Date.now()}`, options),
   saveUserPermission: (data: any) => fetchJson(`${API_URL}/user-permissions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

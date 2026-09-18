@@ -262,9 +262,11 @@ const App: React.FC = () => {
               return;
             }
 
-            // M7 SOLUCIÓN NUCLEAR: Forzar refresco de permisos para TODOS en cada restauración
-            // Esto evita que datos obsoletos en localStorage permitan peticiones prohibidas
-            const freshPerms = await api.getUserPermissions(parsedUser.id).catch(() => null);
+            // M7 SOLUCIÓN NUCLEAR: Forzar refresco de permisos con timeout de seguridad (4s)
+            const permController = new AbortController();
+            const permTimer = setTimeout(() => permController.abort(), 4000);
+            const freshPerms = await api.getUserPermissions(parsedUser.id, { signal: permController.signal }).catch(() => null);
+            clearTimeout(permTimer);
 
             if (freshPerms) {
               if (Array.isArray(freshPerms)) {
@@ -323,6 +325,16 @@ const App: React.FC = () => {
 
     restoreSession();
   }, []);
+
+  // Timer de seguridad global (5s): garantiza que isRestoring NUNCA se quede trabado indefinidamente
+  useEffect(() => {
+    if (!isRestoring) return;
+    const safetyTimer = setTimeout(() => {
+      console.warn('[ORBIT-RESTORE] Timeout de seguridad (5s) alcanzado. Desactivando isRestoring.');
+      setIsRestoring(false);
+    }, 5000);
+    return () => clearTimeout(safetyTimer);
+  }, [isRestoring]);
 
 
 
