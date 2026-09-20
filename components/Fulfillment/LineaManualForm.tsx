@@ -103,7 +103,7 @@ export const LineaManualForm: React.FC<{
 
   const numMontoInicial = linea.monto !== '' && !isNaN(Number(linea.monto)) ? Number(linea.monto) : null;
   const numMontoFinal = linea.monto_final !== '' && !isNaN(Number(linea.monto_final)) ? Number(linea.monto_final) : null;
-  const calcDiferencia = numMontoFinal !== null && numMontoInicial !== null ? (numMontoFinal - numMontoInicial) : null;
+  const calcDiferencia = numMontoFinal !== null && numMontoInicial !== null ? (numMontoInicial - numMontoFinal) : null;
 
   // Monto = Cantidad × Tarifa, recalculado en vivo — pero el usuario puede sobrescribirlo a mano
   // en cualquier momento (ej. para dejarlo en 0, o un valor negociado distinto al cálculo).

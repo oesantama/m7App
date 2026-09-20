@@ -360,8 +360,8 @@ export const ConciliacionFulfillment: React.FC<Props> = ({ user }) => {
               isZero
                 ? 'bg-slate-100 text-slate-600'
                 : isPos
-                ? 'bg-red-100 text-red-700'
-                : 'bg-emerald-100 text-emerald-700'
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-red-100 text-red-700'
             }`}
           >
             {isPos ? `+${fmtMoney(diff)}` : fmtMoney(diff)}
@@ -481,8 +481,8 @@ export const ConciliacionFulfillment: React.FC<Props> = ({ user }) => {
               isZero
                 ? 'bg-slate-100 text-slate-600'
                 : isPos
-                ? 'bg-red-100 text-red-700'
-                : 'bg-emerald-100 text-emerald-700'
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-red-100 text-red-700'
             }`}
           >
             {isZero ? '$0.00' : isPos ? `+${fmtMoney(diff)}` : fmtMoney(diff)}
@@ -627,7 +627,7 @@ export const ConciliacionFulfillment: React.FC<Props> = ({ user }) => {
         </div>
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
           <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Diferencia Fletes</p>
-          <p className={`text-lg font-black mt-1 font-mono ${diferenciaTotal > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+          <p className={`text-lg font-black mt-1 font-mono ${diferenciaTotal < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
             {diferenciaTotal > 0 ? `+${fmtMoney(diferenciaTotal)}` : fmtMoney(diferenciaTotal)}
           </p>
         </div>

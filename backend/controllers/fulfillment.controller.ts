@@ -117,6 +117,7 @@ const ensureTablesImpl = async () => {
   await pool.query(`ALTER TABLE fulfillment_detalle ADD COLUMN IF NOT EXISTS nota TEXT`);
   await pool.query(`ALTER TABLE fulfillment_detalle ADD COLUMN IF NOT EXISTS monto_final NUMERIC(14,2)`);
   await pool.query(`ALTER TABLE fulfillment_detalle ADD COLUMN IF NOT EXISTS diferencia_monto NUMERIC(14,2)`);
+  await pool.query(`UPDATE fulfillment_detalle SET diferencia_monto = (COALESCE(monto, 0) - monto_final) WHERE monto_final IS NOT NULL AND (diferencia_monto IS NULL OR diferencia_monto != (COALESCE(monto, 0) - monto_final))`);
   await pool.query(`ALTER TABLE fulfillment_detalle ADD COLUMN IF NOT EXISTS factura_transportista TEXT`);
   await pool.query(`ALTER TABLE fulfillment_detalle ADD COLUMN IF NOT EXISTS fecha_factura_transportista DATE`);
   await pool.query(`ALTER TABLE fulfillment_detalle ADD COLUMN IF NOT EXISTS estado_id TEXT DEFAULT 'EST-22' REFERENCES estados(id)`);
@@ -589,7 +590,7 @@ export const createDetalleManual = async (req: Request, res: Response) => {
     const numMontoInicial = toNum(monto);
     const numMontoFinal = monto_final !== undefined && monto_final !== null && monto_final !== '' ? toNum(monto_final) : null;
     const numCostoTransp = costo_transportista !== undefined && costo_transportista !== null && costo_transportista !== '' ? toNum(costo_transportista) : null;
-    const calcDiferencia = numMontoFinal !== null ? (numMontoFinal - numMontoInicial) : null;
+    const calcDiferencia = numMontoFinal !== null ? (numMontoInicial - numMontoFinal) : null;
     const textFactura = factura_transportista?.trim() || null;
     const textFechaFactura = fecha_factura_transportista || null;
 
@@ -674,7 +675,7 @@ export const updateDetalleManual = async (req: Request, res: Response) => {
     const numMontoInicial = toNum(monto);
     const numMontoFinal = monto_final !== undefined && monto_final !== null && monto_final !== '' ? toNum(monto_final) : null;
     const numCostoTransp = costo_transportista !== undefined && costo_transportista !== null && costo_transportista !== '' ? toNum(costo_transportista) : null;
-    const calcDiferencia = numMontoFinal !== null ? (numMontoFinal - numMontoInicial) : null;
+    const calcDiferencia = numMontoFinal !== null ? (numMontoInicial - numMontoFinal) : null;
     const textFactura = factura_transportista?.trim() || null;
     const textFechaFactura = fecha_factura_transportista || null;
 
@@ -1418,7 +1419,7 @@ export const analizarArchivoConciliacion = async (req: Request, res: Response) =
 
         const montoComparar = montoFinalBD !== null ? montoFinalBD : montoInicial;
         const montoFinalGuardar = montoExtraido !== null ? montoExtraido : montoComparar;
-        const diferenciaCalculada = montoExtraido !== null ? (montoExtraido - montoComparar) : (montoFinalBD !== null ? (montoFinalBD - montoInicial) : 0);
+        const diferenciaCalculada = montoExtraido !== null ? (montoInicial - montoExtraido) : (montoFinalBD !== null ? (montoInicial - montoFinalBD) : 0);
         const isYaConciliado = row.estado_id === 'EST-19';
 
         coincidencias.push({
@@ -1485,7 +1486,7 @@ export const confirmarConciliacion = async (req: Request, res: Response) => {
           factura_transportista = COALESCE($1, factura_transportista),
           fecha_factura_transportista = CASE WHEN $2::text IS NOT NULL AND $2::text <> '' THEN $2::date ELSE fecha_factura_transportista END,
           monto_final = COALESCE($3::numeric, monto_final),
-          diferencia_monto = CASE WHEN $3::numeric IS NOT NULL THEN ($3::numeric - monto) ELSE diferencia_monto END
+          diferencia_monto = CASE WHEN $3::numeric IS NOT NULL THEN (monto - $3::numeric) ELSE diferencia_monto END
         WHERE id = $4
       `;
       await client.query(query, [
