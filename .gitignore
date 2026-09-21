@@ -68,6 +68,7 @@ local_*.jpg
 # ── Informes HTML generados automáticamente ───────────────────────────────────
 informe-*.html
 INFORME_*.html
+!public/INFORME_GERENCIAL_ORBIT.html
 playwright-report/
 
 # ── Base de Datos ─────────────────────────────────────────────────────────────
