@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => {
             clientsClaim: true,
             skipWaiting: true,
             navigateFallback: 'index.html',
-            navigateFallbackDenylist: [/^\/api/, /^\/publico\//, /^\/documentacion\//],
+            navigateFallbackDenylist: [/^\/api/, /^\/publico\//, /^\/documentacion\//, /\.html$/],
           },
           manifest: {
             name: 'Milla 7 - Sistema de Logística',

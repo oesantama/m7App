@@ -2576,7 +2576,15 @@ export const InformesGerenciales: React.FC = () => {
         </div>
 
         {/* Filters and File Inputs */}
-        <div className="flex items-center gap-3">
+          <a
+            href="/INFORME_GERENCIAL_ORBIT.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-md shadow-emerald-600/20"
+          >
+            <FileText size={14} />
+            <span>Ver Informe Gerencial HTML</span>
+          </a>
           <button
             onClick={() => setShowFiltersPanel(!showFiltersPanel)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border ${
