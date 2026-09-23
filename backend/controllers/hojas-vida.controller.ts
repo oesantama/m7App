@@ -14,8 +14,12 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'm7secret';
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === 'production') {
+    console.warn('[SECURITY-ALERT] JWT_SECRET no está definido en las variables de entorno de producción. Se recomienda definir una clave robusta.');
+}
 const TOKEN_HOURS_DEFAULT = 72;
 const LOCAL_BASE = path.join(process.cwd(), 'backend', 'docs', 'hojas-vida');
+
 
 // ─── UTILIDADES ──────────────────────────────────────────────────────────────
 
@@ -632,6 +636,9 @@ export const eliminarFormatoPlantilla = async (req: Request, res: Response) => {
 
 export const serveLocalFile = async (req: Request, res: Response) => {
     const filePath = (req.query['p'] as string) || '';
+    if (!filePath || filePath.trim() === '') {
+        return res.status(400).json({ error: 'Ruta de archivo no especificada' });
+    }
     const safePath = path.resolve(LOCAL_BASE, decodeURIComponent(filePath).replace(/^[/\\]+/, ''));
     if (!safePath.startsWith(path.resolve(LOCAL_BASE))) {
         return res.status(403).json({ error: 'Acceso no permitido' });
@@ -640,6 +647,7 @@ export const serveLocalFile = async (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'application/pdf');
     fs.createReadStream(safePath).pipe(res);
 };
+
 
 export const serveFormatoPlantilla = async (req: Request, res: Response) => {
     const tipoDocId = req.params['id'] as string;

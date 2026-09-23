@@ -9,6 +9,8 @@
 
 import { Router } from 'express';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
+
 import {
     getCatalogos,
     crearSolicitud,
@@ -85,6 +87,17 @@ export default router;
 
 export const hvPublicRouter = Router();
 
+// Rate Limiter para accesos públicos por token (OWASP A04 / Mitigación DoS y Fuerza Bruta)
+const hvPublicLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minuto
+    limit: 30, // Máximo 30 solicitudes por minuto por IP
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    message: { error: 'Demasiadas solicitudes desde esta IP. Por favor espere un minuto antes de reintentar.' }
+});
+
+hvPublicRouter.use(hvPublicLimiter);
+
 hvPublicRouter.get('/catalogos', getCatalogosPublicos);
 hvPublicRouter.get('/formato/:id', serveFormatoPlantilla);
 hvPublicRouter.get('/:token', getPublicSolicitud);
@@ -92,3 +105,4 @@ hvPublicRouter.patch('/:token/datos', guardarDatosPublico);
 hvPublicRouter.post('/:token/documento', upload.single('archivo'), subirDocumentoPublico);
 hvPublicRouter.patch('/:token/documento/:docId/vencimiento', actualizarFechaVencimiento);
 hvPublicRouter.post('/:token/submit', submitFormularioPublico);
+

@@ -18,11 +18,13 @@ const RCLONE_REMOTE = 'gdrive_cumplidos';
 export function sanitizeFolderName(name: string): string {
     return name
         .normalize('NFD').replace(/[̀-ͯ]/g, '')
+        .replace(/\.\./g, '')
         .replace(/[^a-zA-Z0-9\s\-_.]/g, '')
         .replace(/\s+/g, ' ')
         .trim()
         .substring(0, 80);
 }
+
 
 export function buildDrivePath(
     tipoEntidad: 'vehiculo' | 'tercero',
