@@ -110,46 +110,48 @@ function edgePoint(cx: number, cy: number, rx: number, ry: number, thetaDeg: num
   return { x: cx - rx * Math.sin(t), y: cy - ry * Math.cos(t) };
 }
 
-/** Gráfica de pastel 2D con etiquetas únicamente de porcentajes (sin nombres ni líneas guía). */
-function pieOnlyPercentages(items: [string, number][], total: number, size: number = 150): string {
+/** Gráfica de pastel 2D con etiquetas únicamente de porcentajes enteros coincidentes con la tabla (sin nombres ni líneas guía). */
+function pieOnlyPercentages(items: [string, number][], subtotal: number, grandTotal: number, size: number = 210): string {
   const r = size / 2;
 
-  if (!items.length || total <= 0) {
+  if (!items.length || subtotal <= 0) {
     return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#e5e5e5"></div>`;
   }
 
   if (items.length === 1) {
+    const p = pct0(items[0][1], grandTotal);
     return `
     <div style="position:relative;width:${size}px;height:${size}px">
       <div style="position:absolute;inset:0;border-radius:50%;background:${PALETTE[0]};
-        box-shadow:0 2px 6px rgba(0,0,0,.15), inset 0 0 0 1.5px rgba(255,255,255,.6)"></div>
+        box-shadow:0 2px 8px rgba(0,0,0,.15), inset 0 0 0 1.5px rgba(255,255,255,.6)"></div>
       <div style="position:absolute;inset:0;border-radius:50%;pointer-events:none;
         background:radial-gradient(circle at 34% 28%, rgba(255,255,255,.35), rgba(255,255,255,0) 60%)"></div>
       <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-        font-size:16px;font-weight:900;color:#ffffff;text-shadow:0 1px 3px rgba(0,0,0,0.6)">100%</div>
+        font-size:22px;font-weight:900;color:#ffffff;text-shadow:0 1px 3px rgba(0,0,0,0.6)">${p}%</div>
     </div>`;
   }
 
-  const segs = buildSegments(items, total);
+  const segs = buildSegments(items, subtotal);
   const gradient = segs.map(s => `${s.color} ${s.start.toFixed(2)}deg ${s.end.toFixed(2)}deg`).join(', ');
 
   const boundaries = [...new Set(segs.map(s => s.start))];
   const separators = boundaries.map(b => {
     const p = edgePoint(r, r, r, r, b);
-    return `<line x1="${r}" y1="${r}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="#ffffff" stroke-width="1.5"/>`;
+    return `<line x1="${r}" y1="${r}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="#ffffff" stroke-width="1.8"/>`;
   }).join('');
 
   type LabelItem = { pctText: string; isLarge: boolean; x: number; y: number; side: 'left' | 'right'; thetaRad: number };
   const rawLabels: LabelItem[] = [];
 
   segs.forEach(seg => {
-    const pctVal = (seg.qty / total) * 100;
-    if (pctVal < 1.5) return;
+    const pctVal = pct0(seg.qty, grandTotal);
+    if (pctVal < 1) return;
 
-    const pctText = `${pctComma(seg.qty, total)}%`;
+    const pctText = `${pctVal}%`;
     const thetaRad = (seg.mid * Math.PI) / 180;
-    const isLarge = pctVal >= 9;
-    const dist = isLarge ? r * 0.62 : r * 1.18;
+    const subPct = (seg.qty / subtotal) * 100;
+    const isLarge = subPct >= 7;
+    const dist = isLarge ? r * 0.64 : r * 1.15;
 
     const lx = r - dist * Math.sin(thetaRad);
     const ly = r - dist * Math.cos(thetaRad);
@@ -162,7 +164,7 @@ function pieOnlyPercentages(items: [string, number][], total: number, size: numb
   const rightExternal = rawLabels.filter(l => !l.isLarge && l.side === 'right').sort((a, b) => a.y - b.y);
 
   const declutter = (arr: LabelItem[]) => {
-    const rowH = 12;
+    const rowH = 13;
     for (let i = 1; i < arr.length; i++) {
       if (arr[i].y < arr[i - 1].y + rowH) {
         arr[i].y = arr[i - 1].y + rowH;
@@ -174,8 +176,8 @@ function pieOnlyPercentages(items: [string, number][], total: number, size: numb
 
   const pctLabels = rawLabels.map(l => {
     const style = l.isLarge
-      ? `position:absolute;left:${l.x.toFixed(1)}px;top:${l.y.toFixed(1)}px;transform:translate(-50%,-50%);font-size:10px;font-weight:900;color:#ffffff;text-shadow:0 1px 2px rgba(0,0,0,0.8);white-space:nowrap;pointer-events:none`
-      : `position:absolute;left:${l.x.toFixed(1)}px;top:${l.y.toFixed(1)}px;transform:translate(-50%,-50%);font-size:8.5px;font-weight:800;color:#1a1a1a;background:rgba(255,255,255,0.9);padding:1px 3px;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,0.12);white-space:nowrap;pointer-events:none`;
+      ? `position:absolute;left:${l.x.toFixed(1)}px;top:${l.y.toFixed(1)}px;transform:translate(-50%,-50%);font-size:11px;font-weight:900;color:#ffffff;text-shadow:0 1px 3px rgba(0,0,0,0.8);white-space:nowrap;pointer-events:none`
+      : `position:absolute;left:${l.x.toFixed(1)}px;top:${l.y.toFixed(1)}px;transform:translate(-50%,-50%);font-size:9.5px;font-weight:900;color:#1a1a1a;background:rgba(255,255,255,0.92);padding:1px 4px;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,0.15);white-space:nowrap;pointer-events:none`;
 
     return `<div style="${style}">${l.pctText}</div>`;
   }).join('');
@@ -184,7 +186,7 @@ function pieOnlyPercentages(items: [string, number][], total: number, size: numb
   <div style="position:relative;width:${size}px;height:${size}px">
     <div style="position:absolute;inset:0;border-radius:50%;
       background:conic-gradient(${gradient});transform:scaleX(-1);
-      box-shadow:0 2px 6px rgba(0,0,0,.15), inset 0 0 0 1.5px rgba(255,255,255,.5)"></div>
+      box-shadow:0 2px 8px rgba(0,0,0,.15), inset 0 0 0 1.5px rgba(255,255,255,.5)"></div>
     <svg width="${size}" height="${size}" style="position:absolute;inset:0;pointer-events:none">${separators}</svg>
     <div style="position:absolute;inset:0;border-radius:50%;pointer-events:none;
       background:radial-gradient(circle at 34% 28%, rgba(255,255,255,.35), rgba(255,255,255,0) 55%)"></div>
@@ -323,14 +325,12 @@ function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fec
   </div>`;
 
   const flotaBlock = (titulo: string, items: [string, number][], subtotal: number) => `
-  <div style="border:1px solid #bbb;border-radius:6px;padding:12px;background:#fff;display:flex;flex-direction:column;align-items:center;flex:1;justify-content:center">
-    <div style="font-size:16px;font-weight:900;color:#1a1a1a;text-align:center;text-transform:uppercase;margin-bottom:4px;width:100%">${titulo}</div>
-    <div style="font-size:14px;font-weight:800;text-align:center;margin-bottom:14px">
-      <span style="color:#3CB44B">${fmt(subtotal)} viajes</span>
-      <span style="color:#1F6FD0">(${pct0(subtotal, total)}%)</span>
+  <div style="border:1px solid #bbb;border-radius:6px;padding:10px 14px;background:#fff;display:flex;flex-direction:column;align-items:center;flex:1;justify-content:center">
+    <div style="font-size:15px;font-weight:900;text-align:center;text-transform:uppercase;margin-bottom:6px;width:100%;white-space:nowrap">
+      <span style="color:#1a1a1a">${titulo}</span> — <span style="color:#3CB44B">${fmt(subtotal)} viajes</span> <span style="color:#1F6FD0">(${pct0(subtotal, total)}%)</span>
     </div>
-    <div style="display:flex;justify-content:center;align-items:center;padding:8px 0;width:100%">
-      ${pieOnlyPercentages(items, subtotal, 160)}
+    <div style="display:flex;justify-content:center;align-items:center;padding:4px 0;width:100%;flex:1">
+      ${pieOnlyPercentages(items, subtotal, total, 210)}
     </div>
   </div>`;
 
