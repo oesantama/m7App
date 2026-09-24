@@ -103,31 +103,33 @@ function buildSegments(items: [string, number][], total: number): Seg[] {
   });
 }
 
-/** Punto sobre el borde de la elipse (vista "3D" achatada) para un ángulo (0°=arriba),
- *  en el sentido visual antihorario que usa Excel para el primer slice. */
+/** Punto sobre el borde de la elipse para un ángulo (0°=arriba). */
 function edgePoint(cx: number, cy: number, rx: number, ry: number, thetaDeg: number): { x: number; y: number } {
   const t = (thetaDeg * Math.PI) / 180;
   return { x: cx - rx * Math.sin(t), y: cy - ry * Math.cos(t) };
 }
 
-/** Gráfica de pastel 2D con etiquetas únicamente de porcentajes enteros coincidentes con la tabla (sin nombres ni líneas guía). */
-function pieOnlyPercentages(items: [string, number][], subtotal: number, grandTotal: number, size: number = 210): string {
-  const r = size / 2;
+/** Gráfica de pastel 2D agrandada al margen del recuadro (diámetro 250px), con porcentajes internos más hacia la orilla y únicamente las etiquetas de 1% afuera con línea guía. */
+function pieOnlyPercentages(items: [string, number][], subtotal: number, grandTotal: number, size: number = 270): string {
+  const cx = size / 2;
+  const cy = size / 2;
+  const rPie = (size / 2) - 10; // 125px de radio para la torta (diámetro 250px), llenando casi todo el recuadro
 
   if (!items.length || subtotal <= 0) {
-    return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:#e5e5e5"></div>`;
+    return `<div style="width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center"><div style="width:${rPie*2}px;height:${rPie*2}px;border-radius:50%;background:#e5e5e5"></div></div>`;
   }
 
   if (items.length === 1) {
     const p = pct0(items[0][1], grandTotal);
     return `
-    <div style="position:relative;width:${size}px;height:${size}px">
-      <div style="position:absolute;inset:0;border-radius:50%;background:${PALETTE[0]};
-        box-shadow:0 2px 8px rgba(0,0,0,.15), inset 0 0 0 1.5px rgba(255,255,255,.6)"></div>
-      <div style="position:absolute;inset:0;border-radius:50%;pointer-events:none;
-        background:radial-gradient(circle at 34% 28%, rgba(255,255,255,.35), rgba(255,255,255,0) 60%)"></div>
-      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-        font-size:22px;font-weight:900;color:#ffffff;text-shadow:0 1px 3px rgba(0,0,0,0.6)">${p}%</div>
+    <div style="position:relative;width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center">
+      <div style="position:relative;width:${rPie*2}px;height:${rPie*2}px;border-radius:50%;background:${PALETTE[0]};
+        box-shadow:0 3px 10px rgba(0,0,0,.18), inset 0 0 0 2px rgba(255,255,255,.6)">
+        <div style="position:absolute;inset:0;border-radius:50%;pointer-events:none;
+          background:radial-gradient(circle at 34% 28%, rgba(255,255,255,.35), rgba(255,255,255,0) 60%)"></div>
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+          font-size:32px;font-weight:900;color:#ffffff;text-shadow:0 2px 4px rgba(0,0,0,0.7)">${p}%</div>
+      </div>
     </div>`;
   }
 
@@ -136,12 +138,16 @@ function pieOnlyPercentages(items: [string, number][], subtotal: number, grandTo
 
   const boundaries = [...new Set(segs.map(s => s.start))];
   const separators = boundaries.map(b => {
-    const p = edgePoint(r, r, r, r, b);
-    return `<line x1="${r}" y1="${r}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="#ffffff" stroke-width="1.8"/>`;
+    const p = edgePoint(rPie, rPie, rPie, rPie, b);
+    return `<line x1="${rPie}" y1="${rPie}" x2="${p.x.toFixed(1)}" y2="${p.y.toFixed(1)}" stroke="#ffffff" stroke-width="1.5"/>`;
   }).join('');
 
-  type LabelItem = { pctText: string; isLarge: boolean; x: number; y: number; side: 'left' | 'right'; thetaRad: number };
-  const rawLabels: LabelItem[] = [];
+  interface InternalLabel { type: 'in'; pctText: string; lx: number; ly: number; fontSize: string }
+  interface ExternalLabel { type: 'out'; pctText: string; ex: number; ey: number; lx: number; ly: number; side: 'left' | 'right' }
+
+  const insideLabels: InternalLabel[] = [];
+  const leftExternal: ExternalLabel[] = [];
+  const rightExternal: ExternalLabel[] = [];
 
   segs.forEach(seg => {
     const pctVal = pct0(seg.qty, grandTotal);
@@ -150,47 +156,87 @@ function pieOnlyPercentages(items: [string, number][], subtotal: number, grandTo
     const pctText = `${pctVal}%`;
     const thetaRad = (seg.mid * Math.PI) / 180;
     const subPct = (seg.qty / subtotal) * 100;
-    const isLarge = subPct >= 7;
-    const dist = isLarge ? r * 0.64 : r * 1.15;
 
-    const lx = r - dist * Math.sin(thetaRad);
-    const ly = r - dist * Math.cos(thetaRad);
-    const side = Math.sin(thetaRad) >= 0 ? 'left' : 'right';
+    // Solo se sacan del gráfico las etiquetas que indican 1% (para evitar sobreescritura)
+    if (pctVal <= 1) {
+      const ex = cx - rPie * Math.sin(thetaRad);
+      const ey = cy - rPie * Math.cos(thetaRad);
+      const distOut = rPie + 16;
+      const lx = cx - distOut * Math.sin(thetaRad);
+      const ly = cy - distOut * Math.cos(thetaRad);
+      const side = Math.sin(thetaRad) >= 0 ? 'left' : 'right';
 
-    rawLabels.push({ pctText, isLarge, x: lx, y: ly, side, thetaRad });
+      const item: ExternalLabel = { type: 'out', pctText, ex, ey, lx, ly, side };
+      if (side === 'left') leftExternal.push(item);
+      else rightExternal.push(item);
+    } else {
+      // Para las etiquetas internas (2% en adelante), se colocan más hacia la orilla del corte (distMult mayor)
+      let distMult = 0.70;
+      let fontSize = '12px';
+
+      if (subPct >= 15) {
+        distMult = 0.65;
+        fontSize = '15px';
+      } else if (subPct >= 6) {
+        distMult = 0.72;
+        fontSize = '13px';
+      } else if (subPct >= 3) {
+        distMult = 0.76;
+        fontSize = '10.5px';
+      } else { // 2%
+        distMult = 0.76;
+        fontSize = '8.5px';
+      }
+
+      const dist = rPie * distMult;
+      const lx = cx - dist * Math.sin(thetaRad);
+      const ly = cy - dist * Math.cos(thetaRad);
+
+      insideLabels.push({ type: 'in', pctText, lx, ly, fontSize });
+    }
   });
 
-  const leftExternal = rawLabels.filter(l => !l.isLarge && l.side === 'left').sort((a, b) => a.y - b.y);
-  const rightExternal = rawLabels.filter(l => !l.isLarge && l.side === 'right').sort((a, b) => a.y - b.y);
+  // Ordenar y desaglomerar etiquetas externas (únicamente 1%) por eje Y
+  leftExternal.sort((a, b) => a.ly - b.ly);
+  rightExternal.sort((a, b) => a.ly - b.ly);
 
-  const declutter = (arr: LabelItem[]) => {
-    const rowH = 13;
+  const declutter = (arr: ExternalLabel[]) => {
+    const minGap = 16;
     for (let i = 1; i < arr.length; i++) {
-      if (arr[i].y < arr[i - 1].y + rowH) {
-        arr[i].y = arr[i - 1].y + rowH;
+      if (arr[i].ly < arr[i - 1].ly + minGap) {
+        arr[i].ly = arr[i - 1].ly + minGap;
       }
     }
   };
   declutter(leftExternal);
   declutter(rightExternal);
 
-  const pctLabels = rawLabels.map(l => {
-    const style = l.isLarge
-      ? `position:absolute;left:${l.x.toFixed(1)}px;top:${l.y.toFixed(1)}px;transform:translate(-50%,-50%);font-size:11px;font-weight:900;color:#ffffff;text-shadow:0 1px 3px rgba(0,0,0,0.8);white-space:nowrap;pointer-events:none`
-      : `position:absolute;left:${l.x.toFixed(1)}px;top:${l.y.toFixed(1)}px;transform:translate(-50%,-50%);font-size:9.5px;font-weight:900;color:#1a1a1a;background:rgba(255,255,255,0.92);padding:1px 4px;border-radius:3px;box-shadow:0 1px 2px rgba(0,0,0,0.15);white-space:nowrap;pointer-events:none`;
+  const allExternal = [...leftExternal, ...rightExternal];
 
+  const leaderLinesSvg = allExternal.map(l =>
+    `<line x1="${l.ex.toFixed(1)}" y1="${l.ey.toFixed(1)}" x2="${l.lx.toFixed(1)}" y2="${l.ly.toFixed(1)}" stroke="#444444" stroke-width="1.2" stroke-dasharray="2,2"/>`
+  ).join('');
+
+  const insideHtml = insideLabels.map(l => {
+    const style = `position:absolute;left:${l.lx.toFixed(1)}px;top:${l.ly.toFixed(1)}px;transform:translate(-50%,-50%);font-size:${l.fontSize};font-weight:900;color:#ffffff;text-shadow:0 1px 3px rgba(0,0,0,0.95), 0 0 3px rgba(0,0,0,0.95);white-space:nowrap;pointer-events:none`;
+    return `<div style="${style}">${l.pctText}</div>`;
+  }).join('');
+
+  const externalHtml = allExternal.map(l => {
+    const style = `position:absolute;left:${l.lx.toFixed(1)}px;top:${l.ly.toFixed(1)}px;transform:translate(-50%,-50%);font-size:9px;font-weight:900;color:#1a1a1a;background:rgba(255,255,255,0.95);padding:1px 4px;border:1px solid #999;border-radius:3px;box-shadow:0 1px 3px rgba(0,0,0,0.2);white-space:nowrap;pointer-events:none`;
     return `<div style="${style}">${l.pctText}</div>`;
   }).join('');
 
   return `
   <div style="position:relative;width:${size}px;height:${size}px">
-    <div style="position:absolute;inset:0;border-radius:50%;
+    <div style="position:absolute;left:${cx - rPie}px;top:${cy - rPie}px;width:${rPie*2}px;height:${rPie*2}px;border-radius:50%;
       background:conic-gradient(${gradient});transform:scaleX(-1);
-      box-shadow:0 2px 8px rgba(0,0,0,.15), inset 0 0 0 1.5px rgba(255,255,255,.5)"></div>
-    <svg width="${size}" height="${size}" style="position:absolute;inset:0;pointer-events:none">${separators}</svg>
-    <div style="position:absolute;inset:0;border-radius:50%;pointer-events:none;
-      background:radial-gradient(circle at 34% 28%, rgba(255,255,255,.35), rgba(255,255,255,0) 55%)"></div>
-    <div style="position:absolute;inset:0;pointer-events:none">${pctLabels}</div>
+      box-shadow:0 3px 10px rgba(0,0,0,.18), inset 0 0 0 1.5px rgba(255,255,255,.5)"></div>
+    <svg width="${rPie*2}" height="${rPie*2}" style="position:absolute;left:${cx - rPie}px;top:${cy - rPie}px;pointer-events:none">${separators}</svg>
+    <div style="position:absolute;left:${cx - rPie}px;top:${cy - rPie}px;width:${rPie*2}px;height:${rPie*2}px;border-radius:50%;pointer-events:none;
+      background:radial-gradient(circle at 34% 28%, rgba(255,255,255,.32), rgba(255,255,255,0) 55%)"></div>
+    <svg width="${size}" height="${size}" style="position:absolute;inset:0;pointer-events:none">${leaderLinesSvg}</svg>
+    <div style="position:absolute;inset:0;pointer-events:none">${insideHtml}${externalHtml}</div>
   </div>`;
 }
 
@@ -329,8 +375,8 @@ function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fec
     <div style="font-size:15px;font-weight:900;text-align:center;text-transform:uppercase;margin-bottom:6px;width:100%;white-space:nowrap">
       <span style="color:#1a1a1a">${titulo}</span> — <span style="color:#3CB44B">${fmt(subtotal)} viajes</span> <span style="color:#1F6FD0">(${pct0(subtotal, total)}%)</span>
     </div>
-    <div style="display:flex;justify-content:center;align-items:center;padding:4px 0;width:100%;flex:1">
-      ${pieOnlyPercentages(items, subtotal, total, 210)}
+    <div style="display:flex;justify-content:center;align-items:center;padding:2px 0;width:100%;flex:1">
+      ${pieOnlyPercentages(items, subtotal, total, 280)}
     </div>
   </div>`;
 
@@ -346,7 +392,7 @@ body{font-family:Calibri,Arial,sans-serif;font-size:10px;color:#1a1a1a;backgroun
     <div style="font-size:7px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#777;margin-top:2px">Total viajes</div>
   </div>
   <div style="text-align:center">
-    ${logoSrc ? `<img src="${logoSrc}" style="height:38px;object-fit:contain;margin-bottom:3px" alt="logo">` : ''}
+    ${logoSrc ? `<img src="${logoSrc}" style="height:54px;object-fit:contain;margin-bottom:3px" alt="logo">` : ''}
     <div style="font-size:20px;font-weight:900;letter-spacing:.3px;color:#1a1a1a;white-space:nowrap">${fecha}</div>
   </div>
   <div style="text-align:center">
