@@ -2576,6 +2576,7 @@ export const InformesGerenciales: React.FC = () => {
         </div>
 
         {/* Filters and File Inputs */}
+        <div className="flex items-center gap-3 flex-wrap">
           <a
             href="/INFORME_GERENCIAL_ORBIT.html"
             target="_blank"
