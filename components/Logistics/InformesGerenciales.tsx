@@ -2249,7 +2249,40 @@ export const InformesGerenciales: React.FC = () => {
         };
       });
 
-      const worksheetDetail = XLSX.utils.json_to_sheet(detailRows);
+      const tdmDetailRows = tdmFlotaRows.map(r => {
+        const clientObj = clients.find(c => String(c.id).trim().toUpperCase() === String(r.client_id || '').trim().toUpperCase());
+        const clientBaseName = clientObj ? String(clientObj.name).trim().toUpperCase() : String(r.client_name || r.client_id || 'S/I').trim().toUpperCase();
+        const rowClient = `TDM ${clientBaseName}`;
+        const cobrar = Number(r.valor_cobrar) || 0;
+        const pagar = Number(r.valor_pagar) || 0;
+        const fechaManStr = r.fecha_operacion ? String(r.fecha_operacion).trim().slice(0, 10) : '';
+
+        return {
+          "ORDEN DE COMPRA":       'S/I',
+          "MANIFIESTO":            safeStr(r.manifiesto || 'S/I'),
+          "FECHA MANIFIESTO":      formatColombianDateStr(fechaManStr),
+          "ESTADO MANIFIESTO":     'REGISTRADO',
+          "CLIENTE":               rowClient,
+          "TOTAL CXC":             cobrar,
+          "VALOR TOTAL CXC FINAL": cobrar,
+          "VALOR TOT CXP FINAL":   pagar,
+          "PLACA":                 safeStr(r.placa || 'SIN PLACA'),
+          "CONDUCTOR":             'S/I',
+          "FECHA FACTURA":         '',
+          "FECHA RECIBO":          '',
+          "FECHA EGRESO":          '',
+          "FACT. MISMO MES":       0,
+          "DÍA FACTURACION (MAN→FACT)": '',
+          "DIAS REC (FACT→REC)":  '',
+          "DIAS EGRESO (MAN→EGR)": '',
+          "DIA MAN RECIBIDO (MAN→REC)": '',
+          "VL REC MISMO MES":      0,
+          "VL REC DIF MES":        0,
+        };
+      });
+
+      const allDetailRows = [...detailRows, ...tdmDetailRows];
+      const worksheetDetail = XLSX.utils.json_to_sheet(allDetailRows);
 
       // Aplicar formatos numéricos en Detalle Transacciones
       const detailColFormats: Record<string, string> = {
@@ -2556,7 +2589,56 @@ export const InformesGerenciales: React.FC = () => {
       }
 
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Vehículos INT");
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Resumen_Vehiculos");
+
+      // Sheet 2: Detalle_Vehiculos
+      const detailRows: any[] = [];
+      vehiclesData.forEach(v => {
+        (v.manifests || []).forEach(m => {
+          const dRow: any = {
+            "Vehículo (Placa)": v.plate,
+          };
+          if (selectedClientForVehiclesInt === 'GENERAL') {
+            dRow["Cliente"] = v.clientName || 'S/I';
+          }
+          dRow["Manifiesto"] = m.manifest_number;
+          dRow["Fecha"] = formatDate(m.manifest_date);
+          dRow["Valor CXC"] = Math.round(m.venta || 0);
+          dRow["Valor CXP"] = Math.round(m.ingTerceros || 0);
+          dRow["Intermediación"] = Math.round(m.ingresosPropios || 0);
+          dRow["INT (%)"] = m.venta > 0 ? (m.ingresosPropios / m.venta) : 0;
+          dRow["Estado"] = m.manifest_status || 'COMPLETADO';
+          detailRows.push(dRow);
+        });
+      });
+
+      const worksheetDetail = XLSX.utils.json_to_sheet(detailRows);
+      const colZFormatsDetail: Record<string, string> = {
+        "Valor CXC": '"$"#,##0',
+        "Valor CXP": '"$"#,##0',
+        "Intermediación": '"$"#,##0',
+        "INT (%)": '0.00%'
+      };
+
+      if (worksheetDetail['!ref']) {
+        const dRange = XLSX.utils.decode_range(worksheetDetail['!ref']);
+        const dColNames: Record<number, string> = {};
+        for (let C = dRange.s.c; C <= dRange.e.c; ++C) {
+          const cell = worksheetDetail[XLSX.utils.encode_cell({ r: 0, c: C })];
+          if (cell && cell.v) dColNames[C] = cell.v.toString();
+        }
+        for (let R = dRange.s.r + 1; R <= dRange.e.r; ++R) {
+          for (let C = dRange.s.c; C <= dRange.e.c; ++C) {
+            const colName = dColNames[C];
+            if (colName && colZFormatsDetail[colName]) {
+              const cell = worksheetDetail[XLSX.utils.encode_cell({ r: R, c: C })];
+              if (cell && cell.t === 'n') cell.z = colZFormatsDetail[colName];
+            }
+          }
+        }
+      }
+
+      XLSX.utils.book_append_sheet(workbook, worksheetDetail, "Detalle_Vehiculos");
       XLSX.writeFile(workbook, `Vehiculos_INT_${selectedClientForVehiclesInt.replace(/\s+/g, '_')}.xlsx`);
       toast.success('Detalle de vehículos exportado con éxito.');
     } catch (err) {
@@ -4967,6 +5049,57 @@ export const InformesGerenciales: React.FC = () => {
                       }
                       
                       XLSX.utils.book_append_sheet(workbook, worksheetResumen, "Resumen_Vehiculos");
+
+                      // Hoja 2: Detalle de Vehículos (Manifiestos individuales)
+                      const processedDetailRows: any[] = [];
+                      sortedData.forEach((v: any) => {
+                        (v.manifests || []).forEach((m: any) => {
+                          const dRow: any = {
+                            "Vehículo (Placa)": v.plate,
+                          };
+                          if (selectedClientForVehiclesInt === 'GENERAL') {
+                            dRow["Cliente"] = v.clientName || 'S/I';
+                          }
+                          dRow["Manifiesto"] = m.manifest_number;
+                          dRow["Fecha"] = formatDate(m.manifest_date);
+                          dRow["Valor CXC"] = Math.round(m.venta || 0);
+                          dRow["Valor CXP"] = Math.round(m.ingTerceros || 0);
+                          dRow["Intermediación"] = Math.round(m.ingresosPropios || 0);
+                          dRow["INT (%)"] = m.venta > 0 ? (m.ingresosPropios / m.venta) : 0;
+                          dRow["Estado"] = m.manifest_status || 'COMPLETADO';
+                          processedDetailRows.push(dRow);
+                        });
+                      });
+
+                      const worksheetDetalle = XLSX.utils.json_to_sheet(processedDetailRows);
+                      const colZFormatsDetalle: Record<string, string> = {
+                        "Valor CXC": '"$"#,##0',
+                        "Valor CXP": '"$"#,##0',
+                        "Intermediación": '"$"#,##0',
+                        "INT (%)": '0.00%'
+                      };
+
+                      if (worksheetDetalle['!ref']) {
+                        const range = XLSX.utils.decode_range(worksheetDetalle['!ref']);
+                        const colNames: Record<number, string> = {};
+                        for (let C = range.s.c; C <= range.e.c; ++C) {
+                          const cell = worksheetDetalle[XLSX.utils.encode_cell({ r: 0, c: C })];
+                          if (cell && cell.v) colNames[C] = cell.v.toString();
+                        }
+                        for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                          for (let C = range.s.c; C <= range.e.c; ++C) {
+                            const colName = colNames[C];
+                            if (colName && colZFormatsDetalle[colName]) {
+                              const cell = worksheetDetalle[XLSX.utils.encode_cell({ r: R, c: C })];
+                              if (cell && cell.t === 'n') {
+                                cell.z = colZFormatsDetalle[colName];
+                              }
+                            }
+                          }
+                        }
+                      }
+
+                      XLSX.utils.book_append_sheet(workbook, worksheetDetalle, "Detalle_Vehiculos");
                       XLSX.writeFile(workbook, `Vehiculos_INT_${selectedClientForVehiclesInt}.xlsx`);
                     }}
                   />
