@@ -40,9 +40,10 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
     const allowedIds: string[] = (user as any)?.clientIds?.length
       ? (user as any).clientIds
       : user?.clientId ? [user.clientId] : [];
-    api.getClients().then((all: any[]) => {
+    api.getClients().then((all: any) => {
+      const list = Array.isArray(all) ? all : (all?.clients || []);
       const isAdmin = allowedIds.length === 1 && allowedIds[0] === 'CLI-01';
-      const filtered = isAdmin ? all : all.filter((c: any) => allowedIds.includes(c.id));
+      const filtered = isAdmin ? list : list.filter((c: any) => allowedIds.includes(c.id));
       const mapped = filtered.map((c: any) => ({ id: c.id, name: c.name || c.id }));
       setClients(mapped);
       if (mapped.length === 1) setSelectedClientId(mapped[0].id);
@@ -50,15 +51,15 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
     }).catch(() => setClientsReady(true));
   }, [user]);
 
-  const filteredDocuments = useMemo(() =>
-    selectedClientId
-      ? documents.filter(d => {
+  const filteredDocuments = useMemo(() => {
+    const docsList = Array.isArray(documents) ? documents : [];
+    return selectedClientId
+      ? docsList.filter(d => {
           const dClient = (d as any).clientId || (d as any).client_id;
           return !dClient || String(dClient) === String(selectedClientId);
         })
-      : documents,
-    [documents, selectedClientId]
-  );
+      : docsList;
+  }, [documents, selectedClientId]);
 
   const [selectedDocForCount, setSelectedDocForCount] = useState<DocumentL | null>(null);
 

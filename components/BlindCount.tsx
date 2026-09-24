@@ -68,7 +68,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
     }
     
     const initial: { [id: string]: number } = {};
-    docL.items.forEach(it => {
+    (Array.isArray(docL?.items) ? docL.items : []).forEach(it => {
       const val = Number(it.count2 || it.countedQty || 0);
       if (val > 0) initial[it.articleId] = val;
     });
@@ -79,7 +79,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
   const [count1Data, setCount1Data] = useState<{ [articleId: string]: number }>(() => {
     const initial: { [id: string]: number } = {};
-    docL.items.forEach(it => {
+    (Array.isArray(docL?.items) ? docL.items : []).forEach(it => {
       const val = Number(it.count1 || 0);
       if (val > 0) initial[it.articleId] = val;
     });
@@ -88,7 +88,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
   const [itemObservations, setItemObservations] = useState<{ [articleId: string]: string }>(() => {
     const initial: { [id: string]: string } = {};
-    docL.items.forEach(it => {
+    (Array.isArray(docL?.items) ? docL.items : []).forEach(it => {
       // M7-FIX: Cargar desde inventoryNote o inventory_observation
       const note = it.inventoryNote || (it as any).inventory_observation;
       if (note && note !== it.notes) {
@@ -202,7 +202,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
   // AGRUPACIÓN DE ITEMS POR SKU (VISTA GENERAL)
   const groupedItems = useMemo(() => {
     const groups: { [id: string]: DocumentLItem } = {};
-    const allItems = [...docL.items, ...extraItems];
+    const allItems = [...(Array.isArray(docL?.items) ? docL.items : []), ...(Array.isArray(extraItems) ? extraItems : [])];
     
     allItems.forEach(item => {
       // Normalización: Usar SKU si existe, sino articleId
@@ -702,7 +702,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
     setShowConfirmDialog(false);
     
     // 1. Identificar IDs del tipo de notificación — soporta snake_case y camelCase del backend
-    const matchedTypes = masterTipoNotificacion.filter(t =>
+    const safeTypes = Array.isArray(masterTipoNotificacion) ? masterTipoNotificacion : [];
+    const matchedTypes = safeTypes.filter(t =>
       t.name?.trim().toUpperCase() === 'INVENTARIO AJOVER' ||
       String(t.id || '').toUpperCase() === 'TGN-01'
     );
@@ -716,18 +717,19 @@ const BlindCount: React.FC<BlindCountProps> = ({
       name:     n.name || '',
     });
 
-    const activeNotifs = masterNotificaciones.filter(raw => {
+    const safeNotifs = Array.isArray(masterNotificaciones) ? masterNotificaciones : [];
+    const activeNotifs = safeNotifs.filter(raw => {
       const n = normalize(raw);
       const isCorrectType = typeIds.length > 0 ? typeIds.includes(n.typeId) : true;
-      const isActive = n.statusId === 'EST-01' || n.statusId.toUpperCase() === 'ACTIVO';
+      const isActive = n.statusId === 'EST-01' || String(n.statusId || '').toUpperCase() === 'ACTIVO';
       return isCorrectType && isActive && n.email;
     });
 
     if (activeNotifs.length === 0) {
       // Fallback: búsqueda flexible por nombre
-      const fallback = masterNotificaciones.find(raw => {
+      const fallback = safeNotifs.find(raw => {
         const n = normalize(raw);
-        const isActive = n.statusId === 'EST-01' || n.statusId.toUpperCase() === 'ACTIVO';
+        const isActive = n.statusId === 'EST-01' || String(n.statusId || '').toUpperCase() === 'ACTIVO';
         return n.name.toUpperCase().includes('INVENTARIO') && n.email && isActive;
       });
 

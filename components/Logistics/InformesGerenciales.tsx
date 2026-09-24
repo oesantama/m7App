@@ -86,9 +86,35 @@ const CHART_COLORS = [
   '#f43f5e', // Rose
 ];
 
-// Intermediación real: si rawPct >= 20 → divide en 2; si < 20 → resta 10 (mínimo 0)
-function calcIntReal(rawPct: number): number {
-  return rawPct >= 20 ? rawPct / 2 : Math.max(0, rawPct - 10);
+// Intermediación real para clientes de TDM:
+// - Para TODOS los clientes TDM excepto SOCODA: se mide SIEMPRE la mitad (rawPct / 2).
+// - Para SOCODA:
+//   * Del 31 de julio de 2026 hacia adelante (> 2026-07-31): aplica por mitad (rawPct / 2).
+//   * Del 31 de julio de 2026 o anterior (<= 2026-07-31): si rawPct < 20% resta 10% (mínimo 0); si rawPct >= 20% la mitad.
+function calcIntReal(rawPct: number, clientName?: string, dateStr?: string): number {
+  if (rawPct <= 0) return 0;
+  const cName = (clientName || '').toUpperCase();
+
+  if (cName.includes('SOCODA')) {
+    let cleanDate = '';
+    if (dateStr) {
+      const s = dateStr.trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) cleanDate = s.slice(0, 10);
+      else if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+        const parts = s.split('/');
+        cleanDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      } else cleanDate = s.slice(0, 10);
+    }
+    // Si la fecha es de 31 de julio de 2026 o anterior (<= '2026-07-31'):
+    if (cleanDate && cleanDate <= '2026-07-31') {
+      return rawPct >= 20 ? rawPct / 2 : Math.max(0, rawPct - 10);
+    }
+    // Del 31 de julio de 2026 en adelante (o por defecto): aplica por mitad
+    return rawPct / 2;
+  }
+
+  // Para todos los demás clientes TDM (Leonisa, Ajover, M7, etc.): SIEMPRE la mitad
+  return rawPct / 2;
 }
 
 export const InformesGerenciales: React.FC = () => {
@@ -1429,7 +1455,8 @@ export const InformesGerenciales: React.FC = () => {
       const ingTerceros = node.ingTerceros;
       const ingresosPropios = ventaTotal - ingTerceros;
       const rawPct = ventaTotal > 0 ? (ingresosPropios / ventaTotal) * 100 : 0;
-      const int = node.isFromTdmFlota ? calcIntReal(rawPct) : rawPct;
+      const maxDate = Array.from(node.workedDates).sort().pop() || reportToDate;
+      const int = node.isFromTdmFlota ? calcIntReal(rawPct, clientName, maxDate) : rawPct;
       const vehiculosCount = node.vehicles.size;
       const workedDaysCount = node.workedDates.size;
       const totalVehicleUtilizations = node.vehicleDays.size;
@@ -1680,7 +1707,8 @@ export const InformesGerenciales: React.FC = () => {
       const ingTerceros = node.ingTerceros;
       const ingresosPropios = ventaTotal - ingTerceros;
       const rawPct = ventaTotal > 0 ? (ingresosPropios / ventaTotal) * 100 : 0;
-      const int = node.isFromTdmFlota ? calcIntReal(rawPct) : rawPct;
+      const maxDate = Array.from(node.workedDates).sort().pop() || reportToDate;
+      const int = node.isFromTdmFlota ? calcIntReal(rawPct, clientName, maxDate) : rawPct;
       const vehiculosCount = node.vehicles.size;
       const workedDaysCount = node.workedDates.size;
       const totalVehicleUtilizations = node.vehicleDays.size;
@@ -1863,7 +1891,8 @@ export const InformesGerenciales: React.FC = () => {
       platesMap[mapKey].ingTerceros += pagar;
       platesMap[mapKey].manifestCount += 1;
       const ip = cobrar - pagar;
-      const intVal = calcIntReal(cobrar > 0 ? (ip / cobrar) * 100 : 0);
+      const manDate = String(r.fecha_operacion || '').slice(0, 10) || reportToDate;
+      const intVal = calcIntReal(cobrar > 0 ? (ip / cobrar) * 100 : 0, rowClient, manDate);
       platesMap[mapKey].manifests.push({
         manifest_number: String(r.manifiesto || 'S/I'),
         manifest_date: String(r.fecha_operacion || 'S/I').slice(0, 10),
@@ -1874,7 +1903,8 @@ export const InformesGerenciales: React.FC = () => {
     const rawPlates = Object.values(platesMap).map(p => {
       const ingresosPropios = p.ventaTotal - p.ingTerceros;
       const rawPct = p.ventaTotal > 0 ? (ingresosPropios / p.ventaTotal) * 100 : 0;
-      const int = p.isFromTdmFlota ? calcIntReal(rawPct) : rawPct;
+      const plateMaxDate = p.manifests.map((m: any) => m.manifest_date).filter(Boolean).sort().pop() || reportToDate;
+      const int = p.isFromTdmFlota ? calcIntReal(rawPct, p.clientName, plateMaxDate) : rawPct;
       return {
         ...p,
         ingresosPropios,
@@ -2541,7 +2571,7 @@ export const InformesGerenciales: React.FC = () => {
       const totalIngresosPropios = totalVentas - totalIngTerceros;
       const rawIntVal = totalVentas > 0 ? (totalIngresosPropios / totalVentas) * 100 : 0;
       const isTdmClient = vehiclesData.some((item: any) => item.isFromTdmFlota);
-      const overallInt = (isTdmClient ? calcIntReal(rawIntVal) : rawIntVal) / 100;
+      const overallInt = (isTdmClient ? calcIntReal(rawIntVal, selectedClientForVehiclesInt, reportToDate) : rawIntVal) / 100;
       const totalManifests = vehiclesData.reduce((sum, item) => sum + item.manifestCount, 0);
 
       const totalRow: any = {
@@ -5002,7 +5032,7 @@ export const InformesGerenciales: React.FC = () => {
                       const totalIngresosPropios = totalVentas - totalIngTerceros;
                       const rawIntVal = totalVentas > 0 ? (totalIngresosPropios / totalVentas) * 100 : 0;
                       const isTdmClient = sortedData.some((item: any) => item.isFromTdmFlota);
-                      const overallInt = (isTdmClient ? calcIntReal(rawIntVal) : rawIntVal) / 100;
+                      const overallInt = (isTdmClient ? calcIntReal(rawIntVal, selectedClientForVehiclesInt, reportToDate) : rawIntVal) / 100;
                       const totalManifests = sortedData.reduce((sum: number, item: any) => sum + item.manifestCount, 0);
 
                       const totalRow: any = {
