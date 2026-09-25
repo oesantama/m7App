@@ -6,7 +6,7 @@ export interface AuthRequest extends Request {
     user?: any;
 }
 
-export const authenticateToken = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
     const authHeader = req.headers['authorization'];
     let token = authHeader && authHeader.split(' ')[1];
 
@@ -20,7 +20,30 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
     }
 
     try {
-        const decoded = verifyToken(token);
+        const decoded: any = verifyToken(token);
+        
+        // VALIDACIÓN DE CIBERSEGURIDAD: Verificar en DB que el usuario siga activo
+        if (decoded && (decoded.id || decoded.email)) {
+            const userCheck = await pool.query(
+                `SELECT id, status_id FROM users WHERE id = $1 OR LOWER(email) = LOWER($2) LIMIT 1`,
+                [decoded.id || '0', decoded.email || '']
+            );
+
+            if (userCheck.rows.length === 0) {
+                console.warn(`[AUTH-FAILURE] Usuario no encontrado en DB: ${decoded.email || decoded.id}`);
+                return res.status(401).json({ success: false, error: 'Usuario no encontrado. Sesión revocada.' });
+            }
+
+            const statusUpper = String(userCheck.rows[0].status_id || '').trim().toUpperCase();
+            const isInactive = statusUpper === 'EST-02' || statusUpper === 'INACTIVO' || statusUpper === 'DESACTIVADO' || 
+                               (userCheck.rows[0].status_id && statusUpper !== 'EST-01' && statusUpper !== 'ACTIVO');
+
+            if (isInactive) {
+                console.warn(`[SECURITY-ALERT] Intento de acceso por usuario inactivo (${decoded.email || decoded.id}). Bloqueado.`);
+                return res.status(401).json({ success: false, error: 'Usuario inactivo. Su sesión ha sido revocada por ciberseguridad.' });
+            }
+        }
+
         req.user = decoded;
         next();
     } catch (error: any) {
@@ -79,6 +102,8 @@ const ID_MAP: Record<string, string> = {
     'ASIGNACION_DEVOLUCION_GH': 'PAG-53',
     'CONSULTA_INVENTARIO_GH': 'PAG-54',
     'MASTER_INVENTARIO_GH': 'PAG-55',
+    'SONDEOS': 'PAG-79',
+    'PAG-79': 'PAG-79',
 };
 
 // Módulos que usuarios con permiso RUTAS (PAG-15) pueden leer (solo view)

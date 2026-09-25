@@ -109,6 +109,14 @@ export const logout = (req: Request, res: Response) => {
   res.json({ success: true, message: 'Sesión finalizada' });
 };
 
+export const validateSession = async (req: Request, res: Response) => {
+  const user = (req as any).user;
+  if (!user) {
+    return res.status(401).json({ success: false, error: 'Sesión no válida o usuario inactivo.' });
+  }
+  res.json({ success: true, user });
+};
+
 import { sendEmail } from '../services/notification.service.js';
 
 export const forgotPassword = async (req: Request, res: Response) => {

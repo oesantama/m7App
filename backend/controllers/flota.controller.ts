@@ -70,13 +70,35 @@ export const uploadTdmManifiestos = async (req: Request, res: Response) => {
         let updated = 0;
         const errors: string[] = [];
 
+        // Obtener fecha actual en formato Colombia (America/Bogota) YYYY-MM-DD
+        const todayCol = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
+
         for (const row of rows) {
             const manifiesto = String(row.manifiesto || '').trim();
-            const fecha = row.fecha_operacion ? String(row.fecha_operacion).trim() : null;
+            let fecha = row.fecha_operacion ? String(row.fecha_operacion).trim() : null;
 
             if (!manifiesto || !fecha) {
                 errors.push(`Fila inválida: manifiesto="${manifiesto}" fecha="${fecha}"`);
                 continue;
+            }
+
+            // Normalizar fecha si viene en formato DD/MM/YYYY
+            if (fecha.includes('/')) {
+                const parts = fecha.split('/');
+                if (parts.length === 3) {
+                    if (parts[2].length === 4) {
+                        fecha = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                    } else if (parts[0].length === 4) {
+                        fecha = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+                    }
+                }
+            }
+
+            // REGLA DE CIBERSEGURIDAD: La fecha máxima permitida es la fecha de hoy en formato colombiano.
+            // Si se detecta una fecha futura o posterior al día actual, se actualiza automáticamente a todayCol.
+            if (fecha > todayCol) {
+                console.warn(`[TDM-SECURITY] Manifiesto ${manifiesto} tenía fecha futura (${fecha}). Ajustado a fecha actual Colombia: ${todayCol}`);
+                fecha = todayCol;
             }
 
             try {

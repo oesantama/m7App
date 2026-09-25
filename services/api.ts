@@ -154,6 +154,7 @@ export const api = {
     if (!res.ok) throw new Error('Error de conexión con el servidor');
     return res.json();
   },
+  validateSession: () => fetchJson(`${API_URL}/auth/validate-session`),
 
   // --- DISPATCH AUDIT ---
   initDispatch(data: any) {
@@ -2912,5 +2913,24 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items }),
     }),
+
+  // --- SONDEOS Y ENCUESTAS ---
+  getSondeos: () => fetchJson(`${API_URL}/sondeos`),
+  getSondeoById: (id: string | number) => fetchJson(`${API_URL}/sondeos/${id}`),
+  saveSondeo: (data: any, id?: string | number) => fetchJson(id ? `${API_URL}/sondeos/${id}` : `${API_URL}/sondeos`, {
+    method: id ? 'PUT' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }),
+  deleteSondeo: (id: string | number) => fetchJson(`${API_URL}/sondeos/${id}`, { method: 'DELETE' }),
+  getSondeosAppFeed: () => fetchJson(`${API_URL}/sondeos/feed`),
+  getSondeoPublico: (id: string | number) => fetchPublic(`${API_URL}/sondeos/public/${id}`),
+  submitSondeoRespuesta: (id: string | number, data: { nombre_encuestado?: string; documento_encuestado?: string; respuestas: any }) =>
+    fetchPublic(`${API_URL}/sondeos/public/${id}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }),
+  getSondeoResultados: (id: string | number) => fetchJson(`${API_URL}/sondeos/${id}/resultados`),
 };
 

@@ -24,6 +24,7 @@ const PAGE_DESCRIPTIONS: Record<string, string> = {
   'capacitaciones': 'Programación y seguimiento de cursos y talleres para el personal.',
   'training-ops': 'Registro de asistencia y avance de las capacitaciones activas.',
   'noticias-avisos': 'Publicación de noticias y avisos internos para todo el personal.',
+  'encuestas-sondeos': 'Formulación de encuestas dinámicas, sondeos de opinión y recolección de datos.',
   // Configuración Maestros
   'aprobar-firma': 'Aprobación de firmas digitales pendientes de validación.',
   'inventory/items': 'Catálogo maestro de artículos: SKU, unidades y categorías.',

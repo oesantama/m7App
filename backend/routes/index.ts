@@ -76,6 +76,7 @@ import ghPerfilesCargoRoutes, { publicRouter as ghPerfilesCargoPublicRoutes } fr
 import whatsappWebhookRoutes from './whatsapp-webhook.routes.js';
 import dicorpLegalizacionRoutes from './dicorp-legalizacion.routes.js';
 import fulfillmentRoutes from './fulfillment.routes.js';
+import sondeosRoutes from './sondeos.routes.js';
 
 const router = Router();
 
@@ -144,6 +145,7 @@ router.use('/flota', flotaRoutes);
 router.use('/planillas-operativas', planillasOperativasRoutes);
 router.use('/cap', capRoutes);
 router.use('/noticias', noticiasRoutes);
+router.use('/sondeos', sondeosRoutes);
 router.use('/dogama', dogamaRoutes);
 router.use('/helpdesk', helpdeskRoutes);
 router.use('/geo', geoRoutes);

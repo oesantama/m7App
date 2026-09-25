@@ -28,7 +28,7 @@ const fmtDate = (d: string) => {
 };
 
 export default function OperacionesFlotaManual({ user }: Props) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(new Date());
   // Primer y último día del mes en curso
   const nowD = new Date();
   const firstOfMonth = new Date(nowD.getFullYear(), nowD.getMonth(), 1).toISOString().slice(0, 10);
@@ -115,7 +115,10 @@ export default function OperacionesFlotaManual({ user }: Props) {
       if (m) {
         const ciudadDestino = m[1].trim().toUpperCase();
         const [dd, mm, yyyy] = m[2].split('/');
-        const fecha = `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+        let fecha = `${yyyy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+        if (fecha > today) {
+          fecha = today;
+        }
 
         // Leer hasta 12 filas del bloque, construir mapa label→valor
         const block: Record<string, string> = {};
@@ -228,6 +231,10 @@ export default function OperacionesFlotaManual({ user }: Props) {
           if (!manifiesto) { errs.push(`Fila ${i + 2}: falta "manifiesto"`); return; }
           if (!fecha)       { errs.push(`Fila ${i + 2}: falta "fecha_operacion"`); return; }
 
+          if (fecha > today) {
+            fecha = today;
+          }
+
           mapped.push({
             manifiesto,
             fecha_operacion: fecha,
@@ -318,13 +325,16 @@ export default function OperacionesFlotaManual({ user }: Props) {
     if (!manualRow.clientId) { toast.error('Seleccione un cliente'); return; }
     if (!manualRow.manifiesto.trim()) { toast.error('El manifiesto es obligatorio'); return; }
     if (!manualRow.fecha_operacion) { toast.error('La fecha es obligatoria'); return; }
+
+    const fechaOp = manualRow.fecha_operacion > today ? today : manualRow.fecha_operacion;
+
     setSavingManual(true);
     try {
       const res = await api.uploadTdmManifiestos({
         clientId: manualRow.clientId,
         rows: [{
           manifiesto: manualRow.manifiesto.trim().toUpperCase(),
-          fecha_operacion: manualRow.fecha_operacion,
+          fecha_operacion: fechaOp,
           remesa: manualRow.remesa.trim(),
           valor_cobrar: Number(manualRow.valor_cobrar) || 0,
           valor_pagar: Number(manualRow.valor_pagar) || 0,
@@ -599,11 +609,15 @@ export default function OperacionesFlotaManual({ user }: Props) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Fecha */}
               <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha Operacion *</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fecha Operación *</label>
                 <input
                   type="date"
+                  max={today}
                   value={manualRow.fecha_operacion}
-                  onChange={e => setManual('fecha_operacion', e.target.value)}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setManual('fecha_operacion', val > today ? today : val);
+                  }}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm font-bold outline-none focus:border-indigo-400 transition-all"
                 />
               </div>

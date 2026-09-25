@@ -54,6 +54,8 @@ const DigitalSignature = lazyWithRetry(() => import('./components/DigitalSignatu
 const CentroCapacitaciones = lazyWithRetry(() => import('./components/Capacitaciones/CapacitacionesAdmin'));
 const PublicCapacitacion = lazyWithRetry(() => import('./components/Capacitaciones/PublicCapacitacion'));
 const NoticiasAdmin = lazyWithRetry(() => import('./components/Noticias/NoticiasAdmin'));
+const EncuestasSondeos = lazyWithRetry(() => import('./components/CentroFormacion/EncuestasSondeos'));
+const PublicEncuestaViewer = lazyWithRetry(() => import('./components/CentroFormacion/PublicEncuestaViewer'));
 const ApprovalManager = lazyWithRetry(() => import('./components/ApprovalManager'));
 const ChatbotWidget = lazyWithRetry(() => import('./components/ChatbotWidget'));
 const DriverGamification = lazyWithRetry(() => import('./components/DriverGamification'));
@@ -585,6 +587,14 @@ const App: React.FC = () => {
 
 
   // Rutas 100% públicas — deben evaluarse ANTES de cualquier guard de auth o restore
+  if (window.location.hash.startsWith('#/publico/encuesta') || window.location.pathname.startsWith('/publico/encuesta')) {
+    return (
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}>
+        <PublicEncuestaViewer />
+      </React.Suspense>
+    );
+  }
+
   if (window.location.pathname.startsWith('/publico/noticia')) {
     return (
       <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
@@ -1111,6 +1121,9 @@ const App: React.FC = () => {
         return <CentroCapacitaciones user={user!} />;
       case 'noticias-avisos':
         return <NoticiasAdmin user={user!} />;
+      case 'encuestas-sondeos':
+      case 'encuestas':
+        return <EncuestasSondeos user={user!} />;
       case 'chatbot':
         return <AIChat context={{ user: user!.name, activeTab: 'chatbot-fullscreen' }} />;
       case 'gestion-humana-miscelaneos':

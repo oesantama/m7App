@@ -175,6 +175,7 @@ app.use('/api', (req, res, next) => {
     '/gh-visitas/public',
     '/cap/public',
     '/noticias/public',
+    '/sondeos/public',
     '/dispatch/public',
     '/dogama/email-config/callback',
     '/validation/pdf',
