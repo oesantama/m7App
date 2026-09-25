@@ -117,7 +117,8 @@ export const saveEncuesta = async (req: Request, res: Response) => {
     try {
         await client.query('BEGIN');
 
-        let encuestaId = id ? parseInt(id, 10) : null;
+        const rawId = Array.isArray(id) ? id[0] : id;
+        let encuestaId = rawId ? parseInt(String(rawId), 10) : null;
 
         if (encuestaId) {
             await client.query(
