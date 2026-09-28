@@ -30,13 +30,23 @@ export const saveClient = async (req: Request, res: Response) => {
   const c = req.body;
   try {
     await pool.query(`
-      INSERT INTO clients (id, name, logo_url, status_id, client_type, created_by, updated_by, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      INSERT INTO clients (id, name, logo_url, status_id, client_type, short_name, report_type, created_by, updated_by, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
       ON CONFLICT (id) DO UPDATE SET
-      name = $2, logo_url = $3, status_id = $4, client_type = $5, updated_by = $6, updated_at = CURRENT_TIMESTAMP
-    `, [c.id, c.name, c.logoUrl, c.statusId, c.clientType || 'MUNICIPAL', c.createdBy || c.updatedBy || 'System']);
+      name = $2, logo_url = $3, status_id = $4, client_type = $5, short_name = $6, report_type = $7, updated_by = $8, updated_at = CURRENT_TIMESTAMP
+    `, [
+      c.id,
+      c.name,
+      c.logoUrl || c.logo_url || null,
+      c.statusId || c.status_id || 'EST-01',
+      c.clientType || c.client_type || 'MUNICIPAL',
+      c.shortName || c.short_name || null,
+      c.reportType || c.report_type || 'DIARIO',
+      c.createdBy || c.updatedBy || 'System'
+    ]);
     res.json({ success: true, message: 'Cliente guardado' });
   } catch (err: any) {
+    console.error('[M7-CLIENTS] Save failed:', err);
     res.status(500).json({ error: "No se pudo guardar el cliente" });
   }
 };

@@ -13,7 +13,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'categories': ['name', 'description', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'modules': ['name', 'icon_class', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'pages': ['name', 'route', 'module_id', 'parent_id', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
-  'clients': ['name', 'logo_url', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at'],
+  'clients': ['name', 'logo_url', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at', 'short_name', 'report_type'],
   'users': ['email', 'password', 'name', 'role_id', 'document_type', 'document_number', 'phone', 'avatar', 'client_ids', 'status_id', 'created_by', 'updated_by', 'created_at', 'updated_at', 'permissions', 'two_factor_enabled', 'two_factor_secret'],
   'drivers': ['name', 'document_type', 'document_number', 'phone', 'client_id', 'license_expiry', 'license_pdf', 'status_id', 'license_side_a', 'license_side_b', 'license_category', 'created_by', 'updated_by', 'created_at', 'updated_at'],
   'vehicles': ['plate', 'brand', 'owner', 'capacity_m3', 'client_id', 'soat_expiry', 'techno_expiry', 'soat_pdf', 'techno_pdf', 'status_id', 'model_year', 'color', 'vehicle_type', 'created_by', 'updated_by', 'created_at', 'updated_at'],
@@ -1202,6 +1202,8 @@ const healSchema = async (client: any) => {
 
     await client.query(`
       ALTER TABLE clients ADD COLUMN IF NOT EXISTS client_type VARCHAR(20) DEFAULT 'MUNICIPAL';
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS short_name VARCHAR(100);
+      ALTER TABLE clients ADD COLUMN IF NOT EXISTS report_type VARCHAR(50) DEFAULT 'DIARIO';
     `);
 
     await client.query(`
@@ -2202,6 +2204,45 @@ export const restoreSystem = async () => {
       INSERT INTO pages (id, name, route, module_id, parent_id, status_id)
       VALUES ('PAG-78', 'CONCILIACION FULFILLMENT', 'conciliacion-fulfillment', 'MOD-19', 'MOD-19', 'EST-01')
       ON CONFLICT (id) DO UPDATE SET name = 'CONCILIACION FULFILLMENT', route = 'conciliacion-fulfillment', module_id = 'MOD-19', parent_id = 'MOD-19';
+    `);
+
+    // ── CLIENTES: COLUMNAS SHORT_NAME Y REPORT_TYPE + SEEDS ──
+    await client.query(`
+      ALTER TABLE clients 
+      ADD COLUMN IF NOT EXISTS short_name VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS report_type VARCHAR(20) DEFAULT 'DIARIO';
+    `);
+
+    await client.query(`
+      UPDATE clients SET short_name = 'EXITO SECOS', report_type = 'DIARIO' WHERE (short_name IS NULL OR short_name = '') AND (name ILIKE '%EXITO SECOS%' OR name ILIKE '%EXITO%SECOS%');
+      UPDATE clients SET short_name = 'EXITO FRIOS', report_type = 'DIARIO' WHERE (short_name IS NULL OR short_name = '') AND (name ILIKE '%EXITO FRIOS%' OR name ILIKE '%EXITO%FRIOS%');
+      UPDATE clients SET short_name = 'AJOVER', report_type = 'DIARIO' WHERE (short_name IS NULL OR short_name = '') AND (name ILIKE '%AJOVER%');
+      UPDATE clients SET short_name = 'DORIA', report_type = 'DIARIO' WHERE (short_name IS NULL OR short_name = '') AND (name ILIKE '%DORIA%');
+      UPDATE clients SET short_name = 'NOVASECO', report_type = 'DIARIO' WHERE (short_name IS NULL OR short_name = '') AND (name ILIKE '%NOVASECO%' OR name ILIKE '%NOVAVENTA%');
+      UPDATE clients SET short_name = 'PASTAS COMET', report_type = 'DIARIO' WHERE (short_name IS NULL OR short_name = '') AND (name ILIKE '%COMET%');
+      UPDATE clients SET short_name = 'LIZ', report_type = 'LUNES_A_SABADO' WHERE (short_name IS NULL OR short_name = '') AND (name ILIKE '%LIZ%');
+      UPDATE clients SET short_name = 'TDM', report_type = 'DIARIO' WHERE (short_name IS NULL OR short_name = '') AND (name ILIKE '%TDM%');
+
+      UPDATE clients SET short_name = UPPER(name), report_type = COALESCE(report_type, 'DIARIO') WHERE short_name IS NULL OR short_name = '';
+    `);
+
+    // ── ALERTA WHATSAPP: REPORTES DIARIOS SIN OPERACIÓN (6:30 AM) ──
+    await client.query(`
+      INSERT INTO alertas_whatsapp (id, name, description, cron_expression, tipo_evento, adjunto_tipo, status_id)
+      VALUES (
+        'WA-SIN-OPERACION-DIARIA',
+        'Reporte Diario Sin Operación (6:30 AM)',
+        'Notificación de clientes diarios sin operación ni viajes en Transportando ni TDM',
+        '30 6 * * *',
+        'SIN_OPERACION_DIARIA',
+        'ninguno',
+        'EST-01'
+      )
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        cron_expression = EXCLUDED.cron_expression,
+        tipo_evento = EXCLUDED.tipo_evento,
+        status_id = EXCLUDED.status_id;
     `);
 
     // RESCATE DE DATOS: Recupera rutas huérfanas y repara fechas nulas

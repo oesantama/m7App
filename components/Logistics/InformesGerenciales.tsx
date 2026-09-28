@@ -3,7 +3,7 @@ import {
   Upload, X, Search, Calendar, Filter, 
   CheckCircle2, RefreshCw, ChevronLeft, ChevronRight, 
   FileSpreadsheet, HelpCircle, BarChart3, ChevronDown, AlertCircle,
-  Download, Eye, Truck, FileText, Check, Camera
+  Download, Eye, Truck, FileText, Check, Camera, TrendingUp, TrendingDown, Minus, ArrowUpRight, ArrowDownRight, Layers
 } from 'lucide-react';
 import * as htmlToImage from 'html-to-image';
 import { jsPDF } from 'jspdf';
@@ -86,11 +86,68 @@ const CHART_COLORS = [
   '#f43f5e', // Rose
 ];
 
+function toShortClientName(rawName: string, clientsList: any[] = []): string {
+  if (!rawName) return '';
+  const trimmed = rawName.trim();
+  const isTDM = trimmed.toUpperCase().startsWith('TDM ');
+  const cleanName = isTDM ? trimmed.slice(4).trim() : trimmed;
+  const upper = cleanName.toUpperCase();
+
+  const matchClient = clientsList.find(c =>
+    (c.name && c.name.trim().toUpperCase() === upper) ||
+    (c.short_name && c.short_name.trim().toUpperCase() === upper)
+  );
+
+  if (matchClient && matchClient.short_name && matchClient.short_name.trim()) {
+    const sn = matchClient.short_name.trim();
+    return isTDM ? `TDM ${sn}` : sn;
+  }
+
+  const dictionary: Record<string, string> = {
+    'AJOVER M7_BODEGA36': 'AJOVER BODEGA 36',
+    'AJOVER_BODEGA10': 'AJOVER BODEGA 10',
+    'AJOVER CALI M7 LINA': 'AJOVER CALI',
+    'GESTION Y DESARROLLO AMBIENTAL SAS E.S.P': 'GDA',
+    'GESTION Y DESARROLLO AMBIENTAL': 'GDA',
+    'SINETOR COLOMBIA S.A.S': 'SINETOR',
+    'SNETOR COLOMBIA S.A.S': 'SINETOR',
+    'DIANA CORPORACION S.A.S': 'DIANA',
+    'AGAVAL S.A': 'AGAVAL',
+    'RTD SAS': 'RTD',
+    'TDM (PREBEL)': 'PREBEL',
+    'ALBERTO CADAVID R. & CIA SA': 'CADAVID',
+    'COMERCIALIZADORA INTERNACIONAL DE LLANTAS SAS': 'CI LLANTAS',
+    'ESPUMAS PLASTICAS S.A': 'ESPUMAS PLASTICAS',
+    'LINEA DIRECTA S.A.S.': 'LINEA DIRECTA',
+    'LOGISTICA,TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S': 'LTSA',
+    'PAPELERIA Y SERVICIOS S.A.S.': 'PAPELERIA Y SERV',
+    'PLASTICOS UNION SAS': 'PLASTICOS UNION',
+    'SOLUCIONES LOGISTICAS Y EMPAQUES SAS': 'SOLUCIONES LOG',
+    'EXITO SECOS': 'E SEC',
+    'EXITO LINEA BLANCA': 'E L BLANCA',
+    'EXITO TAT': 'E TAT',
+    'EXITO PLAN DE CONTINGENCIA': 'E CONTINGENCIA',
+  };
+
+  if (dictionary[upper]) {
+    const sn = dictionary[upper];
+    return isTDM ? `TDM ${sn}` : sn;
+  }
+
+  let result = cleanName
+    .replace(/\bS\.?A\.?S\.?\b/gi, '')
+    .replace(/\bE\.?S\.?P\.?\b/gi, '')
+    .replace(/\bS\.?A\.?\b/gi, '')
+    .replace(/\bC\.?I\.?\b/gi, '')
+    .replace(/\bLTDA\.?\b/gi, '')
+    .replace(/\b& CIA\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return isTDM ? `TDM ${result}` : result;
+}
+
 // Intermediación real para clientes de TDM:
-// - Para TODOS los clientes TDM excepto SOCODA: se mide SIEMPRE la mitad (rawPct / 2).
-// - Para SOCODA:
-//   * Del 31 de julio de 2026 hacia adelante (> 2026-07-31): aplica por mitad (rawPct / 2).
-//   * Del 31 de julio de 2026 o anterior (<= 2026-07-31): si rawPct < 20% resta 10% (mínimo 0); si rawPct >= 20% la mitad.
 function calcIntReal(rawPct: number, clientName?: string, dateStr?: string): number {
   if (rawPct <= 0) return 0;
   const cName = (clientName || '').toUpperCase();
@@ -105,20 +162,16 @@ function calcIntReal(rawPct: number, clientName?: string, dateStr?: string): num
         cleanDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
       } else cleanDate = s.slice(0, 10);
     }
-    // Si la fecha es de 31 de julio de 2026 o anterior (<= '2026-07-31'):
     if (cleanDate && cleanDate <= '2026-07-31') {
       return rawPct >= 20 ? rawPct / 2 : Math.max(0, rawPct - 10);
     }
-    // Del 31 de julio de 2026 en adelante (o por defecto): aplica por mitad
     return rawPct / 2;
   }
 
-  // Para todos los demás clientes TDM (Leonisa, Ajover, M7, etc.): SIEMPRE la mitad
   return rawPct / 2;
 }
 
 export const InformesGerenciales: React.FC = () => {
-  // Tabs state: 'informes' | 'consultas' | 'cargar'
   const [activeTab, setActiveTab] = useState<'informes' | 'consultas' | 'cargar'>('informes');
 
   // Helper to download an element as an image
@@ -126,9 +179,8 @@ export const InformesGerenciales: React.FC = () => {
     const element = document.getElementById(elementId);
     if (!element) return;
     
-    // Temporarily expand scrollable areas inside the element
     const scrollables = Array.from(element.querySelectorAll('.overflow-y-auto, .overflow-x-auto, .overflow-hidden, .max-h-\\[65vh\\], .custom-scrollbar')) as HTMLElement[];
-    scrollables.push(element); // Incluir el contenedor principal
+    scrollables.push(element);
 
     const originalStyles = scrollables.map(el => ({
       el,
@@ -164,7 +216,6 @@ export const InformesGerenciales: React.FC = () => {
       console.error("Error al generar imagen", err);
       toast.error('Error al generar la imagen');
     } finally {
-      // Restore styles
       originalStyles.forEach(({ el, maxHeight, overflow, overflowX, overflowY, height, width }) => {
         el.style.maxHeight = maxHeight;
         el.style.overflow = overflow;
@@ -176,8 +227,10 @@ export const InformesGerenciales: React.FC = () => {
     }
   };
 
-  // Sub-reports tab: 'estados' | 'clientes'
-  const [subReportTab, setSubReportTab] = useState<'estados' | 'clientes' | 'tdmVentas' | 'pendienteFacturar'>('tdmVentas');
+  // Sub-reports tab: 'comparativoMeses' | 'tdmVentas' | 'pendienteFacturar' | 'estados' | 'clientes'
+  const [subReportTab, setSubReportTab] = useState<'comparativoMeses' | 'tdmVentas' | 'pendienteFacturar' | 'estados' | 'clientes'>('comparativoMeses');
+  const [comparativoSearchTerm, setComparativoSearchTerm] = useState('');
+  const [comparativoSortBy, setComparativoSortBy] = useState<'total' | 'diffDesc' | 'diffAsc' | 'name'>('total');
   const [provClientes, setProvClientes] = useState<any[]>([]);
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
@@ -189,6 +242,8 @@ export const InformesGerenciales: React.FC = () => {
   const [pdfGenerating, setPdfGenerating] = useState(false);
   
   const PDF_SECTIONS = [
+    { id: 'chart-comparativo-meses', label: 'Gráfica: Comparativo Mensual por Cliente' },
+    { id: 'table-comparativo-meses', label: 'Tabla: Comparativo Mensual por Cliente' },
     { id: 'chart-manifiesto-mes', label: 'Gráfica: Volúmenes Mensuales' },
     { id: 'chart-manifiesto-cliente', label: 'Gráfica: Volúmenes por Cliente' },
     { id: 'table-ventas-clientes-general', label: 'Tabla: Ventas Clientes General' },
@@ -201,7 +256,7 @@ export const InformesGerenciales: React.FC = () => {
   ];
   
   const [pdfSelectedSections, setPdfSelectedSections] = useState<string[]>([
-    'chart-manifiesto-mes', 'table-ventas-clientes-general'
+    'chart-comparativo-meses', 'table-comparativo-meses', 'chart-manifiesto-mes', 'table-ventas-clientes-general'
   ]);
 
   const generatePdfReport = async () => {
@@ -1129,6 +1184,124 @@ export const InformesGerenciales: React.FC = () => {
         return obj;
       }),
       statuses: Array.from(allStatuses)
+    };
+  };
+
+  const getMonthlyClientComparisonData = () => {
+    const MONTHS_SPANISH_SHORT = [
+      "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+      "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"
+    ];
+
+    const monthsMap: { [monthKey: string]: { label: string; sortKey: number } } = {};
+    const clientsDataMap: {
+      [clientKey: string]: {
+        rawName: string;
+        shortName: string;
+        monthlyCounts: { [monthKey: string]: number };
+        totalCount: number;
+      };
+    } = {};
+
+    // 1. Process Transportando (management_orders)
+    reportRecords.forEach(r => {
+      const status = r.manifest_status ? String(r.manifest_status).trim().toUpperCase() : '';
+      if (status === 'ANULADO' || status === 'ANULADA' || status === 'CANCELADO') return;
+
+      const parsed = parseCustomDate(r.manifest_date);
+      if (!parsed) return;
+
+      const year = parsed.getFullYear();
+      const monthIdx = parsed.getMonth();
+      const monthKey = `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
+      const monthLabel = `${MONTHS_SPANISH_SHORT[monthIdx]} ${year}`;
+      const sortKey = year * 12 + monthIdx;
+
+      monthsMap[monthKey] = { label: monthLabel, sortKey };
+
+      const rawClient = r.client_name ? String(r.client_name).trim() : 'S/I';
+      const clientKey = rawClient.toUpperCase();
+
+      if (!clientsDataMap[clientKey]) {
+        clientsDataMap[clientKey] = {
+          rawName: rawClient,
+          shortName: toShortClientName(rawClient, clients),
+          monthlyCounts: {},
+          totalCount: 0
+        };
+      }
+
+      const cObj = clientsDataMap[clientKey];
+      cObj.monthlyCounts[monthKey] = (cObj.monthlyCounts[monthKey] || 0) + 1;
+      cObj.totalCount += 1;
+    });
+
+    // 2. Process TDM (flota_tdm_manifiestos)
+    tdmFlotaRows.forEach(r => {
+      if (!r.fecha_operacion) return;
+      const parsed = parseCustomDate(r.fecha_operacion);
+      if (!parsed) return;
+
+      const year = parsed.getFullYear();
+      const monthIdx = parsed.getMonth();
+      const monthKey = `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
+      const monthLabel = `${MONTHS_SPANISH_SHORT[monthIdx]} ${year}`;
+      const sortKey = year * 12 + monthIdx;
+
+      monthsMap[monthKey] = { label: monthLabel, sortKey };
+
+      const clientObj = clients.find(c => String(c.id).trim().toUpperCase() === String(r.client_id || '').trim().toUpperCase());
+      const clientBaseName = clientObj ? String(clientObj.name).trim() : String(r.client_id || 'S/I').trim();
+      const rawClient = `TDM ${clientBaseName}`;
+      const clientKey = rawClient.toUpperCase();
+
+      if (!clientsDataMap[clientKey]) {
+        clientsDataMap[clientKey] = {
+          rawName: rawClient,
+          shortName: toShortClientName(rawClient, clients),
+          monthlyCounts: {},
+          totalCount: 0
+        };
+      }
+
+      const cObj = clientsDataMap[clientKey];
+      cObj.monthlyCounts[monthKey] = (cObj.monthlyCounts[monthKey] || 0) + 1;
+      cObj.totalCount += 1;
+    });
+
+    // 3. Sort month keys chronologically
+    const sortedMonthKeys = Object.keys(monthsMap).sort((a, b) => monthsMap[a].sortKey - monthsMap[b].sortKey);
+
+    // Latest vs preceding month
+    const latestMonthKey = sortedMonthKeys.length > 0 ? sortedMonthKeys[sortedMonthKeys.length - 1] : '';
+    const prevMonthKey = sortedMonthKeys.length > 1 ? sortedMonthKeys[sortedMonthKeys.length - 2] : '';
+
+    // 4. Calculate rows with trend and percentage
+    const rows = Object.values(clientsDataMap).map(item => {
+      const latestCount = latestMonthKey ? (item.monthlyCounts[latestMonthKey] || 0) : 0;
+      const prevCount = prevMonthKey ? (item.monthlyCounts[prevMonthKey] || 0) : 0;
+      const diff = latestCount - prevCount;
+      const pctChange = prevCount > 0 ? Number((((latestCount - prevCount) / prevCount) * 100).toFixed(1)) : (latestCount > 0 ? 100 : 0);
+      const trend = diff > 0 ? 'UP' : (diff < 0 ? 'DOWN' : 'EQUAL');
+      const avgMonthly = sortedMonthKeys.length > 0 ? Number((item.totalCount / sortedMonthKeys.length).toFixed(1)) : 0;
+
+      return {
+        ...item,
+        latestCount,
+        prevCount,
+        diff,
+        pctChange,
+        trend,
+        avgMonthly
+      };
+    });
+
+    return {
+      sortedMonthKeys,
+      monthsMap,
+      latestMonthKey,
+      prevMonthKey,
+      rows
     };
   };
 
@@ -2990,10 +3163,22 @@ export const InformesGerenciales: React.FC = () => {
             <div className="space-y-6">
 
               {/* SUB-REPORT TAB SYSTEM SWITCHER */}
-              <div className="flex border-b border-slate-200 bg-white p-1 rounded-xl gap-1 shadow-sm">
+              <div className="flex border-b border-slate-200 bg-white p-1 rounded-xl gap-1 shadow-sm overflow-x-auto">
+                <button
+                  onClick={() => setSubReportTab('comparativoMeses')}
+                  className={`flex-1 py-2.5 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-center flex items-center justify-center gap-1.5 shrink-0 ${
+                    subReportTab === 'comparativoMeses'
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100/50'
+                  }`}
+                >
+                  <BarChart3 size={13} />
+                  <span>Comparativo Mensual Clientes</span>
+                </button>
+
                 <button
                   onClick={() => setSubReportTab('tdmVentas')}
-                  className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-center ${
+                  className={`flex-1 py-2.5 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-center shrink-0 ${
                     subReportTab === 'tdmVentas'
                       ? 'bg-slate-950 text-white shadow-sm'
                       : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/50'
@@ -3004,7 +3189,7 @@ export const InformesGerenciales: React.FC = () => {
 
                 <button
                   onClick={() => setSubReportTab('pendienteFacturar')}
-                  className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-center ${
+                  className={`flex-1 py-2.5 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-center shrink-0 ${
                     subReportTab === 'pendienteFacturar'
                       ? 'bg-slate-950 text-white shadow-sm'
                       : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/50'
@@ -3015,25 +3200,407 @@ export const InformesGerenciales: React.FC = () => {
 
                 <button
                   onClick={() => setSubReportTab('estados')}
-                  className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-center ${
+                  className={`flex-1 py-2.5 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-center shrink-0 ${
                     subReportTab === 'estados'
                       ? 'bg-slate-950 text-white shadow-sm'
                       : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/50'
                   }`}
                 >
-                  Consolidado por Estados (Árbol 4 Niveles)
+                  Consolidado por Estados
                 </button>
 
                 <button
                   onClick={() => setSubReportTab('clientes')}
-                  className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-center ${
+                  className={`flex-1 py-2.5 px-3 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all text-center shrink-0 ${
                     subReportTab === 'clientes'
                       ? 'bg-slate-950 text-white shadow-sm'
                       : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/50'
                   }`}
                 >
-                  Consolidado Clientes y Placas (Árbol 2 Niveles)
+                  Consolidado Clientes y Placas
                 </button>
+              </div>
+
+              {/* RENDER COMPARATIVO MESES SYSTEM */}
+              <div className={subReportTab === 'comparativoMeses' || pdfGenerating ? 'block' : 'hidden'}>
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  {(() => {
+                    const compData = getMonthlyClientComparisonData();
+                    const { sortedMonthKeys, monthsMap, latestMonthKey, prevMonthKey, rows } = compData;
+
+                    if (sortedMonthKeys.length === 0 || rows.length === 0) {
+                      return (
+                        <div className="bg-white border border-slate-200/80 rounded-2xl p-12 text-center shadow-sm">
+                          <BarChart3 size={32} className="mx-auto text-slate-400 mb-2" />
+                          <p className="text-xs font-black uppercase text-slate-500">Sin datos para la comparación mensual</p>
+                          <p className="text-[10px] text-slate-400 mt-1">Selecciona un rango de fechas con registros de manifiestos.</p>
+                        </div>
+                      );
+                    }
+
+                    // Calculate Summary KPIs
+                    let totalTripsPeriod = 0;
+                    let topGrower: typeof rows[0] | null = null;
+                    let topDropper: typeof rows[0] | null = null;
+
+                    rows.forEach(r => {
+                      totalTripsPeriod += r.totalCount;
+                      if (r.diff > 0 && (!topGrower || r.diff > topGrower.diff)) {
+                        topGrower = r;
+                      }
+                      if (r.diff < 0 && (!topDropper || r.diff < topDropper.diff)) {
+                        topDropper = r;
+                      }
+                    });
+
+                    // Filter and Sort Table Rows
+                    let filteredRows = rows.filter(r =>
+                      r.rawName.toUpperCase().includes(comparativoSearchTerm.toUpperCase()) ||
+                      r.shortName.toUpperCase().includes(comparativoSearchTerm.toUpperCase())
+                    );
+
+                    if (comparativoSortBy === 'total') {
+                      filteredRows.sort((a, b) => b.totalCount - a.totalCount);
+                    } else if (comparativoSortBy === 'diffDesc') {
+                      filteredRows.sort((a, b) => b.diff - a.diff);
+                    } else if (comparativoSortBy === 'diffAsc') {
+                      filteredRows.sort((a, b) => a.diff - b.diff);
+                    } else if (comparativoSortBy === 'name') {
+                      filteredRows.sort((a, b) => a.shortName.localeCompare(b.shortName));
+                    }
+
+                    // Chart Data (Top 10 Clients by total count)
+                    const top10ForChart = [...rows].sort((a, b) => b.totalCount - a.totalCount).slice(0, 10);
+                    const chartData = top10ForChart.map(r => {
+                      const item: any = { client: r.shortName };
+                      sortedMonthKeys.forEach(mKey => {
+                        item[mKey] = r.monthlyCounts[mKey] || 0;
+                      });
+                      return item;
+                    });
+
+                    const exportComparativoExcel = () => {
+                      try {
+                        const exportRows = rows.map(r => {
+                          const obj: any = {
+                            'Cliente (Nombre Corto)': r.shortName,
+                            'Cliente (Razón Social)': r.rawName,
+                          };
+
+                          sortedMonthKeys.forEach(mKey => {
+                            const label = monthsMap[mKey]?.label || mKey;
+                            obj[label] = r.monthlyCounts[mKey] || 0;
+                          });
+
+                          const prevLabel = prevMonthKey ? (monthsMap[prevMonthKey]?.label || prevMonthKey) : 'N/A';
+                          const latestLabel = latestMonthKey ? (monthsMap[latestMonthKey]?.label || latestMonthKey) : 'N/A';
+
+                          obj[`Variación Absoluta (${latestLabel} vs ${prevLabel})`] = r.diff;
+                          obj[`Variación % (${latestLabel} vs ${prevLabel})`] = `${r.pctChange}%`;
+                          obj['Tendencia'] = r.trend === 'UP' ? 'Creció (SUBIÓ)' : (r.trend === 'DOWN' ? 'Redujo (BAJÓ)' : 'Sin Cambio (IGUAL)');
+                          obj['Total Acumulado'] = r.totalCount;
+                          obj['Promedio Mensual'] = r.avgMonthly;
+
+                          return obj;
+                        });
+
+                        const ws = XLSX.utils.json_to_sheet(exportRows);
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, "Comparativo_Mensual");
+                        XLSX.writeFile(wb, `Comparativo_Mensual_Clientes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+                        toast.success("Excel comparativo exportado correctamente");
+                      } catch (err: any) {
+                        console.error("Error al exportar comparativo Excel", err);
+                        toast.error("Error al exportar Excel comparativo");
+                      }
+                    };
+
+                    const latestMonthLabel = latestMonthKey ? monthsMap[latestMonthKey]?.label : '';
+                    const prevMonthLabel = prevMonthKey ? monthsMap[prevMonthKey]?.label : '';
+
+                    return (
+                      <div className="space-y-6">
+
+                        {/* TOP SUMMARY KPIS */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold shrink-0">
+                              <BarChart3 size={20} />
+                            </div>
+                            <div>
+                              <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Total Registros/Viajes</span>
+                              <p className="text-lg font-black text-slate-900 leading-none mt-0.5">{totalTripsPeriod.toLocaleString()}</p>
+                              <span className="text-[9px] text-slate-400">En {sortedMonthKeys.length} mes(es) analizado(s)</span>
+                            </div>
+                          </div>
+
+                          <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 font-bold shrink-0">
+                              <TrendingUp size={20} />
+                            </div>
+                            <div className="overflow-hidden">
+                              <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Mayor Crecimiento</span>
+                              <p className="text-xs font-black text-slate-900 truncate mt-0.5" title={topGrower ? (topGrower as any).rawName : 'N/A'}>
+                                {topGrower ? (topGrower as any).shortName : 'Sin Incrementos'}
+                              </p>
+                              {topGrower ? (
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full mt-0.5">
+                                  <ArrowUpRight size={10} /> +{(topGrower as any).diff} viajes (+{(topGrower as any).pctChange}%)
+                                </span>
+                              ) : (
+                                <span className="text-[9px] text-slate-400">Sin datos</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 font-bold shrink-0">
+                              <TrendingDown size={20} />
+                            </div>
+                            <div className="overflow-hidden">
+                              <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Mayor Caída</span>
+                              <p className="text-xs font-black text-slate-900 truncate mt-0.5" title={topDropper ? (topDropper as any).rawName : 'N/A'}>
+                                {topDropper ? (topDropper as any).shortName : 'Sin Disminuciones'}
+                              </p>
+                              {topDropper ? (
+                                <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded-full mt-0.5">
+                                  <ArrowDownRight size={10} /> {(topDropper as any).diff} viajes ({(topDropper as any).pctChange}%)
+                                </span>
+                              ) : (
+                                <span className="text-[9px] text-slate-400">Sin datos</span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 font-bold shrink-0">
+                              <Calendar size={20} />
+                            </div>
+                            <div>
+                              <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Rango Evaluado</span>
+                              <p className="text-xs font-black text-slate-900 leading-none mt-0.5">
+                                {monthsMap[sortedMonthKeys[0]]?.label} {sortedMonthKeys.length > 1 ? `➔ ${monthsMap[sortedMonthKeys[sortedMonthKeys.length - 1]]?.label}` : ''}
+                              </p>
+                              <span className="text-[9px] text-slate-400 font-mono">
+                                {prevMonthLabel ? `Comparando ${latestMonthLabel} vs ${prevMonthLabel}` : `${sortedMonthKeys.length} mes cargado`}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* VISUAL CHART SECTION */}
+                        <div id="chart-comparativo-meses" className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm">
+                          <div className="border-b border-slate-100 pb-3 mb-4 flex justify-between items-center">
+                            <div>
+                              <span className="text-[9px] font-black tracking-widest text-indigo-600 uppercase font-mono">Evolución de Operaciones</span>
+                              <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 mt-0.5">
+                                Comparativo de Viajes por Cliente (Top 10 Clientes)
+                              </h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => downloadAsImage('chart-comparativo-meses', 'Comparativo_Meses_Clientes.png')}
+                                className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5"
+                              >
+                                <Camera size={13} />
+                                Captura Imagen
+                              </button>
+                            </div>
+                          </div>
+
+                          <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 25 }}>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                              <XAxis dataKey="client" tick={{ fontSize: 9, fontWeight: 700, fill: '#475569' }} interval={0} angle={-15} textAnchor="end" />
+                              <YAxis tick={{ fontSize: 9, fontWeight: 700, fill: '#475569' }} />
+                              <Tooltip
+                                contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: 'none', color: '#fff', fontSize: '11px', fontWeight: 'bold', padding: '10px 14px' }}
+                              />
+                              <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
+                              {sortedMonthKeys.map((mKey, i) => (
+                                <Bar
+                                  key={mKey}
+                                  dataKey={mKey}
+                                  name={monthsMap[mKey]?.label || mKey}
+                                  fill={CHART_COLORS[i % CHART_COLORS.length]}
+                                  radius={[4, 4, 0, 0]}
+                                >
+                                  <LabelList dataKey={mKey} position="top" style={{ fontSize: '8px', fontWeight: 'bold', fill: '#475569' }} formatter={(v: number) => v > 0 ? v : ''} />
+                                </Bar>
+                              ))}
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        {/* DETAILED COMPARISON TABLE */}
+                        <div id="table-comparativo-meses" className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-4">
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-100 pb-3">
+                            <div>
+                              <span className="text-[9px] font-black tracking-widest text-indigo-600 uppercase font-mono">Tabla Comparativa</span>
+                              <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 mt-0.5">
+                                Consolidado Mensual por Cliente & Tendencia
+                              </h3>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                              <div className="relative flex-1 sm:flex-initial">
+                                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                  type="text"
+                                  value={comparativoSearchTerm}
+                                  onChange={(e) => setComparativoSearchTerm(e.target.value)}
+                                  placeholder="Buscar cliente..."
+                                  className="w-full sm:w-48 pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 focus:outline-none focus:border-indigo-500"
+                                />
+                                {comparativoSearchTerm && (
+                                  <button onClick={() => setComparativoSearchTerm('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                                    <X size={12} />
+                                  </button>
+                                )}
+                              </div>
+
+                              <select
+                                value={comparativoSortBy}
+                                onChange={(e: any) => setComparativoSortBy(e.target.value)}
+                                className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-[11px] font-bold text-slate-700 focus:outline-none focus:border-indigo-500"
+                              >
+                                <option value="total">Ordenar por Total Viajes (Desc)</option>
+                                <option value="diffDesc">Mayor Crecimiento (Mes a Mes)</option>
+                                <option value="diffAsc">Mayor Caída (Mes a Mes)</option>
+                                <option value="name">Por Nombre de Cliente (A-Z)</option>
+                              </select>
+
+                              <button
+                                onClick={exportComparativoExcel}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm shrink-0"
+                              >
+                                <FileSpreadsheet size={13} />
+                                Exportar Excel
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* COMPARISON TABLE */}
+                          <div className="overflow-x-auto rounded-xl border border-slate-200/80">
+                            <table className="w-full text-[11px] text-left border-collapse">
+                              <thead>
+                                <tr className="bg-slate-900 text-white font-black uppercase tracking-wider text-[9.5px]">
+                                  <th className="py-3 px-3">Cliente</th>
+                                  {sortedMonthKeys.map(mKey => (
+                                    <th key={mKey} className="py-3 px-3 text-center border-l border-slate-800">
+                                      {monthsMap[mKey]?.label || mKey}
+                                    </th>
+                                  ))}
+                                  {sortedMonthKeys.length > 1 && (
+                                    <th className="py-3 px-3 text-center border-l border-slate-800 bg-slate-800">
+                                      Variación ({latestMonthLabel} vs {prevMonthLabel})
+                                    </th>
+                                  )}
+                                  <th className="py-3 px-3 text-right border-l border-slate-800 bg-slate-800">Total Período</th>
+                                  <th className="py-3 px-3 text-right border-l border-slate-800">Prom. Mensual</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                                {filteredRows.length === 0 ? (
+                                  <tr>
+                                    <td colSpan={sortedMonthKeys.length + 4} className="py-8 text-center text-slate-400 font-bold">
+                                      No se encontraron clientes que coincidan con la búsqueda.
+                                    </td>
+                                  </tr>
+                                ) : (
+                                  filteredRows.map((row, idx) => (
+                                    <tr key={row.rawName} className={`hover:bg-slate-50 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                                      <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                                        <span title={row.rawName}>{row.shortName}</span>
+                                        <span className="text-[9px] text-slate-400 font-normal hidden md:inline truncate max-w-[120px]">({row.rawName})</span>
+                                      </td>
+
+                                      {sortedMonthKeys.map(mKey => {
+                                        const val = row.monthlyCounts[mKey] || 0;
+                                        return (
+                                          <td key={mKey} className={`py-2.5 px-3 text-center border-l border-slate-100 font-bold ${val > 0 ? 'text-slate-800' : 'text-slate-300'}`}>
+                                            {val > 0 ? val.toLocaleString() : '—'}
+                                          </td>
+                                        );
+                                      })}
+
+                                      {sortedMonthKeys.length > 1 && (
+                                        <td className="py-2.5 px-3 text-center border-l border-slate-100 bg-slate-50/30">
+                                          {row.trend === 'UP' ? (
+                                            <span className="inline-flex items-center gap-1 bg-emerald-50 border border-emerald-200/80 text-emerald-700 px-2 py-0.5 rounded-full text-[9.5px] font-black">
+                                              <ArrowUpRight size={12} className="text-emerald-600" />
+                                              +{row.diff} (+{row.pctChange}%)
+                                            </span>
+                                          ) : row.trend === 'DOWN' ? (
+                                            <span className="inline-flex items-center gap-1 bg-rose-50 border border-rose-200/80 text-rose-700 px-2 py-0.5 rounded-full text-[9.5px] font-black">
+                                              <ArrowDownRight size={12} className="text-rose-600" />
+                                              {row.diff} ({row.pctChange}%)
+                                            </span>
+                                          ) : (
+                                            <span className="inline-flex items-center gap-1 bg-slate-100 border border-slate-200 text-slate-500 px-2 py-0.5 rounded-full text-[9.5px] font-black">
+                                              <Minus size={12} />
+                                              0 (0%)
+                                            </span>
+                                          )}
+                                        </td>
+                                      )}
+
+                                      <td className="py-2.5 px-3 text-right font-black text-slate-900 border-l border-slate-100 bg-slate-50/50">
+                                        {row.totalCount.toLocaleString()}
+                                      </td>
+
+                                      <td className="py-2.5 px-3 text-right font-bold text-indigo-600 border-l border-slate-100">
+                                        {row.avgMonthly.toLocaleString()}
+                                      </td>
+                                    </tr>
+                                  ))
+                                )}
+                              </tbody>
+                              <tfoot>
+                                <tr className="bg-slate-100 font-black text-slate-900 uppercase text-[10px]">
+                                  <td className="py-3 px-3">TOTAL GENERAL</td>
+                                  {sortedMonthKeys.map(mKey => {
+                                    const mTotal = rows.reduce((sum, r) => sum + (r.monthlyCounts[mKey] || 0), 0);
+                                    return (
+                                      <td key={mKey} className="py-3 px-3 text-center border-l border-slate-200 text-indigo-700">
+                                        {mTotal.toLocaleString()}
+                                      </td>
+                                    );
+                                  })}
+                                  {sortedMonthKeys.length > 1 && (
+                                    <td className="py-3 px-3 text-center border-l border-slate-200 bg-slate-200/50">
+                                      {(() => {
+                                        const latestTotal = rows.reduce((s, r) => s + r.latestCount, 0);
+                                        const prevTotal = rows.reduce((s, r) => s + r.prevCount, 0);
+                                        const diffTot = latestTotal - prevTotal;
+                                        const pctTot = prevTotal > 0 ? Number((((latestTotal - prevTotal) / prevTotal) * 100).toFixed(1)) : 0;
+                                        return diffTot > 0 ? (
+                                          <span className="text-emerald-700">+{diffTot} (+{pctTot}%)</span>
+                                        ) : diffTot < 0 ? (
+                                          <span className="text-rose-700">{diffTot} ({pctTot}%)</span>
+                                        ) : (
+                                          <span className="text-slate-600">0 (0%)</span>
+                                        );
+                                      })()}
+                                    </td>
+                                  )}
+                                  <td className="py-3 px-3 text-right border-l border-slate-200 text-indigo-900 font-black text-xs">
+                                    {totalTripsPeriod.toLocaleString()}
+                                  </td>
+                                  <td className="py-3 px-3 text-right border-l border-slate-200 text-indigo-700">
+                                    {sortedMonthKeys.length > 0 ? (totalTripsPeriod / sortedMonthKeys.length).toFixed(1) : 0}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </div>
+
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
 
               {/* RENDER TREE SYSTEM */}

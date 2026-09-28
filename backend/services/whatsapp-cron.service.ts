@@ -4,6 +4,7 @@ import { evolutionService } from './evolution.service.js';
 import { generateFlotaReportPdf } from './flota-wa-report.service.js';
 import { generateCierreFactReport } from './cierre-fact-report.service.js';
 import { generateSobrecostoReport } from './sobrecosto-report.service.js';
+import { generateSinOperacionDiariaReport } from './sin-operacion-report.service.js';
 import { sendEmail } from './notification.service.js';
 
 // Nombre de instancia fijo se resuelve dinámicamente al momento de enviar
@@ -69,12 +70,20 @@ class WhatsAppCronRunner {
       throw new Error('No hay ninguna instancia de WhatsApp conectada. Ve a Conexión WhatsApp y vincula tu número.');
     }
     await evolutionService.ensureInstance(INSTANCE);
-    const message = buildMessage(alerta.message_template || alerta.name, alerta);
+    let message = buildMessage(alerta.message_template || alerta.name, alerta);
 
-    // Generar adjunto según tipo de evento o adjunto_tipo
+    // Generar adjunto o contenido dinámico según tipo de evento o adjunto_tipo
     let pdfAttachment: { base64: string; fileName: string; caption: string } | null = null;
 
-    if (alerta.tipo_evento === 'CIERRE_FACT') {
+    if (alerta.tipo_evento === 'SIN_OPERACION_DIARIA') {
+      try {
+        const sinOpReport = await generateSinOperacionDiariaReport();
+        message = sinOpReport.message;
+        console.log(`[WA-CRON] Reporte sin operación diaria generado para fecha: ${sinOpReport.fecha}`);
+      } catch (err: any) {
+        console.error('[WA-CRON] Error generando reporte sin operación diaria:', err.message);
+      }
+    } else if (alerta.tipo_evento === 'CIERRE_FACT') {
       try {
         pdfAttachment = await generateCierreFactReport(alerta.client_id || undefined);
         console.log(`[WA-CRON] PDF CierreFact generado: ${pdfAttachment.fileName}`);

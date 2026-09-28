@@ -125,6 +125,19 @@ export interface Article extends AuditBase {
   factorStd: number;
 }
 
+export interface Client extends AuditBase {
+  id: string;
+  name: string;
+  shortName?: string;
+  short_name?: string;
+  reportType?: 'DIARIO' | 'INTERMITENTE';
+  report_type?: 'DIARIO' | 'INTERMITENTE';
+  logoUrl?: string;
+  logo_url?: string;
+  clientType?: string;
+  client_type?: string;
+}
+
 export interface MasterRecord extends AuditBase {
   id: string;
   name: string;

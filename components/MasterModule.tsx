@@ -395,6 +395,8 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         email: '',
         logoUrl: '',
         clientType: 'MUNICIPAL',
+        shortName: '',
+        reportType: 'DIARIO',
       });
     } else if (category === 'masterRol') {
       Object.assign(defaults, {
@@ -2005,6 +2007,20 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
             <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre del Cliente</label>
               <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
             </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre Abreviado</label>
+              <input type="text" placeholder="Ej: EXITO" value={formData.shortName || formData.short_name || ''} onChange={e => setFormData({ ...formData, shortName: e.target.value.toUpperCase(), short_name: e.target.value.toUpperCase() })} className={commonInputStyle} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Forma de Reporte</label>
+              <div className="relative">
+                <select value={formData.reportType || formData.report_type || 'DIARIO'} onChange={e => setFormData({ ...formData, reportType: e.target.value, report_type: e.target.value })} className={commonInputStyle}>
+                  <option value="DIARIO">DIARIO</option>
+                  <option value="INTERMITENTE">INTERMITENTE</option>
+                </select>
+                <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400"><Icons.ChevronRight className="rotate-90 w-3 h-3" /></div>
+              </div>
+            </div>
             <div className="md:col-span-2 space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Tipo de Cliente</label>
               <div className="relative">
@@ -2486,6 +2502,22 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                         : (item.name || item.id))}
                   </h3>
                   
+                  {/* DETALLES DE CLIENTES */}
+                  {activeMaster === 'masterClientes' && (
+                    <div className="mb-3 space-y-1">
+                      {((item as any).shortName || (item as any).short_name) && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">ABREV:</span>
+                          <span className="text-[9px] font-bold text-slate-700 truncate">{(item as any).shortName || (item as any).short_name}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-2 py-0.5 rounded">REPORTE:</span>
+                        <span className="text-[9px] font-bold text-emerald-700 uppercase">{(item as any).reportType || (item as any).report_type || 'DIARIO'}</span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* DETALLES ESPECÍFICOS DE ARTÍCULOS */}
                   {activeMaster === 'masterArticulo' && (
                     <div className="mb-3 space-y-1">

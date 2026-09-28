@@ -32,6 +32,87 @@ function formatFechaLarga(iso: string): string {
   return s.toUpperCase();
 }
 
+async function fetchClientsMap(): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  try {
+    const res = await pool.query("SELECT name, short_name FROM clients WHERE short_name IS NOT NULL AND TRIM(short_name) <> ''");
+    for (const r of res.rows) {
+      if (r.name && r.short_name) {
+        map.set(r.name.trim().toUpperCase(), r.short_name.trim());
+      }
+    }
+  } catch (e) {
+    console.warn('[FLOTA-REPORT] Error fetching clientsMap:', e);
+  }
+  return map;
+}
+
+export function toShortClientName(rawName: string, clientsMap: Map<string, string>): string {
+  if (!rawName) return '';
+  const trimmed = rawName.trim();
+  const isTDM = trimmed.toUpperCase().startsWith('TDM ');
+  const cleanName = isTDM ? trimmed.slice(4).trim() : trimmed;
+  const upper = cleanName.toUpperCase();
+
+  // 1. Direct match in clients table short_name
+  if (clientsMap.has(upper)) {
+    const sn = clientsMap.get(upper)!;
+    return isTDM ? `TDM ${sn}` : sn;
+  }
+
+  // 2. Substring match in clientsMap
+  for (const [fullName, shortName] of clientsMap.entries()) {
+    if (upper.includes(fullName) || fullName.includes(upper)) {
+      return isTDM ? `TDM ${shortName}` : shortName;
+    }
+  }
+
+  // 3. Fallback dictionary for known client names in management_orders
+  const dictionary: Record<string, string> = {
+    'AJOVER M7_BODEGA36': 'AJOVER BODEGA 36',
+    'AJOVER_BODEGA10': 'AJOVER BODEGA 10',
+    'AJOVER CALI M7 LINA': 'AJOVER CALI',
+    'GESTION Y DESARROLLO AMBIENTAL SAS E.S.P': 'GDA',
+    'GESTION Y DESARROLLO AMBIENTAL': 'GDA',
+    'SINETOR COLOMBIA S.A.S': 'SINETOR',
+    'SNETOR COLOMBIA S.A.S': 'SINETOR',
+    'DIANA CORPORACION S.A.S': 'DIANA',
+    'AGAVAL S.A': 'AGAVAL',
+    'RTD SAS': 'RTD',
+    'TDM (PREBEL)': 'PREBEL',
+    'ALBERTO CADAVID R. & CIA SA': 'CADAVID',
+    'COMERCIALIZADORA INTERNACIONAL DE LLANTAS SAS': 'CI LLANTAS',
+    'ESPUMAS PLASTICAS S.A': 'ESPUMAS PLASTICAS',
+    'LINEA DIRECTA S.A.S.': 'LINEA DIRECTA',
+    'LOGISTICA,TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S': 'LTSA',
+    'PAPELERIA Y SERVICIOS S.A.S.': 'PAPELERIA Y SERV',
+    'PLASTICOS UNION SAS': 'PLASTICOS UNION',
+    'SOLUCIONES LOGISTICAS Y EMPAQUES SAS': 'SOLUCIONES LOG',
+    'EXITO SECOS': 'E SEC',
+    'EXITO LINEA BLANCA': 'E L BLANCA',
+    'EXITO TAT': 'E TAT',
+    'EXITO PLAN DE CONTINGENCIA': 'E CONTINGENCIA',
+  };
+
+  if (dictionary[upper]) {
+    const sn = dictionary[upper];
+    return isTDM ? `TDM ${sn}` : sn;
+  }
+
+  // 4. Algorithmic cleanup of corporate suffixes
+  let result = cleanName
+    .replace(/\bS\.?A\.?S\.?\b/gi, '')
+    .replace(/\bE\.?S\.?P\.?\b/gi, '')
+    .replace(/\bS\.?A\.?\b/gi, '')
+    .replace(/\bC\.?I\.?\b/gi, '')
+    .replace(/\bLTDA\.?\b/gi, '')
+    .replace(/\b& CIA\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return isTDM ? `TDM ${result}` : result;
+}
+
 async function queryFlota(from: string, to: string): Promise<FlotaRow[]> {
   const result = await pool.query(
     `WITH manifests AS (
@@ -240,21 +321,32 @@ function pieOnlyPercentages(items: [string, number][], subtotal: number, grandTo
   </div>`;
 }
 
-function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fecha: string, logoSrc: string): string {
+function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fecha: string, logoSrc: string, clientsMap: Map<string, string> = new Map()): string {
   const m7Rows  = rows.filter(r => r.operator === 'M7');
   const tdmRows = rows.filter(r => r.operator === 'TDM');
   const totalM7  = m7Rows.reduce((s, r) => s + r.quantity, 0);
   const totalTDM = tdmRows.reduce((s, r) => s + r.quantity, 0);
   const total    = totalM7 + totalTDM;
-  const uniqueClients = new Set(rows.map(r => r.client_name)).size;
+  const normClientForCount = (name: string) => (name || '').toUpperCase().includes('AJOVER') ? 'AJOVER' : (name || '').trim();
+  const uniqueClients = new Set(rows.map(r => normClientForCount(r.client_name))).size;
 
-  const m7Client = new Map<string, number>();
-  m7Rows.forEach(r => m7Client.set(r.client_name, (m7Client.get(r.client_name) || 0) + r.quantity));
-  const m7ClientList = [...m7Client.entries()].sort((a, b) => b[1] - a[1]);
+  const m7Client = new Map<string, { shortName: string; fullName: string; qty: number }>();
+  m7Rows.forEach(r => {
+    const sn = toShortClientName(r.client_name, clientsMap);
+    const existing = m7Client.get(sn) || { shortName: sn, fullName: r.client_name, qty: 0 };
+    existing.qty += r.quantity;
+    m7Client.set(sn, existing);
+  });
+  const m7ClientList = [...m7Client.values()].sort((a, b) => b.qty - a.qty);
 
-  const tdmClient = new Map<string, number>();
-  tdmRows.forEach(r => tdmClient.set(r.client_name, (tdmClient.get(r.client_name) || 0) + r.quantity));
-  const tdmClientList = [...tdmClient.entries()].sort((a, b) => b[1] - a[1]);
+  const tdmClient = new Map<string, { shortName: string; fullName: string; qty: number }>();
+  tdmRows.forEach(r => {
+    const sn = toShortClientName(r.client_name, clientsMap);
+    const existing = tdmClient.get(sn) || { shortName: sn, fullName: r.client_name, qty: 0 };
+    existing.qty += r.quantity;
+    tdmClient.set(sn, existing);
+  });
+  const tdmClientList = [...tdmClient.values()].sort((a, b) => b.qty - a.qty);
 
   // Clasificación estricta en 2 ciudades: CALI (si el cliente o ciudad contiene CALI) y MEDELLIN (el resto)
   let caliQty = 0;
@@ -273,11 +365,11 @@ function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fec
   if (medellinQty > 0 || total === 0) cityList.push(['MEDELLIN', medellinQty]);
   if (caliQty > 0) cityList.push(['CALI', caliQty]);
 
-  const tablaRow = (name: string, qty: number) => `
+  const tablaRow = (item: { shortName: string; fullName: string; qty: number }) => `
     <tr>
-      <td style="padding:2.5px 2px;text-align:center;color:#555;border-bottom:1px solid #e2e2e2;white-space:nowrap">${pct0(qty, total)}%</td>
-      <td style="padding:2.5px 6px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:1px solid #e2e2e2;color:#333" title="${name}">${name}</td>
-      <td style="padding:2.5px 4px;text-align:right;font-weight:700;border-bottom:1px solid #e2e2e2;white-space:nowrap;color:#1a1a1a">${fmt(qty)}</td>
+      <td style="padding:2.5px 2px;text-align:center;color:#555;border-bottom:1px solid #e2e2e2;white-space:nowrap">${pct0(item.qty, total)}%</td>
+      <td style="padding:2.5px 6px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:1px solid #e2e2e2;color:#333;font-weight:700" title="${item.fullName}">${item.shortName}</td>
+      <td style="padding:2.5px 4px;text-align:right;font-weight:700;border-bottom:1px solid #e2e2e2;white-space:nowrap;color:#1a1a1a">${fmt(item.qty)}</td>
     </tr>`;
 
   const TABLA_IZQ = `
@@ -299,21 +391,21 @@ function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fec
     </thead>
     <tbody>
       <tr style="background:#E2EFDA;font-weight:900;font-size:11px">
-        <td colspan="3" style="padding:3.5px 6px;text-align:center;color:#1e4d2b;border-bottom:1px solid #c2dfb8;letter-spacing:0.5px">M7</td>
+        <td colspan="3" style="padding:3.5px 6px;text-align:center;color:#1e4d2b;border-bottom:1px solid #c2dfb8;letter-spacing:0.5px">PROPIO</td>
       </tr>
-      ${m7ClientList.map(([n, q]) => tablaRow(n, q)).join('')}
+      ${m7ClientList.map(item => tablaRow(item)).join('')}
       <tr style="background:#C6E0B4;font-weight:900;font-size:8.5px;color:#1e4d2b">
         <td style="padding:3px 2px;text-align:center;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${pct0(totalM7, total)}%</td>
-        <td style="padding:3px 6px;text-align:left;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">TOTAL M7</td>
+        <td style="padding:3px 6px;text-align:left;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">TOTAL PROPIO</td>
         <td style="padding:3px 4px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${fmt(totalM7)}</td>
       </tr>
       <tr style="background:#E2EFDA;font-weight:900;font-size:11px">
-        <td colspan="3" style="padding:3.5px 6px;text-align:center;color:#1e4d2b;border-bottom:1px solid #c2dfb8;letter-spacing:0.5px">TDM</td>
+        <td colspan="3" style="padding:3.5px 6px;text-align:center;color:#1e4d2b;border-bottom:1px solid #c2dfb8;letter-spacing:0.5px">ALIADO</td>
       </tr>
-      ${tdmClientList.map(([n, q]) => tablaRow(n, q)).join('')}
+      ${tdmClientList.map(item => tablaRow(item)).join('')}
       <tr style="background:#C6E0B4;font-weight:900;font-size:8.5px;color:#1e4d2b">
         <td style="padding:3px 2px;text-align:center;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${pct0(totalTDM, total)}%</td>
-        <td style="padding:3px 6px;text-align:left;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">TOTAL TDM</td>
+        <td style="padding:3px 6px;text-align:left;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">TOTAL ALIADO</td>
         <td style="padding:3px 4px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${fmt(totalTDM)}</td>
       </tr>
       <tr style="background:#A9D18E;font-weight:900;font-size:9px;color:#14371e">
@@ -330,12 +422,12 @@ function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fec
     <div style="font-size:12px;font-weight:900;color:#1a1a1a;margin-bottom:6px;text-align:center;text-transform:uppercase">OPERACIONES</div>
     <div style="display:flex;flex-direction:column;gap:5px">
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="width:75px;font-size:9px;font-weight:800;color:#1a1a1a">M7: ${pct0(totalM7, total)}%</span>
+        <span style="width:75px;font-size:9px;font-weight:800;color:#1a1a1a">PROPIO: ${pct0(totalM7, total)}%</span>
         <div style="flex:1;height:14px;background:#eef0f2;border-radius:2px;overflow:hidden"><div style="height:100%;width:${barW(totalM7)}%;background:#8FAABE;min-width:2px"></div></div>
         <span style="width:28px;font-size:11px;font-weight:900;color:#1a1a1a;text-align:right">${fmt(totalM7)}</span>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="width:75px;font-size:9px;font-weight:800;color:#1a1a1a">TDM: ${pct0(totalTDM, total)}%</span>
+        <span style="width:75px;font-size:9px;font-weight:800;color:#1a1a1a">ALIADO: ${pct0(totalTDM, total)}%</span>
         <div style="flex:1;height:14px;background:#eef0f2;border-radius:2px;overflow:hidden"><div style="height:100%;width:${barW(totalTDM)}%;background:#8FAABE;min-width:2px"></div></div>
         <span style="width:28px;font-size:11px;font-weight:900;color:#1a1a1a;text-align:right">${fmt(totalTDM)}</span>
       </div>
@@ -370,6 +462,9 @@ function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fec
     </table>
   </div>`;
 
+  const m7PieItems: [string, number][] = m7ClientList.map(item => [item.shortName, item.qty]);
+  const tdmPieItems: [string, number][] = tdmClientList.map(item => [item.shortName, item.qty]);
+
   const flotaBlock = (titulo: string, items: [string, number][], subtotal: number) => `
   <div style="border:1px solid #bbb;border-radius:6px;padding:10px 14px;background:#fff;display:flex;flex-direction:column;align-items:center;flex:1;justify-content:center">
     <div style="font-size:15px;font-weight:900;text-align:center;text-transform:uppercase;margin-bottom:6px;width:100%;white-space:nowrap">
@@ -392,7 +487,6 @@ body{font-family:Calibri,Arial,sans-serif;font-size:10px;color:#1a1a1a;backgroun
     <div style="font-size:7px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#777;margin-top:2px">Total viajes</div>
   </div>
   <div style="text-align:center">
-    ${logoSrc ? `<img src="${logoSrc}" style="height:54px;object-fit:contain;margin-bottom:3px" alt="logo">` : ''}
     <div style="font-size:20px;font-weight:900;letter-spacing:.3px;color:#1a1a1a;white-space:nowrap">${fecha}</div>
   </div>
   <div style="text-align:center">
@@ -410,14 +504,13 @@ body{font-family:Calibri,Arial,sans-serif;font-size:10px;color:#1a1a1a;backgroun
     ${CIUDADES}
   </div>
   <div style="flex:1;display:flex;flex-direction:column;gap:12px">
-    ${flotaBlock('FLOTA M7', m7ClientList, totalM7)}
-    ${flotaBlock('FLOTA TDM', tdmClientList, totalTDM)}
+    ${flotaBlock('FLOTA PROPIA', m7PieItems, totalM7)}
+    ${flotaBlock('FLOTA ALIADA', tdmPieItems, totalTDM)}
   </div>
 </div>
 
-<div style="border-top:1.5px solid #1a1a1a;margin-top:12px;padding-top:6px;display:flex;justify-content:space-between;font-size:8px;color:#444">
-  <span><strong style="color:#1a1a1a">OrbitM7</strong> — Milla 7 S.A.S.</span>
-  <span>Fecha: ${fecha} &nbsp;|&nbsp; Total: <strong style="color:#1a1a1a">${fmt(total)}</strong> viajes &nbsp;|&nbsp; M7: <strong style="color:#1a1a1a">${fmt(totalM7)}</strong> &nbsp;TDM: <strong style="color:#1a1a1a">${fmt(totalTDM)}</strong></span>
+<div style="border-top:1.5px solid #1a1a1a;margin-top:12px;padding-top:6px;display:flex;justify-content:flex-end;font-size:8px;color:#444">
+  <span>Fecha: ${fecha} &nbsp;|&nbsp; Total: <strong style="color:#1a1a1a">${fmt(total)}</strong> viajes &nbsp;|&nbsp; Propio: <strong style="color:#1a1a1a">${fmt(totalM7)}</strong> &nbsp;Aliado: <strong style="color:#1a1a1a">${fmt(totalTDM)}</strong></span>
 </div>
 
 </body></html>`;
@@ -425,9 +518,10 @@ body{font-family:Calibri,Arial,sans-serif;font-size:10px;color:#1a1a1a;backgroun
 
 export async function generateFlotaReportPdf(fechaOverride?: string): Promise<{ base64: string; fileName: string; caption: string }> {
   const { from } = fechaOverride ? { from: fechaOverride } : yesterday();
-  const [rows, vehiculos] = await Promise.all([
+  const [rows, vehiculos, clientsMap] = await Promise.all([
     queryFlota(from, from),
     queryVehiculos(from, from),
+    fetchClientsMap(),
   ]);
 
   const totalM7  = rows.filter(r => r.operator === 'M7').reduce((s, r) => s + r.quantity, 0);
@@ -436,7 +530,7 @@ export async function generateFlotaReportPdf(fechaOverride?: string): Promise<{ 
 
   const logoSrc = getLogoBase64();
   const fechaLarga = formatFechaLarga(from);
-  const html = buildHtml(rows, vehiculos, fechaLarga, logoSrc);
+  const html = buildHtml(rows, vehiculos, fechaLarga, logoSrc, clientsMap);
 
   const browser = await puppeteer.launch({
     headless: true,
@@ -455,7 +549,7 @@ export async function generateFlotaReportPdf(fechaOverride?: string): Promise<{ 
 
     const base64 = `data:application/pdf;base64,${Buffer.from(pdfBuffer).toString('base64')}`;
     const fileName = `InformeFlota_${from}.pdf`;
-    const caption = `📊 *Informe Flota OrbitM7*\nFecha: ${from}\nTotal: ${total} (M7: ${totalM7} | TDM: ${totalTDM})`;
+    const caption = `📊 *Informe Flota OrbitM7*\nFecha: ${from}\nTotal: ${total} (Propio: ${totalM7} | Aliado: ${totalTDM})`;
     return { base64, fileName, caption };
   } finally {
     await browser.close();
