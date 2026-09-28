@@ -39,6 +39,7 @@ const TIPOS_EVENTO = [
   { value: 'SOBRECOSTO',    label: 'Sobrecostos pendientes' },
   { value: 'RUTA',          label: 'Novedades de ruta' },
   { value: 'INFORME_FLOTA', label: 'Informe Flota (PDF automático)' },
+  { value: 'SIN_OPERACION_DIARIA', label: 'Sin Operación Diaria (6:30 AM)' },
 ];
 
 const ADJUNTO_TIPOS = [
@@ -131,7 +132,7 @@ export default function AlertasWhatsapp() {
     setForm({
       id: a.id, name: a.name, description: a.description,
       destinatarios: (a.destinatarios || []).map(d => ({ ...d })),
-      message_template: a.message_template,
+      message_template: a.message_template || '',
       cron_expression: a.cron_expression,
       tipo_evento: a.tipo_evento,
       adjunto_tipo: a.adjunto_tipo || 'ninguno',
@@ -198,13 +199,13 @@ export default function AlertasWhatsapp() {
   }
 
   function insertVar(v: string) {
-    setForm(f => ({ ...f, message_template: f.message_template + v }));
+    setForm(f => ({ ...f, message_template: (f.message_template || '') + v }));
   }
 
   async function handleSave() {
     if (!form.name.trim()) { toast.error('El nombre es requerido'); return; }
     if (form.destinatarios.length === 0) { toast.error('Agregue al menos un número destinatario'); return; }
-    if (!form.message_template.trim()) { toast.error('El mensaje es requerido'); return; }
+    if (!(form.message_template || '').trim()) { toast.error('El mensaje es requerido'); return; }
     setSaving(true);
     try {
       const res = await api.saveAlertaWhatsapp({
@@ -519,7 +520,7 @@ export default function AlertasWhatsapp() {
                   ))}
                 </div>
               </div>
-              <textarea value={form.message_template}
+              <textarea value={form.message_template || ''}
                 onChange={e => setForm(f => ({ ...f, message_template: e.target.value }))}
                 rows={5}
                 placeholder="Escriba el mensaje. Use las variables de la derecha."
@@ -527,7 +528,7 @@ export default function AlertasWhatsapp() {
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
                 <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Preview</p>
                 <pre className="text-[10px] text-slate-600 whitespace-pre-wrap font-sans">
-                  {form.message_template
+                  {(form.message_template || '')
                     .replace(/\{\{fecha\}\}/gi, new Date().toLocaleDateString('es-CO'))
                     .replace(/\{\{hora\}\}/gi,  new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }))
                     .replace(/\{\{alerta\}\}/gi, form.name || 'Nombre alerta')
@@ -736,7 +737,7 @@ export default function AlertasWhatsapp() {
                     <div>
                       <p className="text-[10px] font-black text-slate-400 uppercase mb-1">Plantilla del mensaje</p>
                       <pre className="text-[10px] bg-white border border-slate-200 rounded-lg p-2.5 whitespace-pre-wrap font-sans text-slate-600">
-                        {a.message_template}
+                        {a.message_template || '(Generado dinámicamente según el evento)'}
                       </pre>
                     </div>
                   </div>
