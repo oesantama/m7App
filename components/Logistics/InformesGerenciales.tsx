@@ -89,24 +89,14 @@ const CHART_COLORS = [
 function toShortClientName(rawName: string, clientsList: any[] = []): string {
   if (!rawName) return '';
   const trimmed = rawName.trim();
-  const isTDM = trimmed.toUpperCase().startsWith('TDM ');
-  const cleanName = isTDM ? trimmed.slice(4).trim() : trimmed;
-  const upper = cleanName.toUpperCase();
-
-  const matchClient = clientsList.find(c =>
-    (c.name && c.name.trim().toUpperCase() === upper) ||
-    (c.short_name && c.short_name.trim().toUpperCase() === upper)
-  );
-
-  if (matchClient && matchClient.short_name && matchClient.short_name.trim()) {
-    const sn = matchClient.short_name.trim();
-    return isTDM ? `TDM ${sn}` : sn;
-  }
+  const rawUpper = trimmed.toUpperCase();
 
   const dictionary: Record<string, string> = {
     'AJOVER M7_BODEGA36': 'AJOVER BODEGA 36',
     'AJOVER_BODEGA10': 'AJOVER BODEGA 10',
-    'AJOVER CALI M7 LINA': 'AJOVER CALI',
+    'AJOVER CALI M7 LINA': 'AJOVER CALI M7 LINA',
+    'AJOVER CALI DIANA LOBATON': 'AJOVER CALI DIANA LOBATON',
+    'AJOVER DARNEL S.A.S': 'AJOVER DARNEL',
     'GESTION Y DESARROLLO AMBIENTAL SAS E.S.P': 'GDA',
     'GESTION Y DESARROLLO AMBIENTAL': 'GDA',
     'SINETOR COLOMBIA S.A.S': 'SINETOR',
@@ -120,6 +110,7 @@ function toShortClientName(rawName: string, clientsList: any[] = []): string {
     'ESPUMAS PLASTICAS S.A': 'ESPUMAS PLASTICAS',
     'LINEA DIRECTA S.A.S.': 'LINEA DIRECTA',
     'LOGISTICA,TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S': 'LTSA',
+    'LOGISTICA, TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S': 'LTSA',
     'PAPELERIA Y SERVICIOS S.A.S.': 'PAPELERIA Y SERV',
     'PLASTICOS UNION SAS': 'PLASTICOS UNION',
     'SOLUCIONES LOGISTICAS Y EMPAQUES SAS': 'SOLUCIONES LOG',
@@ -129,8 +120,26 @@ function toShortClientName(rawName: string, clientsList: any[] = []): string {
     'EXITO PLAN DE CONTINGENCIA': 'E CONTINGENCIA',
   };
 
+  if (dictionary[rawUpper]) {
+    return dictionary[rawUpper];
+  }
+
+  const isTDM = trimmed.toUpperCase().startsWith('TDM ');
+  const cleanName = isTDM ? trimmed.slice(4).trim() : trimmed;
+  const upper = cleanName.toUpperCase();
+
   if (dictionary[upper]) {
     const sn = dictionary[upper];
+    return isTDM ? `TDM ${sn}` : sn;
+  }
+
+  const matchClient = clientsList.find(c =>
+    (c.name && c.name.trim().toUpperCase() === upper) ||
+    (c.short_name && c.short_name.trim().toUpperCase() === upper)
+  );
+
+  if (matchClient && matchClient.short_name && matchClient.short_name.trim()) {
+    const sn = matchClient.short_name.trim();
     return isTDM ? `TDM ${sn}` : sn;
   }
 
@@ -1725,10 +1734,9 @@ export const InformesGerenciales: React.FC = () => {
         return;
       }
 
-      // Join logic using provClientes state
-      const doc = r.client_document ? String(r.client_document).trim().toUpperCase() : 'S/I';
-      const match = provClientes.find(pc => String(pc.documento).trim().toUpperCase() === doc);
-      let client = match ? String(match.nombre).trim().toUpperCase() : (r.client_name ? String(r.client_name).trim().toUpperCase() : 'S/I');
+      // Use validated client name saved on upload (e.g. AJOVER M7_BODEGA36, AJOVER_BODEGA10, AJOVER CALI M7 LINA, etc.)
+      const rawClient = r.client_name ? String(r.client_name).trim() : 'S/I';
+      let client = toShortClientName(rawClient, clients) || rawClient;
       if (client.includes('PREBEL')) {
         client = 'PREBEL';
       }
@@ -3513,7 +3521,9 @@ export const InformesGerenciales: React.FC = () => {
                                       <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-2">
                                         <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
                                         <span title={row.rawName}>{row.shortName}</span>
-                                        <span className="text-[9px] text-slate-400 font-normal hidden md:inline truncate max-w-[120px]">({row.rawName})</span>
+                                        {row.shortName.toUpperCase() !== row.rawName.toUpperCase() && !row.rawName.toUpperCase().includes(row.shortName.toUpperCase()) && (
+                                          <span className="text-[9px] text-slate-400 font-normal hidden md:inline truncate max-w-[120px]">({row.rawName})</span>
+                                        )}
                                       </td>
 
                                       {sortedMonthKeys.map(mKey => {
