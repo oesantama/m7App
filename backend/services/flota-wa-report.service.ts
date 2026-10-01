@@ -481,8 +481,8 @@ function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fec
     </table>
   </div>`;
 
-  const m7PieItems: [string, number][] = m7ClientList.map(item => [item.shortName, item.qty]);
-  const tdmPieItems: [string, number][] = tdmClientList.map(item => [item.shortName, item.qty]);
+  const m7PieItems: [string, number][] = m7ClientList.map(item => [item.shortName, item.totalQty]);
+  const tdmPieItems: [string, number][] = tdmClientList.map(item => [item.shortName, item.totalQty]);
 
   const flotaBlock = (titulo: string, items: [string, number][], subtotal: number) => `
   <div style="border:1px solid #bbb;border-radius:6px;padding:10px 14px;background:#fff;display:flex;flex-direction:column;align-items:center;flex:1;justify-content:center">
