@@ -13,7 +13,7 @@ function getLogoBase64(): string {
   } catch { return ''; }
 }
 
-interface FlotaRow { client_name: string; operator: string; city: string; quantity: number; }
+interface FlotaRow { client_name: string; operator: string; city: string; quantity: number; cxc: number; cxp: number; }
 
 function yesterday(): { from: string; to: string } {
   // Obtener la fecha actual en Colombia (UTC-5) para evitar el desfase de zona horaria.
@@ -38,7 +38,10 @@ async function fetchClientsMap(): Promise<Map<string, string>> {
     const res = await pool.query("SELECT name, short_name FROM clients WHERE short_name IS NOT NULL AND TRIM(short_name) <> ''");
     for (const r of res.rows) {
       if (r.name && r.short_name) {
-        map.set(r.name.trim().toUpperCase(), r.short_name.trim());
+        const fullUpper = r.name.trim().toUpperCase();
+        const shortClean = r.short_name.trim();
+        map.set(fullUpper, shortClean);
+        map.set(shortClean.toUpperCase(), shortClean);
       }
     }
   } catch (e) {
@@ -49,21 +52,38 @@ async function fetchClientsMap(): Promise<Map<string, string>> {
 
 export function toShortClientName(rawName: string, clientsMap: Map<string, string>): string {
   if (!rawName) return '';
-  const trimmed = rawName.trim();
-  const isTDM = trimmed.toUpperCase().startsWith('TDM ');
-  const cleanName = isTDM ? trimmed.slice(4).trim() : trimmed;
-  const upper = cleanName.toUpperCase();
+  let trimmed = rawName.trim();
 
-  // 1. Direct match in clients table short_name
-  if (clientsMap.has(upper)) {
-    const sn = clientsMap.get(upper)!;
-    return isTDM ? `TDM ${sn}` : sn;
+  // Strip duplicate TDM prefixes (e.g. "TDM TDM-LEO" -> "TDM-LEO")
+  while (/^TDM\s+TDM/i.test(trimmed)) {
+    trimmed = trimmed.replace(/^TDM\s+/i, '').trim();
   }
 
-  // 2. Substring match in clientsMap
+  const isTDM = /^TDM\b/i.test(trimmed);
+  const cleanName = isTDM ? trimmed.replace(/^TDM\s*/i, '').trim() : trimmed;
+  const upper = cleanName.toUpperCase();
+
+  const formatResult = (res: string) => {
+    if (!isTDM) return res;
+    if (/^TDM/i.test(res)) return res; // Don't duplicate TDM if already present
+    return `TDM ${res}`;
+  };
+
+  // 1. Direct match in clients table (fullName or shortName)
+  if (clientsMap.has(upper)) {
+    return formatResult(clientsMap.get(upper)!);
+  }
+
+  // 2. Normalized match without punctuation or corporate suffixes
+  const normUpper = upper
+    .replace(/[^A-Z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
   for (const [fullName, shortName] of clientsMap.entries()) {
-    if (upper.includes(fullName) || fullName.includes(upper)) {
-      return isTDM ? `TDM ${shortName}` : shortName;
+    const normFull = fullName.replace(/[^A-Z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (normUpper === normFull) {
+      return formatResult(shortName);
     }
   }
 
@@ -86,25 +106,44 @@ export function toShortClientName(rawName: string, clientsMap: Map<string, strin
     'TDM (PREBEL)': 'PREBEL',
     'ALBERTO CADAVID R. & CIA SA': 'CADAVID',
     'COMERCIALIZADORA INTERNACIONAL DE LLANTAS SAS': 'CI LLANTAS',
+    'COMERCIALIZADORA INTERNACIONAL DE LLANTAS S.A.S.': 'CI LLANTAS',
     'ESPUMAS PLASTICAS S.A': 'ESPUMAS PLASTICAS',
     'LINEA DIRECTA S.A.S.': 'LINEA DIRECTA',
+    'LINEA DIRECTA S.A.S': 'LINEA DIRECTA',
     'LOGISTICA,TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S': 'LTSA',
     'LOGISTICA, TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S': 'LTSA',
+    'LOGISTICA TRANSPORTE Y SERVICIOS ASOCIADOS SAS': 'LTSA',
     'PAPELERIA Y SERVICIOS S.A.S.': 'PAPELERIA Y SERV',
+    'PAPELERIA Y SERVICIOS S.A.S': 'PAPELERIA Y SERV',
     'PLASTICOS UNION SAS': 'PLASTICOS UNION',
     'SOLUCIONES LOGISTICAS Y EMPAQUES SAS': 'SOLUCIONES LOG',
+    'SOLUCIONES LOGISTICAS Y EMPAQUES S.A.S.': 'SOLUCIONES LOG',
     'EXITO SECOS': 'E SEC',
     'EXITO LINEA BLANCA': 'E L BLANCA',
     'EXITO TAT': 'E TAT',
     'EXITO PLAN DE CONTINGENCIA': 'E CONTINGENCIA',
+    'INVESA S.A': 'INVESA',
+    'INVESA S.A.': 'INVESA',
+    'NEROLI SAS': 'NEROLI',
+    'NEROLI S.A.S.': 'NEROLI',
+    'POLIKEM SAS': 'POLIKEM',
+    'POLIKEM S.A.S.': 'POLIKEM',
+    'NOVASEO SAS': 'NOVASEO',
+    'NOVASEO S.A.S.': 'NOVASEO',
   };
 
   if (dictionary[upper]) {
-    const sn = dictionary[upper];
-    return isTDM ? `TDM ${sn}` : sn;
+    return formatResult(dictionary[upper]);
   }
 
-  // 4. Algorithmic cleanup of corporate suffixes
+  // 4. Substring match in clientsMap only if fullName is specific (>= 4 chars)
+  for (const [fullName, shortName] of clientsMap.entries()) {
+    if (fullName.length >= 4 && (upper.includes(fullName) || fullName.includes(upper))) {
+      return formatResult(shortName);
+    }
+  }
+
+  // 5. Algorithmic cleanup of corporate suffixes
   let result = cleanName
     .replace(/\bS\.?A\.?S\.?\b/gi, '')
     .replace(/\bE\.?S\.?P\.?\b/gi, '')
@@ -115,7 +154,7 @@ export function toShortClientName(rawName: string, clientsMap: Map<string, strin
     .replace(/\s+/g, ' ')
     .trim();
 
-  return isTDM ? `TDM ${result}` : result;
+  return formatResult(result);
 }
 
 async function queryFlota(from: string, to: string): Promise<FlotaRow[]> {
@@ -123,7 +162,9 @@ async function queryFlota(from: string, to: string): Promise<FlotaRow[]> {
     `WITH manifests AS (
         SELECT TRIM(client_name) AS client_name, 1 AS quantity,
                'M7' AS operator,
-               COALESCE(UPPER(TRIM(city)), 'SIN CIUDAD') AS city
+               COALESCE(UPPER(TRIM(city)), 'SIN CIUDAD') AS city,
+               COALESCE(total_value_cxc_final, 0)::float AS cxc,
+               COALESCE(total_value_cxp_final, 0)::float AS cxp
         FROM management_orders
         WHERE manifest_date::date BETWEEN $1 AND $2
           AND manifest_status NOT IN ('ANULADO','CANCELADO','ANULADA')
@@ -131,14 +172,21 @@ async function queryFlota(from: string, to: string): Promise<FlotaRow[]> {
      ),
      tdm_excel AS (
         SELECT CONCAT('TDM ', TRIM(c.name)) AS client_name, 1 AS quantity, 'TDM' AS operator,
-               COALESCE(UPPER(TRIM(ftm.ciudad_destino)), 'SIN CIUDAD') AS city
+               COALESCE(UPPER(TRIM(ftm.ciudad_destino)), 'SIN CIUDAD') AS city,
+               COALESCE(ftm.valor_cobrar, 0)::float AS cxc,
+               COALESCE(ftm.valor_pagar, 0)::float AS cxp
         FROM flota_tdm_manifiestos ftm
         LEFT JOIN clients c ON ftm.client_id = c.id
         WHERE ftm.fecha_operacion BETWEEN $1 AND $2
      ),
      combined AS (SELECT * FROM manifests UNION ALL SELECT * FROM tdm_excel)
-    SELECT client_name, operator, city, SUM(quantity)::int AS quantity
-    FROM combined GROUP BY client_name, operator, city ORDER BY operator, quantity DESC`,
+    SELECT client_name, operator, city,
+           SUM(quantity)::int AS quantity,
+           SUM(cxc)::float AS cxc,
+           SUM(cxp)::float AS cxp
+    FROM combined
+    GROUP BY client_name, operator, city
+    ORDER BY operator, quantity DESC`,
     [from, to]
   );
   return result.rows;
@@ -167,6 +215,7 @@ async function queryVehiculos(from: string, to: string): Promise<{ m7: number; t
 }
 
 const fmt = (n: number) => n.toLocaleString('es-CO');
+const fmtMoney = (n: number) => `$ ${Math.round(n).toLocaleString('es-CO')}`;
 const pct0 = (n: number, t: number) => t > 0 ? Math.round((n / t) * 100) : 0;
 const pctComma = (n: number, t: number) => t > 0 ? ((n / t) * 100).toFixed(1).replace('.', ',') : '0';
 
@@ -326,6 +375,29 @@ function pieOnlyPercentages(items: [string, number][], subtotal: number, grandTo
   </div>`;
 }
 
+function calcIntReal(rawPct: number, clientName?: string, dateStr?: string): number {
+  if (rawPct <= 0) return 0;
+  const cName = (clientName || '').toUpperCase();
+
+  if (cName.includes('SOCODA')) {
+    let cleanDate = '';
+    if (dateStr) {
+      const s = dateStr.trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) cleanDate = s.slice(0, 10);
+      else if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+        const parts = s.split('/');
+        cleanDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+      } else cleanDate = s.slice(0, 10);
+    }
+    if (cleanDate && cleanDate <= '2026-07-31') {
+      return rawPct >= 20 ? rawPct / 2 : Math.max(0, rawPct - 10);
+    }
+    return rawPct / 2;
+  }
+
+  return rawPct / 2;
+}
+
 function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fecha: string, logoSrc: string, clientsMap: Map<string, string> = new Map()): string {
   const m7Rows  = rows.filter(r => r.operator === 'M7');
   const tdmRows = rows.filter(r => r.operator === 'TDM');
@@ -355,6 +427,47 @@ function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fec
   });
   const tdmClientList = [...tdmClient.values()].sort((a, b) => b.totalQty - a.totalQty);
 
+  interface ClientFinancialSummary {
+    shortName: string;
+    fullName: string;
+    quantity: number;
+    cxc: number;
+    cxp: number;
+    ingreso: number;
+    rutaPct: number;
+  }
+
+  const clientFinancialMap = new Map<string, ClientFinancialSummary>();
+  rows.forEach(r => {
+    const sn = toShortClientName(r.client_name, clientsMap);
+    const existing = clientFinancialMap.get(sn) || {
+      shortName: sn,
+      fullName: r.client_name,
+      quantity: 0,
+      cxc: 0,
+      cxp: 0,
+      ingreso: 0,
+      rutaPct: 0,
+    };
+    existing.quantity += r.quantity;
+    existing.cxc += r.cxc || 0;
+    existing.cxp += r.cxp || 0;
+    existing.ingreso = existing.cxc - existing.cxp;
+    clientFinancialMap.set(sn, existing);
+  });
+
+  const clientList = [...clientFinancialMap.values()].map(item => {
+    const isTdm = /^TDM\b/i.test(item.shortName) || item.fullName.toUpperCase().includes('TDM');
+    const rawPct = item.cxc > 0 ? ((item.cxc - item.cxp) / item.cxc) * 100 : 0;
+    const rutaPct = isTdm ? calcIntReal(rawPct, item.fullName) : rawPct;
+    return { ...item, rutaPct: Math.round(rutaPct) };
+  }).sort((a, b) => b.quantity - a.quantity);
+
+  const grandTotalCxC = clientList.reduce((sum, c) => sum + c.cxc, 0);
+  const grandTotalCxP = clientList.reduce((sum, c) => sum + c.cxp, 0);
+  const grandTotalIngreso = grandTotalCxC - grandTotalCxP;
+  const grandTotalRutaPct = grandTotalCxC > 0 ? Math.round(((grandTotalCxC - grandTotalCxP) / grandTotalCxC) * 100) : 0;
+
   // Clasificación estricta en 2 ciudades: CALI (si el cliente o ciudad contiene CALI) y MEDELLIN (el resto)
   let caliQty = 0;
   let medellinQty = 0;
@@ -372,65 +485,44 @@ function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fec
   if (medellinQty > 0 || total === 0) cityList.push(['MEDELLIN', medellinQty]);
   if (caliQty > 0) cityList.push(['CALI', caliQty]);
 
-  const tablaRow = (item: { shortName: string; fullName: string; propio: number; intermediacion: number; totalQty: number }) => `
+  const tablaRow = (item: ClientFinancialSummary) => `
     <tr>
-      <td style="padding:2.5px 2px;text-align:center;color:#555;border-bottom:1px solid #e2e2e2;white-space:nowrap">${pct0(item.totalQty, total)}%</td>
-      <td style="padding:2.5px 4px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:1px solid #e2e2e2;color:#333;font-weight:700" title="${item.fullName}">${item.shortName}</td>
-      <td style="padding:2.5px 2px;text-align:right;font-weight:700;border-bottom:1px solid #e2e2e2;white-space:nowrap;color:#1a1a1a">${item.propio > 0 ? fmt(item.propio) : '0'}</td>
-      <td style="padding:2.5px 2px;text-align:right;font-weight:700;border-bottom:1px solid #e2e2e2;white-space:nowrap;color:#1a1a1a">${item.intermediacion > 0 ? fmt(item.intermediacion) : '0'}</td>
-      <td style="padding:2.5px 4px;text-align:right;font-weight:700;border-bottom:1px solid #e2e2e2;white-space:nowrap;color:#1a1a1a">${fmt(item.totalQty)}</td>
+      <td style="padding:2px 2px;text-align:center;color:#555;border-bottom:1px solid #e2e2e2;white-space:nowrap">${pct0(item.quantity, total)}%</td>
+      <td style="padding:2px 2px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:1px solid #e2e2e2;color:#333;font-weight:700" title="${item.fullName}">${item.shortName}</td>
+      <td style="padding:2px 2px;text-align:right;font-weight:700;border-bottom:1px solid #e2e2e2;white-space:nowrap;color:#1a1a1a">${fmt(item.quantity)}</td>
+      <td style="padding:2px 2px;text-align:right;font-weight:700;border-bottom:1px solid #e2e2e2;white-space:nowrap;color:#1a1a1a">${item.rutaPct}%</td>
+      <td style="padding:2px 2px;text-align:right;font-weight:700;border-bottom:1px solid #e2e2e2;white-space:nowrap;color:#1a1a1a">${fmtMoney(item.ingreso)}</td>
     </tr>`;
 
   const TABLA_IZQ = `
-  <div style="font-size:15px;font-weight:900;text-align:center;color:#1a1a1a;margin-bottom:6px;padding-bottom:3px;border-bottom:2px solid #3CB44B;text-transform:uppercase">
+  <div style="font-size:14px;font-weight:900;text-align:center;color:#1a1a1a;margin-bottom:6px;padding-bottom:3px;border-bottom:2px solid #3CB44B;text-transform:uppercase">
     RESUMEN POR CLIENTE
   </div>
-  <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:7.5px">
+  <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:7.2px">
     <colgroup>
-      <col style="width:30px">
-      <col style="width:135px">
-      <col style="width:46px">
-      <col style="width:54px">
-      <col style="width:50px">
+      <col style="width:28px">
+      <col style="width:96px">
+      <col style="width:34px">
+      <col style="width:38px">
+      <col style="width:84px">
     </colgroup>
     <thead>
-      <tr style="background:#D9D9D9;color:#1a1a1a;font-weight:900;font-size:8.5px">
-        <th style="padding:4px 2px;text-align:center">%</th>
-        <th style="padding:4px 4px;text-align:left">CLIENTE</th>
-        <th style="padding:4px 2px;text-align:right">PROPIO</th>
-        <th style="padding:4px 2px;text-align:right">INTERM.</th>
-        <th style="padding:4px 4px;text-align:right">TOTAL</th>
+      <tr style="background:#D9D9D9;color:#1a1a1a;font-weight:900;font-size:7.8px">
+        <th style="padding:3.5px 2px;text-align:center">%</th>
+        <th style="padding:3.5px 2px;text-align:left">CLIENTE</th>
+        <th style="padding:3.5px 2px;text-align:right">TOTAL</th>
+        <th style="padding:3.5px 2px;text-align:right">RUTA</th>
+        <th style="padding:3.5px 2px;text-align:right">INGRESO</th>
       </tr>
     </thead>
     <tbody>
-      <tr style="background:#E2EFDA;font-weight:900;font-size:10px">
-        <td colspan="5" style="padding:3.5px 6px;text-align:center;color:#1e4d2b;border-bottom:1px solid #c2dfb8;letter-spacing:0.5px">PROPIO</td>
-      </tr>
-      ${m7ClientList.map(item => tablaRow(item)).join('')}
-      <tr style="background:#C6E0B4;font-weight:900;font-size:8.5px;color:#1e4d2b">
-        <td style="padding:3px 2px;text-align:center;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${pct0(totalM7, total)}%</td>
-        <td style="padding:3px 4px;text-align:left;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">TOTAL PROPIO</td>
-        <td style="padding:3px 2px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${fmt(totalM7)}</td>
-        <td style="padding:3px 2px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">0</td>
-        <td style="padding:3px 4px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${fmt(totalM7)}</td>
-      </tr>
-      <tr style="background:#E2EFDA;font-weight:900;font-size:10px">
-        <td colspan="5" style="padding:3.5px 6px;text-align:center;color:#1e4d2b;border-bottom:1px solid #c2dfb8;letter-spacing:0.5px">ALIADO</td>
-      </tr>
-      ${tdmClientList.map(item => tablaRow(item)).join('')}
-      <tr style="background:#C6E0B4;font-weight:900;font-size:8.5px;color:#1e4d2b">
-        <td style="padding:3px 2px;text-align:center;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${pct0(totalTDM, total)}%</td>
-        <td style="padding:3px 4px;text-align:left;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">TOTAL ALIADO</td>
-        <td style="padding:3px 2px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">0</td>
-        <td style="padding:3px 2px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${fmt(totalTDM)}</td>
-        <td style="padding:3px 4px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${fmt(totalTDM)}</td>
-      </tr>
-      <tr style="background:#A9D18E;font-weight:900;font-size:9px;color:#14371e">
-        <td style="padding:4px 2px;text-align:center;border-top:1.5px solid #82b463">100%</td>
-        <td style="padding:4px 4px;text-align:left;border-top:1.5px solid #82b463">TOTAL GENERAL</td>
-        <td style="padding:4px 2px;text-align:right;border-top:1.5px solid #82b463">${fmt(totalM7)}</td>
-        <td style="padding:4px 2px;text-align:right;border-top:1.5px solid #82b463">${fmt(totalTDM)}</td>
-        <td style="padding:4px 4px;text-align:right;border-top:1.5px solid #82b463">${fmt(total)}</td>
+      ${clientList.map(item => tablaRow(item)).join('')}
+      <tr style="background:#A9D18E;font-weight:900;font-size:7.5px;color:#14371e">
+        <td style="padding:3.5px 2px;text-align:center;border-top:1.5px solid #82b463">100%</td>
+        <td style="padding:3.5px 2px;text-align:left;border-top:1.5px solid #82b463">TOTAL GENERAL</td>
+        <td style="padding:3.5px 2px;text-align:right;border-top:1.5px solid #82b463">${fmt(total)}</td>
+        <td style="padding:3.5px 2px;text-align:right;border-top:1.5px solid #82b463">${grandTotalRutaPct}%</td>
+        <td style="padding:3.5px 2px;text-align:right;border-top:1.5px solid #82b463">${fmtMoney(grandTotalIngreso)}</td>
       </tr>
     </tbody>
   </table>`;
