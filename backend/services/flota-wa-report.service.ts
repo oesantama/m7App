@@ -69,13 +69,17 @@ export function toShortClientName(rawName: string, clientsMap: Map<string, strin
 
   // 3. Fallback dictionary for known client names in management_orders
   const dictionary: Record<string, string> = {
-    'AJOVER M7_BODEGA36': 'AJOVER BODEGA 36',
-    'AJOVER_BODEGA10': 'AJOVER BODEGA 10',
-    'AJOVER CALI M7 LINA': 'AJOVER CALI',
+    'AJOVER M7_BODEGA36': 'AJV 36',
+    'AJOVER_BODEGA10': 'AJV 10',
+    'AJOVER BODEGA 10': 'AJV 10',
+    'AJOVER BODEGA 36': 'AJV 36',
+    'AJOVER CALI M7 LINA': 'AJV CALI',
+    'AJOVER CALI DIANA LOBATON': 'AJV CALI',
+    'AJOVER DARNEL S.A.S': 'AJV DARNEL',
     'GESTION Y DESARROLLO AMBIENTAL SAS E.S.P': 'GDA',
     'GESTION Y DESARROLLO AMBIENTAL': 'GDA',
-    'SINETOR COLOMBIA S.A.S': 'SINETOR',
-    'SNETOR COLOMBIA S.A.S': 'SINETOR',
+    'SINETOR COLOMBIA S.A.S': 'ST',
+    'SNETOR COLOMBIA S.A.S': 'ST',
     'DIANA CORPORACION S.A.S': 'DIANA',
     'AGAVAL S.A': 'AGAVAL',
     'RTD SAS': 'RTD',
@@ -85,6 +89,7 @@ export function toShortClientName(rawName: string, clientsMap: Map<string, strin
     'ESPUMAS PLASTICAS S.A': 'ESPUMAS PLASTICAS',
     'LINEA DIRECTA S.A.S.': 'LINEA DIRECTA',
     'LOGISTICA,TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S': 'LTSA',
+    'LOGISTICA, TRANSPORTE Y SERVICIOS ASOCIADOS S.A.S': 'LTSA',
     'PAPELERIA Y SERVICIOS S.A.S.': 'PAPELERIA Y SERV',
     'PLASTICOS UNION SAS': 'PLASTICOS UNION',
     'SOLUCIONES LOGISTICAS Y EMPAQUES SAS': 'SOLUCIONES LOG',
@@ -330,23 +335,25 @@ function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fec
   const normClientForCount = (name: string) => (name || '').toUpperCase().includes('AJOVER') ? 'AJOVER' : (name || '').trim();
   const uniqueClients = new Set(rows.map(r => normClientForCount(r.client_name))).size;
 
-  const m7Client = new Map<string, { shortName: string; fullName: string; qty: number }>();
+  const m7Client = new Map<string, { shortName: string; fullName: string; propio: number; intermediacion: number; totalQty: number }>();
   m7Rows.forEach(r => {
     const sn = toShortClientName(r.client_name, clientsMap);
-    const existing = m7Client.get(sn) || { shortName: sn, fullName: r.client_name, qty: 0 };
-    existing.qty += r.quantity;
+    const existing = m7Client.get(sn) || { shortName: sn, fullName: r.client_name, propio: 0, intermediacion: 0, totalQty: 0 };
+    existing.propio += r.quantity;
+    existing.totalQty += r.quantity;
     m7Client.set(sn, existing);
   });
-  const m7ClientList = [...m7Client.values()].sort((a, b) => b.qty - a.qty);
+  const m7ClientList = [...m7Client.values()].sort((a, b) => b.totalQty - a.totalQty);
 
-  const tdmClient = new Map<string, { shortName: string; fullName: string; qty: number }>();
+  const tdmClient = new Map<string, { shortName: string; fullName: string; propio: number; intermediacion: number; totalQty: number }>();
   tdmRows.forEach(r => {
     const sn = toShortClientName(r.client_name, clientsMap);
-    const existing = tdmClient.get(sn) || { shortName: sn, fullName: r.client_name, qty: 0 };
-    existing.qty += r.quantity;
+    const existing = tdmClient.get(sn) || { shortName: sn, fullName: r.client_name, propio: 0, intermediacion: 0, totalQty: 0 };
+    existing.intermediacion += r.quantity;
+    existing.totalQty += r.quantity;
     tdmClient.set(sn, existing);
   });
-  const tdmClientList = [...tdmClient.values()].sort((a, b) => b.qty - a.qty);
+  const tdmClientList = [...tdmClient.values()].sort((a, b) => b.totalQty - a.totalQty);
 
   // Clasificación estricta en 2 ciudades: CALI (si el cliente o ciudad contiene CALI) y MEDELLIN (el resto)
   let caliQty = 0;
@@ -365,52 +372,64 @@ function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fec
   if (medellinQty > 0 || total === 0) cityList.push(['MEDELLIN', medellinQty]);
   if (caliQty > 0) cityList.push(['CALI', caliQty]);
 
-  const tablaRow = (item: { shortName: string; fullName: string; qty: number }) => `
+  const tablaRow = (item: { shortName: string; fullName: string; propio: number; intermediacion: number; totalQty: number }) => `
     <tr>
-      <td style="padding:2.5px 2px;text-align:center;color:#555;border-bottom:1px solid #e2e2e2;white-space:nowrap">${pct0(item.qty, total)}%</td>
-      <td style="padding:2.5px 6px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:1px solid #e2e2e2;color:#333;font-weight:700" title="${item.fullName}">${item.shortName}</td>
-      <td style="padding:2.5px 4px;text-align:right;font-weight:700;border-bottom:1px solid #e2e2e2;white-space:nowrap;color:#1a1a1a">${fmt(item.qty)}</td>
+      <td style="padding:2.5px 2px;text-align:center;color:#555;border-bottom:1px solid #e2e2e2;white-space:nowrap">${pct0(item.totalQty, total)}%</td>
+      <td style="padding:2.5px 4px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:1px solid #e2e2e2;color:#333;font-weight:700" title="${item.fullName}">${item.shortName}</td>
+      <td style="padding:2.5px 2px;text-align:right;font-weight:700;border-bottom:1px solid #e2e2e2;white-space:nowrap;color:#1a1a1a">${item.propio > 0 ? fmt(item.propio) : '0'}</td>
+      <td style="padding:2.5px 2px;text-align:right;font-weight:700;border-bottom:1px solid #e2e2e2;white-space:nowrap;color:#1a1a1a">${item.intermediacion > 0 ? fmt(item.intermediacion) : '0'}</td>
+      <td style="padding:2.5px 4px;text-align:right;font-weight:700;border-bottom:1px solid #e2e2e2;white-space:nowrap;color:#1a1a1a">${fmt(item.totalQty)}</td>
     </tr>`;
 
   const TABLA_IZQ = `
   <div style="font-size:15px;font-weight:900;text-align:center;color:#1a1a1a;margin-bottom:6px;padding-bottom:3px;border-bottom:2px solid #3CB44B;text-transform:uppercase">
     RESUMEN POR CLIENTE
   </div>
-  <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:7.8px">
+  <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-size:7.5px">
     <colgroup>
-      <col style="width:38px">
-      <col style="width:214px">
-      <col style="width:48px">
+      <col style="width:30px">
+      <col style="width:135px">
+      <col style="width:46px">
+      <col style="width:54px">
+      <col style="width:50px">
     </colgroup>
     <thead>
-      <tr style="background:#D9D9D9;color:#1a1a1a;font-weight:900;font-size:9px">
+      <tr style="background:#D9D9D9;color:#1a1a1a;font-weight:900;font-size:8.5px">
         <th style="padding:4px 2px;text-align:center">%</th>
-        <th style="padding:4px 6px;text-align:left">CLIENTE</th>
+        <th style="padding:4px 4px;text-align:left">CLIENTE</th>
+        <th style="padding:4px 2px;text-align:right">PROPIO</th>
+        <th style="padding:4px 2px;text-align:right">INTERM.</th>
         <th style="padding:4px 4px;text-align:right">TOTAL</th>
       </tr>
     </thead>
     <tbody>
-      <tr style="background:#E2EFDA;font-weight:900;font-size:11px">
-        <td colspan="3" style="padding:3.5px 6px;text-align:center;color:#1e4d2b;border-bottom:1px solid #c2dfb8;letter-spacing:0.5px">PROPIO</td>
+      <tr style="background:#E2EFDA;font-weight:900;font-size:10px">
+        <td colspan="5" style="padding:3.5px 6px;text-align:center;color:#1e4d2b;border-bottom:1px solid #c2dfb8;letter-spacing:0.5px">PROPIO</td>
       </tr>
       ${m7ClientList.map(item => tablaRow(item)).join('')}
       <tr style="background:#C6E0B4;font-weight:900;font-size:8.5px;color:#1e4d2b">
         <td style="padding:3px 2px;text-align:center;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${pct0(totalM7, total)}%</td>
-        <td style="padding:3px 6px;text-align:left;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">TOTAL PROPIO</td>
+        <td style="padding:3px 4px;text-align:left;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">TOTAL PROPIO</td>
+        <td style="padding:3px 2px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${fmt(totalM7)}</td>
+        <td style="padding:3px 2px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">0</td>
         <td style="padding:3px 4px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${fmt(totalM7)}</td>
       </tr>
-      <tr style="background:#E2EFDA;font-weight:900;font-size:11px">
-        <td colspan="3" style="padding:3.5px 6px;text-align:center;color:#1e4d2b;border-bottom:1px solid #c2dfb8;letter-spacing:0.5px">ALIADO</td>
+      <tr style="background:#E2EFDA;font-weight:900;font-size:10px">
+        <td colspan="5" style="padding:3.5px 6px;text-align:center;color:#1e4d2b;border-bottom:1px solid #c2dfb8;letter-spacing:0.5px">ALIADO</td>
       </tr>
       ${tdmClientList.map(item => tablaRow(item)).join('')}
       <tr style="background:#C6E0B4;font-weight:900;font-size:8.5px;color:#1e4d2b">
         <td style="padding:3px 2px;text-align:center;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${pct0(totalTDM, total)}%</td>
-        <td style="padding:3px 6px;text-align:left;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">TOTAL ALIADO</td>
+        <td style="padding:3px 4px;text-align:left;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">TOTAL ALIADO</td>
+        <td style="padding:3px 2px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">0</td>
+        <td style="padding:3px 2px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${fmt(totalTDM)}</td>
         <td style="padding:3px 4px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${fmt(totalTDM)}</td>
       </tr>
       <tr style="background:#A9D18E;font-weight:900;font-size:9px;color:#14371e">
         <td style="padding:4px 2px;text-align:center;border-top:1.5px solid #82b463">100%</td>
-        <td style="padding:4px 6px;text-align:left;border-top:1.5px solid #82b463">TOTAL GENERAL</td>
+        <td style="padding:4px 4px;text-align:left;border-top:1.5px solid #82b463">TOTAL GENERAL</td>
+        <td style="padding:4px 2px;text-align:right;border-top:1.5px solid #82b463">${fmt(totalM7)}</td>
+        <td style="padding:4px 2px;text-align:right;border-top:1.5px solid #82b463">${fmt(totalTDM)}</td>
         <td style="padding:4px 4px;text-align:right;border-top:1.5px solid #82b463">${fmt(total)}</td>
       </tr>
     </tbody>

@@ -587,6 +587,14 @@ const App: React.FC = () => {
 
 
   // Rutas 100% públicas — deben evaluarse ANTES de cualquier guard de auth o restore
+  if (window.location.hash.startsWith('#/publico/encuesta-sociodemografica') || window.location.pathname.startsWith('/publico/encuesta-sociodemografica')) {
+    return (
+      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}>
+        <PublicSurvey />
+      </React.Suspense>
+    );
+  }
+
   if (window.location.hash.startsWith('#/publico/encuesta') || window.location.pathname.startsWith('/publico/encuesta')) {
     return (
       <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}>

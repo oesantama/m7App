@@ -421,20 +421,45 @@ export const deactivateEncuesta = async (req: Request, res: Response) => {
 };
 
 export const validateSurveyAccess = async (req: Request, res: Response) => {
-  const { cedula } = req.query;
-  if (!cedula) {
-    return res.status(400).json({ error: 'Cédula requerida.' });
+  const { cedula, id } = req.query;
+  if (!cedula && !id) {
+    return res.status(400).json({ error: 'Cédula o ID de activación requerido.' });
   }
   try {
+    let targetCedula = cedula ? String(cedula).trim() : null;
+
+    if (id) {
+      const actRes = await pool.query(`
+        SELECT id, cedula, estado
+        FROM gh_encuestas_activas
+        WHERE id = $1
+      `, [id]);
+
+      if (actRes.rows.length === 0) {
+        return res.status(403).json({ error: 'La asignación de encuesta solicitada no existe.' });
+      }
+
+      const act = actRes.rows[0];
+      if (act.estado !== 'EST-01' && act.estado !== 'ACTIVO') {
+        return res.status(403).json({ error: 'Esta asignación de encuesta ya fue completada o se encuentra inactiva.' });
+      }
+
+      targetCedula = act.cedula.trim();
+    }
+
+    if (!targetCedula) {
+      return res.status(400).json({ error: 'Cédula no válida.' });
+    }
+
     const r = await pool.query(`
       SELECT nombre, cedula, cargo, fecha_ingreso
       FROM gh_personal
       WHERE TRIM(cedula) = TRIM($1)
       LIMIT 1
-    `, [cedula]);
+    `, [targetCedula]);
 
     if (r.rows.length === 0) {
-      return res.status(403).json({ error: 'Cédula no encontrada. Verifique el número e intente de nuevo.' });
+      return res.status(403).json({ error: 'Cédula no encontrada en la base de datos de personal.' });
     }
 
     res.json(r.rows[0]);

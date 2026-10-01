@@ -280,7 +280,7 @@ const Personal: React.FC<Props> = ({ user }) => {
         <div className="flex justify-end gap-1.5">
           {e.estado === 'EST-01' && (
             <button onClick={() => {
-              navigator.clipboard.writeText(`${window.location.origin}/publico/encuesta?id=${e.id}`);
+              navigator.clipboard.writeText(`${window.location.origin}/publico/encuesta-sociodemografica?id=${e.id}`);
               toast.success('Link copiado');
             }} className="p-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200" title="Copiar Link">
               <Icons.Copy className="w-3.5 h-3.5" />
