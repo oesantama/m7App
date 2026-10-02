@@ -35,13 +35,30 @@ function formatFechaLarga(iso: string): string {
 async function fetchClientsMap(): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   try {
-    const res = await pool.query("SELECT name, short_name FROM clients WHERE short_name IS NOT NULL AND TRIM(short_name) <> ''");
+    const res = await pool.query("SELECT id, name, short_name FROM clients WHERE short_name IS NOT NULL AND TRIM(short_name) <> ''");
+    const clientMapById = new Map<string, string>();
     for (const r of res.rows) {
       if (r.name && r.short_name) {
         const fullUpper = r.name.trim().toUpperCase();
         const shortClean = r.short_name.trim();
         map.set(fullUpper, shortClean);
         map.set(shortClean.toUpperCase(), shortClean);
+        if (r.id) clientMapById.set(r.id.trim().toUpperCase(), shortClean);
+      }
+    }
+
+    const provRes = await pool.query("SELECT nombre, client_mappings FROM prov_cliente WHERE client_mappings IS NOT NULL AND jsonb_array_length(client_mappings::jsonb) > 0");
+    for (const p of provRes.rows) {
+      const provName = p.nombre ? p.nombre.trim().toUpperCase() : '';
+      const mappings = Array.isArray(p.client_mappings) ? p.client_mappings : [];
+      for (const m of mappings) {
+        const cId = m.clientId ? String(m.clientId).trim().toUpperCase() : '';
+        const cName = m.clientName ? String(m.clientName).trim() : '';
+        const targetShort = (cId && clientMapById.has(cId)) ? clientMapById.get(cId)! : (cName || cId);
+        if (targetShort) {
+          if (m.managementName) map.set(m.managementName.trim().toUpperCase(), targetShort.trim());
+          if (provName) map.set(provName, targetShort.trim());
+        }
       }
     }
   } catch (e) {
@@ -171,12 +188,12 @@ async function queryFlota(from: string, to: string): Promise<FlotaRow[]> {
           AND manifest_date IS NOT NULL
      ),
      tdm_excel AS (
-        SELECT CONCAT('TDM ', TRIM(c.name)) AS client_name, 1 AS quantity, 'TDM' AS operator,
+        SELECT CONCAT('TDM ', TRIM(COALESCE(c.name, ftm.client_id, 'DESCONOCIDO'))) AS client_name, 1 AS quantity, 'TDM' AS operator,
                COALESCE(UPPER(TRIM(ftm.ciudad_destino)), 'SIN CIUDAD') AS city,
                COALESCE(ftm.valor_cobrar, 0)::float AS cxc,
                COALESCE(ftm.valor_pagar, 0)::float AS cxp
         FROM flota_tdm_manifiestos ftm
-        LEFT JOIN clients c ON ftm.client_id = c.id
+        LEFT JOIN clients c ON ftm.client_id = c.id OR UPPER(TRIM(ftm.client_id)) = UPPER(TRIM(c.name))
         WHERE ftm.fecha_operacion BETWEEN $1 AND $2
      ),
      combined AS (SELECT * FROM manifests UNION ALL SELECT * FROM tdm_excel)

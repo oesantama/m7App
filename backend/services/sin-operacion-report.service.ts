@@ -38,6 +38,39 @@ export async function generateSinOperacionDiariaReport(fechaOverride?: string): 
 
   const dailyClients = clientsRes.rows;
 
+  // Cargar mapa de proveedores (prov_cliente) para asociar nombres de órdenes de despacho a clientes de Maestras
+  const provMapByClientId = new Map<string, Set<string>>();
+  try {
+    const provRes = await pool.query("SELECT nombre, client_mappings FROM prov_cliente WHERE client_mappings IS NOT NULL AND jsonb_array_length(client_mappings::jsonb) > 0");
+    for (const p of provRes.rows) {
+      const provName = p.nombre ? p.nombre.trim().toUpperCase() : '';
+      const mappings = Array.isArray(p.client_mappings) ? p.client_mappings : [];
+      for (const m of mappings) {
+        const cId = m.clientId ? String(m.clientId).trim().toUpperCase() : '';
+        const cName = m.clientName ? String(m.clientName).trim().toUpperCase() : '';
+        const mName = m.managementName ? String(m.managementName).trim().toUpperCase() : '';
+
+        const addAlias = (key: string, alias: string) => {
+          if (!key || !alias) return;
+          const set = provMapByClientId.get(key) || new Set<string>();
+          set.add(alias);
+          provMapByClientId.set(key, set);
+        };
+
+        if (cId) {
+          if (mName) addAlias(cId, mName);
+          if (provName) addAlias(cId, provName);
+        }
+        if (cName) {
+          if (mName) addAlias(cName, mName);
+          if (provName) addAlias(cName, provName);
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[SIN-OPERACION] Error fetching prov_cliente mappings:', e);
+  }
+
   // 2. Consultar viajes en Transportando (management_orders) para la fecha dada
   const m7Res = await pool.query(`
     SELECT TRIM(client_name) AS client_name, COUNT(*)::int AS cnt
@@ -70,16 +103,25 @@ export async function generateSinOperacionDiariaReport(fechaOverride?: string): 
     const cShortUpper = (c.short_name || '').trim().toUpperCase();
     const cIdUpper = (c.id || '').trim().toUpperCase();
 
+    const provAliases = new Set<string>([
+      ...(provMapByClientId.get(cIdUpper) || []),
+      ...(provMapByClientId.get(cNameUpper) || []),
+      ...(provMapByClientId.get(cShortUpper) || [])
+    ]);
+
     // Conteo M7
     let m7Trips = 0;
     for (const op of m7Ops) {
       const opNameUpper = (op.client_name || '').trim().toUpperCase();
-      if (
+      const isMatch =
         opNameUpper === cNameUpper ||
+        provAliases.has(opNameUpper) ||
+        Array.from(provAliases).some(alias => alias.length >= 3 && opNameUpper.includes(alias)) ||
         (cShortUpper.length >= 2 && opNameUpper.includes(cShortUpper)) ||
         (cNameUpper.length >= 3 && opNameUpper.includes(cNameUpper)) ||
-        (opNameUpper.length >= 3 && cNameUpper.includes(opNameUpper))
-      ) {
+        (opNameUpper.length >= 3 && cNameUpper.includes(opNameUpper));
+
+      if (isMatch) {
         m7Trips += op.cnt;
       }
     }
@@ -89,11 +131,13 @@ export async function generateSinOperacionDiariaReport(fechaOverride?: string): 
     for (const op of tdmOps) {
       const opClientIdUpper = (op.client_id || '').trim().toUpperCase();
       const opNameUpper = (op.client_name || '').trim().toUpperCase();
-      if (
+      const isMatch =
         opClientIdUpper === cIdUpper ||
         opNameUpper === cNameUpper ||
-        (cShortUpper.length >= 2 && opNameUpper.includes(cShortUpper))
-      ) {
+        provAliases.has(opNameUpper) ||
+        (cShortUpper.length >= 2 && opNameUpper.includes(cShortUpper));
+
+      if (isMatch) {
         tdmTrips += op.cnt;
       }
     }
