@@ -454,34 +454,61 @@ function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fec
     rutaPct: number;
   }
 
-  const clientFinancialMap = new Map<string, ClientFinancialSummary>();
-  rows.forEach(r => {
+  // 1. PROPIO (M7)
+  const m7Map = new Map<string, ClientFinancialSummary>();
+  m7Rows.forEach(r => {
     const sn = toShortClientName(r.client_name, clientsMap);
-    const existing = clientFinancialMap.get(sn) || {
-      shortName: sn,
-      fullName: r.client_name,
-      quantity: 0,
-      cxc: 0,
-      cxp: 0,
-      ingreso: 0,
-      rutaPct: 0,
+    const existing = m7Map.get(sn) || {
+      shortName: sn, fullName: r.client_name, quantity: 0, cxc: 0, cxp: 0, ingreso: 0, rutaPct: 0
     };
     existing.quantity += r.quantity;
     existing.cxc += r.cxc || 0;
     existing.cxp += r.cxp || 0;
     existing.ingreso = existing.cxc - existing.cxp;
-    clientFinancialMap.set(sn, existing);
+    m7Map.set(sn, existing);
   });
 
-  const clientList = [...clientFinancialMap.values()].map(item => {
-    const isTdm = /^TDM\b/i.test(item.shortName) || item.fullName.toUpperCase().includes('TDM');
+  const m7List = [...m7Map.values()].map(item => {
     const rawPct = item.cxc > 0 ? ((item.cxc - item.cxp) / item.cxc) * 100 : 0;
-    const rutaPct = isTdm ? calcIntReal(rawPct, item.fullName) : rawPct;
+    return { ...item, rutaPct: Math.round(rawPct) };
+  }).sort((a, b) => b.quantity - a.quantity);
+
+  const m7TotalQty = m7List.reduce((s, c) => s + c.quantity, 0);
+  const m7TotalCxC = m7List.reduce((s, c) => s + c.cxc, 0);
+  const m7TotalCxP = m7List.reduce((s, c) => s + c.cxp, 0);
+  const m7TotalIngreso = m7TotalCxC - m7TotalCxP;
+  const m7RutaPct = m7TotalCxC > 0 ? Math.round(((m7TotalCxC - m7TotalCxP) / m7TotalCxC) * 100) : 0;
+
+  // 2. ALIADO (TDM)
+  const tdmMap = new Map<string, ClientFinancialSummary>();
+  tdmRows.forEach(r => {
+    const sn = toShortClientName(r.client_name, clientsMap);
+    const existing = tdmMap.get(sn) || {
+      shortName: sn, fullName: r.client_name, quantity: 0, cxc: 0, cxp: 0, ingreso: 0, rutaPct: 0
+    };
+    existing.quantity += r.quantity;
+    existing.cxc += r.cxc || 0;
+    existing.cxp += r.cxp || 0;
+    existing.ingreso = existing.cxc - existing.cxp;
+    tdmMap.set(sn, existing);
+  });
+
+  const tdmList = [...tdmMap.values()].map(item => {
+    const rawPct = item.cxc > 0 ? ((item.cxc - item.cxp) / item.cxc) * 100 : 0;
+    const rutaPct = calcIntReal(rawPct, item.fullName);
     return { ...item, rutaPct: Math.round(rutaPct) };
   }).sort((a, b) => b.quantity - a.quantity);
 
-  const grandTotalCxC = clientList.reduce((sum, c) => sum + c.cxc, 0);
-  const grandTotalCxP = clientList.reduce((sum, c) => sum + c.cxp, 0);
+  const tdmTotalQty = tdmList.reduce((s, c) => s + c.quantity, 0);
+  const tdmTotalCxC = tdmList.reduce((s, c) => s + c.cxc, 0);
+  const tdmTotalCxP = tdmList.reduce((s, c) => s + c.cxp, 0);
+  const tdmTotalIngreso = tdmTotalCxC - tdmTotalCxP;
+  const tdmRutaPct = tdmTotalCxC > 0 ? Math.round(((tdmTotalCxC - tdmTotalCxP) / tdmTotalCxC) * 100) : 0;
+
+  // GRAND TOTALS
+  const grandTotalQty = m7TotalQty + tdmTotalQty;
+  const grandTotalCxC = m7TotalCxC + tdmTotalCxC;
+  const grandTotalCxP = m7TotalCxP + tdmTotalCxP;
   const grandTotalIngreso = grandTotalCxC - grandTotalCxP;
   const grandTotalRutaPct = grandTotalCxC > 0 ? Math.round(((grandTotalCxC - grandTotalCxP) / grandTotalCxC) * 100) : 0;
 
@@ -533,11 +560,37 @@ function buildHtml(rows: FlotaRow[], vehiculos: { m7: number; tdm: number }, fec
       </tr>
     </thead>
     <tbody>
-      ${clientList.map(item => tablaRow(item)).join('')}
+      <!-- PROPIO SECTION -->
+      <tr style="background:#E2EFDA;font-weight:900;font-size:9px">
+        <td colspan="5" style="padding:3px 6px;text-align:center;color:#1e4d2b;border-bottom:1px solid #c2dfb8;letter-spacing:0.5px">PROPIO</td>
+      </tr>
+      ${m7List.length > 0 ? m7List.map(item => tablaRow(item)).join('') : '<tr><td colspan="5" style="padding:2px;text-align:center;color:#888">Sin operaciones propias</td></tr>'}
+      <tr style="background:#C6E0B4;font-weight:900;font-size:7.5px;color:#1e4d2b">
+        <td style="padding:3px 2px;text-align:center;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${pct0(m7TotalQty, grandTotalQty)}%</td>
+        <td style="padding:3px 2px;text-align:left;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">TOTAL PROPIO</td>
+        <td style="padding:3px 2px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${fmt(m7TotalQty)}</td>
+        <td style="padding:3px 2px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${m7RutaPct}%</td>
+        <td style="padding:3px 2px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${fmtMoney(m7TotalIngreso)}</td>
+      </tr>
+
+      <!-- ALIADO SECTION -->
+      <tr style="background:#E2EFDA;font-weight:900;font-size:9px">
+        <td colspan="5" style="padding:3px 6px;text-align:center;color:#1e4d2b;border-bottom:1px solid #c2dfb8;letter-spacing:0.5px">ALIADO</td>
+      </tr>
+      ${tdmList.length > 0 ? tdmList.map(item => tablaRow(item)).join('') : '<tr><td colspan="5" style="padding:2px;text-align:center;color:#888">Sin operaciones aliadas</td></tr>'}
+      <tr style="background:#C6E0B4;font-weight:900;font-size:7.5px;color:#1e4d2b">
+        <td style="padding:3px 2px;text-align:center;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${pct0(tdmTotalQty, grandTotalQty)}%</td>
+        <td style="padding:3px 2px;text-align:left;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">TOTAL ALIADO</td>
+        <td style="padding:3px 2px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${fmt(tdmTotalQty)}</td>
+        <td style="padding:3px 2px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${tdmRutaPct}%</td>
+        <td style="padding:3px 2px;text-align:right;border-top:1px solid #a8c690;border-bottom:1px solid #a8c690">${fmtMoney(tdmTotalIngreso)}</td>
+      </tr>
+
+      <!-- GRAND TOTAL -->
       <tr style="background:#A9D18E;font-weight:900;font-size:7.5px;color:#14371e">
         <td style="padding:3.5px 2px;text-align:center;border-top:1.5px solid #82b463">100%</td>
         <td style="padding:3.5px 2px;text-align:left;border-top:1.5px solid #82b463">TOTAL GENERAL</td>
-        <td style="padding:3.5px 2px;text-align:right;border-top:1.5px solid #82b463">${fmt(total)}</td>
+        <td style="padding:3.5px 2px;text-align:right;border-top:1.5px solid #82b463">${fmt(grandTotalQty)}</td>
         <td style="padding:3.5px 2px;text-align:right;border-top:1.5px solid #82b463">${grandTotalRutaPct}%</td>
         <td style="padding:3.5px 2px;text-align:right;border-top:1.5px solid #82b463">${fmtMoney(grandTotalIngreso)}</td>
       </tr>
