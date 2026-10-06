@@ -393,10 +393,10 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     } else if (category === 'masterClientes') {
       Object.assign(defaults, {
         email: '',
-        logoUrl: '',
-        clientType: 'MUNICIPAL',
-        shortName: '',
-        reportType: 'DIARIO',
+        logoUrl: record.logoUrl || record.logo_url || '',
+        clientType: record.clientType || record.client_type || 'MUNICIPAL',
+        shortName: record.shortName || record.short_name || '',
+        reportType: record.reportType || record.report_type || 'DIARIO',
       });
     } else if (category === 'masterRol') {
       Object.assign(defaults, {
@@ -430,6 +430,14 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         }
         return Array.isArray(val) ? val : [];
       })(),
+      shortName: record.shortName || record.short_name || '',
+      short_name: record.shortName || record.short_name || '',
+      reportType: record.reportType || record.report_type || 'DIARIO',
+      report_type: record.reportType || record.report_type || 'DIARIO',
+      clientType: record.clientType || record.client_type || 'MUNICIPAL',
+      client_type: record.clientType || record.client_type || 'MUNICIPAL',
+      logoUrl: record.logoUrl || record.logo_url || '',
+      logo_url: record.logoUrl || record.logo_url || '',
       phone: record.phone || record.phone_number || '',
       documentType: record.documentType || record.document_type || '',
       documentNumber: record.documentNumber || record.document_number || '',
@@ -2017,6 +2025,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
                 <select value={formData.reportType || formData.report_type || 'DIARIO'} onChange={e => setFormData({ ...formData, reportType: e.target.value, report_type: e.target.value })} className={commonInputStyle}>
                   <option value="DIARIO">DIARIO</option>
                   <option value="INTERMITENTE">INTERMITENTE</option>
+                  <option value="NO APLICA">NO APLICA</option>
                 </select>
                 <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-slate-400"><Icons.ChevronRight className="rotate-90 w-3 h-3" /></div>
               </div>

@@ -130,8 +130,8 @@ export interface Client extends AuditBase {
   name: string;
   shortName?: string;
   short_name?: string;
-  reportType?: 'DIARIO' | 'INTERMITENTE';
-  report_type?: 'DIARIO' | 'INTERMITENTE';
+  reportType?: 'DIARIO' | 'INTERMITENTE' | 'NO APLICA';
+  report_type?: 'DIARIO' | 'INTERMITENTE' | 'NO APLICA';
   logoUrl?: string;
   logo_url?: string;
   clientType?: string;
