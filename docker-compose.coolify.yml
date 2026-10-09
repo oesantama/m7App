@@ -28,7 +28,7 @@ services:
       - DATABASE_SAVE_DATA_LABELS=false
       - DATABASE_SAVE_DATA_HISTORIC=false
       - QRCODE_LIMIT=30
-      - DEL_INSTANCE=false
+      - DEL_INSTANCE=true
       - LOG_LEVEL=ERROR
       - TZ=America/Bogota
       - CONFIG_SESSION_PHONE_VERSION=

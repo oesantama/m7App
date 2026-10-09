@@ -113,13 +113,21 @@ export async function generateSinOperacionDiariaReport(fechaOverride?: string): 
     let m7Trips = 0;
     for (const op of m7Ops) {
       const opNameUpper = (op.client_name || '').trim().toUpperCase();
+      const opNorm = opNameUpper.replace(/[^A-Z0-9]/g, '');
+      const cNorm = cNameUpper.replace(/[^A-Z0-9]/g, '');
+      const cShortNorm = cShortUpper.replace(/[^A-Z0-9]/g, '');
+
       const isMatch =
         opNameUpper === cNameUpper ||
+        (cNorm.length >= 3 && opNorm === cNorm) ||
+        (cShortNorm.length >= 2 && opNorm.includes(cShortNorm)) ||
+        (cNorm.length >= 3 && opNorm.includes(cNorm)) ||
+        (opNorm.length >= 3 && cNorm.includes(opNorm)) ||
         provAliases.has(opNameUpper) ||
-        Array.from(provAliases).some(alias => alias.length >= 3 && opNameUpper.includes(alias)) ||
-        (cShortUpper.length >= 2 && opNameUpper.includes(cShortUpper)) ||
-        (cNameUpper.length >= 3 && opNameUpper.includes(cNameUpper)) ||
-        (opNameUpper.length >= 3 && cNameUpper.includes(opNameUpper));
+        Array.from(provAliases).some(alias => {
+          const aliasNorm = alias.replace(/[^A-Z0-9]/g, '');
+          return aliasNorm.length >= 3 && opNorm.includes(aliasNorm);
+        });
 
       if (isMatch) {
         m7Trips += op.cnt;
@@ -131,11 +139,16 @@ export async function generateSinOperacionDiariaReport(fechaOverride?: string): 
     for (const op of tdmOps) {
       const opClientIdUpper = (op.client_id || '').trim().toUpperCase();
       const opNameUpper = (op.client_name || '').trim().toUpperCase();
+      const opNorm = opNameUpper.replace(/[^A-Z0-9]/g, '');
+      const cNorm = cNameUpper.replace(/[^A-Z0-9]/g, '');
+      const cShortNorm = cShortUpper.replace(/[^A-Z0-9]/g, '');
+
       const isMatch =
         opClientIdUpper === cIdUpper ||
         opNameUpper === cNameUpper ||
+        (cNorm.length >= 3 && opNorm === cNorm) ||
         provAliases.has(opNameUpper) ||
-        (cShortUpper.length >= 2 && opNameUpper.includes(cShortUpper));
+        (cShortNorm.length >= 2 && opNorm.includes(cShortNorm));
 
       if (isMatch) {
         tdmTrips += op.cnt;

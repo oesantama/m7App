@@ -945,39 +945,61 @@ const AdminDBManager: React.FC = () => {
                       </div>
                       <div className="border border-emerald-300 rounded p-4 flex flex-col gap-3 bg-emerald-50 hover:shadow-md transition-shadow">
                           <h4 className="font-bold text-slate-800">Importación Transportando (Unificada)</h4>
-                          <p className="text-xs text-slate-500">Ejecuta en secuencia: manifiestos → recaudos → egresos. Garantiza que no haya conflicto de sesión en el portal TMS. Equivalente al cron automático de las 2 AM.</p>
-                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Diariamente 02:00 AM (unificado) + 07:00 AM (manifiestos 2da pasada)</p>
+                          <p className="text-xs text-slate-500">Ejecuta en secuencia: manifiestos → recaudos → egresos → preoperacional. Garantiza no conflicto de sesión en el portal TMS.</p>
+                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: 02:00 AM (unificado) + 05:30 AM (preop) + 07:00 AM (2da pasada)</p>
                           <div className="mt-auto pt-2 flex flex-col gap-2">
                               <button
                                   onClick={() => handleRunCron('transportandoUnificado')}
                                   disabled={runningCrons['transportandoUnificado']}
                                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
                               >
-                                  {runningCrons['transportandoUnificado'] ? 'Ejecutando (3 procesos)...' : 'Ejecutar TODO Secuencial ▶▶'}
+                                  {runningCrons['transportandoUnificado'] ? 'Ejecutando (4 procesos)...' : 'Ejecutar TODO Secuencial ▶▶'}
                               </button>
-                              <div className="flex gap-2">
+                              <div className="grid grid-cols-2 gap-1.5">
                                   <button
                                       onClick={() => handleRunCron('transportandoScrape')}
                                       disabled={runningCrons['transportandoScrape']}
-                                      className="flex-1 bg-slate-500 hover:bg-slate-600 text-white py-1.5 rounded text-xs font-semibold shadow transition-colors disabled:opacity-50"
+                                      className="bg-slate-600 hover:bg-slate-700 text-white py-1 rounded text-[11px] font-semibold shadow transition-colors disabled:opacity-50"
                                   >
-                                      {runningCrons['transportandoScrape'] ? '...' : 'Solo Manifiestos'}
+                                      {runningCrons['transportandoScrape'] ? '...' : 'Manifiestos'}
                                   </button>
                                   <button
                                       onClick={() => handleRunCron('transportandoRecaudosScrape')}
                                       disabled={runningCrons['transportandoRecaudosScrape']}
-                                      className="flex-1 bg-slate-500 hover:bg-slate-600 text-white py-1.5 rounded text-xs font-semibold shadow transition-colors disabled:opacity-50"
+                                      className="bg-slate-600 hover:bg-slate-700 text-white py-1 rounded text-[11px] font-semibold shadow transition-colors disabled:opacity-50"
                                   >
-                                      {runningCrons['transportandoRecaudosScrape'] ? '...' : 'Solo Recaudos'}
+                                      {runningCrons['transportandoRecaudosScrape'] ? '...' : 'Recaudos'}
                                   </button>
                                   <button
                                       onClick={() => handleRunCron('transportandoEgresosScrape')}
                                       disabled={runningCrons['transportandoEgresosScrape']}
-                                      className="flex-1 bg-slate-500 hover:bg-slate-600 text-white py-1.5 rounded text-xs font-semibold shadow transition-colors disabled:opacity-50"
+                                      className="bg-slate-600 hover:bg-slate-700 text-white py-1 rounded text-[11px] font-semibold shadow transition-colors disabled:opacity-50"
                                   >
-                                      {runningCrons['transportandoEgresosScrape'] ? '...' : 'Solo Egresos'}
+                                      {runningCrons['transportandoEgresosScrape'] ? '...' : 'Egresos'}
+                                  </button>
+                                  <button
+                                      onClick={() => handleRunCron('transportandoPreoperacionalScrape')}
+                                      disabled={runningCrons['transportandoPreoperacionalScrape']}
+                                      className="bg-teal-700 hover:bg-teal-800 text-white py-1 rounded text-[11px] font-semibold shadow transition-colors disabled:opacity-50"
+                                  >
+                                      {runningCrons['transportandoPreoperacionalScrape'] ? '...' : 'Preoperacional'}
                                   </button>
                               </div>
+                          </div>
+                      </div>
+
+                      <div className="border border-teal-300 rounded p-4 flex flex-col gap-3 bg-teal-50 hover:shadow-md transition-shadow">
+                          <h4 className="font-bold text-slate-800">Reporte Preoperacional (WA / Email)</h4>
+                          <p className="text-xs text-slate-500">Genera y envía el reporte diario de cumplimiento preoperacional con PDF y Excel adjuntos a WhatsApp y Correo.</p>
+                          <p className="text-[10px] font-mono text-teal-700 font-bold mt-1">🕒 Auto: Diariamente 06:20 AM</p>
+                          <div className="mt-auto pt-2">
+                              <button 
+                                  onClick={() => handleRunCron('reportePreoperacional')}
+                                  disabled={runningCrons['reportePreoperacional']}
+                                  className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
+                              >
+                                  {runningCrons['reportePreoperacional'] ? 'Generando...' : 'Generar Reporte ▶'}
+                              </button>
                           </div>
                       </div>
                   </div>

@@ -358,7 +358,7 @@ export const initScheduler = () => {
     // Importación unificada desde Transportando: 2 AM secuencial (manifiestos → recaudos → egresos)
     // Secuencial para evitar conflicto de sesión simultánea en Transportando.
     cron.schedule('0 2 * * *', async () => {
-        console.log('[M7-SCHEDULER] Ejecutando cron unificado Transportando: manifiestos → recaudos → egresos...');
+        console.log('[M7-SCHEDULER] Ejecutando cron unificado Transportando: manifiestos → recaudos → egresos → preoperacional...');
         await executeWithCronLog('Importacion_Transportando', async () => {
             const logs1 = await scrapeTransportandoReports('manifiestos');
             console.log('[M7-SCHEDULER] Manifiestos OK:', logs1.join(' | '));
@@ -366,10 +366,23 @@ export const initScheduler = () => {
             console.log('[M7-SCHEDULER] Recaudos OK:', logs2.join(' | '));
             const logs3 = await scrapeTransportandoReports('egresos');
             console.log('[M7-SCHEDULER] Egresos OK:', logs3.join(' | '));
-            return [...logs1, ...logs2, ...logs3];
+            const logs4 = await scrapeTransportandoReports('preoperacional');
+            console.log('[M7-SCHEDULER] Preoperacional OK:', logs4.join(' | '));
+            return [...logs1, ...logs2, ...logs3, ...logs4];
         });
     }, { timezone: 'America/Bogota' });
     console.log('[M7-SCHEDULER] Tarea "Importación Transportando (unificada)" programada: Diariamente 02:00 AM');
+
+    // Importación de Preoperacional a las 5:30 AM para alimentar el informe de las 6:20 AM
+    cron.schedule('30 5 * * *', async () => {
+        console.log('[M7-SCHEDULER] Ejecutando cron de Importación de Preoperacionales desde Transportando...');
+        await executeWithCronLog('Importacion_Preoperacional', async () => {
+            const logs = await scrapeTransportandoReports('preoperacional');
+            console.log('[M7-SCHEDULER] Logs Scraping Preoperacional:', logs.join(' | '));
+            return logs;
+        });
+    }, { timezone: 'America/Bogota' });
+    console.log('[M7-SCHEDULER] Tarea "Importación Preoperacional" programada: Diariamente 05:30 AM');
 
     // Segunda pasada de manifiestos a las 7 AM: alimenta el informe de facturación pendiente (10 AM)
     cron.schedule('0 7 * * *', async () => {
@@ -615,12 +628,17 @@ export const manualRunTransportandoEgresosScrape = async (): Promise<string[]> =
     return await scrapeTransportandoReports('egresos');
 };
 
-// Ejecución manual unificada: manifiestos → recaudos → egresos en secuencia (igual al cron 2 AM)
+export const manualRunTransportandoPreoperacionalScrape = async (): Promise<string[]> => {
+    return await scrapeTransportandoReports('preoperacional');
+};
+
+// Ejecución manual unificada: manifiestos → recaudos → egresos → preoperacional en secuencia
 export const manualRunTransportandoUnificado = async (): Promise<string[]> => {
     const logs1 = await scrapeTransportandoReports('manifiestos');
     const logs2 = await scrapeTransportandoReports('recaudos');
     const logs3 = await scrapeTransportandoReports('egresos');
-    return [...logs1, ...logs2, ...logs3];
+    const logs4 = await scrapeTransportandoReports('preoperacional');
+    return [...logs1, ...logs2, ...logs3, ...logs4];
 };
 
 export const validateMissingNovedadesDrive = async (): Promise<string[]> => {

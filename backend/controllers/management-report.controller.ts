@@ -132,24 +132,25 @@ export const uploadReports = async (req: Request, res: Response) => {
       const originDest = cleanStr(row.city || row['Destino'] || row['destino'] || row['DESTINO'] || row['Origen'] || row['origen'] || '').toUpperCase();
 
       const clientUpper = clientName.toUpperCase();
-      const isAjover = clientUpper.includes('AJOVER') || clientDoc.includes('860013771');
-      const isTdm = clientUpper.includes('TDM') || clientDoc.includes('890904488');
+      const clientDocStr = clientDoc.replace(/[^0-9]/g, '');
+      const isAjoverDoc = clientDocStr.includes('860013771') || clientUpper.includes('AJOVER');
+      const isTdmDoc = clientDocStr.includes('890904488') || clientDocStr.includes('890901352') || clientUpper.includes('TDM');
 
-      if (isAjover) {
-        if (rawOrigin.includes('CALI')) {
-          clientName = 'AJOVER CALI M7 LINA';
-        } else {
-          clientName = 'AJOVER M7_BODEGA36';
-        }
-      } else if (isTdm) {
+      if (isTdmDoc) {
         if (rawOrigin.includes('ESTRELLA')) {
           clientName = 'AJOVER_BODEGA10';
         } else if (rawOrigin.includes('CALI')) {
           clientName = 'AJOVER CALI DIANA LOBATON';
         } else if (rawOrigin.includes('GIRARDOTA')) {
           clientName = 'TDM (PREBEL)';
+        }
+      } else if (isAjoverDoc) {
+        if (rawOrigin.includes('ESTRELLA')) {
+          clientName = 'AJOVER_BODEGA10';
+        } else if (rawOrigin.includes('CALI')) {
+          clientName = 'AJOVER CALI M7 LINA';
         } else {
-          clientName = 'Validar TDM';
+          clientName = 'AJOVER M7_BODEGA36';
         }
       }
 

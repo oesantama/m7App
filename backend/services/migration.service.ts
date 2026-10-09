@@ -1131,6 +1131,43 @@ const healSchema = async (client: any) => {
       CREATE INDEX IF NOT EXISTS idx_management_orders_client ON management_orders (client_name);
     `).catch(() => { });
 
+    // ── preoperacional_respuestas: Registro de Respuestas Preoperacionales de Transportando ──
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS preoperacional_respuestas (
+        id SERIAL PRIMARY KEY,
+        oc_number VARCHAR(100),
+        id_orden VARCHAR(100),
+        fecha DATE,
+        manifest_number VARCHAR(100),
+        id_manifest VARCHAR(100),
+        driver_name VARCHAR(255),
+        driver_document VARCHAR(100),
+        id_driver VARCHAR(100),
+        plate VARCHAR(50),
+        vehicle_model VARCHAR(50),
+        id_vehicle VARCHAR(100),
+        estado VARCHAR(50),
+        firmado VARCHAR(50),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT unq_preoperacional_oc UNIQUE (oc_number, fecha)
+      );
+      CREATE INDEX IF NOT EXISTS idx_preoperacional_oc ON preoperacional_respuestas (oc_number);
+      CREATE INDEX IF NOT EXISTS idx_preoperacional_fecha ON preoperacional_respuestas (fecha);
+      CREATE INDEX IF NOT EXISTS idx_preoperacional_plate ON preoperacional_respuestas (plate);
+
+      INSERT INTO alertas_whatsapp (id, name, message_template, cron_expression, tipo_evento, adjunto_tipo, status_id)
+      VALUES (
+        'alerta-preoperacional',
+        'Informe Diario Preoperacional Transportando',
+        '📋 *OrbitM7 — Informe Preoperacional Diario*\n📅 Fecha: {{fecha}}\n⏰ Hora: 06:20 AM\n\nSe adjunta el reporte consolidado de cumplimiento de preoperacionales por cliente.',
+        '20 6 * * *',
+        'PREOPERACIONAL',
+        'informe_preoperacional',
+        'EST-01'
+      ) ON CONFLICT (id) DO NOTHING;
+    `).catch((e) => { console.warn('[M7-DB] Error al crear preoperacional_respuestas:', e.message); });
+
     // ── FIX: delivery_patterns.id debe tener secuencia BIGSERIAL para INSERT sin id ──
     await client.query(`
       DO $$
@@ -2273,7 +2310,32 @@ export const runBackgroundOptimizations = async () => {
             CREATE INDEX IF NOT EXISTS idx_vehicle_locations_latest 
             ON vehicle_locations (vehicle_id, updated_at DESC)
         `);
-    console.log('[M7-BACKGROUND] Optimizaciones completadas exitosamente.');
+
+    // Reclasificación retroactiva de bodegas Ajover y TDM en management_orders según NIT y Origen
+    await client.query(`
+      UPDATE management_orders
+      SET client_name = 'AJOVER_BODEGA10'
+      WHERE (REPLACE(client_document, '-', '') ILIKE '%860013771%' OR REPLACE(client_document, '-', '') ILIKE '%890904488%' OR REPLACE(client_document, '-', '') ILIKE '%890901352%' OR client_name ILIKE '%AJOVER%' OR client_name ILIKE '%TDM%')
+        AND origin ILIKE '%ESTRELLA%'
+        AND client_name != 'AJOVER_BODEGA10';
+    `);
+
+    await client.query(`
+      UPDATE management_orders
+      SET client_name = 'AJOVER CALI DIANA LOBATON'
+      WHERE (REPLACE(client_document, '-', '') ILIKE '%890904488%' OR REPLACE(client_document, '-', '') ILIKE '%890901352%' OR client_name ILIKE '%TDM%')
+        AND origin ILIKE '%CALI%'
+        AND client_name != 'AJOVER CALI DIANA LOBATON';
+    `);
+
+    await client.query(`
+      UPDATE management_orders
+      SET client_name = 'AJOVER CALI M7 LINA'
+      WHERE (REPLACE(client_document, '-', '') ILIKE '%860013771%' OR (client_name ILIKE '%AJOVER%' AND client_name NOT ILIKE '%TDM%'))
+        AND origin ILIKE '%CALI%'
+        AND client_name != 'AJOVER CALI M7 LINA';
+    `);
+    console.log('[M7-BACKGROUND] Reclasificación retroactiva de bodegas Ajover/TDM completada.');
   } catch (err: any) {
     console.error('[M7-BACKGROUND-ERROR] Falló optimización de índices:', err.message);
   } finally {

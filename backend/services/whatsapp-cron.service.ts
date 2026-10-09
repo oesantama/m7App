@@ -5,6 +5,7 @@ import { generateFlotaReportPdf } from './flota-wa-report.service.js';
 import { generateCierreFactReport } from './cierre-fact-report.service.js';
 import { generateSobrecostoReport } from './sobrecosto-report.service.js';
 import { generateSinOperacionDiariaReport } from './sin-operacion-report.service.js';
+import { generatePreoperacionalReport } from './preoperacional-report.service.js';
 import { sendEmail } from './notification.service.js';
 
 // Nombre de instancia fijo se resuelve dinámicamente al momento de enviar
@@ -75,7 +76,20 @@ class WhatsAppCronRunner {
     // Generar adjunto o contenido dinámico según tipo de evento o adjunto_tipo
     let pdfAttachment: { base64: string; fileName: string; caption: string } | null = null;
 
-    if (alerta.tipo_evento === 'SIN_OPERACION_DIARIA') {
+    if (alerta.tipo_evento === 'PREOPERACIONAL' || alerta.adjunto_tipo === 'informe_preoperacional') {
+      try {
+        const preopReport = await generatePreoperacionalReport();
+        message = preopReport.message;
+        pdfAttachment = {
+          base64: preopReport.pdfBase64,
+          fileName: preopReport.pdfFileName,
+          caption: `📋 *Informe Preoperacional OrbitM7*\nFecha: ${preopReport.fechaFormateada}\nRealizados: ${preopReport.totalRealizados}/${preopReport.totalOrders} (${preopReport.efectividadGlobal}%) | Aptos: ${preopReport.totalAptos} | Pendientes: ${preopReport.totalPendientes}`
+        };
+        console.log(`[WA-CRON] Reporte preoperacional generado: ${preopReport.pdfFileName}`);
+      } catch (err: any) {
+        console.error('[WA-CRON] Error generando reporte preoperacional:', err.message);
+      }
+    } else if (alerta.tipo_evento === 'SIN_OPERACION_DIARIA') {
       try {
         const sinOpReport = await generateSinOperacionDiariaReport();
         message = sinOpReport.message;

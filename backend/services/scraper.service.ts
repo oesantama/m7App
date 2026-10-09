@@ -20,7 +20,7 @@ export const activeScraperLogs: string[] = (globalThis as any).activeScraperLogs
  * desde el 1 de enero hasta la fecha actual.
  */
 export const scrapeTransportandoReports = async (
-    reportType: 'manifiestos' | 'recaudos' | 'egresos' = 'manifiestos'
+    reportType: 'manifiestos' | 'recaudos' | 'egresos' | 'preoperacional' = 'manifiestos'
 ): Promise<string[]> => {
     const logs: string[] = [];
     activeScraperLogs.length = 0; // Clear previous logs
@@ -98,13 +98,15 @@ export const scrapeTransportandoReports = async (
         let reportUrl = 'https://tms.transportando.com.co/#/informe-transporte?tipo=general-manifiestos';
         if (reportType === 'recaudos' || reportType === 'egresos') {
             reportUrl = 'https://tms.transportando.com.co/#/informes-contabilidad?tipo=informe-listado-consecutivos-documento';
+        } else if (reportType === 'preoperacional') {
+            reportUrl = 'https://tms.transportando.com.co/#/informe-preoperacional-respuestas';
         }
         log(`Navegando al módulo de informes: ${reportUrl}...`);
         await page.goto(reportUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
         // Esperar a que la SPA (Vue) se monte e inicialice completamente
         await new Promise(r => setTimeout(r, 4000));
 
-        // 3. CALCULAR LOS MESES A CONSULTAR (Desde Enero hasta el mes actual)
+        // 3. CALCULAR LOS MESES/PERIODOS A CONSULTAR
         const currentDate = new Date();
         const currentYear = currentDate.getFullYear();
         const currentMonth = currentDate.getMonth(); // 0 = Enero, 11 = Diciembre
@@ -118,19 +120,30 @@ export const scrapeTransportandoReports = async (
         };
 
         const monthsToQuery: {start: string, end: string}[] = [];
-        for (let m = 0; m <= currentMonth; m++) {
-            const firstDay = new Date(currentYear, m, 1);
-            let lastDay = new Date(currentYear, m + 1, 0); // Último día del mes
 
-            // Si es el mes actual, consultar hasta hoy
-            if (m === currentMonth) {
-                lastDay = currentDate;
-            }
-
+        if (reportType === 'preoperacional') {
+            // Para preoperacional, consultar ayer y hoy
+            const ayer = new Date();
+            ayer.setDate(ayer.getDate() - 1);
             monthsToQuery.push({
-                start: toLocalDateStr(firstDay),
-                end: toLocalDateStr(lastDay),
+                start: toLocalDateStr(ayer),
+                end: toLocalDateStr(currentDate)
             });
+        } else {
+            for (let m = 0; m <= currentMonth; m++) {
+                const firstDay = new Date(currentYear, m, 1);
+                let lastDay = new Date(currentYear, m + 1, 0); // Último día del mes
+
+                // Si es el mes actual, consultar hasta hoy
+                if (m === currentMonth) {
+                    lastDay = currentDate;
+                }
+
+                monthsToQuery.push({
+                    start: toLocalDateStr(firstDay),
+                    end: toLocalDateStr(lastDay),
+                });
+            }
         }
 
         log(`Se realizarán ${monthsToQuery.length} consultas por mes.`);
@@ -333,14 +346,14 @@ export const scrapeTransportandoReports = async (
                 const buttons = await page.$$('button.el-button, button');
                 for (const btn of buttons) {
                     const text = await page.evaluate(el => el.textContent, btn);
-                    if (text && (text.includes('Obtener informe') || text.includes('Obtener informes'))) {
+                    if (text && (text.includes('Obtener informe') || text.includes('Obtener informes') || text.includes('Filtrar'))) {
                         targetButtonHandle = btn;
                         break;
                     }
                 }
                 if (targetButtonHandle) break;
                 if (intento < MAX_INTENTOS_BOTON) {
-                    log(`Botón "Obtener informe" no encontrado todavía (intento ${intento}/${MAX_INTENTOS_BOTON}), esperando 2s más...`);
+                    log(`Botón "Obtener informe/Filtrar" no encontrado todavía (intento ${intento}/${MAX_INTENTOS_BOTON}), esperando 2s más...`);
                     await new Promise(r => setTimeout(r, 2000));
                 }
             }
@@ -349,14 +362,14 @@ export const scrapeTransportandoReports = async (
                 await targetButtonHandle.scrollIntoView();
                 await new Promise(r => setTimeout(r, 500));
                 await page.evaluate(el => (el as HTMLElement).click(), targetButtonHandle);
-                log(`Se hizo clic exitosamente en el botón "Obtener informe".`);
+                log(`Se hizo clic exitosamente en el botón "Obtener informe / Filtrar".`);
             } else {
-                log(`ERROR: No se encontró el botón "Obtener informe" en la página después de ${MAX_INTENTOS_BOTON} intentos.`);
+                log(`ERROR: No se encontró el botón "Obtener informe / Filtrar" en la página después de ${MAX_INTENTOS_BOTON} intentos.`);
             }
 
             let downloadedFilePath: string | null = null;
 
-            if (reportType === 'manifiestos') {
+            if (reportType === 'manifiestos' || reportType === 'preoperacional') {
                 log(`Esperando a que la tabla de resultados cargue...`);
 
                 // Esperar hasta 45 segundos a que aparezca el botón de Excel.
@@ -475,9 +488,45 @@ export const scrapeTransportandoReports = async (
                         bestSheetData = sheetData;
                     }
                 }
-                const rawJson = reportType === 'manifiestos'
-                    ? XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: '' })
-                    : bestSheetData;
+
+                const sheet0 = workbook.Sheets[workbook.SheetNames[0]];
+                let rawJson: any[] = [];
+                if (reportType === 'preoperacional') {
+                    // El informe preoperacional de Transportando tiene títulos en filas 1-3 y los encabezados en la fila 5
+                    const ref = sheet0['!ref'];
+                    let headerRowIndex = 0;
+                    if (ref) {
+                        const range = XLSX.utils.decode_range(ref);
+                        for (let R = range.s.r; R <= Math.min(range.e.r, 15); ++R) {
+                            let rowHasKeyCol = false;
+                            for (let C = range.s.c; C <= range.e.c; ++C) {
+                                const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                                const cell = sheet0[cellAddress];
+                                if (cell && cell.v) {
+                                    const valStr = String(cell.v).trim().toLowerCase();
+                                    if (
+                                        valStr.includes('orden de cargue') ||
+                                        valStr.includes('manifiesto') ||
+                                        valStr.includes('conductor') ||
+                                        valStr.includes('estado preoperacional')
+                                    ) {
+                                        rowHasKeyCol = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (rowHasKeyCol) {
+                                headerRowIndex = R;
+                                break;
+                            }
+                        }
+                    }
+                    rawJson = XLSX.utils.sheet_to_json(sheet0, { range: headerRowIndex, defval: '' });
+                } else if (reportType === 'manifiestos') {
+                    rawJson = XLSX.utils.sheet_to_json(sheet0, { defval: '' });
+                } else {
+                    rawJson = bestSheetData;
+                }
 
                 if (rawJson.length > 0) {
                     const cols = Object.keys(rawJson[0] as object);
@@ -525,6 +574,10 @@ export const scrapeTransportandoReports = async (
                         const { uploadEgressDates } = await import('../controllers/management-report.controller.js');
                         const mockReq = { body: { records: rawJson }, user: { name: 'CRON_BOT_EGRESOS' } } as any;
                         await uploadEgressDates(mockReq, mockRes);
+                    } else if (reportType === 'preoperacional') {
+                        const { uploadPreoperacionalReports } = await import('../controllers/preoperacional.controller.js');
+                        const count = await uploadPreoperacionalReports(rawJson);
+                        mockRes._data = { count };
                     }
                     const bdResult = mockRes._data;
                     const processed = bdResult?.count ?? '?';

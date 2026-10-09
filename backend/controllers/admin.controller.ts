@@ -365,6 +365,28 @@ export const runCron = async (req: any, res: Response) => {
                 });
                 logs = ["Iniciando importación de egresos en segundo plano...", "Por favor, mantén esta ventana abierta y observa la terminal de logs."];
                 return res.json({ success: true, logs, isBackground: true });
+            case 'transportandoPreoperacionalScrape':
+                scheduler.manualRunTransportandoPreoperacionalScrape().then(() => {
+                    scraper.activeScraperLogs.push("[COMPLETADO] Scraping de preoperacionales finalizado.");
+                }).catch(err => {
+                    scraper.activeScraperLogs.push(`[ERROR CRÍTICO] Scraping de preoperacionales falló: ${err.message}`);
+                });
+                logs = ["Iniciando importación de preoperacionales en segundo plano...", "Por favor, mantén esta ventana abierta y observa la terminal de logs."];
+                return res.json({ success: true, logs, isBackground: true });
+            case 'reportePreoperacional':
+                try {
+                    const { generatePreoperacionalReport } = await import('../services/preoperacional-report.service.js');
+                    const preopResult = await generatePreoperacionalReport();
+                    logs = [
+                        `[REPORTE PREOPERACIONAL GENERADO]`,
+                        `Fecha: ${preopResult.fechaFormateada}`,
+                        `Órdenes Totales: ${preopResult.totalOrders} | Realizados: ${preopResult.totalRealizados} (${preopResult.efectividadGlobal}%) | Aptos: ${preopResult.totalAptos} | Pendientes: ${preopResult.totalPendientes}`,
+                        `PDF: ${preopResult.pdfFileName} | Excel: ${preopResult.excelFileName}`
+                    ];
+                } catch (reportErr: any) {
+                    logs = [`[ERROR GENERANDO REPORTE PREOPERACIONAL] ${reportErr.message}`];
+                }
+                break;
             default:
                 return res.status(404).json({ error: "Cron no encontrado" });
         }

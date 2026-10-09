@@ -24,10 +24,13 @@ services:
       - DATABASE_SAVE_DATA_CHATS=false
       - CACHE_REDIS_ENABLED=false
       - QRCODE_LIMIT=30
-      - DEL_INSTANCE=false
-      - LOG_LEVEL=ERROR
+      - DEL_INSTANCE=true
+      - LOG_LEVEL=DEBUG
+      - LOG_BAILEYS=debug
+      - CONFIG_SESSION_PHONE_VERSION=2.3000.1049587578
+      - CONFIG_SESSION_PHONE_CLIENT=Ubuntu
+      - CONFIG_SESSION_PHONE_NAME=Chrome
       - TZ=America/Bogota
-      - CONFIG_SESSION_PHONE_VERSION=
     networks:
       m7-podman-network:
         aliases:

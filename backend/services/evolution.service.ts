@@ -26,7 +26,7 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 export class EvolutionService {
     private qrCache: Map<string, QrCache> = new Map();
     private refreshLocks: Map<string, Promise<void>> = new Map();
-    private readonly QR_TTL_MS = 50_000;
+    private readonly QR_TTL_MS = 12_000;
     private webhookRegisteredCache: Set<string> = new Set();
 
     private getHeaders() {
