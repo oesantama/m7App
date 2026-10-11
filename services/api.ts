@@ -800,6 +800,8 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(data)
   }),
+  getGhUltimaEntregaElemento: (personalId: number | string, elementoId: number | string) => 
+    fetchJson(`${API_URL}/gh-entradas-salidas/ultima-entrega/${personalId}/${elementoId}`),
   getGhPersonalInventario: (personalId: number | string) => fetchJson(`${API_URL}/gh-entradas-salidas/personal-inventario/${personalId}`),
   getGhPersonalSerials: (personalId: number | string, elementoId: number | string) => fetchJson(`${API_URL}/gh-entradas-salidas/personal-serials/${personalId}/${elementoId}`),
   getGhInventarioBodega: (params?: { elemento_id?: string | number }) => {

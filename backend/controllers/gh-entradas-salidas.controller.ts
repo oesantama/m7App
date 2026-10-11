@@ -1472,3 +1472,47 @@ export const generateDevolucionActaPDF = async (req: Request, res: Response) => 
         res.status(500).json({ success: false, error: err.message || 'Error al generar el PDF de la devolución' });
     }
 };
+
+// ─── GET /api/gh-entradas-salidas/ultima-entrega/:personal_id/:elemento_id ───
+// Obtiene la fecha y detalles de la última entrega de un elemento específico a un trabajador.
+export const getUltimaEntregaElemento = async (req: Request, res: Response) => {
+    const { personal_id, elemento_id } = req.params;
+
+    if (!personal_id || !elemento_id) {
+        return res.status(400).json({ success: false, error: 'personal_id y elemento_id son requeridos' });
+    }
+
+    try {
+        const query = `
+            SELECT a.id, a.numero_asignacion, a.fecha, a.autorizado_por, a.observaciones,
+                   p.nombre as personal_nombre, e.nombre as elemento_nombre, d.cantidad
+            FROM gh_asignaciones_personal a
+            JOIN gh_asignaciones_personal_detalle d ON d.asignacion_id = a.id
+            LEFT JOIN gh_personal p ON a.personal_id = p.id
+            LEFT JOIN gh_elementos e ON d.elemento_id = e.id
+            WHERE a.personal_id = $1 AND d.elemento_id = $2
+            ORDER BY a.fecha DESC, a.id DESC
+            LIMIT 1
+        `;
+        const result = await pool.query(query, [Number(personal_id), Number(elemento_id)]);
+
+        if (result.rows.length === 0) {
+            return res.json({
+                success: true,
+                hasPrevious: false,
+                data: null
+            });
+        }
+
+        const lastRecord = result.rows[0];
+        res.json({
+            success: true,
+            hasPrevious: true,
+            data: lastRecord
+        });
+    } catch (error: any) {
+        console.error('Error fetching ultima entrega elemento:', error);
+        res.status(500).json({ success: false, error: 'Error del servidor' });
+    }
+};
+

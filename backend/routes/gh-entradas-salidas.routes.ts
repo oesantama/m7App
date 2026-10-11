@@ -8,7 +8,8 @@ import {
     getAsignaciones, createAsignacionPersonal, firmarAsignacion, generateAsignacionActaPDF,
     getDevoluciones, createDevolucionPersonal, firmarDevolucion, generateDevolucionActaPDF,
     getPersonalInventario, getPersonalSerials,
-    getInventarioBodega, getInventarioPersonal
+    getInventarioBodega, getInventarioPersonal,
+    getUltimaEntregaElemento
 } from '../controllers/gh-entradas-salidas.controller.js';
 import { requirePermission, authenticateToken } from '../middleware/auth.middleware.js';
 
@@ -28,6 +29,7 @@ router.get('/asignaciones', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACI
 router.post('/asignaciones', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH'], 'create'), createAsignacionPersonal);
 router.post('/asignaciones/:id/firmar', authenticateToken, firmarAsignacion);
 router.get('/asignaciones/:id/acta', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH', 'CONSULTA_INVENTARIO_GH'], 'view'), generateAsignacionActaPDF);
+router.get('/ultima-entrega/:personal_id/:elemento_id', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH', 'ENTREGAS_SALIDAS_GH'], 'view'), getUltimaEntregaElemento);
 
 router.get('/devoluciones', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH'], 'view'), getDevoluciones);
 router.post('/devoluciones', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH'], 'create'), createDevolucionPersonal);
@@ -40,3 +42,4 @@ router.get('/inventario-bodega', requirePermission(['MASTER_INVENTARIO_GH', 'CON
 router.get('/inventario-personal', requirePermission(['MASTER_INVENTARIO_GH', 'CONSULTA_INVENTARIO_GH'], 'view'), getInventarioPersonal);
 
 export default router;
+

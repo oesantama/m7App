@@ -118,6 +118,61 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({ options, value, onC
   );
 };
 
+const calcularTiempoTranscurrido = (fechaUltimaStr: string, fechaActualStr?: string) => {
+  const start = new Date(fechaUltimaStr);
+  const end = fechaActualStr ? new Date(fechaActualStr) : new Date();
+
+  const dInicio = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const dFin = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+
+  if (dInicio > dFin) {
+    return {
+      totalMeses: 0,
+      meses: 0,
+      dias: 0,
+      textoCompleto: 'Recientemente',
+      fechaFormatted: dInicio.toLocaleDateString('es-CO')
+    };
+  }
+
+  let anos = dFin.getFullYear() - dInicio.getFullYear();
+  let meses = dFin.getMonth() - dInicio.getMonth();
+  let dias = dFin.getDate() - dInicio.getDate();
+
+  if (dias < 0) {
+    meses--;
+    const ultimoDiaMesAnterior = new Date(dFin.getFullYear(), dFin.getMonth(), 0).getDate();
+    dias += ultimoDiaMesAnterior;
+  }
+
+  if (meses < 0) {
+    anos--;
+    meses += 12;
+  }
+
+  const totalMeses = anos * 12 + meses;
+
+  const partes: string[] = [];
+  if (totalMeses > 0) {
+    partes.push(`${totalMeses} ${totalMeses === 1 ? 'mes' : 'meses'}`);
+  }
+  if (dias > 0 || partes.length === 0) {
+    partes.push(`${dias} ${dias === 1 ? 'día' : 'días'}`);
+  }
+
+  const diaStr = String(dInicio.getDate()).padStart(2, '0');
+  const mesStr = String(dInicio.getMonth() + 1).padStart(2, '0');
+  const anoStr = dInicio.getFullYear();
+
+  return {
+    totalMeses,
+    meses,
+    dias,
+    textoCompleto: partes.join(' y '),
+    fechaFormatted: `${diaStr}/${mesStr}/${anoStr}`
+  };
+};
+
 const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
   const [activeTab, setActiveTab] = useState<'asignaciones' | 'devoluciones'>('asignaciones');
   const [isLoading, setIsLoading] = useState(false);
@@ -177,6 +232,29 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
     isOpen: false, asignacionId: null, personalNombre: '', clave: '', isSigning: false, tab: 'asignaciones'
   });
   const [showFirmaClave, setShowFirmaClave] = useState(false);
+
+  // Ultima entrega validation modal dialog
+  const [ultimaEntregaModal, setUltimaEntregaModal] = useState<{
+    isOpen: boolean;
+    personalNombre: string;
+    elementoNombre: string;
+    hasPrevious: boolean;
+    fechaUltima: string;
+    numeroAsignacion: string;
+    cantidadUltima: number;
+    textoTiempo: string;
+    pendingItemToAdd: any | null;
+  }>({
+    isOpen: false,
+    personalNombre: '',
+    elementoNombre: '',
+    hasPrevious: false,
+    fechaUltima: '',
+    numeroAsignacion: '',
+    cantidadUltima: 0,
+    textoTiempo: '',
+    pendingItemToAdd: null
+  });
 
   // Derived permissions
   const canViewAll = hasPermission(user, 'ASIGNACION_DEVOLUCION_GH', 'view') || hasPermission(user, 'MASTER_INVENTARIO_GH', 'view');
@@ -587,7 +665,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
   };
 
   // Add Element to detailed form list
-  const handleAddElementToForm = () => {
+  const handleAddElementToForm = async () => {
     if (!selectedElement) {
       toast.error('Seleccione un elemento válido.');
       return;
@@ -622,15 +700,77 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       serials: selectedElement.es_serializado ? [...scannedSerials] : []
     };
 
-    setFormItems(prev => [...prev, newItem]);
+    // If activeTab is asignaciones and personal_id is selected, query last delivery date
+    if (activeTab === 'asignaciones' && formHeader.personal_id) {
+      const personalObj = personalList.find(p => p.id.toString() === formHeader.personal_id.toString());
+      const personalNombre = personalObj?.nombre || 'Colaborador';
 
-    // Reset scratch state
+      try {
+        const res = await api.getGhUltimaEntregaElemento(formHeader.personal_id, selectedElement.id);
+        if (res.success) {
+          const fechaActual = formHeader.fecha || new Date().toISOString().split('T')[0];
+          let textoTiempo = '';
+          let fechaFormatted = '';
+          let numeroAsig = '';
+          let cantUlt = 0;
+
+          if (res.hasPrevious && res.data) {
+            const calc = calcularTiempoTranscurrido(res.data.fecha, fechaActual);
+            textoTiempo = calc.textoCompleto;
+            fechaFormatted = calc.fechaFormatted;
+            numeroAsig = res.data.numero_asignacion || '';
+            cantUlt = res.data.cantidad || 0;
+          }
+
+          setUltimaEntregaModal({
+            isOpen: true,
+            personalNombre,
+            elementoNombre: selectedElement.nombre,
+            hasPrevious: res.hasPrevious,
+            fechaUltima: fechaFormatted,
+            numeroAsignacion: numeroAsig,
+            cantidadUltima: cantUlt,
+            textoTiempo,
+            pendingItemToAdd: newItem
+          });
+          return;
+        }
+      } catch (err) {
+        console.error('Error al consultar última entrega:', err);
+      }
+    }
+
+    // Direct add if no modal or devoluciones
+    setFormItems(prev => [...prev, newItem]);
     setSelectedElementId('');
     setSelectedElement(null);
     setInputCantidad(1);
     setAvailableStock(0);
     setAvailableSerials([]);
     setScannedSerials([]);
+  };
+
+  const handleConfirmAddFromUltimaEntrega = () => {
+    if (ultimaEntregaModal.pendingItemToAdd) {
+      setFormItems(prev => [...prev, ultimaEntregaModal.pendingItemToAdd]);
+    }
+    setSelectedElementId('');
+    setSelectedElement(null);
+    setInputCantidad(1);
+    setAvailableStock(0);
+    setAvailableSerials([]);
+    setScannedSerials([]);
+    setUltimaEntregaModal({
+      isOpen: false,
+      personalNombre: '',
+      elementoNombre: '',
+      hasPrevious: false,
+      fechaUltima: '',
+      numeroAsignacion: '',
+      cantidadUltima: 0,
+      textoTiempo: '',
+      pendingItemToAdd: null
+    });
   };
 
   // Open modal and initialize Header
@@ -1559,6 +1699,88 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                 ) : (
                   <><UserCheck size={12} /> Guardar</>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Dialog: Notificación / Validación de Última Entrega de Dotación */}
+      {ultimaEntregaModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden transform animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className={`p-5 text-white flex items-center gap-3 ${ultimaEntregaModal.hasPrevious ? 'bg-gradient-to-r from-amber-500 to-amber-600' : 'bg-gradient-to-r from-indigo-600 to-blue-600'}`}>
+              <div className="p-2.5 bg-white/20 backdrop-blur-md rounded-xl text-white">
+                <Clock size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-black uppercase tracking-tight">Validación de Entrega Previa</h3>
+                <p className="text-[11px] font-medium text-white/80">Gestión Humana - Historial por Artículo</p>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-4">
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1">
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Colaborador</div>
+                <div className="text-sm font-black text-slate-900">{ultimaEntregaModal.personalNombre}</div>
+                <div className="text-[10px] font-black text-indigo-600 uppercase tracking-widest pt-1">Artículo / Ítem</div>
+                <div className="text-xs font-bold text-slate-800">{ultimaEntregaModal.elementoNombre}</div>
+              </div>
+
+              {!ultimaEntregaModal.hasPrevious ? (
+                /* Caso A: NUNCA se ha entregado este artículo previamente */
+                <div className="bg-indigo-50/80 border-2 border-indigo-200 text-indigo-950 rounded-xl p-4 flex items-start gap-3 shadow-sm">
+                  <CheckCircle2 size={22} className="text-indigo-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-black uppercase tracking-wide text-indigo-900">Primera Entrega de este Artículo</h4>
+                    <p className="text-xs font-medium text-indigo-800 leading-relaxed">
+                      Es la <strong className="font-black text-indigo-950">primera vez</strong> que se entrega este artículo a este colaborador. No existen registros de entregas previas para este ítem.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* Caso B: YA se ha entregado este artículo previamente */
+                <div className="bg-amber-50/90 border-2 border-amber-200/90 text-amber-950 rounded-xl p-4 space-y-3 shadow-sm">
+                  <div className="flex items-center gap-2 border-b border-amber-200/60 pb-2">
+                    <Clock size={18} className="text-amber-600 shrink-0" />
+                    <h4 className="text-xs font-black uppercase tracking-wide text-amber-900">Historial de Entrega del Artículo</h4>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-amber-800 font-bold">Fecha de última entrega:</span>
+                      <span className="font-black text-amber-950 bg-amber-100 px-2.5 py-0.5 rounded-lg text-xs border border-amber-300">{ultimaEntregaModal.fechaUltima}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center bg-amber-100/70 p-2.5 rounded-xl border border-amber-200">
+                      <span className="text-amber-900 font-bold">Tiempo transcurrido:</span>
+                      <span className="font-black text-amber-950 text-xs uppercase tracking-tight">{ultimaEntregaModal.textoTiempo}</span>
+                    </div>
+
+                    {ultimaEntregaModal.numeroAsignacion && (
+                      <div className="flex justify-between items-center pt-1 text-[11px] text-amber-800 font-medium">
+                        <span>Asignación previa: <strong>#{ultimaEntregaModal.numeroAsignacion}</strong></span>
+                        {ultimaEntregaModal.cantidadUltima > 0 && (
+                          <span>Cant: <strong>{ultimaEntregaModal.cantidadUltima} und(s)</strong></span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Action Button */}
+            <div className="p-4 bg-slate-50 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={handleConfirmAddFromUltimaEntrega}
+                className="w-full py-3 px-5 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+              >
+                <CheckCircle2 size={16} className="text-emerald-400" />
+                Aceptar
               </button>
             </div>
           </div>
