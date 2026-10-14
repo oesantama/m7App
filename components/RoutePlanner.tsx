@@ -201,19 +201,18 @@ const getTimeWindowUrgency = (mins: number | null): 'critical' | 'warning' | 'ok
 };
 
 interface RoutePlannerProps {
-  invoices: Invoice[];
-  vehicles: Vehicle[];
-  drivers: Driver[];
-  assignments: VehicleAssignment[];
-  documents: DocumentL[];
-  activeRoutes: Route[]; // Nueva prop
+  invoices?: Invoice[];
+  vehicles?: Vehicle[];
+  drivers?: Driver[];
+  assignments?: VehicleAssignment[];
+  documents?: DocumentL[];
+  activeRoutes?: Route[]; // Nueva prop
   user: User;
-  clients: MasterRecord[]; // Nueva prop
+  clients?: MasterRecord[]; // Nueva prop
   onAssign: (vId: string, dId: string, cId: string) => void;
   onSaveRoute: (route: Partial<Route>) => void;
   onRefresh?: (clientId?: string) => void;
 }
-
 
 // MEJORA 1: Haversine reemplaza distancia euclidiana — más precisa para rutas reales
 const getDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
@@ -270,8 +269,27 @@ interface SuggestedRoute {
 }
 
 const RoutePlanner: React.FC<RoutePlannerProps> = ({
-  invoices, vehicles, drivers, assignments, documents, activeRoutes, user, clients, onAssign, onSaveRoute, onRefresh
+  invoices: rawInvoices = [],
+  vehicles: rawVehicles = [],
+  drivers: rawDrivers = [],
+  assignments: rawAssignments = [],
+  documents: rawDocuments = [],
+  activeRoutes: rawActiveRoutes = [],
+  user,
+  clients: rawClients = [],
+  onAssign,
+  onSaveRoute,
+  onRefresh
 }) => {
+  // Blindaje estricto: garantizar que todas las entidades operativas sean arreglos iterables
+  const invoices = useMemo(() => Array.isArray(rawInvoices) ? rawInvoices : [], [rawInvoices]);
+  const vehicles = useMemo(() => Array.isArray(rawVehicles) ? rawVehicles : [], [rawVehicles]);
+  const drivers = useMemo(() => Array.isArray(rawDrivers) ? rawDrivers : [], [rawDrivers]);
+  const assignments = useMemo(() => Array.isArray(rawAssignments) ? rawAssignments : [], [rawAssignments]);
+  const documents = useMemo(() => Array.isArray(rawDocuments) ? rawDocuments : [], [rawDocuments]);
+  const activeRoutes = useMemo(() => Array.isArray(rawActiveRoutes) ? rawActiveRoutes : [], [rawActiveRoutes]);
+  const clients = useMemo(() => Array.isArray(rawClients) ? rawClients : [], [rawClients]);
+
   const mapRef = useRef<L.Map | null>(null);
   const isSuperAdmin = user.roleId === 'ROL-01' || user.email === 'directorti@millasiete.com';
   const allowedClientIds = user.clientIds || [];
@@ -294,6 +312,7 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
 
   const setInvoices = useAppStore(state => state.setInvoices);
   const setRoutes  = useAppStore(state => state.setRoutes);
+  const setDocuments = useAppStore(state => state.setDocuments);
 
   // Al montar: sincronizar rutas activas para que el contador SIN RUTA sea exacto desde el inicio
   useEffect(() => {
@@ -304,15 +323,22 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
     };
   }, []);
 
-  // Recargar facturas automáticamente cuando el usuario cambia de cliente
+  // Recargar facturas y documentos automáticamente cuando el usuario cambia de cliente (e.g. AJOVER BODEGA 10)
   useEffect(() => {
     if (!selectedClient) return;
-    api.getInvoices(selectedClient === 'GLOBAL' ? undefined : selectedClient)
+    const targetClient = selectedClient === 'GLOBAL' ? undefined : selectedClient;
+    api.getInvoices(targetClient)
       .then((data: any[]) => {
         if (Array.isArray(data)) setInvoices(data);
       })
       .catch(() => { });
-  }, [selectedClient]);
+
+    api.getDocuments(targetClient)
+      .then((docs: any[]) => {
+        if (Array.isArray(docs)) setDocuments(docs);
+      })
+      .catch(() => { });
+  }, [selectedClient, setInvoices, setDocuments]);
   const [suggestedRoutes, setSuggestedRoutes] = useState<SuggestedRoute[]>([]);
   const [geocodedCount, setGeocodedCount] = useState(0);
   const [unroutedReason, setUnroutedReason] = useState('');
@@ -738,8 +764,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
   const unassignedCounts = useMemo(() => {
     let planR = 0;
     let planNormal = 0;
-    unassignedInvoices.forEach(inv => {
-      const doc = documents.find(d => d.id === inv.docLId);
+    (unassignedInvoices || []).forEach(inv => {
+      const doc = (documents || []).find(d => d && d.id === inv.docLId);
       const pt = String(doc?.planType || '').toUpperCase();
       if (pt.includes('PLAN R') || pt.includes('(R)') || pt === 'R') planR++;
       else planNormal++;
@@ -4449,8 +4475,8 @@ const RoutePlanner: React.FC<RoutePlannerProps> = ({
                                 DOC: {inv.externalDocId}
                               </span>
                             )}
-                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${String(documents.find(d => d.id === inv.docLId)?.planType || '').toUpperCase().includes('PLAN R') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
-                              {documents.find(d => d.id === inv.docLId)?.planType || 'Plan Normal'}
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${String((documents || []).find(d => d && d.id === inv.docLId)?.planType || '').toUpperCase().includes('PLAN R') ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                              {(documents || []).find(d => d && d.id === inv.docLId)?.planType || 'Plan Normal'}
                             </span>
                           </div>
                           {(inv as any).isPriority && (

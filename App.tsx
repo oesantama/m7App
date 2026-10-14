@@ -374,7 +374,7 @@ const App: React.FC = () => {
         if (['dashboard', 'documentos', 'recibido', 'recibido-manual', 'cumplidos', 'rutas'].includes(activeTab)) {
           if (hasPerm('DOCUMENTOS_L') || hasPerm('RUTAS') || hasPerm('RECIBIDO_MATERIAL') || hasPerm('RECIBIDO_MANUAL')) {
             fetches.push(
-              api.getDocuments(clientId).then(d => useAppStore.setState({ documents: d || [] })).catch(() => { })
+              api.getDocuments(clientId).then(d => useAppStore.setState({ documents: Array.isArray(d) ? d : [] })).catch(() => { })
             );
           }
         }
@@ -382,26 +382,26 @@ const App: React.FC = () => {
         if (['dashboard', 'documentos', 'recibido', 'recibido-manual', 'cumplidos', 'rutas', 'despacho', 'dashboard-ajover'].includes(activeTab)) {
           if (hasPerm('DOCUMENTOS_L') || hasPerm('RUTAS') || hasPerm('DESPACHO_L') || hasPerm('RECIBIDO_MATERIAL')) {
             fetches.push(
-              api.getInvoices(clientId).then(inv => useAppStore.setState({ invoices: inv || [] })).catch(() => { })
+              api.getInvoices(clientId).then(inv => useAppStore.setState({ invoices: Array.isArray(inv) ? inv : [] })).catch(() => { })
             );
           }
         }
 
         if (['dashboard', 'rutas', 'despacho', 'dashboard-ajover'].includes(activeTab)) {
           fetches.push(
-            api.getRoutes().then(r => useAppStore.setState({ routes: r || [] })).catch(() => { })
+            api.getRoutes().then(r => useAppStore.setState({ routes: Array.isArray(r) ? r : [] })).catch(() => { })
           );
         }
 
         if (['dashboard', 'rutas', 'despacho', 'vinculo', 'dashboard-ajover'].includes(activeTab)) {
           fetches.push(
-            api.getAssignments().then(a => useAppStore.setState({ assignments: a || [] })).catch(() => { })
+            api.getAssignments().then(a => useAppStore.setState({ assignments: Array.isArray(a) ? a : [] })).catch(() => { })
           );
         }
 
         if (['dashboard', 'rutas', 'despacho', 'flotas', 'vinculo', 'dashboard-ajover'].includes(activeTab)) {
           fetches.push(
-            api.getVehicles().then(v => useAppStore.setState({ vehicles: v || [] })).catch(() => { })
+            api.getVehicles().then(v => useAppStore.setState({ vehicles: Array.isArray(v) ? v : [] })).catch(() => { })
           );
         }
 

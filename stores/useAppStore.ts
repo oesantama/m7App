@@ -149,43 +149,43 @@ export const useAppStore = create<AppState>((set, get) => ({
   })),
   
   // Documentos
-  setDocuments: (documents) => set({ documents }),
+  setDocuments: (documents) => set({ documents: Array.isArray(documents) ? documents : [] }),
   addDocument: (document) => set((state) => ({ 
-    documents: [...state.documents, document] 
+    documents: [...(Array.isArray(state.documents) ? state.documents : []), document] 
   })),
   
   // Facturas
-  setInvoices: (invoices) => set({ invoices }),
+  setInvoices: (invoices) => set({ invoices: Array.isArray(invoices) ? invoices : [] }),
   updateInvoice: (id, data) => set((state) => ({
-    invoices: state.invoices.map(inv => inv.id === id ? { ...inv, ...data } : inv)
+    invoices: (Array.isArray(state.invoices) ? state.invoices : []).map(inv => inv.id === id ? { ...inv, ...data } : inv)
   })),
   
   // Vehículos
-  setVehicles: (vehicles) => set({ vehicles }),
+  setVehicles: (vehicles) => set({ vehicles: Array.isArray(vehicles) ? vehicles : [] }),
   addVehicle: (vehicle) => set((state) => ({ 
-    vehicles: [...state.vehicles, vehicle] 
+    vehicles: [...(Array.isArray(state.vehicles) ? state.vehicles : []), vehicle] 
   })),
   updateVehicle: (id, data) => set((state) => ({
-    vehicles: state.vehicles.map(v => v.id === id ? { ...v, ...data } : v)
+    vehicles: (Array.isArray(state.vehicles) ? state.vehicles : []).map(v => v.id === id ? { ...v, ...data } : v)
   })),
   deleteVehicle: (id) => set((state) => ({
-    vehicles: state.vehicles.filter(v => v.id !== id)
+    vehicles: (Array.isArray(state.vehicles) ? state.vehicles : []).filter(v => v.id !== id)
   })),
   
   // Conductores
-  setDrivers: (drivers) => set({ drivers }),
+  setDrivers: (drivers) => set({ drivers: Array.isArray(drivers) ? drivers : [] }),
   addDriver: (driver) => set((state) => ({ 
-    drivers: [...state.drivers, driver] 
+    drivers: [...(Array.isArray(state.drivers) ? state.drivers : []), driver] 
   })),
   updateDriver: (id, data) => set((state) => ({
-    drivers: state.drivers.map(d => d.id === id ? { ...d, ...data } : d)
+    drivers: (Array.isArray(state.drivers) ? state.drivers : []).map(d => d.id === id ? { ...d, ...data } : d)
   })),
   deleteDriver: (id) => set((state) => ({
-    drivers: state.drivers.filter(d => d.id !== id)
+    drivers: (Array.isArray(state.drivers) ? state.drivers : []).filter(d => d.id !== id)
   })),
   
   // Asignaciones
-  setAssignments: (assignments) => set({ assignments }),
+  setAssignments: (assignments) => set({ assignments: Array.isArray(assignments) ? assignments : [] }),
   addAssignment: (assignment) => set((state) => ({ 
     assignments: [...state.assignments, assignment] 
   })),
@@ -196,9 +196,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   })),
   
   // Rutas
-  setRoutes: (routes) => set({ routes }),
+  setRoutes: (routes) => set({ routes: Array.isArray(routes) ? routes : [] }),
   addRoute: (route) => set((state) => ({ 
-    routes: [...state.routes, route] 
+    routes: [...(Array.isArray(state.routes) ? state.routes : []), route] 
   })),
   
   // UI
