@@ -82,7 +82,7 @@ export const getDocuments = async (req: Request, res: Response) => {
     `;
 
     const queryParams: any[] = [];
-    const { clientId, docL, statuses, plate, planType } = req.query;
+    const { clientId, docL, statuses, plate, planType, history, limit } = req.query;
     const user = (req as any).user;
     const isSuper = user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
 
@@ -93,7 +93,7 @@ export const getDocuments = async (req: Request, res: Response) => {
 
     if (statuses) {
       const statusList = String(statuses).split(',').map(s => s.trim()).filter(Boolean);
-      if (statusList.length > 0) {
+      if (statusList.length > 0 && !statusList.includes('ALL')) {
         queryParams.push(statusList);
         query += ` AND d.status = ANY($${queryParams.length}::text[])`;
       }
@@ -103,7 +103,8 @@ export const getDocuments = async (req: Request, res: Response) => {
         const docIds = String(docL).split(',').map(id => id.trim()).filter(Boolean);
         if (docIds.length > 0) {
             queryParams.push(docIds);
-            query += ` AND d.external_doc_id = ANY($${queryParams.length})`;
+            const pIdx = queryParams.length;
+            query += ` AND (d.external_doc_id = ANY($${pIdx}) OR d.id = ANY($${pIdx}))`;
         }
     }
 
@@ -119,11 +120,24 @@ export const getDocuments = async (req: Request, res: Response) => {
 
     if (!isSuper) {
       const allowedIds = user?.client_ids || [];
-      queryParams.push(allowedIds);
-      query += ` AND d.client_id = ANY($${queryParams.length}::text[])`;
+      if (allowedIds.length > 0) {
+        queryParams.push(allowedIds);
+        query += ` AND d.client_id = ANY($${queryParams.length}::text[])`;
+      }
     }
 
-    query += ` ORDER BY d.created_at DESC`;
+    const isSpecificSearch = !!(docL || plate || statuses || planType);
+    if (!isSpecificSearch && history !== 'true') {
+      // Optimización M7: Carga operativa inicial / login no debe arrastrar años de histórico cerrado para evitar saturación OOM/502
+      query += ` AND (d.status NOT IN ('EST-07', 'EST-12', 'EST-16', 'EST-17', 'EST-18', 'EST-19', 'COMPLETADO', 'ENTREGADO', 'ELIMINADO', 'CONCILIADO', 'LEGALIZADO') OR d.created_at >= NOW() - INTERVAL '30 days')`;
+      query += ` ORDER BY d.created_at DESC LIMIT 150`;
+    } else {
+      query += ` ORDER BY d.created_at DESC`;
+      if (limit) {
+        queryParams.push(Number(limit));
+        query += ` LIMIT $${queryParams.length}`;
+      }
+    }
 
     const result = await pool.query(query, queryParams);
     res.json(result.rows);

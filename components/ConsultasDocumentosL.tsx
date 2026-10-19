@@ -436,10 +436,10 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
     try {
       const data = await api.getDocuments(
         undefined,
-        filters.status ? [filters.status] : undefined,
+        filters.status ? [filters.status] : ['ALL'],
         filters.docL || undefined,
         filters.plate || undefined,
-        filters.planType || undefined,
+        filters.planType || undefined
       );
       setSearchResults(Array.isArray(data) ? data : []);
     } catch {
