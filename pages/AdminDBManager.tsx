@@ -66,6 +66,20 @@ const AdminDBManager: React.FC = () => {
     logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [cronLogs]);
 
+  // Horario real de las tareas que viven en Alertas WhatsApp (no un texto fijo)
+  const [alertasWa, setAlertasWa] = useState<any[]>([]);
+  useEffect(() => {
+    api.getAlertasWhatsapp().then((r: any) => setAlertasWa(r?.data || [])).catch(() => {});
+  }, []);
+  const horarioAlerta = (tipo: string): string => {
+    const a = alertasWa.find(x => x.tipo_evento === tipo && x.status_id === 'EST-01');
+    if (!a) return alertasWa.length ? 'Sin alerta activa en Alertas WhatsApp' : 'Alertas WhatsApp';
+    const [min, hora, , , dow] = String(a.cron_expression || '').split(' ');
+    const dias: Record<string, string> = { '*': 'Diario', '1-5': 'Lun–Vie', '1-6': 'Lun–Sáb', '0-6': 'Diario' };
+    const hhmm = /^\d+$/.test(hora || '') && /^\d+$/.test(min || '') ? `${hora.padStart(2, '0')}:${min.padStart(2, '0')}` : a.cron_expression;
+    return `${dias[dow] || a.cron_expression}, ${hhmm} · Alertas WhatsApp`;
+  };
+
   const handleRunCron = async (cronName: string) => {
       setRunningCrons(prev => ({ ...prev, [cronName]: true }));
       setCronLogs([`Ejecutando ${cronName}...`]);
@@ -887,32 +901,17 @@ const AdminDBManager: React.FC = () => {
                   <p className="text-sm text-slate-500 mb-6">Ejecute manualmente las tareas programadas (CRON) y observe los logs de ejecución en tiempo real.</p>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                      <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
-                          <h4 className="font-bold text-slate-800">Facturación Pendiente General</h4>
-                          <p className="text-xs text-slate-500">Envía un reporte Excel consolidado de todos los clientes a los correos en notificaciones (TGN-04).</p>
-                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Lunes a Sábado, 10:00 AM</p>
+                      <div className="border border-purple-200 rounded p-4 flex flex-col gap-3 bg-purple-50/40 hover:shadow-md transition-shadow">
+                          <h4 className="font-bold text-slate-800">Facturación Pendiente</h4>
+                          <p className="text-xs text-slate-500">Excel general o por cliente según cada destinatario (canal y alcance) configurado en <b>Alertas WhatsApp</b>. Reemplaza los antiguos envíos General (TGN-04) e Individual.</p>
+                          <p className="text-[10px] font-mono text-purple-700 font-bold mt-1">🕒 Auto: {horarioAlerta('FACTURACION_PENDIENTE')}</p>
                           <div className="mt-auto pt-2">
-                              <button 
-                                  onClick={() => handleRunCron('facturacionPendiente')}
+                              <button
+                                  onClick={() => { if (window.confirm('Se enviará AHORA la facturación pendiente a todos los destinatarios activos de la alerta (correo/WhatsApp). ¿Continuar?')) handleRunCron('facturacionPendiente'); }}
                                   disabled={runningCrons['facturacionPendiente']}
                                   className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
                               >
-                                  {runningCrons['facturacionPendiente'] ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
-                              </button>
-                          </div>
-                      </div>
-
-                      <div className="border border-slate-200 rounded p-4 flex flex-col gap-3 bg-slate-50 hover:shadow-md transition-shadow">
-                          <h4 className="font-bold text-slate-800">Facturación Pendiente Individual</h4>
-                          <p className="text-xs text-slate-500">Envía correos personalizados (TGN-03) únicamente con los clientes asignados a cada usuario o proveedor.</p>
-                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: Lunes a Sábado, 10:00 AM</p>
-                          <div className="mt-auto pt-2">
-                              <button 
-                                  onClick={() => handleRunCron('facturacionPendienteIndividual')}
-                                  disabled={runningCrons['facturacionPendienteIndividual']}
-                                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
-                              >
-                                  {runningCrons['facturacionPendienteIndividual'] ? 'Ejecutando...' : 'Ejecutar CRON ▶'}
+                                  {runningCrons['facturacionPendiente'] ? 'Enviando...' : 'Enviar ahora ▶'}
                               </button>
                           </div>
                       </div>
@@ -1003,15 +1002,23 @@ const AdminDBManager: React.FC = () => {
 
                       <div className="border border-teal-300 rounded p-4 flex flex-col gap-3 bg-teal-50 hover:shadow-md transition-shadow">
                           <h4 className="font-bold text-slate-800">Reporte Preoperacional (WA / Email)</h4>
-                          <p className="text-xs text-slate-500">Genera y envía el reporte diario de cumplimiento preoperacional con PDF y Excel adjuntos a WhatsApp y Correo.</p>
-                          <p className="text-[10px] font-mono text-teal-700 font-bold mt-1">🕒 Auto: Diariamente 06:20 AM</p>
-                          <div className="mt-auto pt-2">
-                              <button 
+                          <p className="text-xs text-slate-500">PDF + Excel de cumplimiento preoperacional, general o por cliente según los destinatarios de <b>Alertas WhatsApp</b>.</p>
+                          <p className="text-[10px] font-mono text-teal-700 font-bold mt-1">🕒 Auto: {horarioAlerta('PREOPERACIONAL')}</p>
+                          <div className="mt-auto pt-2 grid grid-cols-2 gap-2">
+                              <button
                                   onClick={() => handleRunCron('reportePreoperacional')}
                                   disabled={runningCrons['reportePreoperacional']}
-                                  className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
+                                  title="Genera el informe y muestra el resumen, sin enviar nada"
+                                  className="w-full bg-white border border-teal-600 text-teal-700 hover:bg-teal-50 py-2 rounded text-xs font-bold transition-colors disabled:opacity-50"
                               >
-                                  {runningCrons['reportePreoperacional'] ? 'Generando...' : 'Generar Reporte ▶'}
+                                  {runningCrons['reportePreoperacional'] ? 'Generando...' : 'Vista previa'}
+                              </button>
+                              <button
+                                  onClick={() => { if (window.confirm('Se enviará AHORA el informe preoperacional a todos los destinatarios activos de la alerta (correo/WhatsApp). ¿Continuar?')) handleRunCron('reportePreoperacionalEnviar'); }}
+                                  disabled={runningCrons['reportePreoperacionalEnviar']}
+                                  className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2 rounded text-xs font-bold shadow transition-colors disabled:opacity-50"
+                              >
+                                  {runningCrons['reportePreoperacionalEnviar'] ? 'Enviando...' : 'Enviar ahora ▶'}
                               </button>
                           </div>
                       </div>

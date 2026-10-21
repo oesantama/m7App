@@ -457,6 +457,12 @@ export const runCron = async (req: any, res: Response) => {
                 });
                 logs = ["Iniciando importación de preoperacionales en segundo plano...", "Por favor, mantén esta ventana abierta y observa la terminal de logs."];
                 return res.json({ success: true, logs, isBackground: true });
+            case 'reportePreoperacionalEnviar': {
+                // Envío real: misma alerta de Alertas WhatsApp (destinatarios, canal y alcance)
+                const { whatsappCronRunner } = await import('../services/whatsapp-cron.service.js');
+                logs = await whatsappCronRunner.runByTipo('PREOPERACIONAL');
+                break;
+            }
             case 'reportePreoperacional':
                 try {
                     const { generatePreoperacionalReport } = await import('../services/preoperacional-report.service.js');
