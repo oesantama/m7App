@@ -82,6 +82,8 @@ playwright-report/
 !backend/docs/migrations/*.sql
 !backend/init_production_coolify.sql
 !backend/full_restore.sql
+# Scripts de esquema (sin datos) para aplicar migraciones a mano en otros entornos
+!docs/sql/*.sql
 !backend/scripts/MIGRACION_CAPACITACIONES.sql
 !backend/scripts/MIGRACION_DOTACIONES_PROD.sql
 

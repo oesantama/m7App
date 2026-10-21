@@ -2146,13 +2146,17 @@ export const restoreSystem = async () => {
         ON alertas_whatsapp_destinatarios (alerta_id);
     `);
     // Migración de datos: cada número que ya vivía en el arreglo phone_numbers pasa a ser
-    // una fila propia, habilitada por defecto. Idempotente por el UNIQUE(alerta_id, phone_number).
+    // una fila propia, habilitada por defecto. Idempotente por el NOT EXISTS (la migración 010
+    // reemplazó el UNIQUE(alerta_id, phone_number) por un índice parcial, que ON CONFLICT no infiere).
     await client.query(`
       INSERT INTO alertas_whatsapp_destinatarios (alerta_id, phone_number, enabled)
-      SELECT id, unnest(phone_numbers), true
-      FROM alertas_whatsapp
-      WHERE phone_numbers IS NOT NULL AND array_length(phone_numbers, 1) > 0
-      ON CONFLICT (alerta_id, phone_number) DO NOTHING;
+      SELECT a.id, p.phone, true
+      FROM alertas_whatsapp a, unnest(a.phone_numbers) AS p(phone)
+      WHERE a.phone_numbers IS NOT NULL AND array_length(a.phone_numbers, 1) > 0
+        AND NOT EXISTS (
+          SELECT 1 FROM alertas_whatsapp_destinatarios d
+          WHERE d.alerta_id = a.id AND d.phone_number = p.phone
+        );
     `);
 
     // Página en el menú — Configuración Maestros

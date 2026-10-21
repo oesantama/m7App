@@ -10,8 +10,10 @@ export const getAlertasWhatsapp = async (_req: Request, res: Response) => {
              a.last_run, a.next_run, a.created_by, a.updated_by, a.created_at, a.updated_at,
              COALESCE(
                (SELECT json_agg(
-                          json_build_object('id', d.id, 'phone_number', d.phone_number, 'enabled', d.enabled, 'email', d.email)
-                          ORDER BY d.created_at ASC
+                          json_build_object('id', d.id, 'nombre', d.nombre, 'phone_number', d.phone_number,
+                                            'enabled', d.enabled, 'email', d.email, 'canal', d.canal,
+                                            'alcance', d.alcance, 'client_ids', d.client_ids)
+                          ORDER BY d.created_at ASC, d.id ASC
                         )
                 FROM alertas_whatsapp_destinatarios d
                 WHERE d.alerta_id = a.id),
@@ -29,9 +31,43 @@ export const getAlertasWhatsapp = async (_req: Request, res: Response) => {
 
 interface DestinatarioInput {
   id?: number;
-  phone_number: string;
+  nombre: string | null;
+  phone_number: string | null;
   enabled: boolean;
   email: string | null;
+  canal: 'WHATSAPP' | 'EMAIL' | 'AMBOS';
+  alcance: 'GENERAL' | 'CLIENTE';
+  client_ids: string[];
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Normaliza y valida un destinatario. Devuelve el mensaje de error o null. */
+function normalizarDestinatario(d: any, i: number): { dest: DestinatarioInput; error: string | null } {
+  const phone = String(d.phone_number || '').replace(/\D/g, '');
+  const email = d.email ? String(d.email).trim().toLowerCase() : '';
+  const canal = ['WHATSAPP', 'EMAIL', 'AMBOS'].includes(d.canal) ? d.canal : 'AMBOS';
+  const alcance = d.alcance === 'CLIENTE' ? 'CLIENTE' : 'GENERAL';
+  const clientIds = Array.isArray(d.client_ids)
+    ? [...new Set(d.client_ids.map((c: any) => String(c).trim()).filter(Boolean))] as string[]
+    : [];
+  const dest: DestinatarioInput = {
+    id: d.id ? Number(d.id) : undefined,
+    nombre: d.nombre ? String(d.nombre).trim().slice(0, 120) : null,
+    phone_number: phone || null,
+    enabled: d.enabled !== false,
+    email: email || null,
+    canal,
+    alcance,
+    client_ids: alcance === 'CLIENTE' ? clientIds : [],
+  };
+  const quien = dest.nombre || dest.phone_number || dest.email || `#${i + 1}`;
+  let error: string | null = null;
+  if (canal !== 'EMAIL' && (!phone || phone.length < 10)) error = `${quien}: el celular es obligatorio para WhatsApp (mínimo 10 dígitos).`;
+  else if (canal !== 'WHATSAPP' && !email) error = `${quien}: el correo es obligatorio para envío por correo.`;
+  else if (email && !EMAIL_RE.test(email)) error = `${quien}: correo inválido.`;
+  else if (alcance === 'CLIENTE' && clientIds.length === 0) error = `${quien}: seleccione al menos un cliente.`;
+  return { dest, error };
 }
 
 export const saveAlertaWhatsapp = async (req: Request, res: Response) => {
@@ -45,16 +81,17 @@ export const saveAlertaWhatsapp = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'El ID es requerido' });
     }
 
-    const destinatarios: DestinatarioInput[] = Array.isArray(a.destinatarios)
-      ? a.destinatarios
-          .map((d: any) => ({
-            id: d.id,
-            phone_number: String(d.phone_number || '').replace(/\D/g, ''),
-            enabled: !!d.enabled,
-            email: d.email ? String(d.email).trim() : null,
-          }))
-          .filter((d: DestinatarioInput) => d.phone_number.length >= 10)
-      : [];
+    const normalizados = (Array.isArray(a.destinatarios) ? a.destinatarios : []).map(normalizarDestinatario);
+    const errorDest = normalizados.find((n: { error: string | null }) => n.error)?.error;
+    if (errorDest) {
+      return res.status(400).json({ success: false, error: errorDest });
+    }
+    const destinatarios: DestinatarioInput[] = normalizados.map((n: { dest: DestinatarioInput }) => n.dest);
+    const claves = destinatarios.map(d => d.phone_number || `@${d.email}`);
+    const repetido = claves.find((k, i) => claves.indexOf(k) !== i);
+    if (repetido) {
+      return res.status(400).json({ success: false, error: `Destinatario repetido: ${repetido.replace(/^@/, '')}. Si necesita varios clientes, selecciónelos en el mismo destinatario.` });
+    }
 
     await client.query('BEGIN');
 
@@ -107,17 +144,20 @@ export const saveAlertaWhatsapp = async (req: Request, res: Response) => {
     }
 
     for (const d of destinatarios) {
-      if (d.id) {
+      const vals = [d.nombre, d.phone_number, d.enabled, d.email, d.canal, d.alcance, d.client_ids];
+      if (d.id && existingIds.includes(d.id)) {
         await client.query(
-          `UPDATE alertas_whatsapp_destinatarios SET phone_number = $1, enabled = $2, email = $3, updated_at = NOW() WHERE id = $4`,
-          [d.phone_number, d.enabled, d.email, d.id]
+          `UPDATE alertas_whatsapp_destinatarios
+           SET nombre = $1, phone_number = $2, enabled = $3, email = $4, canal = $5, alcance = $6, client_ids = $7,
+               updated_at = NOW()
+           WHERE id = $8 AND alerta_id = $9`,
+          [...vals, d.id, a.id]
         );
       } else {
         await client.query(
-          `INSERT INTO alertas_whatsapp_destinatarios (alerta_id, phone_number, enabled, email)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT (alerta_id, phone_number) DO UPDATE SET enabled = $3, email = $4, updated_at = NOW()`,
-          [a.id, d.phone_number, d.enabled, d.email]
+          `INSERT INTO alertas_whatsapp_destinatarios (alerta_id, nombre, phone_number, enabled, email, canal, alcance, client_ids)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [a.id, ...vals]
         );
       }
     }
@@ -128,6 +168,12 @@ export const saveAlertaWhatsapp = async (req: Request, res: Response) => {
     whatsappCronRunner.reload().catch(() => {}); // recarga crons sin bloquear
   } catch (err: any) {
     await client.query('ROLLBACK').catch(() => {});
+    if (err.code === '23505') {
+      return res.status(400).json({ success: false, error: 'Hay un destinatario repetido (mismo celular o correo) en esta alerta.' });
+    }
+    if (err.code === '23514') {
+      return res.status(400).json({ success: false, error: 'Revise los destinatarios: falta celular o correo según el canal, o el cliente.' });
+    }
     console.error('[WA-ALERTAS] saveAlertaWhatsapp error:', err);
     res.status(500).json({ success: false, error: 'Error al guardar alerta WhatsApp' });
   } finally {
@@ -172,9 +218,12 @@ export const sendTestAlerta = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'La alerta no tiene destinatarios habilitados' });
     }
 
-    const sent = await whatsappCronRunner.sendAlerta(alerta, true);
+    const r = await whatsappCronRunner.sendAlerta(alerta, true);
+    const partes = [`${r.whatsapp} WhatsApp`, `${r.email} correo(s)`];
+    if (r.omitidos) partes.push(`${r.omitidos} sin datos para su cliente`);
+    const message = `Prueba enviada: ${partes.join(', ')}.` + (r.errores.length ? ` Advertencias: ${r.errores.slice(0, 2).join(' | ')}` : '');
 
-    res.json({ success: true, message: `Prueba enviada a ${sent} número(s)` });
+    res.json({ success: true, message, data: r });
   } catch (err: any) {
     console.error('[WA-ALERTAS] sendTestAlerta error:', err);
     res.status(500).json({ success: false, error: err.message || 'Error al enviar prueba' });

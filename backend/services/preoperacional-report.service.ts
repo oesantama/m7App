@@ -2,6 +2,7 @@ import pool from '../config/database.js';
 import puppeteer from 'puppeteer';
 import XLSX from 'xlsx';
 import { toShortClientName } from './flota-wa-report.service.js';
+import { AlcanceClientes, sqlFiltroClientes } from './client-scope.service.js';
 
 export interface PreoperacionalClientStat {
   clientRaw: string;
@@ -68,18 +69,24 @@ async function fetchClientsMap(): Promise<Map<string, string>> {
   return map;
 }
 
-export async function generatePreoperacionalReport(fechaOverride?: string): Promise<PreoperacionalReportResult> {
+/**
+ * @param alcance Si viene, el informe solo incluye las órdenes de esos clientes (envío por cliente).
+ */
+export async function generatePreoperacionalReport(fechaOverride?: string, alcance?: AlcanceClientes): Promise<PreoperacionalReportResult> {
   const fecha = fechaOverride || getYesterdayIso();
   const clientsMap = await fetchClientsMap();
 
   // 1. Consultar manifiestos / órdenes de cargue para la fecha dada en management_orders
+  const ordersParams: any[] = [fecha];
+  const filtroCliente = alcance ? `AND ${sqlFiltroClientes('mo', alcance, ordersParams)}` : '';
   const ordersRes = await pool.query(`
-    SELECT oc_number, manifest_number, client_name, plate, manifest_date
-    FROM management_orders
-    WHERE manifest_date::date = $1
-      AND manifest_status NOT IN ('ANULADO', 'CANCELADO', 'ANULADA')
-      AND oc_number IS NOT NULL AND TRIM(oc_number) <> ''
-  `, [fecha]);
+    SELECT mo.oc_number, mo.manifest_number, mo.client_name, mo.plate, mo.manifest_date
+    FROM management_orders mo
+    WHERE mo.manifest_date::date = $1
+      AND mo.manifest_status NOT IN ('ANULADO', 'CANCELADO', 'ANULADA')
+      AND mo.oc_number IS NOT NULL AND TRIM(mo.oc_number) <> ''
+      ${filtroCliente}
+  `, ordersParams);
   // 2. Consultar respuestas de preoperacional registradas en preoperacional_respuestas para esa fecha
   const preopRes = await pool.query(`
     SELECT oc_number, id_orden, manifest_number, id_manifest, driver_name, driver_document, plate, estado, firmado, fecha
@@ -230,9 +237,10 @@ export async function generatePreoperacionalReport(fechaOverride?: string): Prom
   // 3. Formatear mensaje para WhatsApp
   let message = `📋 *OrbitM7 — INFORME CUMPLIMIENTO PREOPERACIONAL*\n`;
   message += `📅 *Fecha:* ${fechaFormateada} (Ayer)\n`;
-  message += `⏰ *Hora de verificación:* 06:20 AM\n\n`;
+  if (alcance) message += `🏢 *Cliente(s):* ${alcance.etiqueta}\n`;
+  message += `⏰ *Hora de verificación:* ${new Date().toLocaleTimeString('es-CO', { timeZone: 'America/Bogota', hour: '2-digit', minute: '2-digit' })}\n\n`;
 
-  message += `📊 *Resumen Consolidado General:*\n`;
+  message += alcance ? `📊 *Resumen:*\n` : `📊 *Resumen Consolidado General:*\n`;
   message += `• Total Órdenes de Cargue: *${totalOrders}*\n`;
   message += `• Preoperacionales Realizados: *${totalRealizados}* (${efectividadGlobal}% efectividad)\n`;
   message += `  └ Aptos: *${totalAptos}* ✅\n`;
@@ -245,7 +253,7 @@ export async function generatePreoperacionalReport(fechaOverride?: string): Prom
       message += `• *${c.shortName}*: ${c.realizados}/${c.totalOrders} realizados (${c.efectividadPct}%) | ⚠️ Pendientes: ${c.pendientes}\n`;
     }
     message += `\n──────────────────────────────\n`;
-    message += `_Se adjunta informe completo en PDF y Excel con la lista de conductores. Enviado también a su correo electrónico._`;
+    message += `_Se adjunta el informe completo en PDF; por correo también va el Excel con la lista de conductores._`;
   }
 
   // 4. Generar Libro Excel con 3 Hojas
@@ -300,7 +308,8 @@ export async function generatePreoperacionalReport(fechaOverride?: string): Prom
   XLSX.utils.book_append_sheet(wb, wsPendientes, 'Pendientes');
 
   const excelBuffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
-  const excelFileName = `Informe_Preoperacional_${fecha}.xlsx`;
+  const sufijo = alcance ? `_${alcance.clientIds.join('-')}` : '';
+  const excelFileName = `Informe_Preoperacional_${fecha}${sufijo}.xlsx`;
 
   // 5. Generar PDF con Puppeteer
   const pdfHtml = buildPreopPdfHtml(fechaFormateada, totalOrders, totalRealizados, totalAptos, totalNoAptos, totalPendientes, efectividadGlobal, clientStats, pendientesList);
@@ -311,7 +320,7 @@ export async function generatePreoperacionalReport(fechaOverride?: string): Prom
   });
 
   let pdfBase64 = '';
-  const pdfFileName = `Informe_Preoperacional_${fecha}.pdf`;
+  const pdfFileName = `Informe_Preoperacional_${fecha}${sufijo}.pdf`;
 
   try {
     const page = await browser.newPage();

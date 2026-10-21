@@ -6,10 +6,21 @@ import { generateCierreFactReport } from './cierre-fact-report.service.js';
 import { generateSobrecostoReport } from './sobrecosto-report.service.js';
 import { generateSinOperacionDiariaReport } from './sin-operacion-report.service.js';
 import { generatePreoperacionalReport } from './preoperacional-report.service.js';
+import { generateFacturacionPendienteReport } from './facturacion-pendiente-report.service.js';
+import { resolverAlcanceClientes } from './client-scope.service.js';
 import { sendEmail } from './notification.service.js';
 
 // Nombre de instancia fijo se resuelve dinámicamente al momento de enviar
 const INSTANCE_OVERRIDE = process.env.WA_ALERTS_INSTANCE || '';
+
+/**
+ * Los envíos programados solo corren en producción (o con WA_ALERTS_CRON_ENABLED=true): así un
+ * entorno de desarrollo no duplica los WhatsApp/correos que ya envía producción.
+ * El botón "Enviar prueba" funciona en cualquier entorno.
+ */
+const CRON_ENABLED = process.env.WA_ALERTS_CRON_ENABLED
+  ? process.env.WA_ALERTS_CRON_ENABLED === 'true'
+  : process.env.NODE_ENV === 'production';
 
 interface AlertaWA {
   id: string;
@@ -21,6 +32,41 @@ interface AlertaWA {
   status_id: string;
   client_id?: string;
 }
+
+type Canal = 'WHATSAPP' | 'EMAIL' | 'AMBOS';
+
+interface Destinatario {
+  id: number;
+  nombre: string | null;
+  phone_number: string | null;
+  email: string | null;
+  canal: Canal;
+  alcance: 'GENERAL' | 'CLIENTE';
+  client_ids: string[];
+}
+
+/** Contenido ya generado para un alcance (se reutiliza entre destinatarios con el mismo alcance). */
+interface Contenido {
+  vacio: boolean;                // no hay datos para este alcance → no se envía
+  mensaje: string;               // texto de WhatsApp
+  /**
+   * Adjuntos por WhatsApp, en orden. El primero lleva el mensaje (+ su caption) como texto;
+   * los siguientes van con su propio caption.
+   */
+  adjuntosWa?: { base64: string; fileName: string; caption?: string }[];
+  emailHtml?: string;            // si no viene, se arma con el mensaje
+  emailAdjuntos?: { filename: string; content: Buffer }[];
+}
+
+export interface ResultadoEnvio {
+  whatsapp: number;
+  email: number;
+  omitidos: number;              // destinatarios sin datos para su alcance
+  errores: string[];
+}
+
+/** Tipos cuyo informe se puede filtrar por cliente para cada destinatario. */
+export const TIPOS_CON_ALCANCE = ['PREOPERACIONAL', 'FACTURACION_PENDIENTE', 'CIERRE_FACT', 'SOBRECOSTO'];
 
 const activeJobs = new Map<string, ReturnType<typeof cron.schedule>>();
 
@@ -40,140 +86,247 @@ async function sleep(ms: number) {
 }
 
 function buildEmailHtml(alerta: AlertaWA, message: string, caption?: string): string {
-  const bodyHtml = message.replace(/\n/g, '<br/>');
+  const bodyHtml = message
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/_([^_\n]+)_/g, '<i>$1</i>')
+    .replace(/\n/g, '<br/>');
   const captionHtml = caption ? `<p style="color:#0d3b3b;font-weight:700;">${caption.replace(/[*_]/g, '').replace(/\n/g, '<br/>')}</p>` : '';
   return `
-    <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#1a2a2a;">
+    <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;color:#1a2a2a;">
       <div style="background:#0d3b3b;color:#fff;padding:16px 20px;border-radius:8px 8px 0 0;">
         <h2 style="margin:0;font-size:16px;">OrbitM7 — ${alerta.name}</h2>
       </div>
       <div style="border:1px solid #e8f0f0;border-top:none;padding:20px;border-radius:0 0 8px 8px;">
         <p>${bodyHtml}</p>
         ${captionHtml}
-        <p style="font-size:11px;color:#80a0a0;margin-top:20px;">Este correo es una copia de respaldo del mensaje automático enviado por WhatsApp — Milla 7 S.A.S.</p>
+        <p style="font-size:11px;color:#80a0a0;margin-top:20px;">Mensaje automático de OrbitM7 — Milla 7 S.A.S.</p>
       </div>
     </div>`;
 }
 
+const base64Puro = (b64: string) => (b64.includes(';base64,') ? b64.split(';base64,')[1] : b64);
+
 class WhatsAppCronRunner {
-  async sendAlerta(alerta: AlertaWA, isTest = false): Promise<number> {
-    // Solo destinatarios habilitados — un número deshabilitado queda en la lista pero no recibe nada.
-    const destRes = await pool.query(
-      'SELECT phone_number, email FROM alertas_whatsapp_destinatarios WHERE alerta_id = $1 AND enabled = true',
-      [alerta.id]
-    );
-    const destinatarios: { phone_number: string; email: string | null }[] = destRes.rows;
-    if (destinatarios.length === 0) return 0;
+  /**
+   * Genera el contenido de la alerta para un alcance. `clientIds` vacío = informe general
+   * (para CIERRE_FACT/SOBRECOSTO, el general respeta el filtro de bodegas de la propia alerta).
+   */
+  async generarContenido(alerta: AlertaWA, clientIds: string[]): Promise<Contenido> {
+    const base = buildMessage(alerta.message_template || alerta.name, alerta);
+    const alcance = clientIds.length ? await resolverAlcanceClientes(clientIds) : undefined;
 
-    // Resolver instancia: env override → primera user_* conectada
-    const INSTANCE = INSTANCE_OVERRIDE || await evolutionService.findFirstConnectedInstance() || '';
-    if (!INSTANCE) {
-      throw new Error('No hay ninguna instancia de WhatsApp conectada. Ve a Conexión WhatsApp y vincula tu número.');
+    if (alerta.tipo_evento === 'FACTURACION_PENDIENTE') {
+      const r = await generateFacturacionPendienteReport(alcance);
+      if (!r) return { vacio: true, mensaje: '' };
+      const intro = alerta.message_template?.trim() ? `${base}\n\n` : '';
+      return {
+        vacio: false,
+        mensaje: `${intro}${r.waMessage}`,
+        adjuntosWa: [{ base64: r.excelBuffer.toString('base64'), fileName: r.fileName }],
+        emailHtml: r.emailHtml,
+        emailAdjuntos: [{ filename: r.fileName, content: r.excelBuffer }],
+      };
     }
-    await evolutionService.ensureInstance(INSTANCE);
-    let message = buildMessage(alerta.message_template || alerta.name, alerta);
-
-    // Generar adjunto o contenido dinámico según tipo de evento o adjunto_tipo
-    let pdfAttachment: { base64: string; fileName: string; caption: string } | null = null;
 
     if (alerta.tipo_evento === 'PREOPERACIONAL' || alerta.adjunto_tipo === 'informe_preoperacional') {
-      try {
-        const preopReport = await generatePreoperacionalReport();
-        message = preopReport.message;
-        pdfAttachment = {
-          base64: preopReport.pdfBase64,
-          fileName: preopReport.pdfFileName,
-          caption: `📋 *Informe Preoperacional OrbitM7*\nFecha: ${preopReport.fechaFormateada}\nRealizados: ${preopReport.totalRealizados}/${preopReport.totalOrders} (${preopReport.efectividadGlobal}%) | Aptos: ${preopReport.totalAptos} | Pendientes: ${preopReport.totalPendientes}`
-        };
-        console.log(`[WA-CRON] Reporte preoperacional generado: ${preopReport.pdfFileName}`);
-      } catch (err: any) {
-        console.error('[WA-CRON] Error generando reporte preoperacional:', err.message);
-      }
-    } else if (alerta.tipo_evento === 'SIN_OPERACION_DIARIA') {
-      try {
-        const sinOpReport = await generateSinOperacionDiariaReport();
-        message = sinOpReport.message;
-        console.log(`[WA-CRON] Reporte sin operación diaria generado para fecha: ${sinOpReport.fecha}`);
-      } catch (err: any) {
-        console.error('[WA-CRON] Error generando reporte sin operación diaria:', err.message);
-      }
-    } else if (alerta.tipo_evento === 'CIERRE_FACT') {
-      try {
-        pdfAttachment = await generateCierreFactReport(alerta.client_id || undefined);
-        console.log(`[WA-CRON] PDF CierreFact generado: ${pdfAttachment.fileName}`);
-      } catch (err: any) {
-        console.error('[WA-CRON] Error generando PDF cierre-fact:', err.message);
-      }
-    } else if (alerta.tipo_evento === 'SOBRECOSTO') {
-      try {
-        pdfAttachment = await generateSobrecostoReport(alerta.client_id || undefined);
-        console.log(`[WA-CRON] PDF Sobrecosto generado: ${pdfAttachment.fileName}`);
-      } catch (err: any) {
-        console.error('[WA-CRON] Error generando PDF sobrecosto:', err.message);
-      }
-    } else if (alerta.adjunto_tipo === 'informe_flota') {
-      try {
-        pdfAttachment = await generateFlotaReportPdf();
-        console.log(`[WA-CRON] PDF generado: ${pdfAttachment.fileName}`);
-      } catch (err: any) {
-        console.error('[WA-CRON] Error generando PDF flota:', err.message);
+      const r = await generatePreoperacionalReport(undefined, alcance);
+      if (alcance && r.totalOrders === 0) return { vacio: true, mensaje: '' };
+      const caption = `📋 *Informe Preoperacional OrbitM7*\nFecha: ${r.fechaFormateada}` +
+        (alcance ? `\nCliente(s): ${alcance.etiqueta}` : '') +
+        `\nRealizados: ${r.totalRealizados}/${r.totalOrders} (${r.efectividadGlobal}%) | Aptos: ${r.totalAptos} | Pendientes: ${r.totalPendientes}`;
+      return {
+        vacio: false,
+        mensaje: r.message,
+        adjuntosWa: [
+          { base64: r.pdfBase64, fileName: r.pdfFileName, caption },
+          { base64: r.excelBuffer.toString('base64'), fileName: r.excelFileName, caption: '📊 Excel con la lista de conductores (realizados y pendientes)' },
+        ],
+        emailHtml: buildEmailHtml(alerta, r.message, caption),
+        emailAdjuntos: [
+          { filename: r.pdfFileName, content: Buffer.from(base64Puro(r.pdfBase64), 'base64') },
+          { filename: r.excelFileName, content: r.excelBuffer },
+        ],
+      };
+    }
+
+    if (alerta.tipo_evento === 'SIN_OPERACION_DIARIA') {
+      const r = await generateSinOperacionDiariaReport();
+      return { vacio: false, mensaje: r.message };
+    }
+
+    if (alerta.tipo_evento === 'CIERRE_FACT') {
+      const filtro = clientIds.length ? clientIds.join(',') : (alerta.client_id || undefined);
+      const r = await generateCierreFactReport(filtro);
+      // Por cliente sin planillas pendientes → no se envía (el general sí, aunque esté en cero)
+      if (clientIds.length && r.totalPlanillas === 0) return { vacio: true, mensaje: '' };
+      // Dash informativo (resumen general) + PDF con el detalle por planilla
+      return {
+        vacio: false,
+        mensaje: base,
+        adjuntosWa: [
+          { base64: r.dashboardPngBase64, fileName: r.dashboardFileName, caption: r.caption },
+          { base64: r.base64, fileName: r.fileName, caption: '📄 Detalle por planilla (PDF)' },
+        ],
+        emailHtml: `${buildEmailHtml(alerta, base)}<div style="margin-top:12px;">${r.dashboardHtml}</div>`,
+        emailAdjuntos: [{ filename: r.fileName, content: Buffer.from(base64Puro(r.base64), 'base64') }],
+      };
+    }
+
+    if (alerta.tipo_evento === 'SOBRECOSTO') {
+      const filtro = clientIds.length ? clientIds.join(',') : (alerta.client_id || undefined);
+      const pdf = await generateSobrecostoReport(filtro);
+      return {
+        vacio: false,
+        mensaje: base,
+        adjuntosWa: [pdf],
+        emailAdjuntos: [{ filename: pdf.fileName, content: Buffer.from(base64Puro(pdf.base64), 'base64') }],
+      };
+    }
+
+    if (alerta.adjunto_tipo === 'informe_flota') {
+      const pdf = await generateFlotaReportPdf();
+      return {
+        vacio: false,
+        mensaje: base,
+        adjuntosWa: [pdf],
+        emailAdjuntos: [{ filename: pdf.fileName, content: Buffer.from(base64Puro(pdf.base64), 'base64') }],
+      };
+    }
+
+    return { vacio: false, mensaje: base };
+  }
+
+  /**
+   * Envía la alerta. Cada destinatario recibe el informe de su alcance (general o sus clientes)
+   * por su canal (WhatsApp, correo o ambos). El informe de cada alcance se genera una sola vez.
+   */
+  async sendAlerta(alerta: AlertaWA, isTest = false): Promise<ResultadoEnvio> {
+    const resultado: ResultadoEnvio = { whatsapp: 0, email: 0, omitidos: 0, errores: [] };
+
+    // Solo destinatarios habilitados — uno deshabilitado queda en la lista pero no recibe nada.
+    const destRes = await pool.query(
+      `SELECT id, nombre, phone_number, email, canal, alcance, client_ids
+       FROM alertas_whatsapp_destinatarios
+       WHERE alerta_id = $1 AND enabled = true
+       ORDER BY id`,
+      [alerta.id]
+    );
+    const destinatarios: Destinatario[] = destRes.rows;
+    if (destinatarios.length === 0) return resultado;
+
+    const usaAlcance = TIPOS_CON_ALCANCE.includes(alerta.tipo_evento) || alerta.adjunto_tipo === 'informe_preoperacional';
+    const alcanceDe = (d: Destinatario) =>
+      usaAlcance && d.alcance === 'CLIENTE' && d.client_ids?.length ? [...d.client_ids].sort() : [];
+
+    // WhatsApp solo si algún destinatario lo usa; si no hay instancia, los correos igual salen.
+    const necesitaWa = destinatarios.some(d => d.canal !== 'EMAIL' && d.phone_number);
+    let INSTANCE = '';
+    if (necesitaWa) {
+      INSTANCE = INSTANCE_OVERRIDE || await evolutionService.findFirstConnectedInstance() || '';
+      if (INSTANCE) {
+        await evolutionService.ensureInstance(INSTANCE);
+      } else {
+        const msg = 'No hay ninguna instancia de WhatsApp conectada (Conexión WhatsApp). Solo se enviaron correos.';
+        console.error(`[WA-CRON] ${msg}`);
+        resultado.errores.push(msg);
       }
     }
 
-    let sent = 0;
+    const cache = new Map<string, Promise<Contenido>>();
+    const contenidoPara = (clientIds: string[]) => {
+      const key = clientIds.join(',') || '__GENERAL__';
+      if (!cache.has(key)) cache.set(key, this.generarContenido(alerta, clientIds));
+      return cache.get(key)!;
+    };
 
+    let waCaido = false;
     for (const dest of destinatarios) {
-      const phone = dest.phone_number;
+      const clientIds = alcanceDe(dest);
+      let contenido: Contenido;
       try {
-        // Revalidar la conexión antes de CADA envío, no solo una vez al inicio del lote —
-        // en listas largas la sesión puede caerse a mitad de camino sin que nos enteremos.
-        const stillOpen = await evolutionService.isInstanceOpen(INSTANCE);
-        if (!stillOpen) {
-          console.error(`[WA-CRON] La instancia "${INSTANCE}" se desconectó a mitad del envío. Restantes omitidos desde ${phone}.`);
-          break;
-        }
-
-        if (pdfAttachment) {
-          await evolutionService.sendMediaDirect(
-            INSTANCE,
-            phone,
-            pdfAttachment.base64,
-            pdfAttachment.fileName,
-            `${message}\n\n${pdfAttachment.caption}`
-          );
-        } else {
-          await evolutionService.sendMessageDirect(INSTANCE, phone, message);
-        }
-        sent++;
-        await sleep(5000); // rate limit: 1 msg / 5s — margen más amplio para evitar throttling de WhatsApp
+        contenido = await contenidoPara(clientIds);
       } catch (err: any) {
-        console.error(`[WA-CRON] Error enviando a ${phone}:`, err.message);
+        const msg = `Error generando informe${clientIds.length ? ` (${clientIds.join(', ')})` : ''}: ${err.message}`;
+        console.error(`[WA-CRON] ${msg}`);
+        if (!resultado.errores.includes(msg)) resultado.errores.push(msg);
+        continue;
+      }
+      if (contenido.vacio) {
+        resultado.omitidos++;
+        continue;
+      }
+      const quien = dest.nombre || dest.phone_number || dest.email;
+
+      // WhatsApp
+      if (dest.canal !== 'EMAIL' && dest.phone_number && INSTANCE && !waCaido) {
+        try {
+          // Revalidar la conexión antes de CADA envío: en listas largas la sesión puede caerse.
+          if (!(await evolutionService.isInstanceOpen(INSTANCE))) {
+            waCaido = true;
+            const msg = `La instancia "${INSTANCE}" se desconectó a mitad del envío; WhatsApp restantes omitidos desde ${quien}.`;
+            console.error(`[WA-CRON] ${msg}`);
+            resultado.errores.push(msg);
+          } else {
+            const adjuntos = contenido.adjuntosWa || [];
+            if (adjuntos.length === 0) {
+              await evolutionService.sendMessageDirect(INSTANCE, dest.phone_number, contenido.mensaje);
+            }
+            for (const [i, adj] of adjuntos.entries()) {
+              const texto = i === 0
+                ? (adj.caption ? `${contenido.mensaje}\n\n${adj.caption}` : contenido.mensaje)
+                : (adj.caption || adj.fileName);
+              if (i > 0) await sleep(2000);
+              await evolutionService.sendMediaDirect(INSTANCE, dest.phone_number, adj.base64, adj.fileName, texto);
+            }
+            resultado.whatsapp++;
+            await sleep(5000); // rate limit: 1 destinatario / 5s para evitar throttling de WhatsApp
+          }
+        } catch (err: any) {
+          console.error(`[WA-CRON] Error enviando WhatsApp a ${quien}:`, err.message);
+          resultado.errores.push(`WhatsApp ${quien}: ${err.message}`);
+        }
       }
 
-      // Correo en paralelo, siempre que el destinatario tenga uno configurado — no bloqueante
-      // y no depende de si el WhatsApp de arriba tuvo éxito o no.
-      if (dest.email) {
-        const rawBase64 = pdfAttachment?.base64.includes(';base64,')
-          ? pdfAttachment.base64.split(';base64,')[1]
-          : pdfAttachment?.base64;
-        sendEmail(
-          dest.email,
-          `OrbitM7 — ${alerta.name}`,
-          buildEmailHtml(alerta, message, pdfAttachment?.caption),
-          pdfAttachment && rawBase64 ? [{ filename: pdfAttachment.fileName, content: Buffer.from(rawBase64, 'base64') }] : undefined
-        ).catch((err: any) => console.error(`[WA-CRON] Error enviando email a ${dest.email}:`, err.message));
+      // Correo
+      if (dest.canal !== 'WHATSAPP' && dest.email) {
+        try {
+          await sendEmail(
+            dest.email,
+            `OrbitM7 — ${alerta.name}${clientIds.length ? ' (por cliente)' : ''}`,
+            contenido.emailHtml || buildEmailHtml(alerta, contenido.mensaje, contenido.adjuntosWa?.[0]?.caption),
+            contenido.emailAdjuntos
+          );
+          resultado.email++;
+        } catch (err: any) {
+          console.error(`[WA-CRON] Error enviando correo a ${dest.email}:`, err.message);
+          resultado.errores.push(`Correo ${dest.email}: ${err.message}`);
+        }
       }
     }
 
     if (!isTest) {
-      await pool.query(
-        `UPDATE alertas_whatsapp SET last_run = NOW() WHERE id = $1`,
-        [alerta.id]
-      ).catch(() => {});
+      await pool.query(`UPDATE alertas_whatsapp SET last_run = NOW() WHERE id = $1`, [alerta.id]).catch(() => {});
     }
 
-    console.log(`[WA-CRON] Alerta "${alerta.name}" enviada a ${sent}/${destinatarios.length} destinatario(s)`);
-    return sent;
+    console.log(`[WA-CRON] Alerta "${alerta.name}": ${resultado.whatsapp} WhatsApp, ${resultado.email} correo(s), ` +
+      `${resultado.omitidos} sin datos para su alcance, ${resultado.errores.length} error(es).`);
+    return resultado;
+  }
+
+  /** Ejecuta ahora la alerta activa de un tipo (usado por los botones manuales del panel de administración). */
+  async runByTipo(tipoEvento: string): Promise<string[]> {
+    const logs: string[] = [`[${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}] Ejecutando alertas ${tipoEvento}...`];
+    const res = await pool.query(`SELECT * FROM alertas_whatsapp WHERE tipo_evento = $1 AND status_id = 'EST-01'`, [tipoEvento]);
+    if (!res.rowCount) {
+      logs.push(`No hay alertas activas de tipo ${tipoEvento}. Configúrela en Alertas WhatsApp.`);
+      return logs;
+    }
+    for (const alerta of res.rows) {
+      const r = await this.sendAlerta(alerta);
+      logs.push(`"${alerta.name}": ${r.whatsapp} WhatsApp, ${r.email} correo(s), ${r.omitidos} sin datos.`);
+      r.errores.forEach(e => logs.push(`ERROR: ${e}`));
+    }
+    return logs;
   }
 
   async loadAndSchedule() {
@@ -181,6 +334,12 @@ class WhatsAppCronRunner {
     for (const [id, task] of activeJobs) {
       task.stop();
       activeJobs.delete(id);
+    }
+
+    if (!CRON_ENABLED) {
+      console.log('[WA-CRON] Envíos programados deshabilitados en este entorno (NODE_ENV≠production). ' +
+        'Use WA_ALERTS_CRON_ENABLED=true para activarlos; "Enviar prueba" sigue disponible.');
+      return;
     }
 
     let alertas: AlertaWA[] = [];
@@ -208,7 +367,11 @@ class WhatsAppCronRunner {
 
       const task = cron.schedule(expr, async () => {
         console.log(`[WA-CRON] Ejecutando alerta programada: ${alerta.name}`);
-        await this.sendAlerta(alerta);
+        try {
+          await this.sendAlerta(alerta);
+        } catch (err: any) {
+          console.error(`[WA-CRON] Falló la alerta "${alerta.name}":`, err.message);
+        }
       }, { timezone: 'America/Bogota' });
 
       activeJobs.set(alerta.id, task);

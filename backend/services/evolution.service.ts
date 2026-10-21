@@ -304,15 +304,28 @@ export class EvolutionService {
     async sendMediaDirect(instanceName: string, number: string, base64: string, fileName: string, caption?: string) {
         const cleanNumber = number.replace(/\D/g, '');
         const finalNumber = cleanNumber.length === 10 ? '57' + cleanNumber : cleanNumber;
+        // Documentos por extensión (PDF, Excel, Word, CSV…) — sin esto un .xlsx salía como "imagen"
+        const DOC_MIME: Record<string, string> = {
+            pdf: 'application/pdf',
+            xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            xls: 'application/vnd.ms-excel',
+            docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            csv: 'text/csv',
+        };
+        const ext = (fileName.split('.').pop() || '').toLowerCase();
         let mediatype = 'image';
-        if (base64.includes('application/pdf') || fileName.endsWith('.pdf')) mediatype = 'document';
-        else if (base64.includes('audio/')) mediatype = 'audio';
+        let mimetype: string | undefined;
+        if (DOC_MIME[ext] || base64.includes('application/pdf')) {
+            mediatype = 'document';
+            mimetype = DOC_MIME[ext] || 'application/pdf';
+        } else if (base64.includes('audio/')) mediatype = 'audio';
         // Quitar prefijo data URL si existe
         const rawBase64 = base64.includes(';base64,') ? base64.split(';base64,')[1] : base64;
         const bodyLabel = `[MEDIA: ${fileName}] ${caption || ''}`;
         try {
             const url = `${EVO_URL}/message/sendMedia/${instanceName}`;
-            const payload = { number: finalNumber, mediatype, caption: caption || fileName, media: rawBase64, fileName, delay: 1200 };
+            const payload: any = { number: finalNumber, mediatype, caption: caption || fileName, media: rawBase64, fileName, delay: 1200 };
+            if (mimetype) payload.mimetype = mimetype;
             const response = await axios.post(url, payload, { headers: this.getHeaders() });
             await this.logMessage(instanceName, finalNumber, bodyLabel, 'SENT', 'OUTBOUND', response.data?.key?.id);
             return response.data;
