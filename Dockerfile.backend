@@ -9,7 +9,7 @@ COPY backend/package*.json ./backend/
 
 # Instalación declarativa del workspace backend sin manipulación ad-hoc de dependencias
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --workspace=m7-backend --legacy-peer-deps --no-audit --ignore-scripts --prefer-offline
+    npm install --workspace=m7-backend --include-workspace-root --legacy-peer-deps --no-audit --ignore-scripts --prefer-offline
 
 COPY . .
 # Compilamos el servidor con límite de RAM optimizado y podamos devDependencies del workspace

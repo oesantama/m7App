@@ -14,6 +14,12 @@ export const migration007: Migration = {
   id: '007_gh_activos_mensajeria',
   name: 'Gestión Humana: hoja de vida de activos y control de mensajería',
   up: async (client: PoolClient) => {
+    // Los índices sobre la columna de texto `estado` solo aplican si existe (la migración 008
+    // la reemplaza por `estado_id`; el script SQL consolidado ya crea el esquema final).
+    const existe = async (tabla: string, columna: string) => (await client.query(
+      `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2`,
+      [tabla, columna])).rowCount! > 0;
+
     // ── MÓDULO 1: HOJA DE VIDA DE ACTIVOS ─────────────────────────────────────
     await client.query(`
       CREATE TABLE IF NOT EXISTS gh_activos_tipos (
@@ -61,7 +67,9 @@ export const migration007: Migration = {
       );
     `);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_activos_tipo ON gh_activos (tipo_id) WHERE deleted_at IS NULL`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_activos_estado ON gh_activos (estado) WHERE deleted_at IS NULL`);
+    if (await existe('gh_activos', 'estado')) {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_activos_estado ON gh_activos (estado) WHERE deleted_at IS NULL`);
+    }
     await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_activos_responsable ON gh_activos (responsable_id)`);
 
     await client.query(`
@@ -144,8 +152,10 @@ export const migration007: Migration = {
         CONSTRAINT chk_gh_msj_estado CHECK (estado IN ('PENDIENTE','ASIGNADO','EN_CAMINO','ENTREGADO','FALLIDO','DEVUELTO','CANCELADO'))
       );
     `);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_msj_estado ON gh_mensajeria_envios (estado)`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_msj_mensajero ON gh_mensajeria_envios (mensajero_id, estado)`);
+    if (await existe('gh_mensajeria_envios', 'estado')) {
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_msj_estado ON gh_mensajeria_envios (estado)`);
+      await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_msj_mensajero ON gh_mensajeria_envios (mensajero_id, estado)`);
+    }
     await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_msj_remitente ON gh_mensajeria_envios (remitente_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_msj_created ON gh_mensajeria_envios (created_at DESC)`);
 

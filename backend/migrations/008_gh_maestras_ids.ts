@@ -13,6 +13,12 @@ export const migration008: Migration = {
   id: '008_gh_maestras_ids',
   name: 'Gestión Humana: activos y mensajería referencian maestras por ID',
   up: async (client: PoolClient) => {
+    // Las conversiones solo corren si la columna de texto vieja existe: así la migración no falla
+    // en un entorno donde el esquema final se creó con el script SQL consolidado.
+    const existe = async (tabla: string, columna: string) => (await client.query(
+      `SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2`,
+      [tabla, columna])).rowCount! > 0;
+
     // Estados nuevos en la maestra global (los de mensajería reutilizan los existentes)
     await client.query(`
       INSERT INTO estados (id, name, status_id) VALUES
@@ -32,7 +38,7 @@ export const migration008: Migration = {
         ADD COLUMN IF NOT EXISTS proveedor_id TEXT REFERENCES prov_cliente(documento) ON UPDATE CASCADE ON DELETE SET NULL,
         ADD COLUMN IF NOT EXISTS estado_id TEXT REFERENCES estados(id);
     `);
-    await client.query(`
+    if (await existe('gh_activos', 'estado')) await client.query(`
       UPDATE gh_activos a SET
         estado_id = CASE a.estado WHEN 'EN_MANTENIMIENTO' THEN 'EST-25' WHEN 'DAÑADO' THEN 'EST-26'
                                   WHEN 'BAJA' THEN 'EST-27' ELSE 'EST-24' END,
@@ -51,7 +57,7 @@ export const migration008: Migration = {
         ADD COLUMN IF NOT EXISTS proveedor_id TEXT REFERENCES prov_cliente(documento) ON UPDATE CASCADE ON DELETE SET NULL,
         ADD COLUMN IF NOT EXISTS estado_resultante_id TEXT REFERENCES estados(id);
     `);
-    await client.query(`
+    if (await existe('gh_activos_eventos', 'proveedor')) await client.query(`
       UPDATE gh_activos_eventos e SET
         estado_resultante_id = CASE e.estado_resultante WHEN 'OPERATIVO' THEN 'EST-24' WHEN 'EN_MANTENIMIENTO' THEN 'EST-25'
                                      WHEN 'DAÑADO' THEN 'EST-26' WHEN 'BAJA' THEN 'EST-27' END,
@@ -66,10 +72,13 @@ export const migration008: Migration = {
                  WHEN 'CANCELADO' THEN 'EST-29' END`;
 
     await client.query(`ALTER TABLE gh_mensajeria_envios ADD COLUMN IF NOT EXISTS estado_id TEXT REFERENCES estados(id)`);
-    await client.query(`UPDATE gh_mensajeria_envios SET estado_id = ${MAP.replace('%s', 'estado')} WHERE estado_id IS NULL`);
+    if (await existe('gh_mensajeria_envios', 'estado')) {
+      await client.query(`UPDATE gh_mensajeria_envios SET estado_id = ${MAP.replace('%s', 'estado')} WHERE estado_id IS NULL`);
+    }
     await client.query(`ALTER TABLE gh_mensajeria_envios DROP CONSTRAINT IF EXISTS chk_gh_msj_estado`);
     await client.query(`ALTER TABLE gh_mensajeria_envios DROP COLUMN IF EXISTS estado`);
     await client.query(`ALTER TABLE gh_mensajeria_envios ALTER COLUMN estado_id SET DEFAULT 'EST-03', ALTER COLUMN estado_id SET NOT NULL`);
+    await client.query(`ALTER TABLE gh_mensajeria_envios DROP CONSTRAINT IF EXISTS chk_gh_msj_estado_id`);
     await client.query(`
       ALTER TABLE gh_mensajeria_envios ADD CONSTRAINT chk_gh_msj_estado_id
         CHECK (estado_id IN ('EST-03','EST-10','EST-11','EST-12','EST-13','EST-28','EST-29'))
@@ -82,7 +91,7 @@ export const migration008: Migration = {
         ADD COLUMN IF NOT EXISTS estado_anterior_id TEXT REFERENCES estados(id),
         ADD COLUMN IF NOT EXISTS estado_nuevo_id TEXT REFERENCES estados(id);
     `);
-    await client.query(`
+    if (await existe('gh_mensajeria_eventos', 'estado_nuevo')) await client.query(`
       UPDATE gh_mensajeria_eventos SET
         estado_anterior_id = ${MAP.replace('%s', 'estado_anterior')},
         estado_nuevo_id = ${MAP.replace('%s', 'estado_nuevo')}
