@@ -86,11 +86,12 @@ export const bulkSaveDrivers = async (req: Request, res: Response) => {
   const { drivers } = req.body;
   if (!Array.isArray(drivers)) return res.status(400).json({ error: 'Data must be an array' });
 
+  const client = await pool.connect();
   try {
-    await pool.query('BEGIN');
+    await client.query('BEGIN');
 
     // Obtener el último ID base para autoincrementar
-    const lastIdResult = await pool.query("SELECT MAX(substring(id from 5)::bigint) as max_id FROM drivers WHERE id ~ '^DRV-[0-9]{3}$'");
+    const lastIdResult = await client.query("SELECT MAX(substring(id from 5)::bigint) as max_id FROM drivers WHERE id ~ '^DRV-[0-9]{3}$'");
     let currentMax = Number(lastIdResult.rows[0].max_id || 0);
 
     for (const d of drivers) {
@@ -100,7 +101,7 @@ export const bulkSaveDrivers = async (req: Request, res: Response) => {
         driverId = `DRV-${currentMax.toString().padStart(3, '0')}`;
       }
 
-      await pool.query(`
+      await client.query(`
         INSERT INTO drivers (
           id, name, document_type, document_number, phone, client_id, 
           license_expiry, status_id, license_category
@@ -121,11 +122,14 @@ export const bulkSaveDrivers = async (req: Request, res: Response) => {
       ]);
     }
 
-    await pool.query('COMMIT');
+    await client.query('COMMIT');
     res.json({ success: true, message: `Se procesaron ${drivers.length} conductores` });
   } catch (err: any) {
-    await pool.query('ROLLBACK');
+    await client.query('ROLLBACK');
     console.error('[M7-DRIVERS] Bulk Save Error:', err);
     res.status(500).json({ error: "Error en carga masiva: " + err.message });
+  } finally {
+    client.release();
   }
 };
+

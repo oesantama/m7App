@@ -5,13 +5,13 @@ import bcrypt from 'bcryptjs';
 
 export const initPicking = async (req: Request, res: Response) => {
     const { invoiceId, leaderId, createdBy } = req.body;
-    const pickingId = `PICK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
+    const client = await pool.connect();
     try {
-        await pool.query('BEGIN');
+        await client.query('BEGIN');
 
         // 1. Crear registro de alistado (inicialmente solo con el líder)
-        const insertRes = await pool.query(`
+        const insertRes = await client.query(`
             INSERT INTO picking_assignments (
                 invoice_id, leader_id, status, created_by, started_at
             ) VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
@@ -22,22 +22,25 @@ export const initPicking = async (req: Request, res: Response) => {
 
         const pickingId = insertRes.rows[0].id;
 
-        await pool.query('COMMIT');
+        await client.query('COMMIT');
         res.json({ success: true, pickingId });
     } catch (error: any) {
-        await pool.query('ROLLBACK');
+        await client.query('ROLLBACK');
         console.error("Init Picking Error:", error);
         res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
     }
 };
 
 export const finishPicking = async (req: Request, res: Response) => {
     const { pickingId, helperIds } = req.body;
+    const client = await pool.connect();
     try {
-        await pool.query('BEGIN');
+        await client.query('BEGIN');
 
         // 1. Actualizar el equipo en la asignación principal
-        await pool.query(`
+        await client.query(`
             UPDATE picking_assignments 
             SET status = 'PENDING_SIGNATURES', 
                 helper_ids = $1,
@@ -47,42 +50,45 @@ export const finishPicking = async (req: Request, res: Response) => {
         `, [JSON.stringify(helperIds || []), pickingId]);
 
         // 2. Obtener líder para asegurar que también esté en la tabla de firmas
-        const assignRes = await pool.query('SELECT leader_id FROM picking_assignments WHERE id = $1', [pickingId]);
+        const assignRes = await client.query('SELECT leader_id FROM picking_assignments WHERE id = $1', [pickingId]);
         const leaderId = assignRes.rows[0].leader_id;
 
         // 3. Insertar todas las firmas pendientes (Líder + Auxiliares)
         const allTeam = Array.from(new Set([leaderId, ...(helperIds || [])]));
         for (const userId of allTeam) {
-            await pool.query(`
+            await client.query(`
                 INSERT INTO picking_signatures (picking_id, user_id, signed)
                 VALUES ($1, $2, false)
                 ON CONFLICT (picking_id, user_id) DO NOTHING
             `, [pickingId, userId]);
         }
 
-        await pool.query('COMMIT');
+        await client.query('COMMIT');
         res.json({ success: true });
     } catch (error: any) {
-        await pool.query('ROLLBACK');
+        await client.query('ROLLBACK');
         res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
     }
 };
 
 export const signPicking = async (req: Request, res: Response) => {
     const { pickingId, userId, password } = req.body;
 
+    const client = await pool.connect();
     try {
-        await pool.query('BEGIN');
+        await client.query('BEGIN');
 
         // 1. Validar contraseña
-        const userRes = await pool.query('SELECT password FROM users WHERE id = $1', [userId]);
+        const userRes = await client.query('SELECT password FROM users WHERE id = $1', [userId]);
         if (userRes.rows.length === 0) throw new Error('Usuario no encontrado');
 
         const valid = await bcrypt.compare(password, userRes.rows[0].password);
         if (!valid) return res.status(401).json({ error: 'Contraseña incorrecta' });
 
         // 2. Actualizar firma
-        const updateRes = await pool.query(`
+        const updateRes = await client.query(`
             UPDATE picking_signatures 
             SET signed = true, signed_at = CURRENT_TIMESTAMP 
             WHERE picking_id = $1 AND user_id = $2 AND signed = false
@@ -94,30 +100,33 @@ export const signPicking = async (req: Request, res: Response) => {
         }
 
         // 3. Verificar si todos firmaron para completar el proceso
-        const pendingCount = await pool.query(
+        const pendingCount = await client.query(
             'SELECT COUNT(*) FROM picking_signatures WHERE picking_id = $1 AND signed = false',
             [pickingId]
         );
 
         if (parseInt(pendingCount.rows[0].count) === 0) {
-            await pool.query(
+            await client.query(
                 "UPDATE picking_assignments SET status = 'COMPLETED', updated_at = CURRENT_TIMESTAMP WHERE id = $1",
                 [pickingId]
             );
             
             // Opcionalmente actualizar estado de ítems
-            const assignRes = await pool.query('SELECT invoice_id FROM picking_assignments WHERE id = $1', [pickingId]);
+            const assignRes = await client.query('SELECT invoice_id FROM picking_assignments WHERE id = $1', [pickingId]);
             const invId = assignRes.rows[0].invoice_id;
-            await pool.query("UPDATE document_items SET item_status = 'EST-09' WHERE CONCAT(document_id, '_', COALESCE(NULLIF(invoice, ''), order_number)) = $1 OR COALESCE(NULLIF(invoice, ''), order_number) = $1", [invId]);
+            await client.query("UPDATE document_items SET item_status = 'EST-09' WHERE CONCAT(document_id, '_', COALESCE(NULLIF(invoice, ''), order_number)) = $1 OR COALESCE(NULLIF(invoice, ''), order_number) = $1", [invId]);
         }
 
-        await pool.query('COMMIT');
+        await client.query('COMMIT');
         res.json({ success: true, completed: parseInt(pendingCount.rows[0].count) === 0 });
     } catch (error: any) {
-        await pool.query('ROLLBACK');
+        await client.query('ROLLBACK');
         res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
     }
 };
+
 
 export const getPickingStatus = async (req: Request, res: Response) => {
     const { invoiceId } = req.params;

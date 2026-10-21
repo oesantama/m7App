@@ -19,6 +19,19 @@ export const aiController = {
     }
   },
 
+  async analyze(req: Request, res: Response) {
+    try {
+      const { prompt, files } = req.body;
+      if (!prompt) {
+        return res.status(400).json({ error: "Falta el prompt" });
+      }
+      const response = await aiService.generateResponse(prompt, { files });
+      res.json({ success: true, text: response });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+
   async learn(req: Request, res: Response) {
     try {
         const { rule } = req.body;

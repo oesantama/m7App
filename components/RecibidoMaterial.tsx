@@ -63,6 +63,29 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
 
   const [selectedDocForCount, setSelectedDocForCount] = useState<DocumentL | null>(null);
 
+  // ── M7 KEEP-ALIVE: Sesión constante para operarios en Recibido de Material ──
+  useEffect(() => {
+    sessionStorage.setItem('m7_active_counting', 'true');
+
+    const lastRenew = Number(sessionStorage.getItem('m7_last_token_renew') || 0);
+    if (!lastRenew || Date.now() - lastRenew > 5 * 60 * 1000) {
+      api.renewSession().then(() => {
+        sessionStorage.setItem('m7_last_token_renew', String(Date.now()));
+      }).catch(() => {});
+    }
+
+    const timer = setInterval(() => {
+      api.renewSession().then(() => {
+        sessionStorage.setItem('m7_last_token_renew', String(Date.now()));
+      }).catch(() => {});
+    }, 10 * 60 * 1000);
+
+    return () => {
+      clearInterval(timer);
+      sessionStorage.removeItem('m7_active_counting');
+    };
+  }, []);
+
   // Bloquear pull-to-refresh y overscroll del navegador móvil mientras el conteo está activo.
   // Sin esto, al deslizar hacia arriba en el celular durante el escaneo se recarga la página
   // y se pierde el conteo en curso.
@@ -96,6 +119,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const [docToChangeStatus, setDocToChangeStatus] = useState<DocumentL | null>(null);
   const [selectedStatus, setSelectedStatus] = useState<string>('');
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusObservacion, setStatusObservacion] = useState('');
 
   // ── Lista filtrada por backend según vista activa ──────────────────────────
   const [localReciboList, setLocalReciboList] = useState<DocumentL[]>([]);
@@ -461,8 +485,12 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
 
   const handleUpdateStatus = () => {
     if (!docToChangeStatus || !selectedStatus) return;
+    if (!statusObservacion.trim()) {
+      toast.error('Debe indicar el motivo del cambio de estado');
+      return;
+    }
     setIsUpdatingStatus(true);
-    api.updateDocumentStatus(docToChangeStatus.id, selectedStatus, user.name)
+    api.updateDocumentStatus(docToChangeStatus.id, selectedStatus, user.name, undefined, statusObservacion.trim())
       .then(res => {
         if (res.success) {
           const updatedDocs = documents.map(d => d.id === docToChangeStatus.id ? { ...d, status: selectedStatus as DocStatus, updatedAt: new Date().toISOString() } : d);
@@ -724,7 +752,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                     <div className="px-6 pb-5 pt-2 mt-auto space-y-2 border-t border-slate-50">
                       {isPending && hasPermission(user, 'RECIBIDO_MATERIAL', 'create') && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); setDocToChangeStatus(doc); setSelectedStatus(doc.status || ''); }}
+                          onClick={(e) => { e.stopPropagation(); setDocToChangeStatus(doc); setSelectedStatus(doc.status || ''); setStatusObservacion(''); }}
                           className="w-full py-2 flex items-center justify-center gap-2 bg-white text-slate-500 hover:text-blue-600 border border-slate-200 hover:border-blue-200 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all shadow-sm"
                         >
                           <Icons.RefreshCw className="w-3 h-3" /> Cambiar Estado
@@ -904,10 +932,22 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
                 </select>
              </div>
 
+             <div className="text-left space-y-2">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Motivo / Observación *:</label>
+                <textarea
+                   value={statusObservacion}
+                   onChange={e => setStatusObservacion(e.target.value)}
+                   rows={3}
+                   maxLength={500}
+                   placeholder="Indique el motivo del cambio de estado..."
+                   className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-[1.5rem] font-bold text-xs outline-none focus:border-blue-500 transition-all text-slate-900 resize-none"
+                />
+             </div>
+
              <div className="flex flex-col gap-4">
                 <button
                   onClick={handleUpdateStatus}
-                  disabled={isUpdatingStatus || !selectedStatus || selectedStatus === docToChangeStatus.status}
+                  disabled={isUpdatingStatus || !selectedStatus || selectedStatus === docToChangeStatus.status || !statusObservacion.trim()}
                   className="w-full py-4 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-widest hover:bg-blue-500 shadow-xl transition-all disabled:opacity-20 active:scale-95 flex items-center justify-center gap-2"
                 >
                   {isUpdatingStatus ? <Icons.RefreshCw className="w-4 h-4 animate-spin" /> : <Icons.Check className="w-4 h-4" />} Actualizar

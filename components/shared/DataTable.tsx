@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import * as XLSX from 'xlsx';
 import { Search, Download, ArrowUp, ArrowDown, ChevronRight } from 'lucide-react';
 
@@ -50,6 +51,11 @@ interface DataTableProps<T> {
   // Tamaño de página inicial — por defecto 5, pero vistas con muchos registros (ej. hasta 1000
   // líneas/mes) deben arrancar con más filas visibles.
   defaultPageSize?: number | 'all';
+
+  // Virtualización (@tanstack/react-virtual) para mitigar consumo de RAM en listas extensas
+  virtualized?: boolean;
+  virtualRowHeight?: number;
+  maxVirtualHeight?: string;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -77,6 +83,9 @@ export function DataTable<T extends Record<string, any>>({
   onSelectionChange,
   toolbarActions,
   defaultPageSize = 5,
+  virtualized,
+  virtualRowHeight = 52,
+  maxVirtualHeight = '650px',
 }: DataTableProps<T>) {
   // Búsqueda
   const [searchTerm, setSearchTerm] = useState('');
@@ -286,6 +295,80 @@ export function DataTable<T extends Record<string, any>>({
     });
   };
 
+  // Virtualización (@tanstack/react-virtual) para mitigar consumo de RAM en listas extensas
+  const isVirtualized = virtualized ?? (paginatedData.length > 60);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: paginatedData.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => virtualRowHeight,
+    overscan: 8,
+    enabled: isVirtualized,
+  });
+
+  const virtualItems = isVirtualized ? rowVirtualizer.getVirtualItems() : null;
+  const paddingTop = virtualItems && virtualItems.length > 0 ? virtualItems[0]?.start || 0 : 0;
+  const paddingBottom = virtualItems && virtualItems.length > 0
+    ? rowVirtualizer.getTotalSize() - (virtualItems[virtualItems.length - 1]?.end || 0)
+    : 0;
+
+  const renderRow = (row: T, rIdx: number) => {
+    const rowId = row.id || rIdx;
+    const isExpanded = expandedRows.has(rowId);
+    return (
+      <React.Fragment key={rowId}>
+        <tr
+          className={`hover:bg-slate-50/70 transition-colors group ${renderExpandedRow ? 'cursor-pointer' : ''}`}
+          onClick={() => renderExpandedRow && toggleRow(rowId)}
+        >
+          {selectable && (
+            <td className="px-4 py-4 align-top" onClick={e => e.stopPropagation()}>
+              {!isRowSelectable || isRowSelectable(row) ? (
+                <input type="checkbox" className="w-4 h-4 accent-indigo-600 cursor-pointer"
+                  checked={(selectedIds || new Set()).has(rowId)}
+                  onChange={() => toggleRowSelected(rowId)} />
+              ) : (
+                <input type="checkbox" className="w-4 h-4 text-slate-300 opacity-40 cursor-not-allowed"
+                  disabled checked={false} title="No seleccionable (Ya Conciliado)" />
+              )}
+            </td>
+          )}
+          {columns.map((col) => {
+            const value = row[col.key as string];
+            return (
+              <td
+                key={String(col.key)}
+                className={`px-6 py-4 text-sm text-slate-600 font-medium align-top ${col.noWrap ? 'whitespace-nowrap' : 'break-words'} ${col.cellClassName || ''}`}
+                style={{
+                  ...(col.minWidth ? { minWidth: col.minWidth } : {}),
+                  ...(col.maxWidth ? { maxWidth: col.maxWidth, wordBreak: 'break-word' } : {}),
+                }}
+              >
+                {col.render ? (
+                  col.render(row)
+                ) : value !== null && value !== undefined && value !== '' ? (
+                  String(value)
+                ) : (
+                  <span className="text-slate-300 font-bold">—</span>
+                )}
+              </td>
+            );
+          })}
+        </tr>
+        {renderExpandedRow && isExpanded && (
+          <tr>
+            <td colSpan={columns.length + (selectable ? 1 : 0)} className="bg-slate-50 border-b-2 border-slate-200 p-0">
+              <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                {renderExpandedRow(row)}
+              </div>
+            </td>
+          </tr>
+        )}
+      </React.Fragment>
+    );
+  };
+
   return (
     <div className={naked ? '' : 'bg-white rounded-[2.5rem] shadow-xl border border-slate-100 p-6 md:p-8 animate-in fade-in duration-500'}>
       {/* Controles de Búsqueda, Acciones y Exportar */}
@@ -317,6 +400,11 @@ export function DataTable<T extends Record<string, any>>({
             <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs font-black">
               {serverSide && totalRows !== undefined ? totalRows : sortedData.length}
             </span>
+            {isVirtualized && (
+              <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-wider" title="Renderizado de alta eficiencia">
+                Virtual
+              </span>
+            )}
           </div>
 
           {toolbarActions}
@@ -333,9 +421,15 @@ export function DataTable<T extends Record<string, any>>({
       )}
 
       {/* Contenedor de la Tabla */}
-      <div className="overflow-x-auto rounded-3xl border border-slate-100">
+      <div 
+        ref={tableContainerRef} 
+        className={`overflow-x-auto rounded-3xl border border-slate-100 ${
+          isVirtualized ? 'overflow-y-auto max-h-[650px]' : ''
+        }`}
+        style={isVirtualized && maxVirtualHeight ? { maxHeight: maxVirtualHeight } : undefined}
+      >
         <table className="w-full text-left border-collapse">
-          <thead>
+          <thead className={isVirtualized ? 'sticky top-0 z-20 shadow-sm' : ''}>
             <tr className="bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 text-white select-none">
               {selectable && (
                 <th className="px-4 py-4.5 border-b border-slate-800 w-10">
@@ -388,61 +482,26 @@ export function DataTable<T extends Record<string, any>>({
               </tr>
             )}
             {paginatedData.length > 0 ? (
-              paginatedData.map((row, rIdx) => {
-                const rowId = row.id || rIdx;
-                const isExpanded = expandedRows.has(rowId);
-                return (
-                  <React.Fragment key={rowId}>
-                    <tr
-                      className={`hover:bg-slate-50/70 transition-colors group ${renderExpandedRow ? 'cursor-pointer' : ''}`}
-                      onClick={() => renderExpandedRow && toggleRow(rowId)}
-                    >
-                      {selectable && (
-                        <td className="px-4 py-4 align-top" onClick={e => e.stopPropagation()}>
-                          {!isRowSelectable || isRowSelectable(row) ? (
-                            <input type="checkbox" className="w-4 h-4 accent-indigo-600 cursor-pointer"
-                              checked={(selectedIds || new Set()).has(rowId)}
-                              onChange={() => toggleRowSelected(rowId)} />
-                          ) : (
-                            <input type="checkbox" className="w-4 h-4 text-slate-300 opacity-40 cursor-not-allowed"
-                              disabled checked={false} title="No seleccionable (Ya Conciliado)" />
-                          )}
-                        </td>
-                      )}
-                      {columns.map((col) => {
-                        const value = row[col.key as string];
-                        return (
-                          <td
-                            key={String(col.key)}
-                            className={`px-6 py-4 text-sm text-slate-600 font-medium align-top ${col.noWrap ? 'whitespace-nowrap' : 'break-words'} ${col.cellClassName || ''}`}
-                            style={{
-                              ...(col.minWidth ? { minWidth: col.minWidth } : {}),
-                              ...(col.maxWidth ? { maxWidth: col.maxWidth, wordBreak: 'break-word' } : {}),
-                            }}
-                          >
-                            {col.render ? (
-                              col.render(row)
-                            ) : value !== null && value !== undefined && value !== '' ? (
-                              String(value)
-                            ) : (
-                              <span className="text-slate-300 font-bold">—</span>
-                            )}
-                          </td>
-                        );
-                      })}
+              isVirtualized && virtualItems ? (
+                <>
+                  {paddingTop > 0 && (
+                    <tr style={{ height: `${paddingTop}px` }}>
+                      <td colSpan={columns.length + (selectable ? 1 : 0)} className="p-0 border-0" />
                     </tr>
-                    {renderExpandedRow && isExpanded && (
-                      <tr>
-                        <td colSpan={columns.length + (selectable ? 1 : 0)} className="bg-slate-50 border-b-2 border-slate-200 p-0">
-                          <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                            {renderExpandedRow(row)}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })
+                  )}
+                  {virtualItems.map((virtualRow) => {
+                    const row = paginatedData[virtualRow.index];
+                    return renderRow(row, virtualRow.index);
+                  })}
+                  {paddingBottom > 0 && (
+                    <tr style={{ height: `${paddingBottom}px` }}>
+                      <td colSpan={columns.length + (selectable ? 1 : 0)} className="p-0 border-0" />
+                    </tr>
+                  )}
+                </>
+              ) : (
+                paginatedData.map((row, rIdx) => renderRow(row, rIdx))
+              )
             ) : (
               <tr>
                 <td

@@ -48,7 +48,8 @@ type TabKey =
   | 'convivientes'
   | 'frecuencia-deporte'
   | 'tipos-deporte'
-  | 'usos-tiempo-libre';
+  | 'usos-tiempo-libre'
+  | 'activos-tipos';
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'horarios-laborales', label: 'Horario Laboral' },
@@ -69,6 +70,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'frecuencia-deporte', label: 'Frecuencia Deporte' },
   { key: 'tipos-deporte',      label: 'Tipos de Deporte' },
   { key: 'usos-tiempo-libre',  label: 'Usos Tiempo Libre' },
+  { key: 'activos-tipos',      label: 'Tipos de Activo' },
 ];
 
 // ─── Sub-componente CRUD reutilizable ─────────────────────────────────────────

@@ -1,5 +1,6 @@
 
 import { Router } from 'express';
+import { authenticateToken } from '../middleware/auth.middleware.js';
 import authRoutes from './auth.routes.js';
 import userRoutes from './user.routes.js';
 import clientRoutes from './client.routes.js';
@@ -72,6 +73,8 @@ import validationRoutes from './validation.routes.js';
 import hojasVidaRoutes, { hvPublicRouter } from './hojas-vida.routes.js';
 import bascRoutes from './basc.routes.js';
 import itActivosRoutes from './it-activos.routes.js';
+import ghActivosRoutes from './gh-activos.routes.js';
+import ghMensajeriaRoutes from './gh-mensajeria.routes.js';
 import ghPerfilesCargoRoutes, { publicRouter as ghPerfilesCargoPublicRoutes } from './gh-perfiles-cargo.routes.js';
 import whatsappWebhookRoutes from './whatsapp-webhook.routes.js';
 import dicorpLegalizacionRoutes from './dicorp-legalizacion.routes.js';
@@ -155,17 +158,17 @@ router.use('/hv', hojasVidaRoutes);
 router.use('/public/hv', hvPublicRouter);
 router.use('/basc', bascRoutes);
 router.use('/it-activos', itActivosRoutes);
+router.use('/gh-activos', ghActivosRoutes);
+router.use('/gh-mensajeria', ghMensajeriaRoutes);
 router.use('/gh-perfiles-cargo-publico', ghPerfilesCargoPublicRoutes);
 router.use('/gh-perfiles-cargo', ghPerfilesCargoRoutes);
 router.use('/whatsapp/webhook', whatsappWebhookRoutes);
 router.use('/cybersecurity', cybersecurityRoutes);
 
-// Endpoint seguro: devuelve la API key de Gemini del backend al frontend autenticado
-router.get('/config/gemini-key', (req: any, res) => {
-  if (!req.user) return res.status(401).json({ error: 'No autorizado' });
+// Endpoint seguro: informa si la IA está configurada sin exponer la clave al cliente
+router.get('/config/gemini-key', authenticateToken, (req: any, res) => {
   const key = process.env.GEMINI_API_KEY || process.env.API_KEY || '';
-  if (!key) return res.status(404).json({ hasKey: false, key: '' });
-  res.json({ hasKey: true, key });
+  res.json({ hasKey: Boolean(key && key.trim()) });
 });
 
 export default router;

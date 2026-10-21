@@ -25,6 +25,11 @@ legacy_sources/
 !.env.example
 .wwebjs_auth/
 .wwebjs_cache/
+backend/config/keys/*.pem
+backend/config/keys/
+*.pem
+*.key
+rclone.conf
 
 # ── Dockerfiles de desarrollo local (no van a producción) ────────────────────
 Dockerfile.evolution.dev
@@ -97,3 +102,6 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 /tmp/
+
+# Cola local de evidencias GH (firmas/fotos) antes de subir a Drive — nunca al repo
+backend/docs/gh-cola/

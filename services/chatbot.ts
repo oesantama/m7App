@@ -1,9 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { fetchJson } from './api';
+import { api, fetchJson } from './api';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
-
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY || '');
 
 export interface ChatMessage {
   id: string;
@@ -21,15 +18,13 @@ export interface ConversationContext {
 }
 
 /**
- * Chatbot M7 Intelligence - Powered by Gemini AI
+ * Chatbot M7 Intelligence - Powered by Gemini AI (Procesamiento Seguro en Backend)
  * Contextos: Cliente, Conductor, Despachador
  */
 export class M7Chatbot {
-  private model;
   private context: ConversationContext;
 
   constructor(context: ConversationContext) {
-    this.model = genAI.getGenerativeModel({ model: 'gemini-pro' });
     this.context = context;
   }
 
@@ -86,9 +81,8 @@ Responde con datos precisos y sugiere acciones concretas para optimizar operacio
     const fullPrompt = `${systemPrompt}\n\nHistorial reciente:\n${historyText}\n\nUsuario: ${userMessage}\nAsistente:`;
 
     try {
-      const result = await this.model.generateContent(fullPrompt);
-      const response = await result.response;
-      const aiResponse = response.text();
+      const data: any = await api.aiChat(fullPrompt, this.context);
+      const aiResponse = typeof data === 'string' ? data : (data?.response || data?.text || 'Respuesta procesada correctamente');
 
       const assistantMessage: ChatMessage = {
         id: `msg-${Date.now()}`,
@@ -100,12 +94,12 @@ Responde con datos precisos y sugiere acciones concretas para optimizar operacio
 
       return assistantMessage;
     } catch (error) {
-      console.error('Error en chatbot:', error);
+      console.error('[M7Chatbot] Error consultando IA en servidor:', error);
       
       return {
         id: `msg-${Date.now()}`,
         role: 'assistant',
-        content: 'Lo siento, hubo un error procesando tu solicitud. Por favor intenta nuevamente.',
+        content: 'Lo siento, hubo un error procesando tu solicitud en el servidor. Por favor intenta nuevamente.',
         timestamp: new Date(),
         context: this.context.userRole
       };

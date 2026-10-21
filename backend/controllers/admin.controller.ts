@@ -113,28 +113,112 @@ export const getTableData = async (req: any, res: Response) => {
   }
 };
 
-export const executeSql = async (req: any, res: Response) => {
-    const { query } = req.body;
-    const user = req.user;
-    try {
-        if (!isUserAdmin(user)) return res.status(403).json({ error: "Acceso denegado." });
-        if (!query) return res.status(400).json({ error: "Query requerido" });
+import { decryptSqlPayload } from '../utils/crypto.util.js';
 
-        // DANGEROUS: Raw SQL execution.
-        const result = await pool.query(query);
+let isAuditTableReady = false;
+const ensureAuditTable = async () => {
+  if (isAuditTableReady) return;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS audit_superadmin_sql (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(50),
+        user_email VARCHAR(150),
+        ip_address VARCHAR(100),
+        query_text TEXT,
+        command VARCHAR(50),
+        row_count INT,
+        status VARCHAR(20),
+        error_message TEXT,
+        executed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      )
+    `);
+    isAuditTableReady = true;
+  } catch (err: any) {
+    console.warn('[ADMIN-SQL-AUDIT] No se pudo verificar tabla de auditoría:', err.message);
+  }
+};
+
+export const executeSql = async (req: any, res: Response) => {
+    const { query, encryptedQuery } = req.body;
+    const user = req.user;
+    const ipAddress = (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.socket?.remoteAddress || 'unknown';
+
+    try {
+        if (!isUserAdmin(user)) {
+          return res.status(403).json({ error: "Acceso denegado. Exclusivo para SuperAdmin." });
+        }
+
+        // Descifrar query si viene cifrado con AES-256-GCM desde el frontend
+        let resolvedQuery = '';
+        if (encryptedQuery) {
+          resolvedQuery = decryptSqlPayload(encryptedQuery);
+        } else if (query) {
+          resolvedQuery = query;
+        }
+
+        if (!resolvedQuery || !resolvedQuery.trim()) {
+          return res.status(400).json({ error: "Query requerido." });
+        }
+
+        // Salvaguarda de Ciberseguridad: Prohibir alteración de roles/usuarios y destrucción de base de datos
+        const forbiddenPatterns = [
+          /\bDROP\s+DATABASE\b/i,
+          /\bDROP\s+SCHEMA\b/i,
+          /\bALTER\s+USER\b/i,
+          /\bCREATE\s+USER\b/i,
+          /\bDROP\s+USER\b/i,
+          /\bGRANT\b/i,
+          /\bREVOKE\b/i
+        ];
+
+        if (forbiddenPatterns.some(pattern => pattern.test(resolvedQuery))) {
+          return res.status(403).json({ 
+            error: "Operación restringida por política de ciberseguridad. Comandos de administración de usuarios, roles o destrucción estructural están prohibidos desde la consola web." 
+          });
+        }
+
+        await ensureAuditTable();
+
+        // Ejecutar query
+        const result = await pool.query(resolvedQuery);
         
+        const command = Array.isArray(result) 
+          ? result.map(r => r.command).join(', ') 
+          : (result.command || 'UNKNOWN');
+
+        const rowCount = Array.isArray(result)
+          ? result.reduce((acc, r) => acc + (r.rowCount || 0), 0)
+          : (result.rowCount || 0);
+
+        // Registro de Auditoría Inmutable
+        pool.query(
+          `INSERT INTO audit_superadmin_sql 
+           (user_id, user_email, ip_address, query_text, command, row_count, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [user.id || '', user.email || '', ipAddress, resolvedQuery, command, rowCount, 'SUCCESS']
+        ).catch(() => {});
+
         // Determine type of result
         if (Array.isArray(result)) {
-             // Multi-statement? usually pg returns array if multiple queries.
              res.json(result.map(r => ({ rows: r.rows, rowCount: r.rowCount })));
         } else {
              res.json({ rows: result.rows, rowCount: result.rowCount, command: result.command });
         }
     } catch (err: any) {
         console.error('[ADMIN-SQL]', err.message);
+
+        // Registrar fallo en auditoría
+        pool.query(
+          `INSERT INTO audit_superadmin_sql 
+           (user_id, user_email, ip_address, query_text, command, row_count, status, error_message)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [user?.id || '', user?.email || '', ipAddress, (req.body.query || 'ENCRYPTED_QUERY'), 'ERROR', 0, 'ERROR', err.message]
+        ).catch(() => {});
+
         res.status(400).json({ error: err.message });
     }
-}
+};
 
 export const saveRecord = async (req: any, res: Response) => {
   const { tableName, data, isUpdate } = req.body;
@@ -429,3 +513,28 @@ export const getPendingDriveCount = async (req: any, res: Response) => {
         res.status(500).json({ error: "Error al obtener pendientes", details: err.message });
     }
 };
+
+export const getMigrationsController = async (req: any, res: Response) => {
+    try {
+        if (!isUserAdmin(req.user)) return res.status(403).json({ error: "Acceso denegado." });
+        const { getMigrationStatus } = await import('../migrations/runner.js');
+        const status = await getMigrationStatus();
+        res.json(status);
+    } catch (err: any) {
+        console.error('[ADMIN-GET-MIGRATIONS]', err.message);
+        res.status(500).json({ error: "Error al obtener estado de migraciones", details: err.message });
+    }
+};
+
+export const runMigrationsController = async (req: any, res: Response) => {
+    try {
+        if (!isUserAdmin(req.user)) return res.status(403).json({ error: "Acceso denegado." });
+        const { runMigrations } = await import('../migrations/runner.js');
+        const report = await runMigrations();
+        res.json({ success: true, report });
+    } catch (err: any) {
+        console.error('[ADMIN-RUN-MIGRATIONS]', err.message);
+        res.status(500).json({ error: "Error al ejecutar migraciones", details: err.message });
+    }
+};
+

@@ -117,6 +117,91 @@ export const validateSession = async (req: Request, res: Response) => {
   res.json({ success: true, user });
 };
 
+export const renewToken = async (req: Request, res: Response) => {
+  const currentUser = (req as any).user;
+  if (!currentUser || (!currentUser.id && !currentUser.email)) {
+    return res.status(401).json({ success: false, error: 'Sesión no válida para renovación.' });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT id, email, name, role_id, client_ids, document_number, status_id, permissions as user_level_permissions
+       FROM users
+       WHERE id = $1 OR LOWER(TRIM(email)) = LOWER($2) LIMIT 1`,
+      [currentUser.id || '0', currentUser.email || '']
+    );
+
+    const user = result.rows[0];
+    if (!user) {
+      return res.status(401).json({ success: false, error: 'Usuario no encontrado en base de datos.' });
+    }
+
+    const statusUpper = String(user.status_id || '').trim().toUpperCase();
+    if (statusUpper === 'EST-02' || statusUpper === 'INACTIVO' || statusUpper === 'DESACTIVADO' || 
+       (user.status_id && statusUpper !== 'EST-01' && statusUpper !== 'ACTIVO')) {
+      return res.status(403).json({ success: false, error: 'Usuario inactivo. No es posible renovar sesión.' });
+    }
+
+    const permResult = await pool.query('SELECT permissions FROM user_permissions WHERE user_id = $1', [user.id]);
+    let permissions: any[] = user.user_level_permissions || [];
+
+    if (permResult.rows.length > 0) {
+      const rawPerms = permResult.rows[0].permissions || {};
+      const permMap = new Map<string, Set<string>>();
+
+      Object.keys(rawPerms).forEach(key => {
+        if (rawPerms[key] === true) {
+          const parts = key.toLowerCase().split('_');
+          if (parts.length >= 3 && parts[0] === 'page') {
+            const action = parts.pop();
+            const pageId = parts.slice(1).join('_').toUpperCase();
+            if (pageId && action) {
+              if (!permMap.has(pageId)) permMap.set(pageId, new Set());
+              permMap.get(pageId)?.add(action);
+            }
+          }
+        }
+      });
+
+      const granularPerms = Array.from(permMap.entries()).map(([module, actions]) => ({
+        module,
+        actions: Array.from(actions)
+      }));
+
+      permissions = [...permissions, ...granularPerms];
+    } else if (currentUser.permissions) {
+      permissions = currentUser.permissions;
+    }
+
+    const compactPerms = permissions.map((p: any) => ({
+      module: p.module,
+      actions: Array.isArray(p.actions) ? p.actions : []
+    }));
+
+    const tokenPayload = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role_id: user.role_id,
+      document_number: user.document_number || '',
+      client_ids: user.client_ids || [],
+      permissions: compactPerms,
+    };
+
+    const newToken = signAccessToken(tokenPayload);
+
+    res.json({
+      success: true,
+      token: newToken,
+      user: { ...tokenPayload, permissions }
+    });
+  } catch (error: any) {
+    console.error('[AUTH-RENEW-ERR]', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+
 import { sendEmail } from '../services/notification.service.js';
 
 export const forgotPassword = async (req: Request, res: Response) => {

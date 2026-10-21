@@ -104,6 +104,20 @@ const ID_MAP: Record<string, string> = {
     'MASTER_INVENTARIO_GH': 'PAG-55',
     'SONDEOS': 'PAG-79',
     'PAG-79': 'PAG-79',
+    'ACTIVOS_GH': 'PAG-80',
+    'MENSAJERIA_GH': 'PAG-81',
+    'MENSAJERIA_MENSAJERO': 'PAG-82',
+};
+
+/** Igual que requirePermission pero como función, para decisiones dentro de un controlador. */
+export const userHasPermission = (user: any, moduleName: string, action: string): boolean => {
+    if (!user) return false;
+    if (user.roleId === 'ROL-01' || user.role_id === 'ROL-01') return true;
+    if (user.email?.toLowerCase() === 'directorti@millasiete.com') return true;
+    const pageId = ID_MAP[moduleName];
+    return !!user.permissions?.some((p: any) =>
+        (p.module === moduleName || (pageId && p.module === pageId)) && p.actions?.includes(action)
+    );
 };
 
 // Módulos que usuarios con permiso RUTAS (PAG-15) pueden leer (solo view)

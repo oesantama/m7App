@@ -319,78 +319,11 @@ export const getInvoicePendingSignatures = async (req: Request, res: Response) =
     }
 };
 
-// ─── INICIALIZACIÓN DE TABLAS ─────────────────────────────────────────────────
-// Se llama 1 vez al arrancar para garantizar que las tablas de entrega existen.
+// ─── INICIALIZACIÓN DE TABLAS (DELEGADO A MIGRACIONES VERSIONADAS) ───────────
+// Gestionado de forma declarativa e inmutable por backend/migrations/002_dispatch_delivery_tables.ts
 export const initDeliveryTables = async () => {
-    console.log('[M7-DISPATCH] initDeliveryTables: Iniciando proceso...');
-    try {
-        console.log('[M7-DISPATCH] initDeliveryTables: Ejecutando pool.query...');
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS delivery_confirmations (
-                id          SERIAL PRIMARY KEY,
-                dispatch_id TEXT,
-                invoice_id  TEXT NOT NULL,
-                driver_id   TEXT NOT NULL,
-                vehicle_id  TEXT,
-                delivery_type TEXT NOT NULL CHECK (delivery_type IN ('FULL','PARTIAL','RETURN','REPICE')),
-                delivered_items JSONB DEFAULT '[]',
-                notes       TEXT,
-                delivered_at TIMESTAMPTZ DEFAULT NOW(),
-                created_at  TIMESTAMPTZ DEFAULT NOW()
-            );
-
-            CREATE TABLE IF NOT EXISTS delivery_returns (
-                id          SERIAL PRIMARY KEY,
-                invoice_id  TEXT NOT NULL,
-                driver_id   TEXT,
-                vehicle_id  TEXT,
-                notes       TEXT,
-                status      TEXT DEFAULT 'PENDING' CHECK (status IN ('PENDING','PROCESSED','CANCELLED')),
-                created_at  TIMESTAMPTZ DEFAULT NOW()
-            );
-
-            CREATE TABLE IF NOT EXISTS delivery_return_items (
-                id                  SERIAL PRIMARY KEY,
-                return_id           TEXT NOT NULL,
-                article_id          TEXT,
-                un_code             TEXT,
-                quantity_returned   TEXT,
-                unit                TEXT
-            );
-
-            CREATE TABLE IF NOT EXISTS inventory_news (
-                id SERIAL PRIMARY KEY,
-                document_id TEXT REFERENCES documents_l(id) ON DELETE CASCADE,
-                article_id TEXT,
-                quantity NUMERIC DEFAULT 0,
-                observation TEXT,
-                photo_urls TEXT[], 
-                user_name TEXT,
-                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
-
-            -- Nuevas columnas y tablas para Devoluciones de Bodega (Conciliación)
-            ALTER TABLE invoice_conciliations ADD COLUMN IF NOT EXISTS bodega_received_at TIMESTAMPTZ;
-            ALTER TABLE invoice_conciliations ADD COLUMN IF NOT EXISTS bodega_received_by TEXT;
-            ALTER TABLE invoice_conciliations ADD COLUMN IF NOT EXISTS sobrecosto NUMERIC DEFAULT 0;
-            ALTER TABLE invoice_conciliations ADD COLUMN IF NOT EXISTS items_returned JSONB DEFAULT '[]';
-
-            CREATE TABLE IF NOT EXISTS bodega_receipts (
-                id SERIAL PRIMARY KEY,
-                invoice TEXT NOT NULL,
-                document_id TEXT NOT NULL,
-                client_id TEXT,
-                received_by TEXT,
-                observation TEXT,
-                items JSONB DEFAULT '[]',
-                created_at TIMESTAMPTZ DEFAULT NOW()
-            );
-        `);
-        console.log('[M7-DISPATCH] initDeliveryTables: Tablas verificadas/creadas correctamente.');
-    } catch (err: any) {
-        console.error('[M7-DISPATCH] initDeliveryTables: ERROR CRÍTICO:', err.message);
-        console.error(err.stack);
-    }
+    // Las tablas de entrega ahora se garantizan via migración versionada 002_dispatch_delivery_tables
+    return Promise.resolve();
 };
 
 // ─── CONFIRMAR ENTREGA AL CLIENTE ─────────────────────────────────────────────
@@ -414,8 +347,9 @@ export const confirmDelivery = async (req: Request, res: Response) => {
         return res.status(400).json({ error: 'Faltan campos requeridos: invoiceId, driverId, deliveryType' });
     }
 
+    const client = await pool.connect();
     try {
-        await pool.query('BEGIN');
+        await client.query('BEGIN');
 
         // 2. Determinar nuevo estado de la factura
         // EST-15 = REPICE (pendiente de re-entrega, distinto de EST-01 pendiente inicial)
@@ -428,7 +362,7 @@ export const confirmDelivery = async (req: Request, res: Response) => {
         const newStatus = statusMap[deliveryType] ?? 'EST-11';
 
         // 3. Crear confirmación de entrega
-        const confirmRes = await pool.query(`
+        const confirmRes = await client.query(`
             INSERT INTO delivery_confirmations
                 (dispatch_id, invoice_id, driver_id, vehicle_id, delivery_type, delivered_items, notes)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -447,8 +381,8 @@ export const confirmDelivery = async (req: Request, res: Response) => {
             : deliveredItems.filter((i: any) => Number(i.quantityReturned) > 0);
 
         if ((deliveryType === 'RETURN' || deliveryType === 'PARTIAL' || deliveryType === 'REPICE') && itemsToReturn.length > 0) {
-            const rsnId = await resolveReasonId(returnReason, pool);
-            const returnRes = await pool.query(`
+            const rsnId = await resolveReasonId(returnReason, client);
+            const returnRes = await client.query(`
                 INSERT INTO delivery_returns
                     (invoice_id, driver_id, vehicle_id, reason_id, notes, status)
                 VALUES ($1, $2, $3, $4, $5, 'PENDING')
@@ -466,7 +400,7 @@ export const confirmDelivery = async (req: Request, res: Response) => {
                 return `($${n+1},$${n+2},$${n+3},$${n+4})`;
             }).join(',');
 
-            await pool.query(`
+            await client.query(`
                 INSERT INTO delivery_return_items
                     (return_id, article_id, quantity_returned, unit)
                 VALUES ${riValues}
@@ -474,7 +408,7 @@ export const confirmDelivery = async (req: Request, res: Response) => {
         }
 
         // 5. Actualizar estado de los items en document_items
-        await pool.query(`
+        await client.query(`
             UPDATE document_items
             SET item_status = $1
             WHERE TRIM(COALESCE(NULLIF(invoice, ''), order_number)) = TRIM($2)
@@ -483,14 +417,14 @@ export const confirmDelivery = async (req: Request, res: Response) => {
 
         // 6. Ajustar vehicle_inventory — un SELECT para placa, luego batch UPDATE
         const vehiclePlate = vehicleId
-          ? (await pool.query('SELECT plate FROM vehicles WHERE id = $1 LIMIT 1', [vehicleId])).rows[0]?.plate || vehicleId
+          ? (await client.query('SELECT plate FROM vehicles WHERE id = $1 LIMIT 1', [vehicleId])).rows[0]?.plate || vehicleId
           : vehicleId;
 
         if (vehiclePlate && deliveredItems.length > 0) {
             // Resolver client_id una sola vez (es el mismo para todos los items de la misma factura)
             let invoiceClientId: string | undefined;
             if (deliveryType === 'RETURN' || (deliveryType === 'REPICE' && repiceDestination !== 'SAME_PLATE')) {
-                const clientRes = await pool.query(
+                const clientRes = await client.query(
                     `SELECT d.client_id FROM documents_l d
                      JOIN document_items i ON i.document_id = d.id
                      WHERE TRIM(COALESCE(NULLIF(i.invoice,''), i.order_number)) = $1 LIMIT 1`,
@@ -534,7 +468,7 @@ export const confirmDelivery = async (req: Request, res: Response) => {
                     return `($${n}::text, $${n+1}::text, $${n+2}::numeric)`;
                 }).join(',');
 
-                await pool.query(`
+                await client.query(`
                     UPDATE vehicle_inventory vi
                     SET quantity = GREATEST(0, vi.quantity - v.qty),
                         last_updated = CURRENT_TIMESTAMP, last_user = $1
@@ -554,7 +488,7 @@ export const confirmDelivery = async (req: Request, res: Response) => {
                     return `($${n}::text, $${n+1}::text, $${n+2}::numeric)`;
                 }).join(',');
 
-                await pool.query(`
+                await client.query(`
                     INSERT INTO inventario_clientes (client_id, article_id, batch, quantity, last_user, last_updated)
                     SELECT $2, v.sku, v.batch, v.qty, $1, CURRENT_TIMESTAMP
                     FROM (VALUES ${icValues}) AS v(sku, batch, qty)
@@ -582,7 +516,7 @@ export const confirmDelivery = async (req: Request, res: Response) => {
 
         // ── Actualizar status_id de la ruta si todas sus facturas ya finalizaron ──
         try {
-            const routeRes = await pool.query(`
+            const routeRes = await client.query(`
                 SELECT ri.route_id FROM route_invoices ri
                 JOIN document_items di ON TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
                     OR CONCAT(di.document_id, '_', COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
@@ -592,10 +526,7 @@ export const confirmDelivery = async (req: Request, res: Response) => {
 
             if (routeRes.rows.length > 0) {
                 const routeId = routeRes.rows[0].route_id;
-                // Contar facturas de la ruta que NO están en estado final
-                // LEFT JOIN para no excluir route_invoices sin match en document_items
-                // (match fallido haría count=0 y auto-completaría la ruta incorrectamente)
-                const pendingInRoute = await pool.query(`
+                const pendingInRoute = await client.query(`
                     SELECT COUNT(*) FROM route_invoices ri
                     LEFT JOIN document_items di ON (
                         TRIM(COALESCE(NULLIF(di.invoice,''), di.order_number)) = ri.invoice_id
@@ -607,7 +538,7 @@ export const confirmDelivery = async (req: Request, res: Response) => {
                 `, [routeId]);
 
                 if (parseInt(pendingInRoute.rows[0].count) === 0) {
-                    await pool.query(
+                    await client.query(
                         `UPDATE routes SET status_id = 'EST-12' WHERE id = $1`,
                         [routeId]
                     );
@@ -615,7 +546,7 @@ export const confirmDelivery = async (req: Request, res: Response) => {
             }
         } catch (_) { /* No crítico — no bloquear la respuesta si falla */ }
 
-        await pool.query('COMMIT');
+        await client.query('COMMIT');
         clearInvoicesCache();
 
         res.json({
@@ -631,11 +562,14 @@ export const confirmDelivery = async (req: Request, res: Response) => {
                          : 'Devolución total registrada. Factura vuelve a estado Pendiente.',
         });
     } catch (error: any) {
-        await pool.query('ROLLBACK');
+        await client.query('ROLLBACK');
         console.error('[M7-DELIVERY] confirmDelivery error:', error.message);
         res.status(500).json({ error: error.message });
+    } finally {
+        client.release();
     }
 };
+
 
 // ─── HISTORIAL DE ENTREGAS ────────────────────────────────────────────────────
 /**

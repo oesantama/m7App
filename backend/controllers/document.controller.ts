@@ -931,8 +931,9 @@ async function backgroundGeocodeDocumentItems(docIds: string[]): Promise<void> {
 
 export const updateStatus = async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { status, planType, user } = req.body;
+  const { status, planType, user, observacion } = req.body;
   try {
+    const prev = await pool.query(`SELECT status FROM documents_l WHERE id = $1`, [id]);
     if (planType) {
       await pool.query(`
         UPDATE documents_l SET status = $1, plan_type = $2 WHERE id = $3
@@ -942,6 +943,10 @@ export const updateStatus = async (req: Request, res: Response) => {
         UPDATE documents_l SET status = $1 WHERE id = $2
       `, [status, id]);
     }
+    await pool.query(`
+      INSERT INTO document_l_status_history (document_id, old_status, new_status, observacion, user_name)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [id, prev.rows[0]?.status ?? null, status, observacion?.trim() || null, user || null]);
     invoicesCache.clear(); // Invalidar caché al cambiar estado de documentos
     res.json({ success: true });
   } catch (err: any) {

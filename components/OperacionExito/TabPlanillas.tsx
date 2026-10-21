@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, Folder, Upload, BookOpen, Trash2, Download, AlertTriangle, Calendar, Filter, X, CheckCircle, Edit2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import geminiService from '../../services/geminiPlanillas.service';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
 import { User } from '../../types';
@@ -104,23 +103,15 @@ export const TabPlanillas: React.FC<{ user?: User }> = ({ user }) => {
   useEffect(() => {
     const loadApiKey = async () => {
       try {
-        // Primero intenta desde el env del frontend (compilado por Vite)
-        const frontendKey = process.env.GEMINI_API_KEY || '';
-        if (frontendKey) {
-          setApiKey(frontendKey);
-          setApiKeyLoaded(true);
-          return;
-        }
-        // Si no, pide la key al backend de forma segura
         const res = await fetch(`${(window as any).__API_URL__ || '/api'}/config/gemini-key`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.hasKey && data.key) setApiKey(data.key);
+          if (data.hasKey) setApiKey('online');
         }
       } catch (e) {
-        console.warn('[TabPlanillas] No se pudo obtener API key del servidor');
+        console.warn('[TabPlanillas] No se pudo verificar estado de IA en servidor');
       } finally {
         setApiKeyLoaded(true);
       }

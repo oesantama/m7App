@@ -1,5 +1,18 @@
 import { Router } from 'express';
-import { getTables, getTableData, saveRecord, deleteRecord, executeSql, getTableSchema, bulkDeleteRecords, runCron, getCronLogs, getPendingDriveCount } from '../controllers/admin.controller.js';
+import { 
+  getTables, 
+  getTableData, 
+  saveRecord, 
+  deleteRecord, 
+  executeSql, 
+  getTableSchema, 
+  bulkDeleteRecords, 
+  runCron, 
+  getCronLogs, 
+  getPendingDriveCount,
+  getMigrationsController,
+  runMigrationsController
+} from '../controllers/admin.controller.js';
 import { authenticateToken } from '../middleware/auth.middleware.js';
 
 const router = Router();
@@ -17,5 +30,8 @@ router.post('/schema', getTableSchema); // New schema route
 router.post('/cron/run', runCron); // New cron runner route
 router.get('/cron/logs', getCronLogs); // Live cron logs
 router.get('/cron/pending-drive', getPendingDriveCount);
+router.get('/migrations', getMigrationsController);
+router.post('/migrations/run', runMigrationsController);
 
 export default router;
+

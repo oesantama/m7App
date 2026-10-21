@@ -364,10 +364,6 @@ const Personal: React.FC<Props> = ({ user }) => {
       toast.error('Nombre y Cédula son obligatorios');
       return;
     }
-    if (!form.es_jefe && !form.jefe_inmediato_id) {
-      toast.error('El Jefe Inmediato es obligatorio si no es jefe');
-      return;
-    }
     setSaving(true);
     try {
       await api.savePersonal({ ...form, usuarioControl: user.name });
@@ -608,7 +604,7 @@ const Personal: React.FC<Props> = ({ user }) => {
                   </div>
                   {!form.es_jefe && (
                     <div className="space-y-1.5">
-                      <SearchableSelect label="Jefe Inmediato *" options={jefes} value={form.jefe_inmediato_id || ''} onChange={val => setForm({ ...form, jefe_inmediato_id: val ? Number(val) : null })} placeholder="Seleccione..." />
+                      <SearchableSelect label="Jefe Inmediato" options={jefes} value={form.jefe_inmediato_id || ''} onChange={val => setForm({ ...form, jefe_inmediato_id: val ? Number(val) : null })} placeholder="Seleccione..." />
                     </div>
                   )}
                   <div className="space-y-1.5">

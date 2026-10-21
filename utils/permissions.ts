@@ -47,7 +47,10 @@ export const ID_MAP: Record<string, string> = {
   'ALERTAS_WHATSAPP': 'PAG-02',
   'GESTOR_DB': 'PAG-59',
   'INVENTARIOS_ACTIVOS': 'PAG-74',
-  'GRUPO_INTER_OPS': 'PAG-31'
+  'GRUPO_INTER_OPS': 'PAG-31',
+  'ACTIVOS_GH': 'PAG-80',
+  'MENSAJERIA_GH': 'PAG-81',
+  'MENSAJERIA_MENSAJERO': 'PAG-82'
 };
 
 /**

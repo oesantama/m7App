@@ -20,6 +20,7 @@ const ALLOWED_TABLES: Record<string, string> = {
   'frecuencia-deporte': 'gh_frecuencia_deporte',
   'tipos-deporte':      'gh_tipos_deporte',
   'usos-tiempo-libre':  'gh_usos_tiempo_libre',
+  'activos-tipos':      'gh_activos_tipos',
 };
 
 const resolveTable = (tabla: string): string | null => ALLOWED_TABLES[tabla] ?? null;

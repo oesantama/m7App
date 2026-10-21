@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.9.65",
   "type": "module",
+  "workspaces": [
+    "backend"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -16,6 +19,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
+    "@tanstack/react-virtual": "^3.14.21",
     "@types/bcryptjs": "^2.4.6",
     "@types/react-signature-canvas": "^1.0.7",
     "@types/uuid": "^10.0.0",
@@ -55,6 +59,7 @@
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-i18next": "^17.0.13",
+    "react-router-dom": "^7.18.4",
     "react-signature-canvas": "^1.1.0-alpha.2",
     "recharts": "^3.7.0",
     "resend": "^6.9.2",

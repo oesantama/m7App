@@ -1,6 +1,16 @@
 
 import { api } from './api';
 
+const parseJsonResponse = (text: string) => {
+  if (!text) return {};
+  try {
+    const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+    return JSON.parse(cleaned);
+  } catch {
+    return { raw: text };
+  }
+};
+
 export const extractLicenseInfo = async (files: { data: string, mimeType: string }[]) => {
   const prompt = `Analiza licencia de conducción (Colombia). Extrae JSON: {success: true, data: {fullName, documentNumber, category, expiry(AAAA-MM-DD)}}`;
   try {
@@ -8,8 +18,8 @@ export const extractLicenseInfo = async (files: { data: string, mimeType: string
       data: f.data.includes('base64,') ? f.data.split('base64,')[1] : f.data,
       mimeType: f.mimeType
     }));
-    const res = await api.post('/api/ai/analyze', { prompt, files: cleanFiles });
-    return JSON.parse(res.text);
+    const res: any = await api.post('/api/ai/analyze', { prompt, files: cleanFiles });
+    return parseJsonResponse(res?.text || res?.response || '');
   } catch (e) {
     return { success: false, error: "Error en M7 Vision Server." };
   }
@@ -22,8 +32,8 @@ export const extractVehicleDocInfo = async (file: { data: string, mimeType: stri
       data: file.data.includes('base64,') ? file.data.split('base64,')[1] : file.data,
       mimeType: file.mimeType
     };
-    const res = await api.post('/api/ai/analyze', { prompt, files: [cleanFile] });
-    return JSON.parse(res.text);
+    const res: any = await api.post('/api/ai/analyze', { prompt, files: [cleanFile] });
+    return parseJsonResponse(res?.text || res?.response || '');
   } catch (e) {
     return { plateMatches: false, error: "Fallo en servidor IA M7." };
   }

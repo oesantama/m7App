@@ -25,8 +25,9 @@ ENV TZ=America/Bogota \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
-# Copiar manifiestos e instalar TODAS las dependencias (incluyendo devDependencies)
+# Copiar manifiestos e instalar dependencias del backend
 COPY package*.json ./
+COPY backend/package*.json ./backend/
 RUN npm install --legacy-peer-deps --no-audit --ignore-scripts
 
 # Copiar el código fuente inicial

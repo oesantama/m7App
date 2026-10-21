@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { getMasterCategoryFromRoute } from './constants/routes';
 import { User, PageModule, MasterCategory, MasterRecord } from './types';
 import Login from './components/Login';
 import PWABanner from './components/PWABanner';
-import PortalLayout from './components/portal/PortalLayout';
-import ClientLogin from './components/portal/ClientLogin';
-import OrderTracking from './components/portal/OrderTracking';
+import { PublicRoutes, isPublicRoute } from './components/routes/PublicRoutes';
 import { api } from './services/api';
 import { Icons, INITIAL_VEHICLES, INITIAL_DRIVERS, INITIAL_ARTICLES } from './constants';
 import { Toaster, toast } from 'sonner';
@@ -52,10 +51,8 @@ const AssignmentManager = lazyWithRetry(() => import('./components/AssignmentMan
 const AIChat = lazyWithRetry(() => import('./components/AIChat'));
 const DigitalSignature = lazyWithRetry(() => import('./components/DigitalSignature'));
 const CentroCapacitaciones = lazyWithRetry(() => import('./components/Capacitaciones/CapacitacionesAdmin'));
-const PublicCapacitacion = lazyWithRetry(() => import('./components/Capacitaciones/PublicCapacitacion'));
 const NoticiasAdmin = lazyWithRetry(() => import('./components/Noticias/NoticiasAdmin'));
 const EncuestasSondeos = lazyWithRetry(() => import('./components/CentroFormacion/EncuestasSondeos'));
-const PublicEncuestaViewer = lazyWithRetry(() => import('./components/CentroFormacion/PublicEncuestaViewer'));
 const ApprovalManager = lazyWithRetry(() => import('./components/ApprovalManager'));
 const ChatbotWidget = lazyWithRetry(() => import('./components/ChatbotWidget'));
 const DriverGamification = lazyWithRetry(() => import('./components/DriverGamification'));
@@ -65,7 +62,6 @@ const GrupoInterView = lazyWithRetry(() => import('./components/GrupoInterView')
 const MastersuiteReport = lazyWithRetry(() => import('./components/MastersuiteReport'));
 const TrainingAdmin = lazyWithRetry(() => import('./components/TrainingAdmin'));
 const AjoverDashboard = lazyWithRetry(() => import('./components/AjoverDashboard'));
-const PublicAttendanceForm = lazyWithRetry(() => import('./components/PublicAttendanceForm'));
 const ConciliacionFacturas = lazyWithRetry(() => import('./components/ConciliacionFacturas'));
 const ConsultaFacturas = lazyWithRetry(() => import('./components/ConsultaFacturas'));
 const DevolucionesBodega = lazyWithRetry(() => import('./components/Devoluciones/DevolucionesBodega'));
@@ -79,11 +75,6 @@ const GestionHumanaAsignacionDevolucion = lazyWithRetry(() => import('./componen
 const GestionHumanaConsultasInventario = lazyWithRetry(() => import('./components/GestionHumana/ConsultasInventario'));
 const GestionHumanaMasterInventario = lazyWithRetry(() => import('./components/GestionHumana/MasterInventario'));
 const GestionHumanaInventarioFisico = lazyWithRetry(() => import('./components/GestionHumana/InventarioFisico'));
-const PublicSurvey = lazyWithRetry(() => import('./components/GestionHumana/PublicSurvey'));
-const PublicTraining = lazyWithRetry(() => import('./components/GestionHumana/PublicTraining'));
-const PublicVisitForm = lazyWithRetry(() => import('./components/GestionHumana/PublicVisitForm'));
-const PublicNoticiaPage = lazyWithRetry(() => import('./components/Noticias/PublicNoticiaPage'));
-const ReturnApprovalPage = lazyWithRetry(() => import('./components/ReturnApprovalPage'));
 const CfgCiudades = lazyWithRetry(() => import('./components/Configuracion/Ciudades'));
 const ProvClientes = lazyWithRetry(() => import('./components/Configuracion/ProvClientes'));
 const GestionDocumental = lazyWithRetry(() => import('./components/documents/GestionDocumental'));
@@ -104,13 +95,12 @@ const ConciliacionFulfillment = lazyWithRetry(() => import('./components/Fulfill
 const HelpDesk = lazyWithRetry(() => import('./components/HelpDesk'));
 const ValidadorDocumentos = lazyWithRetry(() => import('./components/RRHH/ValidadorDocumentos'));
 const HojasDeVidaMain = lazyWithRetry(() => import('./components/HojasDeVida/HojasDeVidaMain'));
-const PublicDocForm = lazyWithRetry(() => import('./components/HojasDeVida/PublicDocForm'));
 const BascModule = lazyWithRetry(() => import('./components/BASC/BascModule'));
 const InventarioActivosTI = lazyWithRetry(() => import('./components/InventarioActivosTI'));
 const PerfilesCargo = lazyWithRetry(() => import('./components/GestionHumana/PerfilesCargo'));
-const PerfilCargoPublicSign = lazyWithRetry(() => import('./components/PerfilCargoPublicSign'));
-const GrupoInterCumplidoPage = lazyWithRetry(() => import('./components/GrupoInterCumplidoPage'));
-const GrupoInterSeguimientoPage = lazyWithRetry(() => import('./components/GrupoInterSeguimientoPage'));
+const HojaVidaActivos = lazyWithRetry(() => import('./components/GestionHumana/HojaVidaActivos'));
+const MensajeriaGH = lazyWithRetry(() => import('./components/GestionHumana/Mensajeria'));
+const MisEnvios = lazyWithRetry(() => import('./components/GestionHumana/MisEnvios'));
 const LegalizacionesDicorp = lazyWithRetry(() => import('./components/Dicorp/LegalizacionesDicorp'));
 
 // Import Admin Module
@@ -192,41 +182,30 @@ const App: React.FC = () => {
     }).catch(() => { });
   }, [isAuthenticated, user?.id]);
 
-  // ============ PORTAL ROUTING ============
-  const [activeRoutes, setActiveRoutes] = useState<any[]>([]); // Estado para rutas activas
-  const [isPortalMode, setIsPortalMode] = useState(false);
-  const [portalRoute, setPortalRoute] = useState<'login' | 'tracking'>('login');
+  // ============ REACT ROUTER (FE-02) ============
+  const location = useLocation();
+  const navigate = useNavigate();
 
-  // Detectar modo portal por Hash (Simple Router)
+  // Sincronización bidireccional entre URL y activeTab (soporta historial, Back/Forward y deep links)
   useEffect(() => {
-    const checkHash = () => {
-      const hash = window.location.hash;
-      if (hash.startsWith('#/portal')) {
-        setIsPortalMode(true);
-        if (hash.includes('tracking')) {
-          setPortalRoute('tracking');
-        } else if (hash.includes('/attendance/register')) {
-          setIsPortalMode(true); // Tratamos el registro como modo portal (sin sidebar)
-        } else {
-          setPortalRoute('login');
-        }
-      } else if (window.location.pathname.startsWith('/attendance/register')) {
-        setIsPortalMode(true);
-      } else if (window.location.pathname.startsWith('/publico/encuesta')) {
-        setIsPortalMode(true);
-      } else if (window.location.pathname.startsWith('/publico/capacitacion')) {
-        setIsPortalMode(true);
-      } else if (window.location.pathname.startsWith('/publico/visitas')) {
-        setIsPortalMode(true);
-      } else {
-        setIsPortalMode(false);
-      }
-    };
+    if (!isAuthenticated || isPublicRoute(location.pathname, window.location.hash)) return;
 
-    window.addEventListener('hashchange', checkHash);
-    checkHash(); // Initial check
-    return () => window.removeEventListener('hashchange', checkHash);
-  }, []);
+    const pathTab = location.pathname.replace(/^\/+/, '').split('/')[0];
+    if (pathTab && pathTab !== activeTab && !pathTab.startsWith('public') && !pathTab.startsWith('portal')) {
+      setActiveTab(pathTab);
+    }
+  }, [location.pathname, isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || isPublicRoute(location.pathname, window.location.hash)) return;
+
+    if (activeTab) {
+      const currentTab = location.pathname.replace(/^\/+/, '').split('/')[0];
+      if (currentTab !== activeTab) {
+        navigate(`/${activeTab}`, { replace: false });
+      }
+    }
+  }, [activeTab, isAuthenticated]);
 
   // Import dynamic components locally or use lazy? No, direct import above to keep it simple
 
@@ -586,74 +565,9 @@ const App: React.FC = () => {
   }, [isAuthenticated, needsWelcomeRedirect, pages, modules, user]);
 
 
-  // Rutas 100% públicas — deben evaluarse ANTES de cualquier guard de auth o restore
-  if (window.location.hash.startsWith('#/publico/encuesta-sociodemografica') || window.location.pathname.startsWith('/publico/encuesta-sociodemografica')) {
-    return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}>
-        <PublicSurvey />
-      </React.Suspense>
-    );
-  }
-
-  if (window.location.hash.startsWith('#/publico/encuesta') || window.location.pathname.startsWith('/publico/encuesta')) {
-    return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}>
-        <PublicEncuestaViewer />
-      </React.Suspense>
-    );
-  }
-
-  if (window.location.pathname.startsWith('/publico/noticia')) {
-    return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
-        <PublicNoticiaPage />
-      </React.Suspense>
-    );
-  }
-
-  // /public/return-approval/:batchCode/:token — sin auth, para proveedores
-  const raMatch = window.location.pathname.match(/^\/public\/return-approval\/([^/]+)\/([^/]+)$/);
-  if (raMatch) {
-    const [, raBatchCode, raToken] = raMatch;
-    return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
-        <ReturnApprovalPage batchCode={raBatchCode} token={raToken} />
-      </React.Suspense>
-    );
-  }
-
-  // /public/perfil-cargo/:token — sin auth, firma de un solo destinatario del FO-SG-008
-  const pcMatch = window.location.pathname.match(/^\/public\/perfil-cargo\/([^/]+)$/);
-  if (pcMatch) {
-    const [, pcToken] = pcMatch;
-    return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
-        <PerfilCargoPublicSign token={pcToken} />
-      </React.Suspense>
-    );
-  }
-
-  // /public/gi-cumplido/:token — sin auth, el conductor sube el cumplido de su ruta/placa
-  const giCumplidoMatch = window.location.pathname.match(/^\/public\/gi-cumplido\/([^/]+)$/);
-  if (giCumplidoMatch) {
-    const [, giToken] = giCumplidoMatch;
-    return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
-        <GrupoInterCumplidoPage token={giToken} />
-      </React.Suspense>
-    );
-  }
-
-  // /public/gi-seguimiento/:numeroDocumento?token=... — sin auth, consulta de solo lectura
-  const giSeguimientoMatch = window.location.pathname.match(/^\/public\/gi-seguimiento\/([^/]+)$/);
-  if (giSeguimientoMatch) {
-    const [, giDoc] = giSeguimientoMatch;
-    const giToken2 = new URLSearchParams(window.location.search).get('token') || '';
-    return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}>
-        <GrupoInterSeguimientoPage numeroDocumento={decodeURIComponent(giDoc)} token={giToken2} />
-      </React.Suspense>
-    );
+  // Rutas 100% públicas declarativas (FE-02) — evaluadas antes de guards de auth/restore
+  if (isPublicRoute(location.pathname, window.location.hash)) {
+    return <PublicRoutes />;
   }
 
   if (isRestoring) {
@@ -1255,6 +1169,24 @@ const App: React.FC = () => {
             <InventarioActivosTI />
           </React.Suspense>
         );
+      case 'gestion-humana-activos':
+        return (
+          <React.Suspense fallback={<div className="p-10 text-center text-slate-400 text-sm">Cargando Hoja de Vida de Activos...</div>}>
+            <HojaVidaActivos user={user!} />
+          </React.Suspense>
+        );
+      case 'gestion-humana-mensajeria':
+        return (
+          <React.Suspense fallback={<div className="p-10 text-center text-slate-400 text-sm">Cargando Mensajería...</div>}>
+            <MensajeriaGH user={user!} />
+          </React.Suspense>
+        );
+      case 'gestion-humana-mis-envios':
+        return (
+          <React.Suspense fallback={<div className="p-10 text-center text-slate-400 text-sm">Cargando Mis Envíos...</div>}>
+            <MisEnvios user={user!} />
+          </React.Suspense>
+        );
       case 'gestion-humana-perfiles-cargo':
         return (
           <React.Suspense fallback={<div className="p-10 text-center text-slate-400 text-sm">Cargando Perfiles de Cargo...</div>}>
@@ -1272,84 +1204,7 @@ const App: React.FC = () => {
 
   const handleBack = () => setActiveTab('dashboard');
 
-  // 1. RUTA PÚBLICA PRIORITARIA:Encuesta Sociodemográfica (Sin login, sin portal)
-  if (window.location.pathname.startsWith('/publico/encuesta')) {
-    return (
-      <>
-        <AutoUpdate />
-        <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>}>
-          <PublicSurvey />
-        </React.Suspense>
-      </>
-    );
-  }
 
-  if (window.location.pathname.startsWith('/publico/capacitacion')) {
-    return (
-      <>
-        <AutoUpdate />
-        <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>}>
-          <PublicTraining />
-        </React.Suspense>
-      </>
-    );
-  }
-
-  if (window.location.pathname.startsWith('/publico/cap')) {
-    return (
-      <>
-        <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>}>
-          <PublicCapacitacion />
-        </React.Suspense>
-      </>
-    );
-  }
-
-  if (window.location.pathname.startsWith('/publico/visitas')) {
-    return (
-      <>
-        <AutoUpdate />
-        <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-slate-950"><div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>}>
-          <PublicVisitForm />
-        </React.Suspense>
-      </>
-    );
-  }
-
-  if (window.location.pathname.startsWith('/documentacion/')) {
-    return (
-      <React.Suspense fallback={<div className="h-screen w-full flex items-center justify-center bg-gray-50"><div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>}>
-        <PublicDocForm />
-      </React.Suspense>
-    );
-  }
-
-  // 2. MODO PORTAL: Asistencia o Cliente
-  if (isPortalMode) {
-    const isAttendance = window.location.pathname.startsWith('/attendance/register');
-
-    return (
-      <>
-        <Toaster position="top-left" richColors theme="dark" />
-        <PWABanner />
-        <AutoUpdate />
-
-        <PortalLayout>
-          {isAttendance ? (
-            <PublicAttendanceForm />
-          ) : (
-            <>
-              {portalRoute === 'login' && <ClientLogin onLogin={(token, user) => {
-                localStorage.setItem('m7_client_token', token);
-                window.location.hash = '#/portal/tracking';
-              }} />}
-              {portalRoute === 'tracking' && <OrderTracking />}
-            </>
-          )}
-        </PortalLayout>
-      </>
-    );
-  }
 
   // 3. MODO ADMINISTRADOR (Requiere Login)
   if (!isAuthenticated || !user) {

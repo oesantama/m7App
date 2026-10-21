@@ -12,11 +12,11 @@ services:
       - AI_MODEL=${AI_MODEL}
       # Reducido a 768M para dejar margen a postgres y evolution en gota básica
       - NODE_OPTIONS=--max-old-space-size=768
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TYPE=drive
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_ID=410862023458-6ca0s3t1ao45ihl4mupodbvugg1gbufo.apps.googleusercontent.com
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_SECRET=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
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_SCOPE=drive
-      - 'RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TOKEN={"access_token":"ya29.a0AQvPyINyMiVK9BqykFhW5vMbP-7fX16REtrfsl7rOH_LYNmd52k2V2W7WxEKBCvtpukRbSMEUK9mjDeyySxcnobwqAx71Lapvtm5M-S8JybDdRQq5qW2rD6PUSmXex2fMQfzHMtU5xquCLzyHarBk_LdSgV9rtQHsy5QVmV1frLHE9c405ZZlK0Heu1hvbzCp3LYopcaCgYKAYQSARQSFQHGX2Mis4O4rn496LKSLmPZuHj8Pg0206","token_type":"Bearer","refresh_token":"1//05hSCjSte2j4ECgYIARAAGAUSNwF-L9Ir0yWdyc2TO43xc8vby6F0R_7kPo5QLNb7gqwhH2u9-X0v6wTNgQGyg9VhZrk3ws--Gl0","expiry":"2026-05-01T00:28:42.595243355-05:00","expires_in":3599}'
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TYPE=${RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TYPE:-drive}
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_ID=${RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_ID}
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_SECRET=${RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_SECRET}
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_SCOPE=${RCLONE_CONFIG_GDRIVE_CUMPLIDOS_SCOPE:-drive}
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TOKEN=${RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TOKEN}
     env_file:
       - .env
     volumes:
@@ -95,9 +95,9 @@ services:
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=m7_admin
-      - POSTGRES_PASSWORD=m7_master_password
-      - POSTGRES_DB=m7_logistica
+      - POSTGRES_USER=${POSTGRES_USER:-m7_admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-m7_master_password}
+      - POSTGRES_DB=${POSTGRES_DB:-m7_logistica}
     volumes:
       - m7_logistica_data:/var/lib/postgresql/data
     # Limitar memoria de postgres para no ahogar a los otros contenedores
@@ -113,7 +113,7 @@ services:
       -c max_connections=50
       -c effective_cache_size=128MB
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U m7_admin -d m7_logistica"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-m7_admin} -d ${POSTGRES_DB:-m7_logistica}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -129,13 +129,13 @@ services:
     container_name: m7-backup
     restart: always
     environment:
-      - PGPASSWORD=m7_master_password
+      - PGPASSWORD=${POSTGRES_PASSWORD:-m7_master_password}
       - TZ=America/Bogota
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TYPE=drive
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_ID=410862023458-6ca0s3t1ao45ihl4mupodbvugg1gbufo.apps.googleusercontent.com
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_SECRET=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
-      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_SCOPE=drive
-      - 'RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TOKEN={"access_token":"ya29.a0AQvPyINyMiVK9BqykFhW5vMbP-7fX16REtrfsl7rOH_LYNmd52k2V2W7WxEKBCvtpukRbSMEUK9mjDeyySxcnobwqAx71Lapvtm5M-S8JybDdRQq5qW2rD6PUSmXex2fMQfzHMtU5xquCLzyHarBk_LdSgV9rtQHsy5QVmV1frLHE9c405ZZlK0Heu1hvbzCp3LYopcaCgYKAYQSARQSFQHGX2Mis4O4rn496LKSLmPZuHj8Pg0206","token_type":"Bearer","refresh_token":"1//05hSCjSte2j4ECgYIARAAGAUSNwF-L9Ir0yWdyc2TO43xc8vby6F0R_7kPo5QLNb7gqwhH2u9-X0v6wTNgQGyg9VhZrk3ws--Gl0","expiry":"2026-05-01T00:28:42.595243355-05:00","expires_in":3599}'
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TYPE=${RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TYPE:-drive}
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_ID=${RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_ID}
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_SECRET=${RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_SECRET}
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_SCOPE=${RCLONE_CONFIG_GDRIVE_CUMPLIDOS_SCOPE:-drive}
+      - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TOKEN=${RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TOKEN}
     volumes:
       - m7_backups:/backups
     depends_on:
@@ -156,7 +156,7 @@ services:
         # Función de ejecución de backup
         do_backup() {
           BACKUP_FILE=/backups/m7_logistica_$$(date +%Y%m%d_%H%M%S).sql.gz;
-          pg_dump -h postgres -U m7_admin -d m7_logistica | gzip > $$BACKUP_FILE;
+          pg_dump -h postgres -U $${POSTGRES_USER:-m7_admin} -d $${POSTGRES_DB:-m7_logistica} | gzip > $$BACKUP_FILE;
           echo \"[M7-BACKUP] Backup local creado: $$BACKUP_FILE\";
           
           echo \"[M7-BACKUP] Sincronizando con Google Drive (GDRIVE_CUMPLIDOS)...\";

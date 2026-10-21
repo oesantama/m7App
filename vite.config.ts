@@ -49,8 +49,6 @@ export default defineConfig(({ mode }) => {
       ],
       define: {
         '__APP_VERSION__': JSON.stringify(pkg.version),
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'global': 'window',
       },
       resolve: {

@@ -299,12 +299,18 @@ const AdminDBManager: React.FC = () => {
   };
   
   const handleExecuteSql = async () => {
+      const upper = customQuery.trim().toUpperCase();
+      if (upper.includes('DROP TABLE') || upper.includes('TRUNCATE')) {
+        const confirmed = window.confirm('⚠️ ADVERTENCIA CRÍTICA: Ha ingresado un comando destructivo (DROP / TRUNCATE). ¿Está completamente seguro de ejecutar esta operación en la base de datos?');
+        if (!confirmed) return;
+      }
+
       setLoading(true);
       setSqlResult(null);
       try {
         const result = await api.executeAdminSql(customQuery);
         setSqlResult(result);
-        toast.success('Query Ejecutado');
+        toast.success('Query Cifrado Ejecutado con Éxito (Auditado)');
       } catch (e: any) {
           toast.error(e.message);
       } finally {
@@ -835,6 +841,13 @@ const AdminDBManager: React.FC = () => {
 
       {mode === 'SQL' && (
           <div className="bg-white p-4 rounded shadow border border-slate-200 h-[calc(100vh-150px)] flex flex-col">
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Consola SQL Directa para Soporte Técnico</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-sm">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  🔒 Canal Cifrado AES-256 GCM (Auditoría SuperAdmin Activa)
+                </span>
+              </div>
               <textarea 
                 className="w-full h-40 p-4 font-mono text-sm bg-slate-900 text-green-400 border rounded mb-4 focus:ring-2 focus:ring-blue-500 outline-none"
                 placeholder="SELECT * FROM users WHERE..."

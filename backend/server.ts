@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
 import apiRoutes from './routes/index.js';
 import ghVisitasRoutes from './routes/gh-visitas.routes.js';
 import authRoutes from './routes/auth.routes.js';
-import { initDeliveryTables } from './controllers/dispatch.controller.js';
+import { runMigrations } from './migrations/runner.js';
 import { initScheduler } from './services/scheduler.service.js';
 import { authenticateToken } from './middleware/auth.middleware.js';
 import fs from 'fs';
@@ -254,36 +254,28 @@ app.listen(PORT, () => {
   // Inicializar scheduler SÓLO en el leader worker
   initScheduler();
 
+  // Mensajería GH: cola de subida a Drive + alertas de envíos atrasados
+  import('./services/gh-mensajeria-alertas.service.js').then(m => m.startMensajeriaCron()).catch(e =>
+    console.warn('[ORBIT-BOOT] Cron mensajería GH no iniciado:', e.message)
+  );
+
   // Cron de alertas de vencimiento de documentos HV
   import('./services/hv-alertas.service.js').then(m => m.startAlertasCron()).catch(e =>
     console.warn('[ORBIT-BOOT] HV alertas cron no iniciado:', e.message)
   );
 
   // FLUJO DE ARRANQUE CRÍTICO M7 — solo Worker 1 (o modo standalone en dev)
-  console.log('[ORBIT-BOOT] Iniciando secuencia de servicios...');
+  console.log('[ORBIT-BOOT] Iniciando secuencia de servicios y verificación de migraciones...');
 
-  initDeliveryTables()
-    .then(() => {
-      console.log('[ORBIT-BOOT] Tablas de Despacho verificadas.');
-      return import('./services/migration.service.js');
-    })
-    .then(async (m) => {
-      const dbStart = Date.now();
-      console.log('[ORBIT-BOOT] Ejecutando Restauración Nuclear...');
-      const result = await m.restoreSystem();
-      console.log(`[ORBIT-BOOT] Sistema configurado en ${Date.now() - dbStart}ms:`, result.message);
-
-      // Lanzar optimizaciones pesadas en segundo plano para no bloquear el 200 OK del healthcheck
-      m.runBackgroundOptimizations().catch(() => {});
-
-      // Marcar sistema como listo — el healthcheck de Docker ahora responderá OK
+  runMigrations()
+    .then((report) => {
+      console.log(`[ORBIT-BOOT] Migraciones versionadas verificadas en ${report.duration}ms: ${report.appliedCount} nuevas aplicadas.`);
       systemReady = true;
       console.log('[ORBIT-BOOT] ✓ Sistema LISTO para recibir tráfico.');
     })
     .catch((err: any) => {
-      console.error('[ORBIT-BOOT] ERROR CRÍTICO EN ARRANQUE:', err.message);
+      console.error('[ORBIT-BOOT] ERROR CRÍTICO EN MIGRACIONES:', err.message);
       if (err.stack) console.error(err.stack);
-      // Marcar como listo igual para no bloquear indefinidamente en caso de error no crítico
       systemReady = true;
     });
 });

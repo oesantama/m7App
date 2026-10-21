@@ -88,11 +88,12 @@ export const bulkSaveVehicles = async (req: Request, res: Response) => {
   const { vehicles } = req.body;
   if (!Array.isArray(vehicles)) return res.status(400).json({ error: 'Data must be an array' });
 
+  const client = await pool.connect();
   try {
-    await pool.query('BEGIN');
+    await client.query('BEGIN');
     
     // Obtener el último ID base para autoincrementar
-    const lastIdResult = await pool.query("SELECT MAX(substring(id from 5)::bigint) as max_id FROM vehicles WHERE id ~ '^VEH-[0-9]{3}$'");
+    const lastIdResult = await client.query("SELECT MAX(substring(id from 5)::bigint) as max_id FROM vehicles WHERE id ~ '^VEH-[0-9]{3}$'");
     let currentMax = Number(lastIdResult.rows[0].max_id || 0);
 
     for (const v of vehicles) {
@@ -103,10 +104,10 @@ export const bulkSaveVehicles = async (req: Request, res: Response) => {
       }
 
       // Verificamos si la placa ya existe para decidir si insertar o actualizar
-      const existRes = await pool.query('SELECT id FROM vehicles WHERE plate = $1', [v.plate]);
+      const existRes = await client.query('SELECT id FROM vehicles WHERE plate = $1', [v.plate]);
       if (existRes.rows.length > 0) {
         const existingId = existRes.rows[0].id;
-        await pool.query(`
+        await client.query(`
           UPDATE vehicles SET
             brand = $1, 
             owner = $2, 
@@ -126,7 +127,7 @@ export const bulkSaveVehicles = async (req: Request, res: Response) => {
           existingId
         ]);
       } else {
-        await pool.query(`
+        await client.query(`
           INSERT INTO vehicles (
             id, plate, brand, owner, capacity_m3, client_id, 
             soat_expiry, techno_expiry, status_id, model_year, color, vehicle_type
@@ -140,11 +141,14 @@ export const bulkSaveVehicles = async (req: Request, res: Response) => {
       }
     }
 
-    await pool.query('COMMIT');
+    await client.query('COMMIT');
     res.json({ success: true, message: `Se procesaron ${vehicles.length} vehículos` });
   } catch (err: any) {
-    await pool.query('ROLLBACK');
+    await client.query('ROLLBACK');
     console.error('[M7-VEHICLES] Bulk Save Error:', err);
     res.status(500).json({ error: "Error en carga masiva: " + err.message });
+  } finally {
+    client.release();
   }
 };
+

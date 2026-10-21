@@ -23,7 +23,7 @@ import { requirePermission } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
-router.get('/', requirePermission(['PERSONAL_GH', 'MASTER_INVENTARIO_GH', 'ENTREGAS_SALIDAS_GH', 'ASIGNACION_DEVOLUCION_GH', 'CONSULTA_INVENTARIO_GH', 'VISITAS_GH'], 'view'), getPersonal);
+router.get('/', requirePermission(['PERSONAL_GH', 'MASTER_INVENTARIO_GH', 'ENTREGAS_SALIDAS_GH', 'ASIGNACION_DEVOLUCION_GH', 'CONSULTA_INVENTARIO_GH', 'VISITAS_GH', 'ACTIVOS_GH', 'MENSAJERIA_GH'], 'view'), getPersonal);
 router.post('/', requirePermission('PERSONAL_GH', 'create'), savePersonal);
 router.delete('/:id', requirePermission('PERSONAL_GH', 'edit'), deletePersonal);
 

@@ -44,6 +44,31 @@ const BlindCount: React.FC<BlindCountProps> = ({
     localStorage.setItem(`m7_extras_${docL.id}`, JSON.stringify(extraItems));
   }, [extraItems, docL.id]);
 
+  // ── M7 KEEP-ALIVE: Sesión constante para pistoleo y escaneo ininterrumpido ──
+  useEffect(() => {
+    sessionStorage.setItem('m7_active_counting', 'true');
+
+    // Renovar inmediatamente al abrir el conteo si hace más de 5 min no se renueva
+    const lastRenew = Number(sessionStorage.getItem('m7_last_token_renew') || 0);
+    if (!lastRenew || Date.now() - lastRenew > 5 * 60 * 1000) {
+      api.renewSession().then(() => {
+        sessionStorage.setItem('m7_last_token_renew', String(Date.now()));
+      }).catch(() => {});
+    }
+
+    // Intervalo de renovación silenciosa cada 10 minutos
+    const timer = setInterval(() => {
+      api.renewSession().then(() => {
+        sessionStorage.setItem('m7_last_token_renew', String(Date.now()));
+      }).catch(() => {});
+    }, 10 * 60 * 1000);
+
+    return () => {
+      clearInterval(timer);
+      sessionStorage.removeItem('m7_active_counting');
+    };
+  }, []);
+
   // Bloquear pull-to-refresh móvil durante todo el tiempo que el conteo esté montado.
   // Evita que el operario recargue la página accidentalmente al hacer scroll hacia arriba.
   useEffect(() => {
@@ -377,6 +402,14 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const processBarcode = (rawCode: string) => {
     let input = cleanSkuM7(rawCode);
     if (!input || input.length < 3) return;
+
+    // M7 KEEP-ALIVE: Si el operario está pistoleando activamente, renovar token silenciosamente
+    const lastRenew = Number(sessionStorage.getItem('m7_last_token_renew') || 0);
+    if (!lastRenew || Date.now() - lastRenew > 5 * 60 * 1000) {
+      api.renewSession().then(() => {
+        sessionStorage.setItem('m7_last_token_renew', String(Date.now()));
+      }).catch(() => {});
+    }
 
     // === M7 V17.1: El SKU siempre está antes de los dos puntos ===
     // Ya lo maneja cleanSkuM7, pero aquí aseguramos que la ráfaga fue capturada con su delimitador

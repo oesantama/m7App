@@ -681,6 +681,12 @@ const healSchema = async (client: any) => {
         old_method TEXT, new_method TEXT, user_id TEXT, user_name TEXT,
         observations TEXT,
         changed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS document_l_status_history (
+        id SERIAL PRIMARY KEY, document_id TEXT NOT NULL,
+        old_status TEXT, new_status TEXT NOT NULL, observacion TEXT,
+        user_name TEXT,
+        changed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE INDEX IF NOT EXISTS idx_doc_l_status_hist_doc ON document_l_status_history (document_id)`,
     `CREATE TABLE IF NOT EXISTS gh_tipos_elementos (
         id SERIAL PRIMARY KEY, nombre TEXT NOT NULL UNIQUE, 
         estado_id TEXT DEFAULT 'EST-01', 
