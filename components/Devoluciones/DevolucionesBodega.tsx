@@ -162,7 +162,7 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         const allowedIds: string[] = user?.clientIds?.length
             ? user.clientIds : user?.clientId ? [user.clientId] : [];
         api.getClients().then((all: any[]) => {
-            const isAdmin = allowedIds.length === 1 && allowedIds[0] === 'CLI-01';
+            const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPERADMIN' || user?.roleId === 'ROL-01' || user?.email === 'directorti@millasiete.com';
             const filtered = isAdmin ? all : all.filter((c: any) => allowedIds.includes(c.id));
             const mapped: Client[] = filtered.map((c: any) => ({ id: c.id, name: c.name || c.id }));
             setClients(mapped);
@@ -392,6 +392,7 @@ const DevolucionesBodega: React.FC<{ user: any }> = ({ user }) => {
         try {
             await api.registerRouteReturn({
                 invoiceId:       invoiceData.invoice.invoice_id,
+                clientId:        invoiceData.invoice.client_id || selectedClientId || undefined,
                 vehiclePlate:    invoiceData.invoice.assigned_plate || invoiceData.invoice.vehicle_plate || undefined,
                 vehicleId:       invoiceData.invoice.vehicle_id   || undefined,
                 driverId:        invoiceData.invoice.driver_id    || undefined,

@@ -8,6 +8,7 @@ import { migration005 } from './005_master_seeds_and_modules.js';
 import { migration006 } from './006_audit_and_security_tables.js';
 import { migration007 } from './007_gh_activos_mensajeria.js';
 import { migration008 } from './008_gh_maestras_ids.js';
+import { migration009 } from './009_delivery_returns_optimization.js';
 
 export const MIGRATIONS_REGISTRY: Migration[] = [
   migration001,
@@ -17,7 +18,8 @@ export const MIGRATIONS_REGISTRY: Migration[] = [
   migration005,
   migration006,
   migration007,
-  migration008
+  migration008,
+  migration009
 ];
 
 const ADVISORY_LOCK_ID = 742910385;

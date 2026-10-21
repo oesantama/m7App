@@ -41,7 +41,7 @@ const UNIVERSAL_SCHEMA: Record<string, string[]> = {
   'dispatch_assignments': ['invoice_id', 'driver_id', 'helper_ids', 'scanned_items', 'is_accompanied', 'helper_count', 'status', 'created_by', 'started_at', 'completed_at', 'updated_at', 'created_at'],
   'dispatch_signatures_pending': ['dispatch_id', 'user_id', 'role_type', 'signed', 'signed_at'],
   'delivery_confirmations': ['dispatch_id', 'invoice_id', 'driver_id', 'vehicle_id', 'delivery_type', 'delivered_items', 'notes', 'delivered_at', 'created_at'],
-  'delivery_returns': ['invoice_id', 'driver_id', 'vehicle_id', 'reason_id', 'notes', 'status', 'created_at', 'vendedor', 'numero_planilla', 'fecha_placa', 'return_type'],
+  'delivery_returns': ['invoice_id', 'client_id', 'driver_id', 'vehicle_id', 'reason_id', 'notes', 'status', 'created_at', 'vendedor', 'numero_planilla', 'fecha_placa', 'return_type'],
   'delivery_return_items': ['return_id', 'article_id', 'un_code', 'quantity_returned', 'unit'],
   'routing_patterns': ['city', 'vehicle_id', 'neighborhood', 'strength', 'last_used'],
   'delivery_patterns': ['address_key', 'vehicle_id', 'client_id', 'strength', 'last_used'],
@@ -2022,6 +2022,7 @@ export const restoreSystem = async () => {
       ALTER TABLE return_approval_batch_items ADD COLUMN IF NOT EXISTS approved_by_name TEXT;
 
       -- Campos para recepción de devoluciones bodega (rediseño flujo)
+      ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS client_id TEXT;
       ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS vendedor TEXT;
       ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS numero_planilla TEXT;
       ALTER TABLE delivery_returns ADD COLUMN IF NOT EXISTS fecha_placa DATE;

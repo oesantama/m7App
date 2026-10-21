@@ -147,7 +147,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
   const loadNovedadesList = React.useCallback(async (clientId: string) => {
     setIsLoadingNovedades(true);
     try {
-      const data = await api.getDocuments(clientId || undefined, STATUSES_NOVEDADES);
+      const data = await api.getDocuments(clientId || undefined, STATUSES_NOVEDADES, undefined, undefined, undefined, { days: 7, limit: 100 });
       setNovedadesDocList(data || []);
     } catch { /* silencioso */ } finally {
       setIsLoadingNovedades(false);
@@ -161,8 +161,10 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
 
   useEffect(() => {
     if (!clientsReady) return;
-    loadNovedadesList(selectedClientId);
-  }, [clientsReady, selectedClientId, loadNovedadesList]);
+    if (activeTab === 'novedades') {
+      loadNovedadesList(selectedClientId);
+    }
+  }, [clientsReady, selectedClientId, activeTab, loadNovedadesList]);
 
   const activeList = useMemo(() => {
     if (!searchRecibo.trim()) return localReciboList;

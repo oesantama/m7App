@@ -82,7 +82,7 @@ export const getDocuments = async (req: Request, res: Response) => {
     `;
 
     const queryParams: any[] = [];
-    const { clientId, docL, statuses, plate, planType, history, limit } = req.query;
+    const { clientId, docL, statuses, plate, planType, history, limit, days } = req.query;
     const user = (req as any).user;
     const isSuper = user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
 
@@ -97,6 +97,11 @@ export const getDocuments = async (req: Request, res: Response) => {
         queryParams.push(statusList);
         query += ` AND d.status = ANY($${queryParams.length}::text[])`;
       }
+    }
+
+    if (days && !isNaN(Number(days))) {
+      queryParams.push(Number(days));
+      query += ` AND d.created_at >= NOW() - ($${queryParams.length} || ' days')::INTERVAL`;
     }
 
     if (docL) {
@@ -132,6 +137,9 @@ export const getDocuments = async (req: Request, res: Response) => {
       query += ` AND (d.status NOT IN ('EST-07', 'EST-12', 'EST-16', 'EST-17', 'EST-18', 'EST-19', 'COMPLETADO', 'ENTREGADO', 'ELIMINADO', 'CONCILIADO', 'LEGALIZADO') OR d.created_at >= NOW() - INTERVAL '30 days')`;
       query += ` ORDER BY d.created_at DESC LIMIT 150`;
     } else {
+      if (!docL && !plate && history !== 'true' && !days) {
+        query += ` AND (d.status NOT IN ('EST-08', 'INVENTORED') OR d.created_at >= NOW() - INTERVAL '30 days')`;
+      }
       query += ` ORDER BY d.created_at DESC`;
       if (limit) {
         queryParams.push(Number(limit));

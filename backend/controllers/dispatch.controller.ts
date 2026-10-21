@@ -1423,6 +1423,19 @@ export const registerRouteReturn = async (req: Request, res: Response) => {
         // Cabecera delivery_return
         const rsnId = await resolveReasonId(returnReason, client);
 
+        // Resolver client_id de la factura
+        let returnClientId = req.body.clientId || null;
+        if (!returnClientId) {
+            const clRes = await client.query(
+                `SELECT dl.client_id FROM document_items di
+                 JOIN documents_l dl ON dl.id = di.document_id
+                 WHERE TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number))) = TRIM(UPPER($1))
+                 LIMIT 1`,
+                [invoiceId]
+            );
+            returnClientId = clRes.rows[0]?.client_id || null;
+        }
+
         // Verificar si facturación ya legalizó/concilió esta factura
         const conciliationCheck = await client.query(
             `SELECT 1 FROM invoice_conciliations 
@@ -1438,25 +1451,25 @@ export const registerRouteReturn = async (req: Request, res: Response) => {
         if (hasConciliation) {
             queryStr = `
                 INSERT INTO delivery_returns
-                    (invoice_id, vehicle_id, driver_id, reason_id, notes, status,
+                    (invoice_id, client_id, vehicle_id, driver_id, reason_id, notes, status,
                      vendedor, numero_planilla, fecha_placa,
                      conciliacion_confirmada_at, conciliacion_confirmada_by, created_at)
-                 VALUES ($1,$2,$3,$4,$5,'CONFIRMED',$6,$7,$8,CURRENT_TIMESTAMP,$9,CURRENT_TIMESTAMP)
+                 VALUES ($1,$2,$3,$4,$5,$6,'CONFIRMED',$7,$8,$9,CURRENT_TIMESTAMP,$10,CURRENT_TIMESTAMP)
                  RETURNING id`;
             queryParams = [
-                invoiceId, vehicleId, driverId, rsnId, notes || null,
+                invoiceId, returnClientId, vehicleId, driverId, rsnId, notes || null,
                 String(vendedor).trim(), numeroPlanilla || null, fechaPlaca || null,
                 'SISTEMA_AUTO'
             ];
         } else {
             queryStr = `
                 INSERT INTO delivery_returns
-                    (invoice_id, vehicle_id, driver_id, reason_id, notes, status,
+                    (invoice_id, client_id, vehicle_id, driver_id, reason_id, notes, status,
                      vendedor, numero_planilla, fecha_placa, created_at)
-                 VALUES ($1,$2,$3,$4,$5,'PENDING',$6,$7,$8,CURRENT_TIMESTAMP)
+                 VALUES ($1,$2,$3,$4,$5,$6,'PENDING',$7,$8,$9,CURRENT_TIMESTAMP)
                  RETURNING id`;
             queryParams = [
-                invoiceId, vehicleId, driverId, rsnId, notes || null,
+                invoiceId, returnClientId, vehicleId, driverId, rsnId, notes || null,
                 String(vendedor).trim(), numeroPlanilla || null, fechaPlaca || null
             ];
         }
@@ -1635,7 +1648,10 @@ export const getReturnsTracking = async (req: Request, res: Response) => {
         const { clientId } = req.query as Record<string, string>;
         const params: any[] = [];
         let clientFilter = '';
-        if (clientId) { params.push(clientId); clientFilter = `AND doc_info.client_id = $${params.length}`; }
+        if (clientId) {
+            params.push(clientId);
+            clientFilter = `AND (dr.client_id = $${params.length} OR doc_info.client_id = $${params.length})`;
+        }
 
         const result = await pool.query(`
             SELECT
@@ -1660,14 +1676,14 @@ export const getReturnsTracking = async (req: Request, res: Response) => {
                 doc_info.client_ref          AS codigo_cliente,
                 doc_info.order_number,
                 doc_info.delivery_date::date AS fecha_placa,
-                doc_info.client_id,
+                COALESCE(dr.client_id, doc_info.client_id) AS client_id,
                 doc_info.plan_type,
                 COALESCE(json_agg(json_build_object(
                     'article_id',        dri.article_id,
-                    'article_name',      art.name,
+                    'article_name',      COALESCE(art.name, dri.article_id),
                     'quantity_returned', dri.quantity_returned,
-                    'un_code',           COALESCE(dlp.un_code, di_item.un_code, dri.un_code),
-                    'unit',              COALESCE(di_item.unit, dri.unit)
+                    'un_code',           dri.un_code,
+                    'unit',              COALESCE(dri.unit, 'UND')
                 )) FILTER (WHERE dri.id IS NOT NULL), '[]') AS items
             FROM delivery_returns dr
             LEFT JOIN return_reasons rr ON rr.id = dr.reason_id
@@ -1675,24 +1691,19 @@ export const getReturnsTracking = async (req: Request, res: Response) => {
             LEFT JOIN drivers d ON d.id::text = dr.driver_id::text
             LEFT JOIN delivery_return_items dri ON dri.return_id::text = dr.id::text
             LEFT JOIN articles art ON art.id::text = dri.article_id
-            LEFT JOIN document_items di_item
-                   ON TRIM(UPPER(COALESCE(di_item.invoice, di_item.order_number))) = TRIM(UPPER(dr.invoice_id))
-                  AND TRIM(UPPER(di_item.article_id)) = TRIM(UPPER(dri.article_id))
-            LEFT JOIN document_l_payments dlp
-                   ON TRIM(UPPER(dlp.invoice)) = TRIM(UPPER(dr.invoice_id))
             LEFT JOIN LATERAL (
                 SELECT di.customer_name, di.client_ref, di.order_number,
                        dl.delivery_date, dl.client_id, dl.plan_type
                 FROM document_items di
-                LEFT JOIN documents_l dl ON dl.id = di.document_id
-                WHERE TRIM(UPPER(COALESCE(di.invoice, di.order_number))) = TRIM(UPPER(dr.invoice_id))
+                JOIN documents_l dl ON dl.id = di.document_id
+                WHERE TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number))) = TRIM(UPPER(dr.invoice_id))
                 LIMIT 1
             ) doc_info ON true
             WHERE dr.status NOT IN ('CANCELLED','COMPLETED')
               ${clientFilter}
             GROUP BY dr.id, v.plate, d.name,
                      doc_info.customer_name, doc_info.client_ref, doc_info.order_number,
-                     doc_info.delivery_date, doc_info.client_id, doc_info.plan_type, rr.name, dlp.un_code
+                     doc_info.delivery_date, doc_info.client_id, doc_info.plan_type, rr.name
             ORDER BY dr.created_at DESC
         `, params);
         res.json({ success: true, data: result.rows });
@@ -2536,11 +2547,6 @@ export const getConciliacionPending = async (req: Request, res: Response) => {
             LEFT JOIN drivers drv ON drv.id::text = asgn.driver_id::text
             LEFT JOIN invoice_conciliations ic ON ic.document_id = di.document_id 
               AND TRIM(UPPER(ic.invoice_number)) = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
-            LEFT JOIN (
-                SELECT TRIM(UPPER(COALESCE(NULLIF(di2.invoice,''), di2.order_number))) AS invoice_id, COUNT(*) AS total_count
-                FROM document_items di2
-                GROUP BY TRIM(UPPER(COALESCE(NULLIF(di2.invoice,''), di2.order_number)))
-            ) inv_total ON inv_total.invoice_id = TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number)))
             WHERE di.item_status IN ('EST-13','DEVUELTO','DEVUELT','EST-14','PARCIAL')
               AND NOT EXISTS (
                   SELECT 1 FROM delivery_returns dr
@@ -2588,15 +2594,29 @@ export const importFromConciliacion = async (req: Request, res: Response) => {
             if (exists.rows.length > 0) continue;
 
             const rsnId = await resolveReasonId(inv.return_reason || 'DEVOLUCION CONCILIACION', client);
+
+            let returnClientId = (inv as any).client_id || null;
+            if (!returnClientId) {
+                const clRes = await client.query(
+                    `SELECT dl.client_id FROM document_items di
+                     JOIN documents_l dl ON dl.id = di.document_id
+                     WHERE TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number))) = TRIM(UPPER($1))
+                     LIMIT 1`,
+                    [inv.invoice_id]
+                );
+                returnClientId = clRes.rows[0]?.client_id || null;
+            }
+
             const retRes = await client.query(
                 `INSERT INTO delivery_returns
-                    (invoice_id, vehicle_id, driver_id, reason_id, return_type, status,
+                    (invoice_id, client_id, vehicle_id, driver_id, reason_id, return_type, status,
                      vendedor, numero_planilla, fecha_placa,
                      conciliacion_confirmada_at, conciliacion_confirmada_by, created_at)
-                 VALUES ($1,$2,$3,$4,$5,'CONFIRMED',$6,$7,$8,NOW(),$9,NOW())
+                 VALUES ($1,$2,$3,$4,$5,$6,'CONFIRMED',$7,$8,$9,NOW(),$10,NOW())
                  RETURNING id`,
                 [
                     inv.invoice_id.trim().toUpperCase(),
+                    returnClientId,
                     inv.vehicle_id || null,
                     inv.driver_id  || null,
                     rsnId,
