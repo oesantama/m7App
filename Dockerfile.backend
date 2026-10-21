@@ -45,9 +45,9 @@ COPY backend/package*.json ./backend/
 # COPIA DIRECTA DE ARTEFACTOS PROCESADOS
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist_backend ./dist_backend
-COPY --from=builder /app/backend/config/keys ./backend/config/keys
 COPY --from=builder /app/components ./components
 COPY --from=builder /app/scripts ./scripts
+COPY --from=builder /app/public ./public
 # Permisos y usuario de ejecución no-root para máxima seguridad
 RUN mkdir -p /app/storage /app/public /app/backend/config/keys && \
     chown -R node:node /app
