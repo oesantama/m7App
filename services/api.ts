@@ -30,8 +30,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password: pass })
     });
-    if (res.status === 401) return res.json();
-    if (!res.ok) throw new Error('Error de conexión con el servidor');
+    if (res.status === 401 || res.status === 403) return res.json();
+    if (!res.ok) {
+      const errData = await res.json().catch(() => null);
+      throw new Error(errData?.error || 'Error de conexión con el servidor');
+    }
     return res.json();
   },
   validateSession: () => fetchJson(`${API_URL}/auth/validate-session`),

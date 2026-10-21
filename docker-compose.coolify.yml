@@ -63,6 +63,8 @@ services:
     networks:
       - m7-network
       - coolify
+    volumes:
+      - m7_keys:/app/backend/config/keys
     environment:
       - PORT=8080
       - DB_HOST=m7-postgres
@@ -77,8 +79,8 @@ services:
       - 'GEMINI_API_KEY=${GEMINI_API_KEY}'
       - 'GOOGLE_API_KEY=${GOOGLE_API_KEY}'
       - 'AI_MODEL=${AI_MODEL}'
-      - 'JWT_PRIVATE_KEY=${JWT_PRIVATE_KEY}'
-      - 'JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY}'
+      - 'JWT_PRIVATE_KEY=${JWT_PRIVATE_KEY:-}'
+      - 'JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY:-}'
       # RCLONE — Google Drive Cumplidos (configurado vía variables de entorno)
       - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TYPE=${RCLONE_CONFIG_GDRIVE_CUMPLIDOS_TYPE:-drive}
       - RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_ID=${RCLONE_CONFIG_GDRIVE_CUMPLIDOS_CLIENT_ID}
@@ -224,3 +226,4 @@ volumes:
   evolution_instances: null
   evolution_store: null
   m7_backups: null
+  m7_keys: null
