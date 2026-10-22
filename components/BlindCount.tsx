@@ -146,7 +146,22 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const [aiBrain, setAiBrain] = useState<Record<string, string>>(() => {
     try {
       const saved = localStorage.getItem('m7_ai_brain_relations');
-      return saved ? JSON.parse(saved) : {};
+      if (!saved) return {};
+      const parsed = JSON.parse(saved);
+      // Purgar de inmediato cualquier '*IGNORE*' previo para desbanear códigos bloqueados por error
+      const cleaned: Record<string, string> = {};
+      let hasIgnores = false;
+      for (const [k, v] of Object.entries(parsed)) {
+        if (v !== '*IGNORE*') {
+          cleaned[k] = v as string;
+        } else {
+          hasIgnores = true;
+        }
+      }
+      if (hasIgnores) {
+        localStorage.setItem('m7_ai_brain_relations', JSON.stringify(cleaned));
+      }
+      return cleaned;
     } catch {
       return {};
     }
@@ -223,6 +238,29 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const ignoreScan = useRef(false); // Ref para ignorar basura del scanner
   const lastValidScanAt = useRef<number>(0); // M7 V15: Control de Ventana de Tiempo Lógico
   const tableContainerRef = useRef<HTMLDivElement>(null); // M7 V16: Ref para scroll automático
+
+  // M7 FOCUS GUARDIAN: Asegura que el foco permanezca o vuelva al input de escaneo
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const activeTag = document.activeElement?.tagName?.toLowerCase();
+      // Si el usuario está escribiendo en otro campo (búsqueda, notas, etc.) o modal abierto, no interferir
+      if (activeTag === 'input' || activeTag === 'textarea' || activeTag === 'select') {
+        return;
+      }
+      if (e.ctrlKey || e.altKey || e.metaKey || e.key === 'Tab' || e.key === 'Escape') {
+        return;
+      }
+      // Si se pulsa cualquier caracter imprimible o Enter (ej. disparo de lectora física)
+      if (inputRef.current && (e.key.length === 1 || e.key === 'Enter')) {
+        inputRef.current.focus();
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+    };
+  }, []);
 
   // AGRUPACIÓN DE ITEMS POR SKU (VISTA GENERAL)
   const groupedItems = useMemo(() => {
@@ -381,21 +419,11 @@ const BlindCount: React.FC<BlindCountProps> = ({
       }
 
       // M7 V15: Retrospective Garbage Collection
-      // Si tuvimos incidencias fallidas hace menos de 800ms, seguro son prefijos basura
-      // de la misma estampa que mandó el hardware antes de mandar el código limpio.
+      // Si tuvimos incidencias fallidas hace menos de 800ms, se retiran de la lista de incidencias
+      // al llegar el código limpio, pero SIN envenenar el cerebro con '*IGNORE*'.
       setIncidents(prev => {
           const now = Date.now();
-          const toKeep = prev.filter(inc => (now - inc.createdAt) > 800);
-          const toAutoIgnore = prev.filter(inc => (now - inc.createdAt) <= 800);
-          
-          if (toAutoIgnore.length > 0) {
-              const newBrainUpdates: Record<string, string> = {};
-              toAutoIgnore.forEach(inc => {
-                  if (inc.code) newBrainUpdates[inc.code] = '*IGNORE*';
-              });
-              setAiBrain(prevBrain => persistAiBrain({ ...prevBrain, ...newBrainUpdates }));
-          }
-          return toKeep;
+          return prev.filter(inc => (now - inc.createdAt) > 800);
       });
   };
 
@@ -576,19 +604,6 @@ const BlindCount: React.FC<BlindCountProps> = ({
         ? `¿Quiso decir ${possibleBetterMatch.articleId}? (Lectura incompleta)`
         : `Artículo fuera de plan o código desconocido.`;
 
-    // M7 V15 FUTURE FILTER (Post-Context Filter):
-    // Solo aplicar el filtro de "basura rápida" si el código NO ES un producto conocido (Plan o Maestra)
-    const isKnownProduct = groupedItems.some(it => it.articleId?.toUpperCase() === input || it.sku?.toUpperCase() === input) ||
-                           (masterArticulo as Article[]).some(a => (a.id && a.id.toUpperCase() === input) || (a.sku && a.sku.toUpperCase() === input) || (a.barcode && a.barcode === input));
-    
-    if (!isKnownProduct && Date.now() - lastValidScanAt.current <= 800) {
-        // Silenciador de ráfagas para códigos desconocidos (ej: lotes)
-        const newBrain = { ...aiBrain, [input]: '*IGNORE*' };
-        setAiBrain(persistAiBrain(newBrain));
-        setScanInput('');
-        return; 
-    }
-
     // === M7 V15c: AUTO PROCESAR EXTRAS DESDE MAESTRO ===
     // Si la lectura no está en el plan actual (groupedItems) pero SÍ es un artículo real de base de datos
     // Lo anexamos dinámicamente como "Extra" para evitar engrosar innecesariamente las incidencias.
@@ -622,17 +637,6 @@ const BlindCount: React.FC<BlindCountProps> = ({
             enqueueScan(inMaster.sku || inMaster.id);
         }, 100);
         return; 
-    }
-
-    // M7 V15d: FILTRO DURO "SOLO LETRAS".
-    // El 99% de las incidencias inútiles u olvidadas son códigos numéricos puramente (basura del empaque).
-    // Si la lectura NO empieza por una letra (A-Z) Y NO es un barcode válido en maestra, se descarta.
-    if (!/^[a-zA-Z]/i.test(input) && !inMaster) {
-        // Enseñar al bot para que lo descarte más rápido todavía la prox. vez (Caché O(1))
-        const newBrain = { ...aiBrain, [input]: '*IGNORE*' };
-        setAiBrain(persistAiBrain(newBrain));
-        setScanInput('');
-        return;
     }
 
     // 4. Registrar en TABLA 2 (Incidencias)
@@ -681,33 +685,47 @@ const BlindCount: React.FC<BlindCountProps> = ({
       processingTimer.current = null;
     }
 
-    // PDF417 Ajover: separador en el código indica que la ráfaga llegó completa → procesar AHORA, sin esperar Enter.
-    // Esto evita que el Enter del scanner dispare handleScan DESPUÉS del timer (doble-add).
+    // Si el hardware no envía Enter o envía ráfagas con separadores (: Ñ > < ?),
+    // damos un respiro breve (70ms) para que termine de llegar la ráfaga completa
+    // antes de procesar automáticamente, evitando cortar el código por la mitad.
     if (val.length >= 5 && /[:Ñ><\?]/.test(val)) {
-      enqueueScan(val);
-      setScanInput('');
+      processingTimer.current = setTimeout(() => {
+        const fullVal = (inputRef.current?.value || val).trim();
+        if (fullVal.length >= 2) {
+          enqueueScan(fullVal);
+          setScanInput('');
+          if (inputRef.current) inputRef.current.value = '';
+        }
+      }, 70);
       return;
     }
 
-    // Fallback para códigos muy largos sin ':' (hardware que no envía Enter en ciertos modelos)
+    // Fallback para códigos largos sin separador ni Enter
     if (val.length > 20) {
       processingTimer.current = setTimeout(() => {
-        processBarcode(val);
-        setScanInput('');
-      }, 200);
+        const fullVal = (inputRef.current?.value || val).trim();
+        if (fullVal.length >= 2) {
+          enqueueScan(fullVal);
+          setScanInput('');
+          if (inputRef.current) inputRef.current.value = '';
+        }
+      }, 150);
     }
   };
 
   const handleScan = (e: React.FormEvent) => {
     e.preventDefault();
-    // CRÍTICO: Cancelar timer pendiente antes de procesar (evita doble-add con PDF417)
+    // CRÍTICO: Cancelar timer pendiente antes de procesar
     if (processingTimer.current) {
       clearTimeout(processingTimer.current);
       processingTimer.current = null;
     }
-    const code = scanInput.trim();
+    // LECTURA DIRECTA DEL DOM: Hardware scanners escriben a alta velocidad y disparan Enter
+    // antes de que React complete el ciclo de renderizado. inputRef.current.value tiene el dato real.
+    const code = (inputRef.current?.value || scanInput).trim();
     setScanInput('');
-    if (code.length >= 2) processBarcode(code);
+    if (inputRef.current) inputRef.current.value = '';
+    if (code.length >= 2) enqueueScan(code);
   };
 
   const handleSubtract = (articleId: string) => {
@@ -1157,7 +1175,16 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
 
   return (
-    <div className="bg-white w-full h-full flex flex-col relative animate-in fade-in duration-500 overflow-hidden">
+    <div 
+      onClick={(e) => {
+        const target = e.target as HTMLElement;
+        const interactive = target.closest('button, input, textarea, select, a, [role="button"]');
+        if (!interactive && inputRef.current) {
+          inputRef.current.focus();
+        }
+      }}
+      className="bg-white w-full h-full flex flex-col relative animate-in fade-in duration-500 overflow-hidden"
+    >
 
       {/* ÉXITO OVERLAY */}
       {saveSuccess && (

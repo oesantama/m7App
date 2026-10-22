@@ -76,8 +76,8 @@ export const useAppData = () => {
           api.getAllUserPermissions().then(res => updateCat('masterPermisosUsuario', res)).catch(() => []);
       }
 
-      // Grupo C: Operación de Flota
-      if (hasPerm('ARTICULOS')) {
+      // Grupo C: Operación de Flota y Almacén (Maestra de Artículos necesaria para escáner en Recibido y Despacho)
+      if (hasPerm('ARTICULOS') || hasPerm('RECIBIDO_MATERIAL') || hasPerm('RECIBIDO_MANUAL') || hasPerm('DESPACHO_L') || hasPerm('DOCUMENTOS_L') || isSuper) {
           api.getArticles().then(res => {
               const mapped = Array.isArray(res) ? res.map((a: any) => ({
                 ...a, 
