@@ -8,6 +8,7 @@ import { sendEmail } from '../services/notification.service.js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { logMovement } from '../utils/kardex.js';
 import { resolveDaneCity } from '../utils/daneCities.js';
+import { ensureRcloneConfig } from '../config/rclone.config.js';
 
 // ─── Caché en memoria para getInvoices ───────────────────────────────────────
 // TTL de 45 segundos: reduce carga en Postgres en refrescos frecuentes
@@ -2195,6 +2196,7 @@ const MESES = [
 ];
 
 export const uploadCumplido = async (req: Request, res: Response) => {
+    ensureRcloneConfig();
     const { clientId, clientName, uploadDate } = req.body;
     const files = req.files as Express.Multer.File[];
     const userId = (req as any).user?.id;
@@ -2335,8 +2337,9 @@ export const uploadCumplido = async (req: Request, res: Response) => {
                 const uploadCmd = `rclone copyto "${finalFile}" "gdrive_cumplidos:${drivePath}/${fileName}"`;
                 exec(uploadCmd, (err, stdout, stderr) => {
                     if (err) {
-                        console.error(`[CUMPLIDOS] Error rclone subiendo ${file.originalname}:`, stderr);
-                        reject(err);
+                        const errMsg = stderr?.trim() || err.message;
+                        console.error(`[CUMPLIDOS] Error rclone subiendo ${file.originalname}:`, errMsg);
+                        reject(new Error(`Fallo en subida a Google Drive (${file.originalname}): ${errMsg}`));
                     } else resolve();
                 });
             });
@@ -2405,9 +2408,9 @@ export const uploadCumplido = async (req: Request, res: Response) => {
             results
         });
 
-    } catch (err) {
-        console.error('[CUMPLIDOS] Global error:', err);
-        res.status(500).json({ error: 'Error interno al procesar la carga múltiple' });
+    } catch (err: any) {
+        console.error('[CUMPLIDOS] Global error:', err?.message || err);
+        res.status(500).json({ error: err?.message || 'Error interno al procesar la carga múltiple' });
     }
 };
 

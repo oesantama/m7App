@@ -2,6 +2,7 @@
 process.env.TZ = 'America/Bogota';
 import dotenv from 'dotenv';
 dotenv.config();
+import './config/rclone.config.js';
 
 import cluster from 'cluster';
 import os from 'os';
