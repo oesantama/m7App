@@ -1,4 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { syncPendingCounts } from './utils/pendingCounts';
+
+// Al cargar la página no hay ningún conteo abierto todavía: las marcas de una vida anterior de la
+// pestaña (recarga a mitad de conteo) harían aplazar el inicio de sesión y saltar ese documento al
+// enviar lo pendiente. BlindCount las vuelve a poner cuando se abre un conteo.
+try {
+  ['m7_active_counting', 'm7_counting_doc', 'm7_auth_failed_deferred'].forEach(k => sessionStorage.removeItem(k));
+} catch { /* sin almacenamiento */ }
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getMasterCategoryFromRoute } from './constants/routes';
 import { User, PageModule, MasterCategory, MasterRecord } from './types';
@@ -169,6 +177,62 @@ const App: React.FC = () => {
 
   const { refreshAppData } = useAppData();
 
+  // Sesión invalidada en pleno conteo (no se saca al operario): aviso fijo para renovar ahí mismo
+  const [sesionAplazada, setSesionAplazada] = useState<string | null>(null);
+  const [reloginOpen, setReloginOpen] = useState(false);
+  const [reloginPass, setReloginPass] = useState('');
+  const [reloginBusy, setReloginBusy] = useState(false);
+
+  const renovarSesionEnConteo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.email || !reloginPass) return;
+    setReloginBusy(true);
+    try {
+      const res: any = await api.login(user.email, reloginPass);
+      if (res?.token) {
+        localStorage.setItem('token', res.token);
+        localStorage.setItem('m7_token', res.token);
+        try {
+          const sess = JSON.parse(localStorage.getItem('m7_user_session') || 'null');
+          if (sess) localStorage.setItem('m7_user_session', JSON.stringify({ ...sess, token: res.token }));
+        } catch { /* sesión local ilegible: el token ya quedó guardado */ }
+        sessionStorage.removeItem('m7_auth_failed_deferred');
+        sessionStorage.setItem('m7_last_token_renew', String(Date.now()));
+        setSesionAplazada(null);
+        setReloginOpen(false);
+        setReloginPass('');
+        window.dispatchEvent(new Event('m7-session-renewed'));
+        toast.success('Sesión renovada. Lo contado se está enviando al servidor.');
+      } else if (res?.require2FA) {
+        toast.error('Su usuario requiere verificación en dos pasos: al terminar, salga e inicie sesión. Lo contado está protegido en este equipo.', { duration: 8000 });
+      } else {
+        toast.error(res?.error || 'Contraseña incorrecta');
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Sin conexión. Lo contado sigue guardado en este equipo.');
+    } finally {
+      setReloginBusy(false);
+    }
+  };
+
+  // Conteos pendientes en esta tablet: se envían solos al abrir OrbitM7 / iniciar sesión (cualquier
+  // usuario), al volver el internet y al renovar la sesión — aunque nadie reabra el documento.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const enviar = () => {
+      syncPendingCounts().then(r => {
+        if (r.enviados) toast.success(`Se enviaron ${r.enviados} conteo(s) de inventario que estaban guardados en este equipo.`);
+      }).catch(() => {});
+    };
+    enviar();
+    window.addEventListener('online', enviar);
+    window.addEventListener('m7-session-renewed', enviar);
+    return () => {
+      window.removeEventListener('online', enviar);
+      window.removeEventListener('m7-session-renewed', enviar);
+    };
+  }, [isAuthenticated]);
+
 
   // ============ NOTICIAS MODAL ============
   const [noticiasFeed, setNoticiasFeed] = useState<any[]>([]);
@@ -212,6 +276,16 @@ const App: React.FC = () => {
   useEffect(() => {
     // Listener para fallos de JWT Global (401)
     const handleAuthFailure = (event: any) => {
+      // En Recibido de Material el operario está descargando el camión: sacarlo de la pantalla
+      // haría que dejara de contar. Se aplaza el cierre hasta que salga de Recibido; mientras
+      // tanto el conteo sigue guardándose en la tablet y se envía al volver a iniciar sesión.
+      if (sessionStorage.getItem('m7_active_counting') === 'true') {
+        if (!sessionStorage.getItem('m7_auth_failed_deferred')) {
+          sessionStorage.setItem('m7_auth_failed_deferred', event.detail?.message || 'Sesión Invalida');
+        }
+        setSesionAplazada(event.detail?.message || 'Sesión Invalida');
+        return;
+      }
       handleLogout(false);
       toast.error(event.detail?.message || "Sesión Invalida", {
         description: "Por favor inicie sesión nuevamente.",
@@ -1224,6 +1298,40 @@ const App: React.FC = () => {
         }}
       />
       <PWABanner />
+      {sesionAplazada && isAuthenticated && (
+        <div className="fixed top-0 inset-x-0 z-[2000] bg-amber-500 text-slate-900 shadow-lg" role="alert">
+          <div className="max-w-5xl mx-auto px-4 py-2.5 flex flex-wrap items-center gap-3">
+            <p className="text-sm font-bold flex-1 min-w-[220px]">
+              La sesión necesita renovarse. Puede seguir contando: todo queda guardado en este equipo y se enviará solo.
+            </p>
+            <button onClick={() => setReloginOpen(true)}
+              className="px-4 py-2 rounded-xl bg-slate-900 text-white text-xs font-black uppercase tracking-widest">
+              Renovar sesión
+            </button>
+          </div>
+        </div>
+      )}
+      {reloginOpen && (
+        <div className="fixed inset-0 z-[2100] bg-slate-950/70 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <form onSubmit={renovarSesionEnConteo} className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-4 shadow-2xl">
+            <div>
+              <h3 className="text-lg font-black text-slate-900">Renovar sesión</h3>
+              <p className="text-xs text-slate-500 mt-1">{user?.name} · {user?.email}. No se pierde nada de lo contado.</p>
+            </div>
+            <input type="password" autoFocus value={reloginPass} onChange={e => setReloginPass(e.target.value)}
+              placeholder="Contraseña" aria-label="Contraseña"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm" />
+            <div className="flex gap-2">
+              <button type="button" onClick={() => { setReloginOpen(false); setReloginPass(''); }}
+                className="flex-1 py-3 rounded-2xl border border-slate-200 text-xs font-black uppercase text-slate-500">Después</button>
+              <button type="submit" disabled={reloginBusy || !reloginPass}
+                className="flex-[2] py-3 rounded-2xl bg-emerald-500 text-slate-900 text-xs font-black uppercase disabled:opacity-40">
+                {reloginBusy ? 'Validando…' : 'Renovar'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
       <AutoUpdate />
 
       {/* Modal de noticias/avisos con animación del camión */}

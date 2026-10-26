@@ -171,9 +171,11 @@ export const syncInventory = async (req: Request, res: Response) => {
     }
 
     const currentStatus = checkStatus.rows[0].status;
-    if ((currentStatus === 'INVENTARIADO' || currentStatus === 'EST-08') && !isPartial) {
+    if (currentStatus === 'INVENTARIADO' || currentStatus === 'EST-08') {
+      // También el guardado PARCIAL: si no, una tablet con un conteo viejo pendiente de enviar
+      // devolvía el documento a "EN CONTEO" y sobrescribía los conteos ya cerrados.
       await client.query('ROLLBACK');
-      return res.status(409).json({ error: "Documento ya finalizado" });
+      return res.status(409).json({ error: "Documento ya finalizado", code: 'DOC_FINALIZADO' });
     }
 
     const docL = checkStatus.rows[0];

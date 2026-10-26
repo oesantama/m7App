@@ -4,6 +4,8 @@ import { Icons } from '../constants';
 import { toast } from 'sonner';
 import { Article, DocumentL, DocumentLItem, MasterRecord, DocStatus, User } from '../types';
 import { cleanSkuM7, extractUnitFromBarcode } from '../utils/scanner';
+import { api } from '../services/api';
+import { markPendingCount, clearPendingCount } from '../utils/pendingCounts';
 
 interface BlindCountProps {
   document: DocumentL;
@@ -44,30 +46,49 @@ const BlindCount: React.FC<BlindCountProps> = ({
     localStorage.setItem(`m7_extras_${docL.id}`, JSON.stringify(extraItems));
   }, [extraItems, docL.id]);
 
-  // ── M7 KEEP-ALIVE: Sesión constante para pistoleo y escaneo ininterrumpido ──
+  // ── M7 KEEP-ALIVE: la sesión no se vence mientras el conteo está abierto ──
+  // 1. Al abrir: se verifica/renueva. Si la sesión ya no es válida, la app pide iniciar sesión
+  //    ANTES de contar (la marca de conteo activo aún no está puesta, así que no se aplaza).
+  // 2. Mientras está abierto: renovación cada 4 min, al volver el internet y al reactivar la tablet.
+  // 3. Si aun así se invalida (usuario desactivado, cambio de llaves del servidor), App.tsx NO saca al
+  //    operario: aplaza el cierre y muestra el aviso para renovar aquí mismo; lo contado queda
+  //    pendiente en la tablet y se envía solo. El cierre aplazado se aplica al salir del conteo.
   useEffect(() => {
-    sessionStorage.setItem('m7_active_counting', 'true');
+    // Una recarga a mitad de conteo deja la marca de antes: se limpia para verificar de verdad al abrir
+    sessionStorage.removeItem('m7_active_counting');
+    sessionStorage.setItem('m7_counting_doc', docL.id);
+    let activo = true;
+    const marcarActivo = () => { if (activo) sessionStorage.setItem('m7_active_counting', 'true'); };
+    const renovar = () => api.renewSession().then(() => {
+      sessionStorage.setItem('m7_last_token_renew', String(Date.now()));
+      window.dispatchEvent(new Event('m7-session-renewed'));
+    });
 
-    // Renovar inmediatamente al abrir el conteo si hace más de 5 min no se renueva
-    const lastRenew = Number(sessionStorage.getItem('m7_last_token_renew') || 0);
-    if (!lastRenew || Date.now() - lastRenew > 5 * 60 * 1000) {
-      api.renewSession().then(() => {
-        sessionStorage.setItem('m7_last_token_renew', String(Date.now()));
-      }).catch(() => {});
-    }
+    renovar().then(marcarActivo).catch((err: any) => {
+      // Sin red al abrir: se cuenta igual (todo queda en la tablet). Un 401 ya disparó el login.
+      if (!/sesi[oó]n|caducad|token|inv[aá]lid|401/i.test(String(err?.message || ''))) marcarActivo();
+    });
 
-    // Intervalo de renovación silenciosa cada 10 minutos
-    const timer = setInterval(() => {
-      api.renewSession().then(() => {
-        sessionStorage.setItem('m7_last_token_renew', String(Date.now()));
-      }).catch(() => {});
-    }, 10 * 60 * 1000);
+    const conCatch = () => { renovar().catch(() => {}); };
+    const timer = setInterval(conCatch, 4 * 60 * 1000);
+    const alVolver = () => { if (document.visibilityState === 'visible') conCatch(); };
+    window.addEventListener('online', conCatch);
+    document.addEventListener('visibilitychange', alVolver);
 
     return () => {
+      activo = false;
       clearInterval(timer);
+      window.removeEventListener('online', conCatch);
+      document.removeEventListener('visibilitychange', alVolver);
       sessionStorage.removeItem('m7_active_counting');
+      sessionStorage.removeItem('m7_counting_doc');
+      const aplazado = sessionStorage.getItem('m7_auth_failed_deferred');
+      if (aplazado) {
+        sessionStorage.removeItem('m7_auth_failed_deferred');
+        window.dispatchEvent(new CustomEvent('orbit-auth-failed', { detail: { message: aplazado } }));
+      }
     };
-  }, []);
+  }, [docL.id]);
 
   // Bloquear pull-to-refresh móvil durante todo el tiempo que el conteo esté montado.
   // Evita que el operario recargue la página accidentalmente al hacer scroll hacia arriba.
@@ -190,6 +211,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
   const isQueueProcessing = useRef(false);
 
   const [syncStatus, setSyncStatus] = useState<'synced' | 'syncing' | 'error'>('synced');
+  const [retryTick, setRetryTick] = useState(0); // fuerza un nuevo intento de guardado
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
   const autoSaveTimer = useRef<NodeJS.Timeout | null>(null);
   const processingTimer = useRef<NodeJS.Timeout | null>(null);
@@ -301,27 +323,43 @@ const BlindCount: React.FC<BlindCountProps> = ({
       return;
     }
 
-    localStorage.setItem(`m7_offline_count_${docL.id}`, JSON.stringify(counts));
-    localStorage.setItem(`m7_incidents_${docL.id}`, JSON.stringify(incidents));
+    // Copia local primero: es lo que protege el conteo si se cae el internet o se cierra la app
+    try {
+      localStorage.setItem(`m7_offline_count_${docL.id}`, JSON.stringify(counts));
+      localStorage.setItem(`m7_incidents_${docL.id}`, JSON.stringify(incidents));
+    } catch (err) {
+      console.error('[M7-OFFLINE] No se pudo guardar la copia local del conteo', err);
+    }
 
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
+    const finalItems: DocumentLItem[] = groupedItems.map(it => ({
+      ...it,
+      countedQty: counts[it.articleId] || 0,
+      count1: count1Data[it.articleId] || 0,
+      count2: counts[it.articleId] || 0,
+      inventoryNote: itemObservations[it.articleId] || '',
+      unit: scannedUnits[it.articleId] || it.unit,
+    }));
+    // Si no llega al servidor, queda marcado en la tablet y se envía solo (aunque nadie reabra el documento)
+    const marcarPendiente = () => markPendingCount({ docId: docL.id, items: finalItems, notes: inventoryObservation, user: user?.name || 'Sistema' });
+
+    // Sin internet no se intenta: queda en la tablet y se envía solo al volver la señal (retryTick)
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      marcarPendiente();
+      setSyncStatus('error');
+      return;
+    }
+
     setSyncStatus('syncing');
     autoSaveTimer.current = setTimeout(async () => {
-      const finalItems: DocumentLItem[] = groupedItems.map(it => ({
-        ...it,
-        countedQty: counts[it.articleId] || 0,
-        count1: count1Data[it.articleId] || 0,
-        count2: counts[it.articleId] || 0,
-        inventoryNote: itemObservations[it.articleId] || '',
-        unit: scannedUnits[it.articleId] || it.unit,
-      }));
-
       try {
         await onPartialSave(finalItems, inventoryObservation);
+        clearPendingCount(docL.id);
         setSyncStatus('synced');
         setLastSyncTime(new Date());
       } catch {
+        marcarPendiente();
         setSyncStatus('error');
       }
     }, 5000); // M7 V17: Aumentado a 5 segundos para priorizar ráfaga de escaneo sin bloqueos
@@ -329,7 +367,25 @@ const BlindCount: React.FC<BlindCountProps> = ({
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     };
-  }, [counts, itemObservations, inventoryObservation, groupedItems, incidents]);
+  }, [counts, itemObservations, inventoryObservation, groupedItems, incidents, retryTick]);
+
+  // REINTENTO AUTOMÁTICO: si el último guardado falló, se vuelve a intentar cada 15 s, apenas
+  // regresa el internet y cuando la tablet vuelve a primer plano — sin que el operario haga nada.
+  useEffect(() => {
+    if (syncStatus !== 'error') return;
+    const reintentar = () => setRetryTick(t => t + 1);
+    const timer = setInterval(reintentar, 15000);
+    const alVolver = () => { if (document.visibilityState === 'visible') reintentar(); };
+    window.addEventListener('online', reintentar);
+    window.addEventListener('m7-session-renewed', reintentar);
+    document.addEventListener('visibilitychange', alVolver);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('online', reintentar);
+      window.removeEventListener('m7-session-renewed', reintentar);
+      document.removeEventListener('visibilitychange', alVolver);
+    };
+  }, [syncStatus]);
 
   // M7 V12 BACKGROUND WORKER LOGIC
   const processNextInQueue = () => {
@@ -387,10 +443,17 @@ const BlindCount: React.FC<BlindCountProps> = ({
              }
          }
 
-         if (foundTokens.length > 1 && buffer.length === 0) {
-             foundTokens.forEach(token => processBarcode(token)); // Procesar múltiple
-         } else {
-             processBarcode(nextBatch); // Procesar simple o IA
+         // Un error procesando UNA lectura no puede detener la cola: antes dejaba isQueueProcessing
+         // en true para siempre y ninguna lectura posterior entraba hasta recargar la pantalla.
+         try {
+           if (foundTokens.length > 1 && buffer.length === 0) {
+               foundTokens.forEach(token => processBarcode(token)); // Procesar múltiple
+           } else {
+               processBarcode(nextBatch); // Procesar simple o IA
+           }
+         } catch (err) {
+           console.error('[M7-SCAN] Error procesando lectura, se continúa con la siguiente:', nextBatch, err);
+           setLastScan({ id: Math.random(), article: null, message: `⚠️ LECTURA NO PROCESADA: ${String(nextBatch).slice(0, 30)}`, status: 'error' });
          }
       }
 
@@ -450,9 +513,11 @@ const BlindCount: React.FC<BlindCountProps> = ({
     if (translatedInput === '*IGNORE*' || translatedInput.startsWith('A02')) {
         // M7 V16.3: Auto-recuperación de SKUs "baneados" por error en ráfagas rápidas
         const isActuallyValid = groupedItems.some(it => it.articleId?.toUpperCase() === input || it.sku?.toUpperCase() === input) ||
-                                (masterArticulo as Article[]).some(a => (a.id && a.id.toUpperCase() === input) || (a.sku && a.sku.toUpperCase() === input) || (a.barcode && a.barcode === input));
+                                (masterArticulo as Article[]).some(a => (a.id && String(a.id).toUpperCase() === input) || (a.sku && String(a.sku).toUpperCase() === input) || (a.barcode && String(a.barcode) === input));
         
-        if (isActuallyValid && translatedInput === '*IGNORE*') {
+        // 'A02…' son lotes de Ajover: se descartan SOLO si no corresponden a un artículo real.
+        // Antes un artículo válido que empezara por A02 se perdía en silencio, sin incidencia.
+        if (isActuallyValid) {
             // El cerebro se equivocó por una ráfaga previa. Lo "desbaneamos" en caliente.
             const nextBrain = { ...aiBrain };
             delete nextBrain[input];
@@ -467,16 +532,18 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
     // 1. Buscar en el plan (Match Directo - TABLA 1)
     const master = (masterArticulo as Article[]).find(m => 
-        (m.id && m.id.toUpperCase() === translatedInput) || 
-        (m.sku && m.sku.toUpperCase() === translatedInput) || 
-        (m.barcode && m.barcode === translatedInput)
+        (m.id && String(m.id).toUpperCase() === translatedInput) || 
+        (m.sku && String(m.sku).toUpperCase() === translatedInput) || 
+        (m.barcode && String(m.barcode) === translatedInput)
     );
 
+    // Referencia del cliente (columna "Ref"/"Referencia" del plan): solo cuenta si identifica UN único artículo
+    const byClientRef = groupedItems.filter(it => String((it as any).clientRef || '').trim().toUpperCase() === translatedInput);
     const itemInDoc = groupedItems.find(it => 
       (it.articleId?.toUpperCase() === translatedInput) || 
       (it.sku?.toUpperCase() === translatedInput) ||
       (master && master.id === it.articleId)
-    );
+    ) || (byClientRef.length === 1 ? byClientRef[0] : undefined);
 
     if (itemInDoc) {
         const targetId = itemInDoc.articleId;
@@ -608,9 +675,9 @@ const BlindCount: React.FC<BlindCountProps> = ({
     // Si la lectura no está en el plan actual (groupedItems) pero SÍ es un artículo real de base de datos
     // Lo anexamos dinámicamente como "Extra" para evitar engrosar innecesariamente las incidencias.
     const inMaster = (masterArticulo as Article[]).find(a => 
-        (a.id && a.id.toUpperCase() === input) || 
-        (a.sku && a.sku.toUpperCase() === input) ||
-        (a.barcode && a.barcode === input)
+        (a.id && String(a.id).toUpperCase() === input) || 
+        (a.sku && String(a.sku).toUpperCase() === input) ||
+        (a.barcode && String(a.barcode) === input)
     );
     if (inMaster) {
         const newExtra = {
@@ -632,10 +699,19 @@ const BlindCount: React.FC<BlindCountProps> = ({
             return [...prev, newExtra];
         });
         
-        // Siempre sumar 1 por pistoleada — el factor solo aplica en botones Convertir/Revertir
-        setTimeout(() => {
-            enqueueScan(inMaster.sku || inMaster.id);
-        }, 100);
+        // Siempre sumar 1 por pistoleada — el factor solo aplica en botones Convertir/Revertir.
+        // Se cuenta aquí mismo con la clave que usa la vista agrupada (sku || id). Antes se re-encolaba
+        // con un setTimeout que usaba datos de un render viejo: no encontraba el extra y se repetía sin fin.
+        const extraKey = String(inMaster.sku || inMaster.id).trim().toUpperCase();
+        setCounts(prev => {
+          const newQty = (Number(prev[extraKey]) || 0) + 1;
+          setLastScan({ id: Math.random(), article: inMaster, message: `${extraKey} (fuera de plan)`, status: 'new', qty: newQty });
+          return { ...prev, [extraKey]: newQty };
+        });
+        setLastScannedAt(prev => ({ ...prev, [extraKey]: Date.now() }));
+        handleBingoEffects();
+        setCurrentPage(1);
+        setScanInput('');
         return; 
     }
 
@@ -1202,7 +1278,7 @@ const BlindCount: React.FC<BlindCountProps> = ({
       <div className="flex items-center gap-3 px-6 py-3 bg-slate-50 border-t border-slate-100 shrink-0">
         <div className={`w-2 h-2 rounded-full ${syncStatus === 'syncing' ? 'bg-amber-500 animate-pulse' : syncStatus === 'error' ? 'bg-rose-500' : 'bg-emerald-500'}`}></div>
         <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">
-          {syncStatus === 'syncing' ? 'Cloud Sync: Sincronizando...' : syncStatus === 'error' ? 'Cloud Sync: Error de Conexión' : 'Cloud Sync: Protegido en la Nube'}
+          {syncStatus === 'syncing' ? 'Cloud Sync: Sincronizando...' : syncStatus === 'error' ? 'Pendiente de enviar: guardado en este equipo, se enviará solo' : 'Cloud Sync: Protegido en la Nube'}
           {lastSyncTime && syncStatus === 'synced' && (
             <span className="ml-2 text-slate-300 font-bold opacity-60 italic">({lastSyncTime.toLocaleTimeString()})</span>
           )}

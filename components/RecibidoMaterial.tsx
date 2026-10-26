@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Icons } from '../constants';
 import { toast } from 'sonner';
 import { api } from '../services/api';
+import { clearPendingCount } from '../utils/pendingCounts';
 import { DocumentL, User, DocStatus, MasterRecord, Article, DocumentLItem, getStatusLabel } from '../types';
 import BlindCount from './BlindCount';
 import PickingView from './PickingView';
@@ -63,27 +64,13 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
 
   const [selectedDocForCount, setSelectedDocForCount] = useState<DocumentL | null>(null);
 
-  // ── M7 KEEP-ALIVE: Sesión constante para operarios en Recibido de Material ──
+  // ── Sesión al entrar a Recibido: se verifica y renueva. Si ya no es válida, la app pide iniciar
+  // sesión antes de empezar (no hay conteo abierto, nada que proteger). La renovación continua y la
+  // protección durante el conteo las maneja BlindCount mientras está abierto.
   useEffect(() => {
-    sessionStorage.setItem('m7_active_counting', 'true');
-
-    const lastRenew = Number(sessionStorage.getItem('m7_last_token_renew') || 0);
-    if (!lastRenew || Date.now() - lastRenew > 5 * 60 * 1000) {
-      api.renewSession().then(() => {
-        sessionStorage.setItem('m7_last_token_renew', String(Date.now()));
-      }).catch(() => {});
-    }
-
-    const timer = setInterval(() => {
-      api.renewSession().then(() => {
-        sessionStorage.setItem('m7_last_token_renew', String(Date.now()));
-      }).catch(() => {});
-    }, 10 * 60 * 1000);
-
-    return () => {
-      clearInterval(timer);
-      sessionStorage.removeItem('m7_active_counting');
-    };
+    api.renewSession().then(() => {
+      sessionStorage.setItem('m7_last_token_renew', String(Date.now()));
+    }).catch(() => {});
   }, []);
 
   // Bloquear pull-to-refresh y overscroll del navegador móvil mientras el conteo está activo.
@@ -223,13 +210,14 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         onUpdateDocuments(documents.map(d =>
           d.id === selectedDocForCount.id ? { ...d, items: currentItems, updatedAt: new Date().toISOString() } : d
         ));
-        toast.info("Progreso guardado en el servidor.");
       } else {
         throw new Error(res.error || "Fallo guardando progreso parcial");
       }
     } catch (err: any) {
-      toast.error("Error al guardar progreso parcial.");
+      // Sin avisos emergentes: el operario está descargando y no puede leerlos. El conteo muestra
+      // el estado en su indicador y reintenta solo; aquí se relanza para que sepa que falló.
       if (import.meta.env.DEV) console.error('[M7-PARTIAL-SYNC]', err);
+      throw err;
     } finally {
       setIsSyncingPartial(false);
     }
@@ -254,6 +242,7 @@ const RecibidoMaterial: React.FC<RecibidoMaterialProps> = ({
         localStorage.removeItem(`m7_offline_count_${selectedDocForCount.id}`);
         localStorage.removeItem(`m7_extras_${selectedDocForCount.id}`);
         localStorage.removeItem(`m7_incidents_${selectedDocForCount.id}`);
+        clearPendingCount(selectedDocForCount.id);
 
         setSelectedDocForCount(null);
 
