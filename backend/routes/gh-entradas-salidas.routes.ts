@@ -6,6 +6,7 @@ import {
     getSalidasProveedor, createSalidaProveedor,
     getAvailableSerials,
     getAsignaciones, createAsignacionPersonal, firmarAsignacion, generateAsignacionActaPDF,
+    updateAsignacionPersonal, anularAsignacionPersonal, getHistorialAsignacion,
     getDevoluciones, createDevolucionPersonal, firmarDevolucion, generateDevolucionActaPDF,
     getPersonalInventario, getPersonalSerials,
     getInventarioBodega, getInventarioPersonal,
@@ -28,6 +29,10 @@ router.get('/serials/:elemento_id', requirePermission(['MASTER_INVENTARIO_GH', '
 router.get('/asignaciones', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH'], 'view'), getAsignaciones);
 router.post('/asignaciones', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH'], 'create'), createAsignacionPersonal);
 router.post('/asignaciones/:id/firmar', authenticateToken, firmarAsignacion);
+// Editar / anular: solo con permiso y mientras la firma esté pendiente (validado también en el controlador)
+router.put('/asignaciones/:id', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH'], 'edit'), updateAsignacionPersonal);
+router.delete('/asignaciones/:id', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH'], 'delete'), anularAsignacionPersonal);
+router.get('/asignaciones/:id/historial', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH', 'CONSULTA_INVENTARIO_GH'], 'view'), getHistorialAsignacion);
 router.get('/asignaciones/:id/acta', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH', 'CONSULTA_INVENTARIO_GH'], 'view'), generateAsignacionActaPDF);
 router.get('/ultima-entrega/:personal_id/:elemento_id', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH', 'ENTREGAS_SALIDAS_GH'], 'view'), getUltimaEntregaElemento);
 

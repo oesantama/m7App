@@ -433,6 +433,7 @@ export const getAsignaciones = async (req: Request, res: Response) => {
         let query = `
             SELECT a.id, a.numero_asignacion, a.personal_id, a.autorizado_por, a.fecha, a.observaciones, a.usuario_control, a.fecha_control,
                    COALESCE(a.firma_estado, 'PENDIENTE') as firma_estado, a.fecha_firma, a.firmado_por,
+                   a.estado, a.anulada_por, a.fecha_anulacion, a.motivo_anulacion, a.editada_por, a.fecha_edicion,
                    p.nombre as personal_nombre, p.cedula as personal_documento
             FROM gh_asignaciones_personal a
             LEFT JOIN gh_personal p ON a.personal_id = p.id
@@ -466,7 +467,10 @@ export const getAsignaciones = async (req: Request, res: Response) => {
         for (const row of result.rows) {
             const detQuery = `
                 SELECT d.id, d.elemento_id, d.cantidad, e.nombre as elemento_nombre, e.es_serializado,
-                       (SELECT ARRAY_AGG(serial) FROM gh_inventario_serial_elemento WHERE elemento_id = d.elemento_id AND personal_id = $2 AND estado_serial = 'ASIGNADO') as serials
+                       COALESCE(
+                         (SELECT ARRAY_AGG(x.serial ORDER BY x.serial) FROM gh_asignaciones_personal_serial x WHERE x.asignacion_id = d.asignacion_id AND x.elemento_id = d.elemento_id),
+                         (SELECT ARRAY_AGG(serial) FROM gh_inventario_serial_elemento WHERE elemento_id = d.elemento_id AND personal_id = $2 AND estado_serial = 'ASIGNADO')
+                       ) as serials
                 FROM gh_asignaciones_personal_detalle d
                 LEFT JOIN gh_elementos e ON d.elemento_id = e.id
                 WHERE d.asignacion_id = $1
@@ -514,6 +518,28 @@ export const createAsignacionPersonal = async (req: Request, res: Response) => {
         ]);
         const asignacionId = resAsignacion.rows[0].id;
 
+        await aplicarItemsAsignacion(client, asignacionId, Number(personal_id), items);
+
+        await client.query('COMMIT');
+        res.json({ success: true, data: resAsignacion.rows[0] });
+    } catch (error: any) {
+        await client.query('ROLLBACK');
+        console.error('Error creating assignment:', error);
+        res.status(400).json({ success: false, error: error.message || 'Error al guardar la asignación' });
+    } finally {
+        client.release();
+    }
+};
+
+
+// ─── Asignaciones: movimientos de inventario compartidos por crear / editar / anular ───
+
+/**
+ * Aplica los elementos de una asignación: descuenta bodega, suma al inventario del colaborador,
+ * marca los seriales como ASIGNADOS y registra qué seriales entregó ESTA asignación
+ * (gh_asignaciones_personal_serial), para poder revertirla con precisión.
+ */
+async function aplicarItemsAsignacion(client: any, asignacionId: number, personalId: number, items: any[]) {
         for (const item of items) {
             // Lock warehouse stock
             await client.query('SELECT id FROM gh_inventario_elemento WHERE elemento_id = $1 FOR UPDATE', [item.elemento_id]);
@@ -537,11 +563,11 @@ export const createAsignacionPersonal = async (req: Request, res: Response) => {
             await client.query('UPDATE gh_inventario_elemento SET stock = stock - $1 WHERE elemento_id = $2', [item.cantidad, item.elemento_id]);
 
             // Update Personal Stock (Upsert)
-            const persCheck = await client.query('SELECT id FROM gh_inventario_personal WHERE personal_id = $1 AND elemento_id = $2 FOR UPDATE', [Number(personal_id), item.elemento_id]);
+            const persCheck = await client.query('SELECT id FROM gh_inventario_personal WHERE personal_id = $1 AND elemento_id = $2 FOR UPDATE', [personalId, item.elemento_id]);
             if (persCheck.rows.length > 0) {
-                await client.query('UPDATE gh_inventario_personal SET stock = stock + $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE personal_id = $2 AND elemento_id = $3', [item.cantidad, Number(personal_id), item.elemento_id]);
+                await client.query('UPDATE gh_inventario_personal SET stock = stock + $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE personal_id = $2 AND elemento_id = $3', [item.cantidad, personalId, item.elemento_id]);
             } else {
-                await client.query('INSERT INTO gh_inventario_personal (personal_id, elemento_id, stock) VALUES ($1, $2, $3)', [Number(personal_id), item.elemento_id, item.cantidad]);
+                await client.query('INSERT INTO gh_inventario_personal (personal_id, elemento_id, stock) VALUES ($1, $2, $3)', [personalId, item.elemento_id, item.cantidad]);
             }
 
             // Handle Serials
@@ -564,20 +590,206 @@ export const createAsignacionPersonal = async (req: Request, res: Response) => {
                     // Update serial state to ASIGNADO to this person
                     await client.query(
                         "UPDATE gh_inventario_serial_elemento SET estado_serial = 'ASIGNADO', personal_id = $1, fecha_asignacion = CURRENT_TIMESTAMP WHERE serial = $2", 
-                        [Number(personal_id), rawSerial]
+                        [personalId, rawSerial]
+                    );
+                    await client.query(
+                        'INSERT INTO gh_asignaciones_personal_serial (asignacion_id, elemento_id, serial) VALUES ($1, $2, $3) ON CONFLICT (asignacion_id, serial) DO NOTHING',
+                        [asignacionId, item.elemento_id, rawSerial]
                     );
                 }
             }
         }
 
+}
+
+/** Carga una asignación con su detalle y seriales, bloqueándola para el resto de la transacción. */
+async function cargarAsignacionBloqueada(client: any, id: number) {
+    const r = await client.query(
+        `SELECT a.*, COALESCE(a.firma_estado, 'PENDIENTE') AS firma_estado_real, p.nombre AS personal_nombre
+         FROM gh_asignaciones_personal a LEFT JOIN gh_personal p ON p.id = a.personal_id
+         WHERE a.id = $1 FOR UPDATE OF a`, [id]);
+    if (!r.rows.length) throw Object.assign(new Error('Asignación no encontrada.'), { status: 404 });
+    const asig = r.rows[0];
+    const det = await client.query(
+        `SELECT d.elemento_id, d.cantidad, e.nombre AS elemento_nombre, COALESCE(e.es_serializado, false) AS es_serializado
+         FROM gh_asignaciones_personal_detalle d LEFT JOIN gh_elementos e ON e.id = d.elemento_id
+         WHERE d.asignacion_id = $1 ORDER BY d.id`, [id]);
+    const ser = await client.query(
+        `SELECT elemento_id, serial FROM gh_asignaciones_personal_serial WHERE asignacion_id = $1`, [id]);
+    const items = det.rows.map((d: any) => ({
+        elemento_id: d.elemento_id,
+        nombre: d.elemento_nombre,
+        es_serializado: d.es_serializado,
+        cantidad: Number(d.cantidad),
+        serials: ser.rows.filter((x: any) => Number(x.elemento_id) === Number(d.elemento_id)).map((x: any) => x.serial),
+    }));
+    return { asig, items };
+}
+
+/** Solo se modifica una asignación ACTIVA y con firma PENDIENTE: firmada es inmodificable. */
+function validarModificable(asig: any) {
+    if (asig.estado === 'ANULADA') throw Object.assign(new Error('La asignación ya está anulada.'), { status: 409 });
+    if (asig.firma_estado_real === 'FIRMADO') {
+        throw Object.assign(new Error('La asignación ya fue firmada por el colaborador: es inmodificable. Use una devolución para corregir.'), { status: 409 });
+    }
+}
+
+/**
+ * Revierte los movimientos de una asignación: devuelve a bodega, descuenta del colaborador y libera
+ * sus seriales. Antes de tocar nada verifica que el colaborador AÚN tenga lo asignado y que los seriales
+ * sigan a su nombre: si hubo un movimiento posterior (p. ej. una devolución) se bloquea, para no
+ * alterar inventarios ni movimientos ya registrados.
+ */
+async function revertirItemsAsignacion(client: any, asig: any, items: any[]) {
+    const personalId = Number(asig.personal_id);
+    for (const it of items) {
+        const st = await client.query(
+            'SELECT stock FROM gh_inventario_personal WHERE personal_id = $1 AND elemento_id = $2 FOR UPDATE',
+            [personalId, it.elemento_id]);
+        const tiene = st.rows.length ? Number(st.rows[0].stock) : 0;
+        if (tiene < it.cantidad) {
+            throw Object.assign(new Error(
+                `No se puede modificar: ${asig.personal_nombre || 'el colaborador'} ya no tiene las ${it.cantidad} unidad(es) de "${it.nombre}" ` +
+                `(tiene ${tiene}). Hubo un movimiento posterior (devolución u otra operación); corrija con una devolución.`), { status: 409 });
+        }
+        if (it.es_serializado) {
+            if (it.serials.length !== it.cantidad) {
+                throw Object.assign(new Error(
+                    `No se puede modificar: no se pudieron identificar los seriales entregados de "${it.nombre}" en esta asignación. Corrija con una devolución.`), { status: 409 });
+            }
+            for (const serial of it.serials) {
+                const sr = await client.query(
+                    'SELECT estado_serial, personal_id FROM gh_inventario_serial_elemento WHERE serial = $1 AND elemento_id = $2 FOR UPDATE',
+                    [serial, it.elemento_id]);
+                if (!sr.rows.length || sr.rows[0].estado_serial !== 'ASIGNADO' || Number(sr.rows[0].personal_id) !== personalId) {
+                    throw Object.assign(new Error(
+                        `No se puede modificar: el serial "${serial}" ya no está asignado a ${asig.personal_nombre || 'el colaborador'} (hubo un movimiento posterior).`), { status: 409 });
+                }
+            }
+        }
+    }
+    // Todo verificado: ahora sí se revierte
+    for (const it of items) {
+        await client.query(
+            'UPDATE gh_inventario_personal SET stock = stock - $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE personal_id = $2 AND elemento_id = $3',
+            [it.cantidad, personalId, it.elemento_id]);
+        const wh = await client.query('SELECT id FROM gh_inventario_elemento WHERE elemento_id = $1 FOR UPDATE', [it.elemento_id]);
+        if (wh.rows.length) {
+            await client.query('UPDATE gh_inventario_elemento SET stock = stock + $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE elemento_id = $2', [it.cantidad, it.elemento_id]);
+        } else {
+            await client.query('INSERT INTO gh_inventario_elemento (elemento_id, stock) VALUES ($1, $2)', [it.elemento_id, it.cantidad]);
+        }
+        for (const serial of it.serials || []) {
+            await client.query(
+                "UPDATE gh_inventario_serial_elemento SET estado_serial = 'DISPONIBLE', personal_id = NULL, fecha_asignacion = NULL WHERE serial = $1 AND elemento_id = $2",
+                [serial, it.elemento_id]);
+        }
+    }
+}
+
+const fotoAsignacion = (asig: any, items: any[]) => ({
+    numero_asignacion: asig.numero_asignacion,
+    personal_id: asig.personal_id,
+    personal_nombre: asig.personal_nombre,
+    autorizado_por: asig.autorizado_por,
+    fecha: asig.fecha,
+    observaciones: asig.observaciones,
+    items: items.map(i => ({ elemento_id: i.elemento_id, nombre: i.nombre, cantidad: i.cantidad, serials: i.serials })),
+});
+
+const usuarioDe = (req: Request, fallback?: string) =>
+    String((req as any).user?.name || (req as any).user?.email || fallback || 'Sistema');
+
+// Edit a personal assignment (only ACTIVE + signature PENDING)
+export const updateAsignacionPersonal = async (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    const { personal_id, autorizado_por, fecha, observaciones, items, motivo } = req.body;
+    if (!id || !personal_id || !autorizado_por || !fecha || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ success: false, error: 'Datos incompletos' });
+    }
+    const usuario = usuarioDe(req, req.body.usuario_control);
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const { asig, items: antes } = await cargarAsignacionBloqueada(client, id);
+        validarModificable(asig);
+        const fotoAntes = fotoAsignacion(asig, antes);
+
+        // 1. Revertir lo que hizo la versión anterior (con validación de movimientos posteriores)
+        await revertirItemsAsignacion(client, asig, antes);
+        await client.query('DELETE FROM gh_asignaciones_personal_detalle WHERE asignacion_id = $1', [id]);
+        await client.query('DELETE FROM gh_asignaciones_personal_serial WHERE asignacion_id = $1', [id]);
+
+        // 2. Actualizar encabezado y aplicar la nueva versión con los mismos procesos de una asignación nueva
+        await client.query(
+            `UPDATE gh_asignaciones_personal
+             SET personal_id = $1, autorizado_por = $2, fecha = $3, observaciones = $4,
+                 editada_por = $5, fecha_edicion = CURRENT_TIMESTAMP
+             WHERE id = $6`,
+            [Number(personal_id), String(autorizado_por).trim(), fecha, observaciones || null, usuario, id]);
+        await aplicarItemsAsignacion(client, id, Number(personal_id), items);
+
+        // 3. Historial con la foto completa del antes y el después
+        const { asig: nueva, items: despues } = await cargarAsignacionBloqueada(client, id);
+        await client.query(
+            `INSERT INTO gh_asignaciones_personal_historial (asignacion_id, accion, datos_antes, datos_despues, motivo, usuario)
+             VALUES ($1, 'EDICION', $2, $3, $4, $5)`,
+            [id, JSON.stringify(fotoAntes), JSON.stringify(fotoAsignacion(nueva, despues)), motivo ? String(motivo).trim() : null, usuario]);
+
         await client.query('COMMIT');
-        res.json({ success: true, data: resAsignacion.rows[0] });
+        res.json({ success: true, data: { id } });
     } catch (error: any) {
         await client.query('ROLLBACK');
-        console.error('Error creating assignment:', error);
-        res.status(400).json({ success: false, error: error.message || 'Error al guardar la asignación' });
+        console.error('Error updating assignment:', error.message);
+        res.status(error.status || 400).json({ success: false, error: error.message || 'Error al editar la asignación' });
     } finally {
         client.release();
+    }
+};
+
+// Annul (soft delete) a personal assignment: reverts inventory, keeps the record and its history
+export const anularAsignacionPersonal = async (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    const motivo = String(req.body?.motivo || '').trim();
+    if (!id) return res.status(400).json({ success: false, error: 'ID inválido' });
+    if (!motivo) return res.status(400).json({ success: false, error: 'Indique el motivo de la anulación.' });
+    const usuario = usuarioDe(req, req.body?.usuario_control);
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const { asig, items } = await cargarAsignacionBloqueada(client, id);
+        validarModificable(asig);
+        await revertirItemsAsignacion(client, asig, items);
+        // El detalle y los seriales se CONSERVAN: son el registro de lo que se había asignado
+        await client.query(
+            `UPDATE gh_asignaciones_personal
+             SET estado = 'ANULADA', anulada_por = $1, fecha_anulacion = CURRENT_TIMESTAMP, motivo_anulacion = $2
+             WHERE id = $3`, [usuario, motivo, id]);
+        await client.query(
+            `INSERT INTO gh_asignaciones_personal_historial (asignacion_id, accion, datos_antes, datos_despues, motivo, usuario)
+             VALUES ($1, 'ANULACION', $2, NULL, $3, $4)`,
+            [id, JSON.stringify(fotoAsignacion(asig, items)), motivo, usuario]);
+        await client.query('COMMIT');
+        res.json({ success: true });
+    } catch (error: any) {
+        await client.query('ROLLBACK');
+        console.error('Error annulling assignment:', error.message);
+        res.status(error.status || 400).json({ success: false, error: error.message || 'Error al anular la asignación' });
+    } finally {
+        client.release();
+    }
+};
+
+// History of an assignment (edits and annulment)
+export const getHistorialAsignacion = async (req: Request, res: Response) => {
+    try {
+        const r = await pool.query(
+            `SELECT id, accion, datos_antes, datos_despues, motivo, usuario, fecha
+             FROM gh_asignaciones_personal_historial WHERE asignacion_id = $1 ORDER BY fecha, id`, [Number(req.params.id)]);
+        res.json({ success: true, data: r.rows });
+    } catch (error) {
+        console.error('Error fetching assignment history:', error);
+        res.status(500).json({ success: false, error: 'Error del servidor' });
     }
 };
 
@@ -779,7 +991,7 @@ export const firmarAsignacion = async (req: Request, res: Response) => {
     try {
         // Get the assignment and the personal's document number
         const asigCheck = await pool.query(
-            `SELECT a.id, a.firma_estado, p.cedula as personal_documento, p.nombre as personal_nombre
+            `SELECT a.id, a.firma_estado, a.estado, p.cedula as personal_documento, p.nombre as personal_nombre
              FROM gh_asignaciones_personal a
              JOIN gh_personal p ON a.personal_id = p.id
              WHERE a.id = $1`,
@@ -789,6 +1001,9 @@ export const firmarAsignacion = async (req: Request, res: Response) => {
             return res.status(404).json({ success: false, error: 'Asignación no encontrada.' });
         }
         const asig = asigCheck.rows[0];
+        if (asig.estado === 'ANULADA') {
+            return res.status(400).json({ success: false, error: 'Esta asignación fue anulada: no se puede firmar.' });
+        }
         if (asig.firma_estado === 'FIRMADO') {
             return res.status(400).json({ success: false, error: 'Esta asignación ya fue firmada.' });
         }
@@ -818,11 +1033,15 @@ export const firmarAsignacion = async (req: Request, res: Response) => {
         }
 
         // Apply signature, store who triggered it
-        await pool.query(
-            `UPDATE gh_asignaciones_personal SET firma_estado = 'FIRMADO', fecha_firma = NOW(), firmado_por = $1 WHERE id = $2`,
+        const firmado = await pool.query(
+            `UPDATE gh_asignaciones_personal SET firma_estado = 'FIRMADO', fecha_firma = NOW(), firmado_por = $1
+             WHERE id = $2 AND estado = 'ACTIVA' AND COALESCE(firma_estado, 'PENDIENTE') <> 'FIRMADO'`,
             [firmado_por || personalDocumento, Number(id)]
         );
 
+        if (!firmado.rowCount) {
+            return res.status(409).json({ success: false, error: 'La asignación cambió mientras se firmaba (fue anulada o ya estaba firmada). Actualice la lista.' });
+        }
         res.json({ success: true, message: `Asignación firmada por ${asig.personal_nombre}.` });
     } catch (error: any) {
         console.error('Error firmando asignación:', error);
@@ -1021,7 +1240,10 @@ export const generateAsignacionActaPDF = async (req: Request, res: Response) => 
 
         const detQuery = `
             SELECT d.id, d.elemento_id, d.cantidad, e.nombre as elemento_nombre, e.es_serializado,
-                   (SELECT ARRAY_AGG(serial) FROM gh_inventario_serial_elemento WHERE elemento_id = d.elemento_id AND personal_id = $2 AND estado_serial = 'ASIGNADO') as serials
+                   COALESCE(
+                     (SELECT ARRAY_AGG(x.serial ORDER BY x.serial) FROM gh_asignaciones_personal_serial x WHERE x.asignacion_id = d.asignacion_id AND x.elemento_id = d.elemento_id),
+                     (SELECT ARRAY_AGG(serial) FROM gh_inventario_serial_elemento WHERE elemento_id = d.elemento_id AND personal_id = $2 AND estado_serial = 'ASIGNADO')
+                   ) as serials
             FROM gh_asignaciones_personal_detalle d
             LEFT JOIN gh_elementos e ON d.elemento_id = e.id
             WHERE d.asignacion_id = $1
@@ -1491,10 +1713,14 @@ export const getUltimaEntregaElemento = async (req: Request, res: Response) => {
             LEFT JOIN gh_personal p ON a.personal_id = p.id
             LEFT JOIN gh_elementos e ON d.elemento_id = e.id
             WHERE a.personal_id = $1 AND d.elemento_id = $2
+              AND COALESCE(a.estado, 'ACTIVA') = 'ACTIVA'
+              AND a.id <> $3
             ORDER BY a.fecha DESC, a.id DESC
             LIMIT 1
         `;
-        const result = await pool.query(query, [Number(personal_id), Number(elemento_id)]);
+        // ?excluir=<id>: al editar, la propia asignación no cuenta como "última entrega"
+        const excluir = Number(req.query.excluir) || 0;
+        const result = await pool.query(query, [Number(personal_id), Number(elemento_id), excluir]);
 
         if (result.rows.length === 0) {
             return res.json({

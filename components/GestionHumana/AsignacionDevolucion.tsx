@@ -31,7 +31,10 @@ import {
   Eye,
   EyeOff,
   Download,
-  FileDown
+  FileDown,
+  Lock,
+  Ban,
+  History
 } from 'lucide-react';
 
 interface Props {
@@ -209,6 +212,14 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
     observaciones: ''
   });
   const [formItems, setFormItems] = useState<any[]>([]);
+
+  // Edición / anulación de asignaciones (solo activas con firma pendiente)
+  const [editingAsig, setEditingAsig] = useState<any | null>(null);
+  const [motivoEdicion, setMotivoEdicion] = useState('');
+  const [anularTarget, setAnularTarget] = useState<any | null>(null);
+  const [motivoAnulacion, setMotivoAnulacion] = useState('');
+  const [anulando, setAnulando] = useState(false);
+  const [historial, setHistorial] = useState<any[] | null>(null);
   
   // Add item scratch state
   const [selectedElementId, setSelectedElementId] = useState('');
@@ -260,6 +271,9 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
   const canViewAll = hasPermission(user, 'ASIGNACION_DEVOLUCION_GH', 'view') || hasPermission(user, 'MASTER_INVENTARIO_GH', 'view');
   const canCreate = hasPermission(user, 'ASIGNACION_DEVOLUCION_GH', 'create') || hasPermission(user, 'MASTER_INVENTARIO_GH', 'create');
   const canEdit = hasPermission(user, 'ASIGNACION_DEVOLUCION_GH', 'edit') || hasPermission(user, 'MASTER_INVENTARIO_GH', 'edit');
+  const canDelete = hasPermission(user, 'ASIGNACION_DEVOLUCION_GH', 'delete') || hasPermission(user, 'MASTER_INVENTARIO_GH', 'delete');
+  /** Una asignación se puede editar/anular solo si está activa y la firma sigue pendiente. */
+  const esModificable = (a: any) => a && a.estado !== 'ANULADA' && a.firma_estado !== 'FIRMADO';
 
   const asignacionesColumns = React.useMemo<ColumnDef<any>[]>(() => [
     {
@@ -302,7 +316,11 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       key: 'firma_estado',
       render: (asig) => (
         <div className="text-center">
-          {asig.firma_estado === 'FIRMADO' ? (
+          {asig.estado === 'ANULADA' ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 border border-slate-300 text-slate-500 rounded-lg text-[9px] font-black uppercase tracking-wider" title={asig.motivo_anulacion || ''}>
+              <Ban size={10} /> Anulada
+            </span>
+          ) : asig.firma_estado === 'FIRMADO' ? (
             <div className="flex flex-col items-center gap-0.5">
               <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg text-[9px] font-black uppercase tracking-wider">
                 <ShieldCheck size={10} /> Firmado
@@ -356,10 +374,38 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
           >
             <FileText size={11} /> Detalle
           </button>
+          {esModificable(asig) ? (
+            <>
+              {canEdit && (
+                <button
+                  onClick={() => handleOpenEditModal(asig)}
+                  title="Editar asignación (firma pendiente)"
+                  aria-label="Editar asignación"
+                  className="p-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors border border-indigo-200"
+                >
+                  <PenLine size={12} />
+                </button>
+              )}
+              {canDelete && (
+                <button
+                  onClick={() => { setAnularTarget(asig); setMotivoAnulacion(''); }}
+                  title="Anular asignación (devuelve los elementos a bodega)"
+                  aria-label="Anular asignación"
+                  className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors border border-rose-200"
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
+            </>
+          ) : asig.estado !== 'ANULADA' && (canEdit || canDelete) ? (
+            <span title="Firmada por el colaborador: no se puede modificar" className="p-1.5 text-slate-300">
+              <Lock size={12} />
+            </span>
+          ) : null}
         </div>
       )
     }
-  ], [user, canEdit]);
+  ], [user, canEdit, canDelete]);
 
   const devolucionesColumns = React.useMemo<ColumnDef<any>[]>(() => [
     {
@@ -589,6 +635,23 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
     }
   };
 
+  // En edición, lo que ya entregó esta asignación vuelve a estar disponible para ella misma
+  const originalDe = (elementoId: any) =>
+    editingAsig?.details?.find((d: any) => String(d.elemento_id) === String(elementoId));
+  const elementosBodegaOpciones = React.useMemo(() => {
+    if (!editingAsig) return elementosBodegaList;
+    const lista = elementosBodegaList.map(e => {
+      const o = originalDe(e.id);
+      return o ? { ...e, stock: Number(e.stock) + Number(o.cantidad) } : e;
+    });
+    (editingAsig.details || []).forEach((d: any) => {
+      if (!lista.some(e => String(e.id) === String(d.elemento_id))) {
+        lista.push({ id: d.elemento_id, nombre: d.elemento_nombre, stock: Number(d.cantidad), es_serializado: d.es_serializado });
+      }
+    });
+    return lista;
+  }, [elementosBodegaList, editingAsig]);
+
   // Triggered when element is selected inside the modal
   const handleElementChange = async (elementoId: string) => {
     setSelectedElementId(elementoId);
@@ -604,7 +667,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
     }
 
     if (activeTab === 'asignaciones') {
-      const el = elementosBodegaList.find(e => e.id.toString() === elementoId.toString());
+      const el = elementosBodegaOpciones.find(e => e.id.toString() === elementoId.toString());
       setSelectedElement(el || null);
       setAvailableStock(el ? el.stock : 0);
 
@@ -612,7 +675,11 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
         try {
           const res = await api.getGhAvailableSerials(elementoId);
           if (res.success) {
-            setAvailableSerials(res.data);
+            // En edición se suman los seriales que esta misma asignación ya había entregado
+            const propios = (originalDe(elementoId)?.serials || [])
+              .filter((sr: string) => !res.data.some((x: any) => String(x.serial).toUpperCase() === String(sr).toUpperCase()))
+              .map((sr: string) => ({ serial: sr }));
+            setAvailableSerials([...res.data, ...propios]);
           }
         } catch (err) {
           toast.error('Error al consultar seriales en bodega.');
@@ -706,7 +773,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       const personalNombre = personalObj?.nombre || 'Colaborador';
 
       try {
-        const res = await api.getGhUltimaEntregaElemento(formHeader.personal_id, selectedElement.id);
+        const res = await api.getGhUltimaEntregaElemento(formHeader.personal_id, selectedElement.id, editingAsig?.id);
         if (res.success) {
           const fechaActual = formHeader.fecha || new Date().toISOString().split('T')[0];
           let textoTiempo = '';
@@ -773,8 +840,66 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
     });
   };
 
+  // Abrir la asignación en modo edición con su detalle precargado
+  const handleOpenEditModal = (asig: any) => {
+    if (!esModificable(asig)) {
+      toast.error('Esta asignación ya fue firmada o anulada: no se puede modificar.');
+      return;
+    }
+    setEditingAsig(asig);
+    setMotivoEdicion('');
+    setFormHeader({
+      numero_operacion: asig.numero_asignacion,
+      personal_id: String(asig.personal_id),
+      autorizado_por: asig.autorizado_por || '',
+      motivo: '',
+      fecha: String(asig.fecha || '').slice(0, 10),
+      observaciones: asig.observaciones || ''
+    });
+    setFormItems((asig.details || []).map((d: any) => ({
+      elemento_id: d.elemento_id,
+      nombre: d.elemento_nombre,
+      es_serializado: d.es_serializado,
+      cantidad: Number(d.cantidad),
+      serials: d.es_serializado ? (d.serials || []).filter(Boolean) : []
+    })));
+    setSelectedElementId('');
+    setSelectedElement(null);
+    setInputCantidad(1);
+    setAvailableStock(0);
+    setAvailableSerials([]);
+    setScannedSerials([]);
+    setShowModal(true);
+  };
+
+  // Anular (eliminación lógica): el servidor devuelve los elementos a bodega y conserva el registro
+  const handleConfirmAnular = async () => {
+    if (!anularTarget) return;
+    if (!motivoAnulacion.trim()) {
+      toast.error('Indique el motivo de la anulación.');
+      return;
+    }
+    setAnulando(true);
+    try {
+      const res = await api.anularGhAsignacion(anularTarget.id, motivoAnulacion.trim());
+      if (res.success) {
+        toast.success(`Asignación ${anularTarget.numero_asignacion} anulada. Los elementos volvieron a bodega.`);
+        setAnularTarget(null);
+        loadTabRecords();
+      } else {
+        toast.error(res.error || 'No se pudo anular la asignación.');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'No se pudo anular la asignación.', { duration: 8000 });
+    } finally {
+      setAnulando(false);
+    }
+  };
+
   // Open modal and initialize Header
   const handleOpenNewModal = () => {
+    setEditingAsig(null);
+    setMotivoEdicion('');
     const randomNum = Math.floor(10000 + Math.random() * 90000);
     setFormHeader({
       numero_operacion: activeTab === 'asignaciones' ? `ASIG-${randomNum}` : `DEV-${randomNum}`,
@@ -817,7 +942,25 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
 
     setIsSaving(true);
     try {
-      if (activeTab === 'asignaciones') {
+      if (activeTab === 'asignaciones' && editingAsig) {
+        const res = await api.updateGhAsignacion(editingAsig.id, {
+          personal_id: formHeader.personal_id,
+          autorizado_por: formHeader.autorizado_por.trim(),
+          fecha: formHeader.fecha,
+          observaciones: formHeader.observaciones,
+          items: formItems,
+          motivo: motivoEdicion.trim(),
+          usuario_control: user.name
+        });
+        if (res.success) {
+          toast.success(`Asignación ${editingAsig.numero_asignacion} actualizada. El inventario se ajustó automáticamente.`);
+          setShowModal(false);
+          setEditingAsig(null);
+          loadTabRecords();
+        } else {
+          toast.error(res.error || 'Error al editar la asignación.');
+        }
+      } else if (activeTab === 'asignaciones') {
         const payload = {
           numero_asignacion: formHeader.numero_operacion.trim().toUpperCase(),
           personal_id: formHeader.personal_id,
@@ -920,6 +1063,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       base['Registrado Por'] = r.usuario_control || '';
       base['Fecha Registro'] = r.fecha_control ? new Date(r.fecha_control).toLocaleString('es-CO') : '';
       base['Estado Firma'] = r.firma_estado || 'PENDIENTE';
+      if (r.numero_asignacion) base['Estado'] = r.estado || 'ACTIVA';
       base['Fecha Firma'] = r.fecha_firma ? new Date(r.fecha_firma).toLocaleDateString('es-CO') : '';
       base['Firmado Por'] = r.firmado_por || '';
       base['Elementos'] = r.details?.map((d: any) => `${d.elemento_nombre} x${d.cantidad}`).join('; ') || '';
@@ -1074,9 +1218,9 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                 )}
                 <div>
                   <h3 className="font-black text-lg tracking-tight uppercase">
-                    {activeTab === 'asignaciones' ? 'Nueva Asignación a Funcionario' : 'Nueva Devolución a Bodega'}
+                    {activeTab === 'asignaciones' ? (editingAsig ? 'Editar Asignación a Funcionario' : 'Nueva Asignación a Funcionario') : 'Nueva Devolución a Bodega'}
                   </h3>
-                  <p className="text-[11px] text-white/80 font-bold uppercase mt-0.5">Control de Inventario y Activos</p>
+                  <p className="text-[11px] text-white/80 font-bold uppercase mt-0.5">{editingAsig ? 'Firma pendiente · el inventario se ajusta automáticamente' : 'Control de Inventario y Activos'}</p>
                 </div>
               </div>
               <span className="bg-white/20 px-3.5 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider">
@@ -1087,6 +1231,22 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
             {/* Modal Body */}
             <div className="p-8 overflow-y-auto space-y-6 flex-1 max-h-[70vh] custom-scrollbar">
               
+              {editingAsig && (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 space-y-2">
+                  <p className="text-xs text-indigo-800 font-semibold">
+                    Al guardar, el sistema devuelve a bodega lo que tenía esta asignación y vuelve a entregar lo que quede en el detalle
+                    (incluidos los seriales). Si el colaborador ya devolvió algo de esta asignación, el cambio se bloquea para no descuadrar el inventario.
+                  </p>
+                  <input
+                    value={motivoEdicion}
+                    onChange={e => setMotivoEdicion(e.target.value)}
+                    placeholder="Motivo del cambio (queda en el historial)"
+                    aria-label="Motivo del cambio"
+                    className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-xl text-xs"
+                  />
+                </div>
+              )}
+
               {/* Header card form */}
               <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div>
@@ -1183,7 +1343,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                       onChange={handleElementChange}
                       options={
                         activeTab === 'asignaciones'
-                          ? elementosBodegaList.map(e => ({
+                          ? elementosBodegaOpciones.map(e => ({
                               value: e.id,
                               label: `${e.nombre} (Disponible: ${e.stock})${e.es_serializado ? ' - [SERIALIZADO]' : ''}`
                             }))
@@ -1402,7 +1562,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 size={14} /> Confirmar Movimiento
+                    <CheckCircle2 size={14} /> {editingAsig ? 'Guardar Cambios' : 'Confirmar Movimiento'}
                   </>
                 )}
               </button>
@@ -1537,7 +1697,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                   <p className="text-[11px] text-white/80 font-bold uppercase mt-0.5">#{viewDetail.id} - {viewDetail.numero_asignacion || viewDetail.numero_devolucion}</p>
                 </div>
               </div>
-              <button onClick={() => setViewDetail(null)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/30 text-white font-black text-sm transition-all">
+              <button onClick={() => { setViewDetail(null); setHistorial(null); }} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/20 hover:bg-white/30 text-white font-black text-sm transition-all">
                 ×
               </button>
             </div>
@@ -1577,6 +1737,55 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                   </table>
                 </div>
               </div>
+              {viewDetail.estado === 'ANULADA' && (
+                <div className="bg-slate-100 p-3.5 rounded-xl border border-slate-300 flex items-start gap-2">
+                  <Ban size={14} className="text-slate-500 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Anulada</div>
+                    <p className="text-xs text-slate-700 font-medium mt-0.5">
+                      {viewDetail.motivo_anulacion} · {viewDetail.anulada_por}{viewDetail.fecha_anulacion ? ` · ${new Date(viewDetail.fecha_anulacion).toLocaleString()}` : ''}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {viewDetail.numero_asignacion && (viewDetail.estado === 'ANULADA' || viewDetail.editada_por) && (
+                <div>
+                  {historial === null ? (
+                    <button
+                      onClick={async () => {
+                        try { const r = await api.getGhHistorialAsignacion(viewDetail.id); setHistorial(r.data || []); }
+                        catch { toast.error('No se pudo cargar el historial.'); }
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-[10px] font-black uppercase tracking-wider text-slate-600"
+                    >
+                      <History size={12} /> Ver historial de cambios
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Historial de cambios</h4>
+                      {historial.length === 0 && <p className="text-xs text-slate-400">Sin cambios registrados.</p>}
+                      {historial.map((h: any) => (
+                        <div key={h.id} className="bg-white border border-slate-200 rounded-xl p-3 text-xs">
+                          <div className="flex justify-between gap-2 font-bold text-slate-700">
+                            <span>{h.accion === 'ANULACION' ? 'Anulación' : 'Edición'} · {h.usuario}</span>
+                            <span className="text-slate-400 font-medium">{new Date(h.fecha).toLocaleString()}</span>
+                          </div>
+                          {h.motivo && <p className="text-slate-600 mt-1">Motivo: {h.motivo}</p>}
+                          <p className="text-slate-500 mt-1">
+                            Antes: {(h.datos_antes?.items || []).map((i: any) => `${i.nombre} ×${i.cantidad}`).join(', ') || '—'}
+                          </p>
+                          {h.datos_despues && (
+                            <p className="text-slate-500">
+                              Después: {(h.datos_despues.items || []).map((i: any) => `${i.nombre} ×${i.cantidad}`).join(', ') || '—'}
+                              {h.datos_antes?.personal_id !== h.datos_despues.personal_id ? ` · Funcionario: ${h.datos_antes?.personal_nombre} → ${h.datos_despues.personal_nombre}` : ''}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               {viewDetail.observaciones && (
                 <div className="bg-white p-3.5 rounded-xl border border-slate-200/60 flex items-start gap-2 shadow-sm">
                   <MessageSquare size={14} className="text-slate-400 shrink-0 mt-0.5" />
@@ -1586,6 +1795,41 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Anular asignación */}
+      {anularTarget && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-rose-100 rounded-xl flex items-center justify-center"><Trash2 size={18} className="text-rose-600" /></div>
+              <div>
+                <h3 className="font-black text-slate-900 uppercase text-sm">Anular asignación {anularTarget.numero_asignacion}</h3>
+                <p className="text-[11px] text-slate-500">{anularTarget.personal_nombre}</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-600">
+              Los elementos vuelven a bodega y los seriales quedan disponibles. El registro <b>no se borra</b>: queda como
+              anulado con su detalle e historial. Si el colaborador ya devolvió algo de esta asignación, la anulación se bloquea.
+            </p>
+            <textarea
+              value={motivoAnulacion}
+              onChange={e => setMotivoAnulacion(e.target.value)}
+              rows={3}
+              autoFocus
+              placeholder="Motivo de la anulación *"
+              aria-label="Motivo de la anulación"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm resize-none"
+            />
+            <div className="flex gap-2">
+              <button onClick={() => setAnularTarget(null)} className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-black uppercase text-slate-500">Cancelar</button>
+              <button onClick={handleConfirmAnular} disabled={anulando || !motivoAnulacion.trim()}
+                className="flex-[2] py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase disabled:opacity-40 flex items-center justify-center gap-2">
+                {anulando ? <RefreshCw size={13} className="animate-spin" /> : <Trash2 size={13} />} Anular
+              </button>
             </div>
           </div>
         </div>
