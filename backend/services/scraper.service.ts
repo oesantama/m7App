@@ -143,6 +143,28 @@ export const scrapeTransportandoReports = async (
         // Esperar a que la SPA (Vue) se monte e inicialice completamente
         await new Promise(r => setTimeout(r, 4000));
 
+        // Transportando puede mostrar un modal obligatorio (p. ej. "Aceptación de términos y
+        // tratamiento de datos", vigente desde 29/10/2026) que tapa el formulario: el bot escribe
+        // las fechas pero no quedan y el informe sale vacío sin error. Aceptar términos legales en
+        // nombre de la empresa es decisión de una persona, así que el bot NO lo acepta: falla
+        // explícitamente para que el cron quede en ERROR y se vea en el panel.
+        const modalBloqueante = await page.evaluate(() => {
+            const dialogs = Array.from(document.querySelectorAll('.el-dialog, .el-overlay-dialog, [role="dialog"]'))
+                .filter(d => (d as HTMLElement).offsetParent !== null || getComputedStyle(d).display !== 'none');
+            const txt = dialogs.map(d => d.textContent || '').join(' ').toLowerCase();
+            if (txt.includes('términos') || txt.includes('terminos') || txt.includes('tratamiento de datos')) {
+                return 'Aceptación de términos y tratamiento de datos';
+            }
+            return null;
+        });
+        if (modalBloqueante) {
+            throw new Error(
+                `Transportando está pidiendo "${modalBloqueante}" antes de dejar usar los informes. ` +
+                `Una persona autorizada debe ingresar manualmente a tms.transportando.com.co con el usuario del bot, ` +
+                `aceptar los términos (indicando su cargo) y luego volver a ejecutar el cron.`
+            );
+        }
+
         // 3. CALCULAR LOS MESES/PERIODOS A CONSULTAR
         const currentDate = new Date();
         let monthsToQuery: PeriodoConsulta[];
@@ -346,6 +368,14 @@ export const scrapeTransportandoReports = async (
                 };
             });
             log(`RECORRIDO - Estado Formulario: Fecha Inicio = "${formValues.fechaInicio}", Fecha Fin = "${formValues.fechaFin}", Secuencia = "${formValues.secuencia}"`);
+
+            // Sin fechas en el formulario el informe sale vacío y parecería "sin datos": es un error.
+            if (!formValues.fechaInicio || !formValues.fechaFin || formValues.fechaInicio === 'No encontrado') {
+                throw new Error(
+                    `No se pudieron ingresar las fechas ${start} → ${end} en el formulario de Transportando ` +
+                    `(quedaron vacías). Puede haber un modal bloqueando la pantalla o el portal cambió.`
+                );
+            }
 
             log(`Fechas y opciones ingresadas. Solicitando generación del informe al servidor de Transportando...`);
 
