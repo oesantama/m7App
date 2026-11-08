@@ -1,0 +1,226 @@
+/**
+ * exito-openapi.service.ts
+ * Especificación Oficial OpenAPI 3.0.3 para el Onboarding Técnico con Grupo Éxito (Go Éxito v2.0 - Anexo A).
+ */
+
+export function buildExitoOpenApiSpec(baseUrl = 'https://orbitm7.m7apps.com') {
+  return {
+    openapi: '3.0.3',
+    info: {
+      title: 'OrbitM7 — API de Integración Paquetera Milla 7 para Go Éxito v2.0',
+      version: '2.0.0',
+      description:
+        'Especificación oficial de servicios REST B2B y Webhook de Tracking para la integración entre Grupo Éxito (Go Éxito v2.0) y Milla 7 Logistics (Operación Urbana / Misma Ciudad).',
+      contact: {
+        name: 'Arquitectura e Integraciones TI — Milla 7 Logistics',
+        email: 'directorti@millasiete.com',
+      },
+    },
+    servers: [
+      { url: `${baseUrl}`, description: 'Producción / Principal (HTTPS TLS 1.2+)' },
+      { url: 'http://localhost:8080', description: 'Desarrollo / Sandbox Local' },
+    ],
+    security: [{ ApiKeyAuth: [] }, { BearerAuth: [] }],
+    components: {
+      securitySchemes: {
+        ApiKeyAuth: {
+          type: 'apiKey',
+          in: 'header',
+          name: 'x-api-key',
+          description: 'Llave B2B por ambiente (PROD, QA, SANDBOX). Prohibido enviar en query string.',
+        },
+        BearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+      parameters: {
+        CorrelationIdHeader: {
+          name: 'x-correlation-id',
+          in: 'header',
+          required: true,
+          schema: { type: 'string', format: 'uuid' },
+          description: 'Identificador UUID v4 de correlación extremo a extremo (Sección 6.1).',
+        },
+        IdempotencyKeyHeader: {
+          name: 'Idempotency-Key',
+          in: 'header',
+          required: true,
+          schema: { type: 'string', example: 'idem-goexito-14123456789-03' },
+          description: 'Llave de idempotencia retenida por >= 24 horas para evitar duplicidad de guías/recogidas.',
+        },
+      },
+    },
+    paths: {
+      '/api/v1/guides': {
+        post: {
+          summary: '7.1 Creación de Guía y Generación de Rótulo PDF en Google Drive',
+          tags: ['Go Éxito B2B'],
+          parameters: [
+            { $ref: '#/components/parameters/CorrelationIdHeader' },
+            { $ref: '#/components/parameters/IdempotencyKeyHeader' },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                example: {
+                  header: {
+                    applicationId: 'GO_EXITO',
+                    transactionDate: '2026-11-04T10:25:13',
+                    transactionId: 'abcfed12-235325-2353252-4235235',
+                  },
+                  data: {
+                    conclusion: true,
+                    operationType: 'CREATE_GUIDE_REQUEST',
+                    resultType: 'OK',
+                    trace: '90889079025',
+                    traceType: 'OUT',
+                    transactionId: 'abcfed12-235325-2353252-4235235',
+                    data: {
+                      alto: '30',
+                      ancho: '25',
+                      largo: '40',
+                      peso: '2.5',
+                      peso_volumetrico: '0.03',
+                      cant_cajas: '1',
+                      valor_declarado: '185000',
+                      contenido: 'MERCANCIA GENERAL EXITO',
+                      numero_pedido: '14123456789-03',
+                      contenedor: 'E12345678-03-P-1',
+                      modalidad_pedido: 'FIRME',
+                      codigo_dependencia: '0054',
+                      centro_costos: '723364',
+                      generador: 'Exito.com',
+                      tipo_servicio: '0',
+                      sandbox: false,
+                      nombre_remitente: 'EXITO WOW ENVIGADO',
+                      nit_remitente: '890900608-9',
+                      direccion_remitente: 'CR 48 # 34B SUR 29',
+                      barrio_remitente: 'LAS VEGAS',
+                      ciudad_remitente: '05266000',
+                      departamento_remitente: 'ANTIOQUIA',
+                      telefono_remitente: '6043394000',
+                      celular_remitente: '3004112233',
+                      nombre_destinatario: 'PEDRO PEREZ',
+                      nit_destinatario: '1234567811',
+                      div_destinatario: '0',
+                      direccion_destinatario: 'CARRERA 43A # 14 - 50 APTO 402',
+                      barrio_destinatario: 'EL POBLADO',
+                      ciudad_destinatario: '05001000',
+                      departamento_destinatario: 'ANTIOQUIA',
+                      telefono_destinatario: '3001234567',
+                      celular_destinatario: '3001234567',
+                      correo_destinatario: 'cliente@correo.com',
+                      observaciones: 'Entregar en portería si no contesta',
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '201': { description: 'Guía y rótulo creados exitosamente' },
+            '200': { description: 'Respuesta idempotente (guía previamente creada)' },
+            '400': { description: 'JSON malformado' },
+            '401': { description: 'No autenticado o credencial en query string' },
+            '422': { description: 'Regla de negocio incumplida' },
+            '429': { description: 'Cuota de peticiones superada (incluye Retry-After)' },
+          },
+        },
+      },
+      '/api/v1/pickups': {
+        post: {
+          summary: '7.2 Solicitud de Recogida en Nodo Local (COLLECT_GUIDE)',
+          tags: ['Go Éxito B2B'],
+          parameters: [
+            { $ref: '#/components/parameters/CorrelationIdHeader' },
+            { $ref: '#/components/parameters/IdempotencyKeyHeader' },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                example: {
+                  header: {
+                    applicationId: 'GO_EXITO',
+                    transactionDate: '2026-11-04T11:00:00',
+                    transactionId: '9f8e7d6c-5b4a-3210-fedc-ba9876543210',
+                  },
+                  data: {
+                    operationType: 'COLLECT_GUIDE',
+                    transactionId: '9f8e7d6c-5b4a-3210-fedc-ba9876543210',
+                    data: {
+                      referencia: '90889079025',
+                      guiaInicial: '90889079025',
+                      fechaRecogida: '2026-11-04',
+                      ciudadOrigen: '05266000',
+                      ciudadDestino: '05001000',
+                      direccion: 'CR 48 # 34B SUR 29',
+                      direccionDestinatario: 'CARRERA 43A # 14 - 50',
+                      unidades: 1,
+                      valorDeclarado: 185000,
+                      datafono: false,
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { description: 'Recogida aceptada y programada' },
+          },
+        },
+      },
+      '/api/v1/guides/{guideNumber}/cancel': {
+        post: {
+          summary: '7.3 Anulación Idempotente de Guía',
+          tags: ['Go Éxito B2B'],
+          parameters: [
+            {
+              name: 'guideNumber',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+            },
+            { $ref: '#/components/parameters/CorrelationIdHeader' },
+            { $ref: '#/components/parameters/IdempotencyKeyHeader' },
+          ],
+          responses: {
+            '200': { description: 'Guía anulada (o previamente anulada)' },
+            '404': { description: 'Guía no existe' },
+            '409': { description: 'Guía no anulable en su estado actual (ya recogida o entregada)' },
+          },
+        },
+      },
+      '/api/v1/guides/{guideNumber}/label': {
+        get: {
+          summary: '7.1 Consulta / Reimpresión de Rótulo PDF (URL Google Drive + Base64)',
+          tags: ['Go Éxito B2B'],
+          parameters: [
+            { name: 'guideNumber', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': { description: 'Rótulo retornado con éxito' },
+            '404': { description: 'Guía no encontrada' },
+          },
+        },
+      },
+      '/api/v1/guides/{guideNumber}': {
+        get: {
+          summary: 'Consulta Síncrona de Estado Homologado, Historial y Evidencias en Google Drive',
+          tags: ['Go Éxito B2B'],
+          parameters: [
+            { name: 'guideNumber', in: 'path', required: true, schema: { type: 'string' } },
+          ],
+          responses: {
+            '200': { description: 'Estado actual y evidencias de la guía' },
+            '404': { description: 'Guía no encontrada' },
+          },
+        },
+      },
+    },
+  };
+}
+

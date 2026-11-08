@@ -50,7 +50,11 @@ export const ID_MAP: Record<string, string> = {
   'GRUPO_INTER_OPS': 'PAG-31',
   'ACTIVOS_GH': 'PAG-80',
   'MENSAJERIA_GH': 'PAG-81',
-  'MENSAJERIA_MENSAJERO': 'PAG-82'
+  'MENSAJERIA_MENSAJERO': 'PAG-82',
+  'EXITO_MENSAJERIA_INHOUSE': 'PAG-83',
+  'EXITO_MENSAJERIA_CONDUCTOR': 'PAG-84',
+  'EXITO_MENSAJERIA_RECEPCION': 'PAG-85',
+  'EXITO_MENSAJERIA_DESPACHO': 'PAG-86'
 };
 
 /**
@@ -64,6 +68,11 @@ export const hasPermission = (user: User | null | any, moduleName: string, actio
   // Los Super Administradores tienen acceso total
   const isSuper = user.roleId === 'ROL-01' || user.role_id === 'ROL-01' || user.email === 'directorti@millasiete.com';
   if (isSuper) return true;
+
+  // Conductores (ROL-03) siempre pueden ver la vista simplificada de Éxito Mensajería (PAG-84)
+  if ((user.roleId === 'ROL-03' || user.role_id === 'ROL-03') && (moduleName === 'PAG-84' || moduleName === 'EXITO_MENSAJERIA_CONDUCTOR')) {
+    return true;
+  }
 
   const pageId = ID_MAP[moduleName];
   

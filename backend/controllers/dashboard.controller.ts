@@ -262,8 +262,8 @@ export const getDemandPrediction = async (req: Request, res: Response) => {
 
 export const getGerenciaDashboard = async (req: Request, res: Response) => {
   try {
-    const from = String(req.query.dateFrom || new Date(Date.now() - 30*86400000).toISOString().slice(0,10));
-    const to   = String(req.query.dateTo   || new Date().toISOString().slice(0,10));
+    const from = String(req.query.dateFrom || new Date(Date.now() - 30*86400000).toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' }));
+    const to   = String(req.query.dateTo   || new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' }));
     const toEnd = `${to} 23:59:59`;
 
     const [

@@ -103,8 +103,9 @@ export const saveVisitaPublic = async (req: Request, res: Response) => {
     try {
         let salidaVal: string | null = null;
         if (hora_salida) {
-            const fechaPart = (fecha_entrada ? new Date(fecha_entrada) : new Date()).toISOString().split('T')[0];
-            salidaVal = `${fechaPart}T${hora_salida}:00`;
+            const dRef = fecha_entrada ? new Date(fecha_entrada) : new Date();
+            const fechaPart = dRef.toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
+            salidaVal = `${fechaPart}T${hora_salida}:00-05:00`;
         }
 
         const result = await pool.query(`
@@ -142,13 +143,13 @@ export const marcarSalida = async (req: Request, res: Response) => {
             // Combinar la fecha de entrada con la hora indicada para mantener consistencia
             const entradaRes = await pool.query(`SELECT fecha_entrada FROM gh_visitas WHERE id = $1`, [id]);
             if (entradaRes.rows.length > 0) {
-                const fechaPart = new Date(entradaRes.rows[0].fecha_entrada).toISOString().split('T')[0];
-                salidaVal = `${fechaPart}T${hora}:00`;
+                const fechaPart = new Date(entradaRes.rows[0].fecha_entrada).toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
+                salidaVal = `${fechaPart}T${hora}:00-05:00`;
             }
         }
         await pool.query(
-            `UPDATE gh_visitas SET hora_salida = $1 WHERE id = $2`,
-            [salidaVal || new Date().toISOString(), id]
+            `UPDATE gh_visitas SET hora_salida = COALESCE($1::timestamptz, NOW()) WHERE id = $2`,
+            [salidaVal, id]
         );
         res.json({ success: true });
     } catch (err: any) {

@@ -8,6 +8,19 @@ types.setTypeParser(1082, (val: string) => val);
 // times stored in dogama tables are NOT shifted to UTC by the Node.js TZ offset.
 // Without this, TZ=America/Bogota causes '12:20:22' → 'T17:20:22Z' in JSON.
 types.setTypeParser(1114, (val: string) => val);
+// TIMESTAMP WITH TIME ZONE / TIMESTAMPTZ (OID 1184): PostgreSQL con SET TIME ZONE 'America/Bogota'
+// entrega 'YYYY-MM-DD HH:mm:ss.sss-05'. Si pg lo convierte a Date, JSON.stringify() llama a .toISOString()
+// y lo pasa a UTC (+5h), haciendo que registros creados después de las 7:00 PM en Colombia queden con
+// fecha del día siguiente ('...T01:xx:xxZ'). Lo normalizamos a ISO 8601 Colombia ('YYYY-MM-DDTHH:mm:ss-05:00').
+types.setTypeParser(1184, (val: string) => {
+  if (!val) return val;
+  // Ej: "2026-11-05 20:18:44.123456-05" -> "2026-11-05T20:18:44-05:00"
+  const m = String(val).match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:\.\d+)?([+-]\d{2})(?::?(\d{2}))?$/);
+  if (m) {
+    return `${m[1]}T${m[2]}${m[3]}:${m[4] || '00'}`;
+  }
+  return val;
+});
 
 dotenv.config();
 
@@ -28,6 +41,7 @@ const POOL_SIZE = process.env.NODE_ENV === 'production' ? 10 : 20;
 
 const pool = new Pool({
   connectionString,
+  options: '-c timezone=America/Bogota',
   max: POOL_SIZE,
   min: 2,
   idleTimeoutMillis: 30_000,

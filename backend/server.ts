@@ -185,7 +185,9 @@ app.use('/api', (req, res, next) => {
     '/it-activos/upload-json',
     '/it-activos/script/dl/',
     '/gh-perfiles-cargo-publico',
-    '/whatsapp/webhook'
+    '/whatsapp/webhook',
+    '/v1/guides',
+    '/v1/pickups'
   ];
   
   if (publicPaths.some(p => p === '/' ? req.path === '/' : req.path.startsWith(p))) {

@@ -57,6 +57,21 @@ export const formatDate = (date: Date | string | number | null | undefined, incl
 };
 
 /**
+ * Devuelve la fecha actual en formato YYYY-MM-DD en hora oficial de Colombia (America/Bogota, UTC-5).
+ * Evita que registros hechos después de las 7:00 PM queden con fecha del día siguiente por usar .toISOString().
+ */
+export const getTodayColombia = (date: Date = new Date()): string => {
+  return date.toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
+};
+
+/**
+ * Formatea una fecha/hora siempre en zona horaria oficial de Colombia (America/Bogota, UTC-5).
+ */
+export const formatColombiaDateTime = (date: Date | string | number | null | undefined): string => {
+  return formatDate(date, true);
+};
+
+/**
  * Normaliza strings para comparaciones y búsquedas (remover acentos, lower case).
  */
 export const normalizeString = (str: string): string => {

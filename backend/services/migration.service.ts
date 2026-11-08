@@ -1677,8 +1677,12 @@ export const restoreSystem = async () => {
       ('PAG-49', 'AUDITORÍA FACTURA',          'auditoria-factura',          'MOD-03', 'MOD-03', 'EST-01'),
 
       -- Operación Éxito (MOD-11)
-      ('PAG-46', 'VALIDACIÓN CONCILIACIONES', 'validacion-conciliaciones', 'MOD-11', 'MOD-11', 'EST-01'),
-      ('PAG-47', 'FLETES DE CONCILIACIÓN',    'fletes-conciliacion',        'MOD-11', 'MOD-11', 'EST-01'),
+      ('PAG-46', 'VALIDACIÓN CONCILIACIONES',          'validacion-conciliaciones',    'MOD-11', 'MOD-11', 'EST-01'),
+      ('PAG-47', 'FLETES DE CONCILIACIÓN',             'fletes-conciliacion',          'MOD-11', 'MOD-11', 'EST-01'),
+      ('PAG-83', 'ÉXITO MENSAJERÍA (INHOUSE)',         'exito-mensajeria-inhouse',     'MOD-11', 'MOD-11', 'EST-01'),
+      ('PAG-84', 'ÉXITO MENSAJERÍA (CONDUCTOR)',       'exito-mensajeria-conductor',   'MOD-11', 'MOD-11', 'EST-01'),
+      ('PAG-85', 'ÉXITO MENSAJERÍA (RECEPCIÓN ALMACÉN)','exito-mensajeria-recepcion',  'MOD-11', 'MOD-11', 'EST-01'),
+      ('PAG-86', 'ÉXITO MENSAJERÍA (DESPACHO REPARTO)','exito-mensajeria-despacho',    'MOD-11', 'MOD-11', 'EST-01'),
 
       -- Gestión Documentos Drive (MOD-10) — operaciones manuales flota
       ('PAG-62', 'OPERACIONES FLOTA MANUAL',  'operaciones-flota-manual',   'MOD-10', 'MOD-10', 'EST-01'),

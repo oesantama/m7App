@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 const TabPlanilla: React.FC<{ user?: any }> = ({ user }) => {
     const [clients, setClients]         = useState<any[]>([]);
     const [selectedClient, setSelectedClient] = useState('');
-    const [planDate, setPlanDate]       = useState(new Date().toISOString().split('T')[0]);
+    const [planDate, setPlanDate]       = useState(new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' }));
     const [routesList, setRoutesList]   = useState<any[]>([]);
     const [loadingRoutes, setLoadingRoutes] = useState(false);
     const [downloading, setDownloading] = useState<string | null>(null);

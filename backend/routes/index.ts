@@ -80,6 +80,7 @@ import whatsappWebhookRoutes from './whatsapp-webhook.routes.js';
 import dicorpLegalizacionRoutes from './dicorp-legalizacion.routes.js';
 import fulfillmentRoutes from './fulfillment.routes.js';
 import sondeosRoutes from './sondeos.routes.js';
+import exitoInternalRouter, { exitoB2BRouter } from './exito-mensajeria.routes.js';
 
 const router = Router();
 
@@ -164,6 +165,8 @@ router.use('/gh-perfiles-cargo-publico', ghPerfilesCargoPublicRoutes);
 router.use('/gh-perfiles-cargo', ghPerfilesCargoRoutes);
 router.use('/whatsapp/webhook', whatsappWebhookRoutes);
 router.use('/cybersecurity', cybersecurityRoutes);
+router.use('/v1', exitoB2BRouter);
+router.use('/exito-mensajeria', exitoInternalRouter);
 
 // Endpoint seguro: informa si la IA está configurada sin exponer la clave al cliente
 router.get('/config/gemini-key', authenticateToken, (req: any, res) => {

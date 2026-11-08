@@ -1594,8 +1594,8 @@ export const createApprovalBatch = async (req: Request, res: Response) => {
     try {
         await client.query('BEGIN');
 
-        // Generar código único: DEV-YYYY-MM-DD-NNN
-        const dateStr = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+        // Generar código único: DEV-YYYY-MM-DD-NNN (en hora oficial de Colombia)
+        const dateStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' }); // YYYY-MM-DD
         const countRes = await client.query(
             `SELECT COUNT(*) FROM return_approval_batches WHERE batch_code LIKE $1`,
             [`DEV-${dateStr}-%`]

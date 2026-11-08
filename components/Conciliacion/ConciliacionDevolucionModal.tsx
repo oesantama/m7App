@@ -56,7 +56,7 @@ const ConciliacionDevolucionModal: React.FC<Props> = ({
                 esDevolucion:   true,
                 valor:          Number(valor),
                 comprobante:    obs || 'DEVOLUCION',
-                fechaPago:      new Date().toISOString().slice(0, 10),
+                fechaPago:      new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' }),
                 formaPago:      'DEVOLUCION' as any,
                 conciliadoPor:  currentUserId,
                 vehiclePlate,

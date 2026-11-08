@@ -88,6 +88,10 @@ const ProvClientes = lazyWithRetry(() => import('./components/Configuracion/Prov
 const GestionDocumental = lazyWithRetry(() => import('./components/documents/GestionDocumental'));
 const ValidacionConciliaciones = lazyWithRetry(() => import('./components/OperacionExito/ValidacionConciliaciones'));
 const FletesConciliacion = lazyWithRetry(() => import('./components/OperacionExito/FletesConciliacion'));
+const ExitoMensajeriaInhouse = lazyWithRetry(() => import('./components/OperacionExito/ExitoMensajeriaInhouse'));
+const ExitoMensajeriaConductor = lazyWithRetry(() => import('./components/OperacionExito/ExitoMensajeriaConductor'));
+const ExitoMensajeriaRecepcion = lazyWithRetry(() => import('./components/OperacionExito/ExitoMensajeriaRecepcion'));
+const ExitoMensajeriaDespacho = lazyWithRetry(() => import('./components/OperacionExito/ExitoMensajeriaDespacho'));
 const InformeDashboardDrive = lazyWithRetry(() => import('./components/documents/InformeDashboardDrive'));
 const AuditoriaFactura = lazyWithRetry(() => import('./components/Logistics/AuditoriaFactura'));
 const InformesGerenciales = lazyWithRetry(() => import('./components/Logistics/InformesGerenciales'));
@@ -1205,6 +1209,30 @@ const App: React.FC = () => {
         return <ValidacionConciliaciones user={user!} />;
       case 'fletes-conciliacion':
         return <FletesConciliacion user={user!} />;
+      case 'exito-mensajeria-inhouse':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Torre de Control Éxito Mensajería...</div>}>
+            <ExitoMensajeriaInhouse user={user!} onNavigate={(tab) => setActiveTab(tab)} />
+          </React.Suspense>
+        );
+      case 'exito-mensajeria-conductor':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Modo Fácil Conductor...</div>}>
+            <ExitoMensajeriaConductor user={user!} />
+          </React.Suspense>
+        );
+      case 'exito-mensajeria-recepcion':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Recepción Almacén por Placa / Remisión...</div>}>
+            <ExitoMensajeriaRecepcion user={user!} onNavigate={(tab) => setActiveTab(tab)} />
+          </React.Suspense>
+        );
+      case 'exito-mensajeria-despacho':
+        return (
+          <React.Suspense fallback={<div className="p-10">Cargando Despacho Inteligente de Rutas...</div>}>
+            <ExitoMensajeriaDespacho user={user!} onNavigate={(tab) => setActiveTab(tab)} />
+          </React.Suspense>
+        );
       case 'formatos-transportes':
         return <FormatosTransportes />;
       case 'helpdesk':

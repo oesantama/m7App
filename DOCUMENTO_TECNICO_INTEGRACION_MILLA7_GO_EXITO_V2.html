@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang=es>
+<head>
+<meta charset=utf-8>
+<title>Documento Técnico de Integración - Milla 7 & Go Éxito</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 20mm 18mm 22mm 18mm;
+    @bottom-right {
+      content: counter(page) ' de ' counter(pages);
+      font-size: 8pt;
+      font-family: sans-serif;
+      color: #64748b;
+    }
+    @bottom-left {
+      content: 'Milla Siete S.A.S. · Confidencial Grupo Éxito';
+      font-size: 8pt;
+      font-family: sans-serif;
+      color: #64748b;
+    }
+  }
+
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+    color: #1e293b;
+    line-height: 1.55;
+    font-size: 9.5pt;
+    background: #fff;
+    margin: 0;
+    padding: 0;
+  }
+
+  .cover {
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 850px;
+    padding: 40px 10px;
+  }
+
+  .cover-header {
+    border-bottom: 4px solid #0284c7;
+    padding-bottom: 25px;
+  }
+
+  .badge-top {
+    display: inline-block;
+    background: #0f172a;
+    color: #38bdf8;
+    font-weight: 800;
+    font-size: 8.5pt;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    padding: 5px 12px;
+    border-radius: 6px;
+    margin-bottom: 15px;
+  }
+
+  .cover-title {
+    font-size: 26pt;
+    font-weight: 900;
+    color: #0f172a;
+    margin: 10px 0 5px 0;
+    letter-spacing: -0.5px;
+    line-height: 1.15;
+  }
+
+  .cover-subtitle {
+    font-size: 13pt;
+    font-weight: 600;
+    color: #0284c7;
+    margin: 0 0 20px 0;
+  }
+
+  .meta-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-left: 5px solid #0284c7;
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 40px 0;
+  }
+
+  .meta-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 9.5pt;
+  }
+  .meta-row:last-child { border-bottom: none; }
+  .meta-label { font-weight: 700; color: #475569; width: 40%; }
+  .meta-value { font-weight: 600; color: #0f172a; width: 60%; }
+
+  .cover-footer {
+    border-top: 1px solid #e2e8f0;
+    padding-top: 15px;
+    font-size: 8.5pt;
+    color: #64748b;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  h1 {
+    color: #0f172a;
+    font-size: 14pt;
+    font-weight: 800;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 6px;
+    margin-top: 24px;
+    margin-bottom: 12px;
+    page-break-after: avoid;
+  }
+
+  h2 {
+    color: #0369a1;
+    font-size: 11.5pt;
+    font-weight: 700;
+    margin-top: 18px;
+    margin-bottom: 8px;
+    page-break-after: avoid;
+  }
+
+  h3 {
+    color: #334155;
+    font-size: 10pt;
+    font-weight: 700;
+    margin-top: 14px;
+    margin-bottom: 6px;
+    page-break-after: avoid;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 16px 0;
+    font-size: 8.5pt;
+    page-break-inside: avoid;
+  }
+
+  th {
+    background: #0f172a;
+    color: #ffffff;
+    font-weight: 700;
+    text-align: left;
+    padding: 7px 10px;
+    border: 1px solid #0f172a;
+  }
+
+  td {
+    padding: 6px 10px;
+    border: 1px solid #cbd5e1;
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) td {
+    background: #f8fafc;
+  }
+
+  pre {
+    background: #0f172a;
+    color: #f8fafc;
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 7.5pt;
+    line-height: 1.4;
+    overflow-x: auto;
+    page-break-inside: avoid;
+    margin: 10px 0 14px 0;
+    border: 1px solid #1e293b;
+  }
+
+  code {
+    font-family: 'Consolas', monospace;
+    font-size: 8pt;
+    background: #f1f5f9;
+    color: #0369a1;
+    padding: 1px 4px;
+    border-radius: 4px;
+  }
+
+  pre code {
+    background: transparent;
+    color: inherit;
+    padding: 0;
+  }
+
+  .alert-box {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    padding: 10px 14px;
+    border-radius: 4px;
+    margin: 12px 0;
+    font-size: 9pt;
+  }
+
+  .status-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 7.5pt;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .status-active { background: #dcfce7; color: #166534; }
+  .status-omitted { background: #fee2e2; color: #991b1b; }
+
+  ul {
+    margin: 6px 0 12px 20px;
+    padding: 0;
+  }
+  li {
+    margin-bottom: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="cover-header">
+    <div class="badge-top">Entregables Anexo A · Integración B2B v2.0</div>
+    <div class="cover-title">DOCUMENTO TÉCNICO DE INTEGRACIÓN Y ACCESOS QA</div>
+    <div class="cover-subtitle">Plataforma OrbitM7 x Go Éxito (Grupo Éxito)</div>
+    <p style="color: #64748b; font-size: 10pt; margin-top: 5px;">
+      Especificación de Arquitectura, Homologación de Estados Urbana Misma Ciudad, Catálogo de Endpoints REST, Seguridad y Entorno de Pruebas Sandbox.
+    </p>
+  </div>
+
+  <div class="meta-box">
+    <div class="meta-row">
+      <div class="meta-label">Transportadora / Paquetera</div>
+      <div class="meta-value">Milla Siete S.A.S. (OrbitM7 v1.9.65)</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-label">Cliente Corporativo</div>
+      <div class="meta-value">Grupo Éxito — Ecosistema Go Éxito</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-label">Referencia Normativa</div>
+      <div class="meta-value">Lineamientos Técnicos para Paqueteras v2.0 (2026)</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-label">Modalidad Operativa Homologada</div>
+      <div class="meta-value">Urbana Misma Ciudad (Same-Day y Next-Day)</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-label">Zona Horaria Oficial</div>
+      <div class="meta-value">America/Bogota (UTC-5 / ISO 8601)</div>
+    </div>
+    <div class="meta-row">
+      <div class="meta-label">Estado de Homologación</div>
+      <div class="meta-value"><span class="status-badge status-active">Listo para Certificación QA</span></div>
+    </div>
+  </div>
+
+  <div class="cover-footer">
+    <div>Medellín, Colombia · Noviembre 2026</div>
+    <div>Documento Técnico Oficial · Versión 2.0</div>
+  </div>
+</div>
+
+<!-- CONTENIDO PRINCIPAL -->
+<h1>1. ARQUITECTURA Y ESTÁNDARES DE COMUNICACIÓN (SECCIÓN 3)</h1>
+<p>
+  Milla Siete S.A.S. ha implementado su conector con el ecosistema Go Éxito bajo los estándares técnicos vigentes estipulados en los Lineamientos Técnicos v2.0:
+</p>
+<table>
+  <thead>
+    <tr>
+      <th style="width: 30%;">Parámetro Técnico</th>
+      <th>Especificación Implementada en OrbitM7</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Protocolo</strong></td>
+      <td><code>HTTPS</code> obligatorio con <code>TLS 1.2+</code> (HSTS activo, cifrado en tránsito).</td>
+    </tr>
+    <tr>
+      <td><strong>Formato de Mensajes</strong></td>
+      <td><code>JSON</code> codificado en <code>UTF-8</code> (<code>Content-Type: application/json; charset=utf-8</code>).</td>
+    </tr>
+    <tr>
+      <td><strong>Versionamiento</strong></td>
+      <td>Ruta canónica bajo prefijo <code>/api/v1/...</code></td>
+    </tr>
+    <tr>
+      <td><strong>Estándar de Horarios</strong></td>
+      <td><strong>Hora Oficial de Colombia (<code>America/Bogota</code>, <code>UTC-5</code>)</strong> en formato <code>ISO 8601</code> con offset explícito (<code>YYYY-MM-DDTHH:mm:ss-05:00</code>) y fechas <code>YYYY-MM-DD</code>.</td>
+    </tr>
+    <tr>
+      <td><strong>Trazabilidad Distribuida</strong></td>
+      <td>Cabecera <code>x-correlation-id</code> (UUID v4) aceptada y propagada en cada respuesta técnica y webhook.</td>
+    </tr>
+    <tr>
+      <td><strong>Idempotencia</strong></td>
+      <td>Cabecera <code>Idempotency-Key</code> soportada en operaciones <code>POST</code> con ventana de retención de <strong>48 horas</strong> (&gt; 24h requeridas).</td>
+    </tr>
+    <tr>
+      <td><strong>Rótulos Térmicos PDF</strong></td>
+      <td><strong>Generación 100% On-Demand en memoria RAM</strong> (formato térmico <code>4x6"</code> con QR dinámico y Code-128 con zonas de silencio), retornando Base64 y URL directa con cero latencia de disco.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h1>2. SEGURIDAD, AUTENTICACIÓN Y PRIVACIDAD (SECCIÓN 4 Y 13)</h1>
+<ul>
+  <li><strong>Autenticación por Cabeceras Exclusivas:</strong> El acceso al API B2B de Milla Siete se realiza mediante la cabecera HTTP <code>x-api-key: &lt;API_KEY&gt;</code> o <code>Authorization: Bearer &lt;TOKEN&gt;</code>. Credenciales segregadas entre ambientes Sandbox/QA y Producción.</li>
+  <li><strong>Bloqueo de Credenciales en URL (Sección 4.2):</strong> Conforme a la política de seguridad estricta, cualquier petición que envíe parámetros sensibles en query string (<code>api_key</code>, <code>token</code>, <code>secret</code>) es rechazada con código <strong><code>HTTP 401 CREDENTIALS_IN_QUERY_FORBIDDEN</code></strong>.</li>
+  <li><strong>Protección de Datos Personales (PII / Ley 1581):</strong> Enmascaramiento preventivo de datos personales en logs del sistema (direcciones, teléfonos, documentos y correos quedan anonimizados en trazas técnicas).</li>
+</ul>
+
+<h1>3. HOMOLOGACIÓN DE ESTADOS — OPERACIÓN URBANA MISMA CIUDAD (SECCIÓN 5)</h1>
+<p>
+  Dado que Milla Siete opera recogiendo en las tiendas de Grupo Éxito y entregando directamente en la misma ciudad metropolitana (operación Same-Day / Next-Day sin tránsito troncal nacional), se homologaron los estados canónicos oficiales:
+</p>
+<table>
+  <thead>
+    <tr>
+      <th style="width: 12%;">Id Paquete</th>
+      <th style="width: 23%;">Estado Go Éxito</th>
+      <th style="width: 10%;">Id Guía</th>
+      <th style="width: 25%;">Estado Milla 7</th>
+      <th>Aplicación en Operación Misma Ciudad</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>2</strong></td>
+      <td>En espera de recogida</td>
+      <td><strong>1</strong></td>
+      <td>Guía generada</td>
+      <td><span class="status-badge status-active">ACTIVO</span> Al crear guía (<code>POST /api/v1/guides</code>).</td>
+    </tr>
+    <tr>
+      <td><strong>2</strong></td>
+      <td>Disponible</td>
+      <td><strong>1</strong></td>
+      <td>Guía generada</td>
+      <td><span class="status-badge status-active">ACTIVO</span> Al solicitar recogida (<code>POST /api/v1/pickups</code>).</td>
+    </tr>
+    <tr>
+      <td><strong>3</strong></td>
+      <td>En transporte</td>
+      <td><strong>2</strong></td>
+      <td>En ciudad origen</td>
+      <td><span class="status-badge status-active">ACTIVO</span> Al completar checkout de recogida física en tienda.</td>
+    </tr>
+    <tr>
+      <td><em>3</em></td>
+      <td><em>(En transporte)</em></td>
+      <td><em>3</em></td>
+      <td><em>(En transporte nacional)</em></td>
+      <td><span class="status-badge status-omitted">NO APLICA</span> Omitido por ser operación local misma ciudad.</td>
+    </tr>
+    <tr>
+      <td><em>3</em></td>
+      <td><em>(En transporte)</em></td>
+      <td><em>4</em></td>
+      <td><em>(En ciudad destino)</em></td>
+      <td><span class="status-badge status-omitted">NO APLICA</span> Omitido por ser operación local misma ciudad.</td>
+    </tr>
+    <tr>
+      <td><strong>3</strong></td>
+      <td>En transporte</td>
+      <td><strong>5</strong></td>
+      <td>En reparto</td>
+      <td><span class="status-badge status-active">ACTIVO</span> Al salir el vehículo a ruta urbana de última milla.</td>
+    </tr>
+    <tr>
+      <td><strong>4</strong></td>
+      <td>Entregado</td>
+      <td><strong>6</strong></td>
+      <td>Entregado</td>
+      <td><span class="status-badge status-active">ACTIVO</span> Entrega con foto y firma digital del cliente.</td>
+    </tr>
+    <tr>
+      <td><strong>6</strong></td>
+      <td>Cancelado</td>
+      <td><strong>7</strong></td>
+      <td>Cancelado</td>
+      <td><span class="status-badge status-active">ACTIVO</span> Anulación previa a recogida física en tienda.</td>
+    </tr>
+    <tr>
+      <td><strong>8</strong></td>
+      <td>Devolución</td>
+      <td><strong>9</strong></td>
+      <td>Devolución</td>
+      <td><span class="status-badge status-active">ACTIVO</span> Rechazo o agotamiento de 3 intentos de entrega.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h1>4. ESPECIFICACIÓN DE ENDPOINTS B2B REST (SECCIONES 6 Y 7)</h1>
+
+<h2>4.1. Creación de Guía y Rótulo (POST /api/v1/guides)</h2>
+<p>
+  SLA: <code>p95 &lt;= 800 ms</code>. Compatible con el contrato canónico v2.0 y el payload legacy <code>CREATE_GUIDE_REQUEST</code>.
+</p>
+<pre>POST /api/v1/guides HTTP/1.1
+Host: apiapps.m7apps.com
+Content-Type: application/json; charset=utf-8
+x-api-key: m7-exito-sandbox-key-2026
+x-correlation-id: e377600a-64e0-4d8a-be30-4272521647eb
+Idempotency-Key: idemp-77382-9901-2026
+
+{
+  "CREATE_GUIDE_REQUEST": {
+    "header": {
+      "transactionId": "e377600a-64e0-4d8a-be30-4272521647eb",
+      "applicationId": "GoExito"
+    },
+    "data": {
+      "pedido": "1412345678-01",
+      "contenedor": "E123456-01-P-1",
+      "modalidad_pedido": "FIRME",
+      "tipo_servicio": "1",
+      "codigo_dependencia": "0054",
+      "nombre_remitente": "ÉXITO WOW ENVIGADO",
+      "nit_remitente": "890900608-9",
+      "direccion_remitente": "CR 48 # 34B SUR 29",
+      "ciudad_remitente": "05266000",
+      "nombre_destinatario": "MARIA FERNANDA GOMEZ",
+      "nit_destinatario": "1037654321",
+      "direccion_destinatario": "CL 37 SUR # 43A - 52 APTO 402",
+      "barrio_destinatario": "EL DORADO",
+      "ciudad_destinatario": "05266000",
+      "celular_destinatario": "3001234567",
+      "cant_cajas": "1",
+      "peso": "2.5",
+      "alto": "25",
+      "ancho": "20",
+      "largo": "30",
+      "valor_declarado": "185000",
+      "contenido": "MERCANCIA GENERAL EXITO"
+    }
+  }
+}</pre>
+
+<p><strong>Respuesta Exitosa (HTTP 201 Created):</strong></p>
+<pre>{
+  "transactionId": "e377600a-64e0-4d8a-be30-4272521647eb",
+  "timestamp": "2026-11-06T10:30:00-05:00",
+  "result": "OK",
+  "code": "GUIDE_CREATED",
+  "message": "Guía creada exitosamente. Rótulo PDF generado en memoria bajo demanda.",
+  "data": {
+    "guideNumber": "M7E-85012345678",
+    "orderNumber": "1412345678-01",
+    "container": "E123456-01-P-1",
+    "operationType": "SAME_DAY",
+    "status": "1",
+    "statusDescription": "Guía generada",
+    "label": {
+      "format": "PDF",
+      "url": "/api/exito-mensajeria/guias/por-numero/M7E-85012345678/rotulo.pdf"
+    },
+    "PAQUETERA_CREATE_GUIDE_RESPONSE": {
+      "url_terceros": "/api/exito-mensajeria/guias/por-numero/M7E-85012345678/rotulo.pdf",
+      "pdf_guia": "found",
+      "referencia": "M7E-85012345678",
+      "codigo_remision": "REM-5850123-45678",
+      "id_remision": 101
+    },
+    "PAQUETERA_GET_LABELS_RESPONSE": {
+      "error": false,
+      "rotulos": "JVBERi0xLjcK..."
+    }
+  }
+}</pre>
+
+<h2>4.2. Reimpresión de Rótulo Térmico On-Demand (GET /api/v1/guides/{guideNumber}/label)</h2>
+<p>
+  Genera en tiempo real el PDF 4x6" con código de barras Code-128 con padding óptico y QR con metadatos. Retorna el PDF en binario (<code>?format=pdf</code>) o en Base64 (JSON estándar).
+</p>
+
+<h2>4.3. Solicitud de Recogida en Tienda (POST /api/v1/pickups)</h2>
+<p>
+  Compatible con <code>COLLECT_GUIDE</code>. Habilita los paquetes en la App Móvil de Milla Siete asignada a los nodos Éxito correspondientes.
+</p>
+
+<h2>4.4. Anulación Idempotente de Guía (POST /api/v1/guides/{guideNumber}/cancel)</h2>
+<p>
+  Anula guías en estado <code>1</code> (Guía generada / Disponible). Si ya fue recogida físicamente en tienda, responde <code>409 GUIDE_ALREADY_PICKED_UP</code> para proteger la custodia de la mercancía.
+</p>
+
+<h2>4.5. Notificación Saliente vía Webhook hacia Go Éxito (Sección 7.4 y 9)</h2>
+<p>
+  Milla Siete notifica en tiempo real cada avance de estado hacia el webhook provisto por Grupo Éxito con política de reintentos escalonados (0s, 1m, 2m, 5m, 15m, 30m... hasta 24h) y Circuit Breaker automático.
+</p>
+
+<h1>5. INFORMACIÓN DE ACCESO AL AMBIENTE DE QA / SANDBOX</h1>
+<table>
+  <thead>
+    <tr>
+      <th style="width: 32%;">Parámetro</th>
+      <th>Configuración Oficial Ambiente QA</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Base URL API QA</strong></td>
+      <td><code>https://apiapps.m7apps.com/api/v1</code></td>
+    </tr>
+    <tr>
+      <td><strong>Contrato OpenAPI 3.0.3</strong></td>
+      <td><code>https://apiapps.m7apps.com/api/exito-mensajeria/openapi.json</code> <em>(Adjunto en JSON)</em></td>
+    </tr>
+    <tr>
+      <td><strong>Cabecera de Autenticación QA</strong></td>
+      <td><code>x-api-key: m7-exito-sandbox-key-2026</code></td>
+    </tr>
+    <tr>
+      <td><strong>Cabecera de Ambiente</strong></td>
+      <td><code>x-exito-env: SANDBOX</code> <em>(o <code>QA</code>)</em></td>
+    </tr>
+    <tr>
+      <td><strong>Cabecera de Trazabilidad</strong></td>
+      <td><code>x-correlation-id: &lt;UUID-v4&gt;</code></td>
+    </tr>
+    <tr>
+      <td><strong>Cabecera de Idempotencia</strong></td>
+      <td><code>Idempotency-Key: &lt;UUID-v4&gt;</code></td>
+    </tr>
+    <tr>
+      <td><strong>Carpeta Evidencias en Drive</strong></td>
+      <td><code>exito_fulfillment/Sandbox/</code></td>
+    </tr>
+    <tr>
+      <td><strong>Endpoints Habilitados QA</strong></td>
+      <td>
+        • <code>POST /api/v1/guides</code> (Creación)<br>
+        • <code>GET /api/v1/guides/{guideNumber}/label</code> (Rótulo Térmico)<br>
+        • <code>POST /api/v1/pickups</code> (Recogida Tienda)<br>
+        • <code>POST /api/v1/guides/{guideNumber}/cancel</code> (Anulación)<br>
+        • <code>GET /api/v1/guides/{guideNumber}</code> (Trazabilidad)
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="alert-box">
+  <strong>Nota de Seguridad:</strong> Este ambiente Sandbox procesa datos simulados y no dispara operaciones físicas de entrega real en las tiendas de Grupo Éxito. Todos los registros y rótulos generados quedan aislados bajo la etiqueta <code>is_sandbox = TRUE</code>.
+</div>
+
+</body>
+</html>

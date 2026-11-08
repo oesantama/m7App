@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
       server: {
         proxy: {
           '/api': {
-            target: 'http://localhost:8080',
+            target: env.VITE_PROXY_TARGET || 'http://backend-podman:8080',
             changeOrigin: true,
             secure: false
           }

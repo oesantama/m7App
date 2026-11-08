@@ -623,8 +623,8 @@ const DailyDiscriminadoCard = ({
 };
 
 export default function InformesFlota({ user: _user }: Props) {
-  const today = new Date().toISOString().slice(0, 10);
-  const firstOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Bogota' });
+  const firstOfMonth = `${today.slice(0, 7)}-01`;
 
   const [from, setFrom] = useState(firstOfMonth);
   const [to, setTo] = useState(today);

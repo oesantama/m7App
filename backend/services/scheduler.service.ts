@@ -2,9 +2,11 @@ import cron from 'node-cron';
 import v8 from 'v8';
 import pool from '../config/database.js';
 import { syncDriveCumplidos } from './drive-gemini.service.js';
+import { runTransportandoPendientes } from './transportando-pendientes.service.js';
 import { scrapeTransportandoReports } from './scraper.service.js';
 import { whatsappCronRunner } from './whatsapp-cron.service.js';
 import { runDailyHealthReport } from './health-report.service.js';
+import { ExitoSyncService } from './exito-sync.service.js';
 
 /**
  * Retrocede N días hábiles (lunes-viernes) desde una fecha dada.
@@ -98,6 +100,15 @@ export const initScheduler = () => {
         console.warn('[WA-CRON] loadAndSchedule falló en arranque:', err.message)
     );
 
+    // Cola Durable y DLQ de Tracking Go Éxito v2.0 (reintentos 1m, 2m, 5m, 15m, 30m hasta 24h)
+    cron.schedule('* * * * *', async () => {
+        try {
+            await ExitoSyncService.processPendingQueueBatch();
+        } catch (err: any) {
+            console.warn('[EXITO-SYNC-CRON] Error procesando cola de tracking:', err.message);
+        }
+    }, { timezone: 'America/Bogota' });
+
     if (process.env.NODE_ENV !== 'production') {
         console.log('[M7-SCHEDULER] Entorno no es de producción (NODE_ENV no es production). Cron jobs desactivados.');
         return;
@@ -180,6 +191,17 @@ export const initScheduler = () => {
         });
     }, { timezone: 'America/Bogota' });
     console.log('[M7-SCHEDULER] Tarea "Importación Transportando (2da pasada)" programada: Diariamente 07:00 AM');
+
+    // Pendientes de Transportando por la noche: solo los meses que aún tienen información
+    // pendiente (agrupados por mes, del más reciente al más antiguo). Dividido en dos horarios
+    // para no cruzar sesiones en el portal: 7 PM manifiestos, 8 PM recaudos → egresos.
+    cron.schedule('0 19 * * *', async () => {
+        await executeWithCronLog('Transportando_Pendientes_Manifiestos', () => runTransportandoPendientes(['manifiestos']));
+    }, { timezone: 'America/Bogota' });
+    cron.schedule('0 20 * * *', async () => {
+        await executeWithCronLog('Transportando_Pendientes_Recaudos_Egresos', () => runTransportandoPendientes(['recaudos', 'egresos']));
+    }, { timezone: 'America/Bogota' });
+    console.log('[M7-SCHEDULER] Tareas "Transportando Pendientes" programadas: 07:00 PM (manifiestos) y 08:00 PM (recaudos → egresos)');
 
     // Validación de Novedades no subidas a Drive: Todos los días a las 11:00 AM
     cron.schedule('0 11 * * *', async () => {
@@ -290,6 +312,10 @@ export const manualRunTransportandoRecaudosScrape = async (): Promise<string[]> 
 export const manualRunTransportandoEgresosScrape = async (): Promise<string[]> => {
     return await scrapeTransportandoReports('egresos');
 };
+
+// Ejecución manual de pendientes: manifiestos → recaudos → egresos, solo meses con pendientes
+export const manualRunTransportandoPendientes = async (): Promise<string[]> =>
+    runTransportandoPendientes(['manifiestos', 'recaudos', 'egresos']);
 
 export const manualRunTransportandoPreoperacionalScrape = async (): Promise<string[]> => {
     return await scrapeTransportandoReports('preoperacional');

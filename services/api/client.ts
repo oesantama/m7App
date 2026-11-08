@@ -24,7 +24,9 @@ export const fetchJson = async (url: string, options?: any) => {
     // Búsqueda exhaustiva del token en múltiples llaves
     const token = getStoredToken();
 
-    if (!token && import.meta.env.DEV) {
+    const debugApi = import.meta.env.DEV && localStorage.getItem('m7_debug_api') === 'true';
+
+    if (!token && debugApi) {
       console.error('[API-TOKEN-DIAGNOSTIC] ❌ Token no encontrado. Contenido de localStorage:');
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -34,13 +36,13 @@ export const fetchJson = async (url: string, options?: any) => {
 
     const customHeaders: any = { ...options?.headers };
     if (token) {
-      if (import.meta.env.DEV) {
+      if (debugApi) {
         console.log('%c [API-AUTH-DIAGNOSTIC] 🔑 TOKEN ENCONTRADO', 'background: #059669; color: white; padding: 4px; border-radius: 4px;');
         console.table({ token_preview: token.substring(0, 30) + '...', length: token.length });
       }
       localStorage.setItem('token', token);
       customHeaders['Authorization'] = `Bearer ${token.trim()}`;
-    } else if (import.meta.env.DEV) {
+    } else if (debugApi) {
       console.error('%c [API-AUTH-DIAGNOSTIC] ❌ NO HAY TOKEN DISPONIBLE EN LOCALSTORAGE', 'background: #dc2626; color: white; padding: 4px; border-radius: 4px;');
     }
 
@@ -57,7 +59,7 @@ export const fetchJson = async (url: string, options?: any) => {
       cache: 'no-cache' as RequestCache
     };
 
-    if (import.meta.env.DEV) {
+    if (debugApi) {
       console.log(`[API-DEBUG] Petición: ${options?.method || 'GET'} ${url}`);
       console.log(`[API-DEBUG] Headers Finales:`, fetchOptions.headers);
     }
