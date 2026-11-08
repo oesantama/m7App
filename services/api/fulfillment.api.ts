@@ -75,11 +75,13 @@ export const fulfillmentApi = {
     window.URL.revokeObjectURL(url);
   },
 
-  importFulfillmentXlsx: async (file: File, cliente_id: number) => {
+  /** preview=true solo valida y devuelve el resumen de lo que se importaría (no guarda nada). */
+  importFulfillmentXlsx: async (file: File, cliente_id: number, preview = false) => {
     const token = getStoredToken();
     const formData = new FormData();
     formData.append('file', file);
     formData.append('cliente_id', String(cliente_id));
+    if (preview) formData.append('preview', 'true');
     const res = await fetch(`${API_URL}/fulfillment/importar`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },

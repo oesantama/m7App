@@ -755,11 +755,61 @@ function excelDateToISO(v: any): string | null {
   const d = new Date(String(v));
   return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
 }
+/**
+ * Purifica un valor monetario/numérico que llega como texto: quita símbolos y letras de moneda
+ * ($, US$, COP, USD, €…) y espacios, y deja solo el número. Reconoce 1.234.567,89 (Colombia)
+ * y 1,234,567.89 (EE. UU.):
+ *  - Con punto y coma, el que aparece de último es el decimal.
+ *  - Un solo tipo de separador repetido (1.234.567) es de miles.
+ *  - Una sola vez seguido de exactamente 3 dígitos (1.234 / 25,000) es de miles, salvo parte
+ *    entera 0 (0.125); con 1–2 dígitos después (12,5 / 3.75) es decimal.
+ *  - (1.234) o 1.234- son negativos (formato contable).
+ * Devuelve null si el texto no contiene ningún número.
+ */
+export function parseNumeroLimpio(v: any): number | null {
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'number') return isFinite(v) ? v : null;
+  let s = String(v).trim();
+  if (!s) return null;
+  let negativo = /^\(.*\)$/.test(s) || /-\s*$/.test(s);
+  s = s.replace(/[^\d.,-]/g, '');
+  if (s.startsWith('-')) negativo = true;
+  s = s.replace(/-/g, '').replace(/^[.,]+|[.,]+$/g, '');
+  if (!/\d/.test(s)) return null;
+
+  const ultPunto = s.lastIndexOf('.');
+  const ultComa = s.lastIndexOf(',');
+  let entero = s, decimales = '';
+  if (ultPunto >= 0 && ultComa >= 0) {
+    const i = Math.max(ultPunto, ultComa);
+    entero = s.slice(0, i); decimales = s.slice(i + 1);
+  } else if (ultPunto >= 0 || ultComa >= 0) {
+    const partes = s.split(ultPunto >= 0 ? '.' : ',');
+    const ultima = partes[partes.length - 1];
+    const esMiles = partes.length > 2 || (ultima.length === 3 && partes[0] !== '0');
+    if (!esMiles) { entero = partes.slice(0, -1).join(''); decimales = ultima; }
+  }
+  const n = parseFloat(`${entero.replace(/[.,]/g, '') || '0'}.${decimales || '0'}`);
+  if (isNaN(n)) return null;
+  return negativo ? -n : n;
+}
+
 function toNum(v: any): number {
-  if (v === null || v === undefined || v === '') return 0;
-  if (typeof v === 'number') return v;
-  const n = parseFloat(String(v).replace(/,/g, ''));
-  return isNaN(n) ? 0 : n;
+  return parseNumeroLimpio(v) ?? 0;
+}
+
+/** Lo que se purificó o no se pudo leer al procesar el archivo (para la vista previa). */
+interface NumStats { purificados: number; invalidos: number; ejemplos: { original: string; valor: number | null }[] }
+const nuevoNumStats = (): NumStats => ({ purificados: 0, invalidos: 0, ejemplos: [] });
+function numConStats(v: any, st?: NumStats): number {
+  if (!st || typeof v === 'number' || v === null || v === undefined || String(v).trim() === '') return toNum(v);
+  const txt = String(v).trim();
+  const n = parseNumeroLimpio(txt);
+  const cambio = n === null || txt !== String(n);
+  if (n === null) st.invalidos++;
+  else if (cambio) st.purificados++;
+  if (cambio && st.ejemplos.length < 8 && !st.ejemplos.some(e => e.original === txt)) st.ejemplos.push({ original: txt, valor: n });
+  return n ?? 0;
 }
 function cellText(v: any): string { return v === null || v === undefined ? '' : String(v).trim(); }
 function normName(v: string): string { return v.toUpperCase().trim().replace(/\s+/g, ' '); }
@@ -812,17 +862,18 @@ interface ParsedLine {
 // encabezado — mantienen la MISMA convención posicional de columnas pero sin los rótulos de texto.
 // Se detecta el transportista por nombre conocido en cualquier celda de la fila (columna >= 6),
 // tomando la celda numérica inmediatamente anterior como su costo y la siguiente como seguimiento.
-function parseSheetRowsFallback(rows: any[][]): ParsedLine[] {
+function parseSheetRowsFallback(rows: any[][], st?: NumStats): ParsedLine[] {
+  const num = (v: any) => numConStats(v, st);
   const out: ParsedLine[] = [];
   for (const row of rows) {
     if (!row || !row.length) continue;
     const producto = cellText(row[1]);
     const descripcion = cellText(row[2]);
-    const monto = toNum(row[5]);
-    const cantidad = toNum(row[3]);
-    if (!producto && !descripcion && !monto && !cantidad) continue;
+    if (!producto && !descripcion && !toNum(row[5]) && !toNum(row[3])) continue;
     if (/^TOTAL MES$/i.test(descripcion) || /^TOTAL MES$/i.test(producto)) continue;
     if (/^(PRODUCTO|SERVICE|FECHA|DATE)/.test(normName(producto))) continue; // eco de un encabezado repetido
+    const monto = num(row[5]);
+    const cantidad = num(row[3]);
 
     let transportista: string | null = null, costoTransportista: number | null = null, seguimiento: string | null = null;
     for (let j = 6; j < row.length; j++) {
@@ -830,8 +881,8 @@ function parseSheetRowsFallback(rows: any[][]): ParsedLine[] {
       const m = t.match(CARRIER_TOKENS);
       if (m) {
         transportista = m[1].toUpperCase();
-        const prev = row[j - 1];
-        if (typeof prev === 'number' && prev > 0 && String(Math.round(prev)).length <= MAX_PLAUSIBLE_COST_DIGITS) costoTransportista = prev;
+        const prev = parseNumeroLimpio(row[j - 1]);
+        if (prev !== null && prev > 0 && String(Math.round(prev)).length <= MAX_PLAUSIBLE_COST_DIGITS) costoTransportista = prev;
         const next = cellText(row[j + 1]);
         if (next && !CARRIER_TOKENS.test(next)) seguimiento = next;
         break;
@@ -840,16 +891,17 @@ function parseSheetRowsFallback(rows: any[][]): ParsedLine[] {
     const fecha = excelDateToISO(row[0]);
     out.push({
       fecha, producto: producto || 'Sin clasificar', descripcion, orden: null,
-      cantidad, tarifa: toNum(row[4]), monto, costoTransportista, transportista, seguimiento,
+      cantidad, tarifa: num(row[4]), monto, costoTransportista, transportista, seguimiento,
       compradoEn: null, destinatario: null,
     });
   }
   return out;
 }
 
-function parseSheetRows(rows: any[][]): ParsedLine[] {
+function parseSheetRows(rows: any[][], st?: NumStats): ParsedLine[] {
+  const num = (v: any) => numConStats(v, st);
   const headerIdx = findHeaderRow(rows);
-  if (headerIdx < 0) return parseSheetRowsFallback(rows);
+  if (headerIdx < 0) return parseSheetRowsFallback(rows, st);
   const header = rows[headerIdx].map(c => normName(cellText(c)));
 
   const cFecha = colIndexMatching(header, [/^(FECHA|DATE)$/]);
@@ -881,16 +933,16 @@ function parseSheetRows(rows: any[][]): ParsedLine[] {
     if (!row || !row.length) continue;
     const producto = cellText(row[cProducto]);
     const descripcion = cDescripcion >= 0 ? cellText(row[cDescripcion]) : '';
-    const monto = cMonto >= 0 ? toNum(row[cMonto]) : 0;
-    const cantidad = cCantidad >= 0 ? toNum(row[cCantidad]) : 0;
-    if (!producto && !descripcion && !monto && !cantidad) continue; // fila en blanco
+    if (!producto && !descripcion && !toNum(cMonto >= 0 ? row[cMonto] : 0) && !toNum(cCantidad >= 0 ? row[cCantidad] : 0)) continue; // fila en blanco
     if (/^(PRODUCTO|SERVICE|FECHA|DATE)/.test(normName(producto))) continue; // eco de un encabezado repetido
+    const monto = cMonto >= 0 ? num(row[cMonto]) : 0;
+    const cantidad = cCantidad >= 0 ? num(row[cCantidad]) : 0;
 
     const transportistaRaw = cTransportista >= 0 ? cellText(row[cTransportista]) : '';
     const transportista = transportistaRaw && !COST_LABELS.test(normName(transportistaRaw)) ? transportistaRaw : null;
     const costeTarifaRaw = cCosteTarifa >= 0 ? row[cCosteTarifa] : null;
     const costoTransportista = costeTarifaRaw !== null && costeTarifaRaw !== '' && !COST_LABELS.test(normName(cellText(costeTarifaRaw)))
-      ? toNum(costeTarifaRaw) : null;
+      ? num(costeTarifaRaw) : null;
     const seguimientoRaw = cSeguimiento >= 0 ? cellText(row[cSeguimiento]) : '';
     const seguimiento = seguimientoRaw && !COST_LABELS.test(normName(seguimientoRaw)) ? seguimientoRaw : null;
     const compradoEnRaw = cCompradoEn >= 0 ? cellText(row[cCompradoEn]) : '';
@@ -903,7 +955,7 @@ function parseSheetRows(rows: any[][]): ParsedLine[] {
       producto: producto || 'Sin clasificar',
       descripcion,
       orden: cOrden >= 0 ? (cellText(row[cOrden]) || null) : null,
-      cantidad, tarifa: cTarifa >= 0 ? toNum(row[cTarifa]) : 0, monto,
+      cantidad, tarifa: cTarifa >= 0 ? num(row[cTarifa]) : 0, monto,
       costoTransportista, transportista, seguimiento, compradoEn, destinatario,
     });
   }
@@ -967,12 +1019,15 @@ export const importFulfillmentXlsx = async (req: Request, res: Response) => {
   if (!cliente_id) return res.status(400).json({ success: false, error: 'Debes indicar el cliente.' });
 
   const usuario = getUser(req);
+  // preview=true: solo valida y resume lo que se importaría, sin escribir nada en la base
+  const preview = String(req.body?.preview) === 'true';
   try {
     const cliRes = await pool.query(`SELECT * FROM fulfillment_clientes WHERE id = $1`, [cliente_id]);
     if (!cliRes.rows.length) return res.status(404).json({ success: false, error: 'Cliente no encontrado.' });
     const cliente = cliRes.rows[0];
 
     const wb = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: false });
+    if (preview) return res.json({ success: true, preview: await previsualizarLibro(wb, cliente) });
     const resumenHojas: any[] = [];
     let hojasImportadas = 0, lineasImportadas = 0;
     let hojaSinNombreValido = false, hojaSinDatosValidos = false;
@@ -1095,6 +1150,41 @@ export const importFulfillmentXlsx = async (req: Request, res: Response) => {
     res.status(500).json({ success: false, error: e.message });
   }
 };
+
+// Resumen de lo que haría la importación, hoja por hoja, sin tocar la base: período, líneas,
+// totales, si reemplaza un período ya registrado, valores purificados y hojas omitidas.
+async function previsualizarLibro(wb: XLSX.WorkBook, cliente: any) {
+  const hojas: any[] = [];
+  const omitidas: { hoja: string; motivo: string }[] = [];
+  const numeros = nuevoNumStats();
+  for (const sheetName of wb.SheetNames) {
+    if (SHEET_SKIP.test(sheetName)) { omitidas.push({ hoja: sheetName, motivo: 'Hoja de tarifas/cotización (no se importa)' }); continue; }
+    const parsed = parseSheetName(sheetName);
+    if (!parsed) { omitidas.push({ hoja: sheetName, motivo: 'El nombre no tiene el formato MES-AA o MES-AA-SUBTIPO' }); continue; }
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1, defval: '', raw: true }) as any[][];
+    const st = nuevoNumStats();
+    const lineas = parseSheetRows(rows, st);
+    if (!lineas.length) { omitidas.push({ hoja: sheetName, motivo: 'No se encontraron encabezados ni datos reconocibles' }); continue; }
+    numeros.purificados += st.purificados; numeros.invalidos += st.invalidos;
+    for (const e of st.ejemplos) if (numeros.ejemplos.length < 8 && !numeros.ejemplos.some(x => x.original === e.original)) numeros.ejemplos.push(e);
+
+    const existente = await pool.query(
+      `SELECT id, num_lineas, valor_total FROM fulfillment_registros WHERE cliente_id = $1 AND anio = $2 AND mes = $3 AND COALESCE(subtipo, '') = COALESCE($4, '')`,
+      [cliente.id, parsed.anio, parsed.mes, parsed.subtipo]
+    );
+    const valorTotal = lineas.reduce((s, l) => s + l.monto, 0);
+    const costoTotal = lineas.reduce((s, l) => s + (l.costoTransportista || 0), 0);
+    hojas.push({
+      hoja: sheetName, mes: parsed.mes, anio: parsed.anio, subtipo: parsed.subtipo,
+      lineas: lineas.length, valorTotal, costoTotal,
+      sinMonto: lineas.filter(l => !l.monto).length,
+      purificados: st.purificados, invalidos: st.invalidos,
+      reemplaza: existente.rows[0] ? { lineas: Number(existente.rows[0].num_lineas), valorTotal: Number(existente.rows[0].valor_total) } : null,
+      muestra: lineas.slice(0, 8),
+    });
+  }
+  return { cliente: { id: cliente.id, nombre: cliente.nombre, moneda: cliente.moneda }, hojas, omitidas, numeros };
+}
 
 // ══════════════════════════════ CONCILIACIÓN FULFILLMENT ══════════════════════════════
 

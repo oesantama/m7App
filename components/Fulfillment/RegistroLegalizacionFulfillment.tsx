@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
-import { Upload, Loader2, Trash2, DollarSign, TrendingUp, Package, Users, X, Search, Plus, FileDown, Pencil, Download } from 'lucide-react';
+import { Upload, Loader2, Trash2, DollarSign, TrendingUp, Package, Users, X, Search, Plus, FileDown, Pencil, Download, AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../services/api';
 import { User } from '../../types';
@@ -650,6 +650,9 @@ function RegistroTab({ clientes, user }: { clientes: Cliente[]; user: User }) {
   const [importCliente, setImportCliente] = useState('');
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
+  // Vista previa: lo que se importaría, validado por el servidor sin guardar nada
+  const [preview, setPreview] = useState<any | null>(null);
+  const [validando, setValidando] = useState(false);
   const [downloadingPlantilla, setDownloadingPlantilla] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -707,15 +710,33 @@ function RegistroTab({ clientes, user }: { clientes: Cliente[]; user: User }) {
     finally { setSavingEdit(false); }
   };
 
-  const handleImport = async () => {
+  const cerrarImport = () => { setShowImport(false); setImportFile(null); setImportCliente(''); setPreview(null); };
+
+  // Paso 1: validar el archivo y mostrar lo que se va a importar
+  const handleValidar = async () => {
     if (!importCliente) { toast.error(t('fulfillment:registro.clientLabel')); return; }
     if (!importFile) { toast.error(t('fulfillment:registro.selectFile')); return; }
+    setValidando(true);
+    try {
+      const res = await api.importFulfillmentXlsx(importFile, Number(importCliente), true);
+      if (!res.success) { toast.error(res.error || t('fulfillment:registro.toastImportError')); return; }
+      if (!res.preview.hojas.length) {
+        toast.error('El archivo no tiene hojas importables. Revise el detalle y la plantilla.');
+      }
+      setPreview(res.preview);
+    } catch (e: any) { toast.error(e.message || t('fulfillment:registro.toastImportError')); }
+    finally { setValidando(false); }
+  };
+
+  // Paso 2: el usuario está de acuerdo con la vista previa → importar
+  const handleImport = async () => {
+    if (!importCliente || !importFile || !preview) return;
     setImporting(true);
     try {
       const res = await api.importFulfillmentXlsx(importFile, Number(importCliente));
       if (res.success) {
         toast.success(t('fulfillment:registro.toastImportSuccess', { sheets: res.hojasImportadas, lines: res.lineasImportadas }));
-        setShowImport(false); setImportFile(null); setImportCliente('');
+        cerrarImport();
         loadAll();
       } else toast.error(res.error || t('fulfillment:registro.toastImportError'));
     } catch (e: any) { toast.error(e.message || t('fulfillment:registro.toastImportError')); }
@@ -834,15 +855,16 @@ function RegistroTab({ clientes, user }: { clientes: Cliente[]; user: User }) {
       {/* Modal Importar */}
       {showImport && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-6 py-4">
+          <div className={`bg-white rounded-3xl shadow-2xl w-full ${preview ? 'max-w-4xl' : 'max-w-lg'} max-h-[92vh] flex flex-col overflow-hidden`}>
+            <div className="bg-gradient-to-r from-teal-600 to-teal-500 px-6 py-4 shrink-0">
               <p className="text-xs font-black text-teal-200 uppercase tracking-widest mb-0.5">{t('fulfillment:registro.tabRegistro')}</p>
               <p className="text-lg font-black text-white">{t('fulfillment:registro.importExcel')}</p>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto">
+              {!preview && <>
               <div>
                 <label className={labelCls}>{t('fulfillment:registro.clientLabel')}</label>
-                <select className={inputCls} value={importCliente} onChange={e => setImportCliente(e.target.value)}>
+                <select className={inputCls} value={importCliente} disabled={!!preview} onChange={e => { setImportCliente(e.target.value); setPreview(null); }}>
                   <option value="">{t('common:actions.selectPlaceholder')}</option>
                   {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre} ({c.moneda})</option>)}
                 </select>
@@ -853,20 +875,38 @@ function RegistroTab({ clientes, user }: { clientes: Cliente[]; user: User }) {
                 {downloadingPlantilla ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />} {t('fulfillment:registro.downloadTemplate')}
               </button>
               <div>
-                <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={e => setImportFile(e.target.files?.[0] ?? null)} />
+                <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={e => { setImportFile(e.target.files?.[0] ?? null); setPreview(null); e.target.value = ''; }} />
                 <button onClick={() => fileRef.current?.click()}
                   className={`w-full py-3 rounded-2xl border-2 border-dashed text-sm font-semibold transition ${importFile ? 'border-teal-400 bg-teal-50 text-teal-700' : 'border-slate-300 text-slate-500 hover:border-teal-400 hover:text-teal-600'}`}>
                   {importFile ? `✓ ${importFile.name}` : t('fulfillment:registro.selectFile')}
                 </button>
               </div>
+              </>}
+              {preview && <VistaPreviaImport preview={preview} archivo={importFile?.name || ''} />}
             </div>
-            <div className="px-6 pb-6 flex gap-3">
-              <button onClick={() => { setShowImport(false); setImportFile(null); }} disabled={importing}
-                className="flex-1 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">{t('common:actions.cancel')}</button>
-              <button onClick={handleImport} disabled={importing || !importFile || !importCliente}
-                className="flex-1 py-2.5 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
-                {importing && <Loader2 className="w-4 h-4 animate-spin" />} {importing ? t('fulfillment:registro.importing') : t('fulfillment:registro.import')}
-              </button>
+            <div className="px-6 py-4 flex gap-3 border-t border-slate-100 shrink-0">
+              {!preview ? (
+                <>
+                  <button onClick={cerrarImport} disabled={validando}
+                    className="flex-1 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">{t('common:actions.cancel')}</button>
+                  <button onClick={handleValidar} disabled={validando || !importFile || !importCliente}
+                    className="flex-1 py-2.5 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                    {validando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />} {validando ? 'Validando…' : 'Validar archivo'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setPreview(null)} disabled={importing}
+                    className="flex-1 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">Volver</button>
+                  <button onClick={cerrarImport} disabled={importing}
+                    className="flex-1 py-2.5 rounded-2xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50">{t('common:actions.cancel')}</button>
+                  <button onClick={handleImport} disabled={importing || !preview.hojas.length}
+                    className="flex-[2] py-2.5 rounded-2xl bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2">
+                    {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                    {importing ? t('fulfillment:registro.importing') : `Confirmar importación (${preview.hojas.reduce((s: number, h: any) => s + h.lineas, 0)} líneas)`}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -898,6 +938,92 @@ function RegistroTab({ clientes, user }: { clientes: Cliente[]; user: User }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Vista previa de la importación (paso de confirmación) ───────────────────
+function VistaPreviaImport({ preview, archivo }: { preview: any; archivo: string }) {
+  const moneda = preview.cliente.moneda;
+  const totalLineas = preview.hojas.reduce((s: number, h: any) => s + h.lineas, 0);
+  const totalValor = preview.hojas.reduce((s: number, h: any) => s + h.valorTotal, 0);
+  const reemplazos = preview.hojas.filter((h: any) => h.reemplaza);
+  const n = preview.numeros;
+  const fmtNum = (v: number | null) => v === null ? 'sin número' : v.toLocaleString(moneda === 'USD' ? 'en-US' : 'es-CO', { maximumFractionDigits: 2 });
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3"><p className={labelCls}>Cliente</p><p className="text-sm font-black text-slate-800">{preview.cliente.nombre}</p><p className="text-[10px] text-slate-400 truncate" title={archivo}>{archivo}</p></div>
+        <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3"><p className={labelCls}>Hojas a importar</p><p className="text-xl font-black text-slate-800">{preview.hojas.length}</p></div>
+        <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3"><p className={labelCls}>Líneas</p><p className="text-xl font-black text-slate-800">{totalLineas}</p></div>
+        <div className="rounded-2xl bg-teal-50 border border-teal-200 p-3"><p className={labelCls}>Valor total</p><p className="text-xl font-black text-teal-800">{fmt(totalValor, moneda)}</p></div>
+      </div>
+
+      {reemplazos.length > 0 && (
+        <div className="flex gap-2 rounded-2xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900">
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div><b>{reemplazos.length} período(s) ya existen y su detalle será reemplazado:</b>{' '}
+            {reemplazos.map((h: any) => `${h.mes} ${h.anio}${h.subtipo ? ' · ' + h.subtipo : ''} (hoy ${h.reemplaza.lineas} líneas, ${fmt(h.reemplaza.valorTotal, moneda)})`).join('; ')}.
+          </div>
+        </div>
+      )}
+      {(n.purificados > 0 || n.invalidos > 0) && (
+        <div className={`rounded-2xl border p-3 text-xs ${n.invalidos ? 'bg-rose-50 border-rose-200 text-rose-900' : 'bg-sky-50 border-sky-200 text-sky-900'}`}>
+          <p className="font-bold mb-1">
+            {n.purificados > 0 && `${n.purificados} valor(es) traían símbolos o formato de texto y se limpiaron. `}
+            {n.invalidos > 0 && `${n.invalidos} valor(es) no tienen ningún número y quedarán en 0.`}
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {n.ejemplos.map((e: any) => (
+              <span key={e.original} className="px-2 py-0.5 bg-white/70 rounded-lg border border-current/10 font-mono">"{e.original}" → {fmtNum(e.valor)}</span>
+            ))}
+          </div>
+        </div>
+      )}
+      {preview.omitidas.length > 0 && (
+        <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600">
+          <p className="font-bold mb-1">Hojas que NO se importan:</p>
+          {preview.omitidas.map((o: any) => <p key={o.hoja}>• <b>{o.hoja}</b>: {o.motivo}</p>)}
+        </div>
+      )}
+
+      {preview.hojas.map((h: any) => (
+        <div key={h.hoja} className="rounded-2xl border border-slate-200 overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-slate-800 text-white">
+            <p className="text-xs font-black uppercase tracking-wider">{h.hoja} · {h.mes} {h.anio}{h.subtipo ? ` · ${h.subtipo}` : ''}</p>
+            <p className="text-[11px] font-bold">
+              {h.lineas} líneas · {fmt(h.valorTotal, moneda)} · Costo transp. {fmt(h.costoTotal, moneda)}
+              {h.reemplaza ? <span className="ml-2 px-1.5 py-0.5 rounded bg-amber-400 text-amber-950 text-[9px] font-black">REEMPLAZA</span> : <span className="ml-2 px-1.5 py-0.5 rounded bg-emerald-400 text-emerald-950 text-[9px] font-black">NUEVO</span>}
+            </p>
+          </div>
+          {h.sinMonto > 0 && <p className="px-4 py-1.5 text-[11px] bg-amber-50 text-amber-800 font-semibold">{h.sinMonto} línea(s) sin monto (quedan en 0).</p>}
+          <div className="overflow-x-auto">
+            <table className="w-full text-[11px]">
+              <thead className="bg-slate-50 text-slate-500 uppercase text-[9px] font-black tracking-wider">
+                <tr>{['Fecha', 'Producto', 'Descripción', 'Orden', 'Cant.', 'Tarifa', 'Monto', 'Costo transp.', 'Transportista', 'Seguimiento'].map(c => <th key={c} className="px-3 py-2 text-left whitespace-nowrap">{c}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {h.muestra.map((l: any, i: number) => (
+                  <tr key={i}>
+                    <td className="px-3 py-1.5 whitespace-nowrap">{l.fecha || '—'}</td>
+                    <td className="px-3 py-1.5">{l.producto}</td>
+                    <td className="px-3 py-1.5 max-w-[180px] truncate" title={l.descripcion}>{l.descripcion || '—'}</td>
+                    <td className="px-3 py-1.5">{l.orden || '—'}</td>
+                    <td className="px-3 py-1.5 text-right">{l.cantidad}</td>
+                    <td className="px-3 py-1.5 text-right whitespace-nowrap">{fmt(l.tarifa, moneda)}</td>
+                    <td className="px-3 py-1.5 text-right whitespace-nowrap font-bold">{fmt(l.monto, moneda)}</td>
+                    <td className="px-3 py-1.5 text-right whitespace-nowrap">{l.costoTransportista !== null ? fmt(l.costoTransportista, moneda) : '—'}</td>
+                    <td className="px-3 py-1.5">{l.transportista || '—'}</td>
+                    <td className="px-3 py-1.5">{l.seguimiento || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {h.lineas > h.muestra.length && <p className="px-4 py-1.5 text-[10px] text-slate-400">Mostrando {h.muestra.length} de {h.lineas} líneas.</p>}
+        </div>
+      ))}
+      <p className="text-[11px] text-slate-500">Revise la información. Si está de acuerdo, pulse <b>Confirmar importación</b>; si no, cancele y nada se guardará.</p>
     </div>
   );
 }
