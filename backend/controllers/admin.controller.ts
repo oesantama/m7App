@@ -425,6 +425,14 @@ export const runCron = async (req: any, res: Response) => {
                 });
                 logs = ["Iniciando importación unificada (manifiestos → recaudos → egresos) en segundo plano...", "Los 3 procesos corren en secuencia. Observa la terminal de logs."];
                 return res.json({ success: true, logs, isBackground: true });
+            case 'transportandoPendientes':
+                scheduler.manualRunTransportandoPendientes().then(() => {
+                    scraper.activeScraperLogs.push("[COMPLETADO] Consulta de pendientes (manifiestos → recaudos → egresos) finalizada.");
+                }).catch(err => {
+                    scraper.activeScraperLogs.push(`[ERROR CRÍTICO] Consulta de pendientes falló: ${err.message}`);
+                });
+                logs = ["Consultando en Transportando solo los meses con pendientes en segundo plano...", "Observa la terminal de logs."];
+                return res.json({ success: true, logs, isBackground: true });
             case 'transportandoScrape':
                 scheduler.manualRunTransportandoScrape().then(() => {
                     scraper.activeScraperLogs.push("[COMPLETADO] Scraping de manifiestos (General) finalizado.");

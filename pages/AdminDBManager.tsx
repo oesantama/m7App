@@ -958,7 +958,8 @@ const AdminDBManager: React.FC = () => {
                       <div className="border border-emerald-300 rounded p-4 flex flex-col gap-3 bg-emerald-50 hover:shadow-md transition-shadow">
                           <h4 className="font-bold text-slate-800">Importación Transportando (Unificada)</h4>
                           <p className="text-xs text-slate-500">Ejecuta en secuencia: manifiestos → recaudos → egresos → preoperacional. Garantiza no conflicto de sesión en el portal TMS.</p>
-                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: 02:00 AM (unificado) + 05:30 AM (preop) + 07:00 AM (2da pasada)</p>
+                          <p className="text-[10px] font-mono text-slate-400 mt-1">🕒 Auto: 02:00 AM (unificado, hoy → 7 meses atrás, de lo más reciente a lo más antiguo) + 05:30 AM (preop) + 07:00 AM (2da pasada)</p>
+                          <p className="text-[10px] font-mono text-emerald-700 font-bold">🌙 Pendientes: 07:00 PM manifiestos · 08:00 PM recaudos → egresos (solo meses con pendientes)</p>
                           <div className="mt-auto pt-2 flex flex-col gap-2">
                               <button
                                   onClick={() => handleRunCron('transportandoUnificado')}
@@ -966,6 +967,13 @@ const AdminDBManager: React.FC = () => {
                                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded text-sm font-bold shadow transition-colors disabled:opacity-50"
                               >
                                   {runningCrons['transportandoUnificado'] ? 'Ejecutando (4 procesos)...' : 'Ejecutar TODO Secuencial ▶▶'}
+                              </button>
+                              <button
+                                  onClick={() => handleRunCron('transportandoPendientes')}
+                                  disabled={runningCrons['transportandoPendientes']}
+                                  className="w-full bg-emerald-800 hover:bg-emerald-900 text-white py-1.5 rounded text-[11px] font-bold shadow transition-colors disabled:opacity-50"
+                              >
+                                  {runningCrons['transportandoPendientes'] ? 'Consultando pendientes...' : 'Solo meses pendientes 🌙'}
                               </button>
                               <div className="grid grid-cols-2 gap-1.5">
                                   <button

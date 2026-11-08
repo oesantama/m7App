@@ -15,12 +15,49 @@ if (!(globalThis as any).activeScraperLogs) {
 }
 export const activeScraperLogs: string[] = (globalThis as any).activeScraperLogs;
 
+export interface PeriodoConsulta { start: string; end: string }
+
+// Fecha local (YYYY-MM-DD) sin desfase UTC
+const fechaLocal = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 /**
- * Función para descargar el informe general de manifiestos mes a mes
- * desde el 1 de enero hasta la fecha actual.
+ * Periodos mes a mes desde hoy hasta `meses` meses atrás, del MÁS RECIENTE al más antiguo:
+ * mes actual (1 → hoy), meses completos anteriores y el mes más viejo desde el mismo día.
+ * Ej. hoy 05/11/2026 con 7 meses → 01/11–05/11, octubre, …, mayo, 05/04–30/04.
+ */
+export function periodosRecientes(hoy: Date = new Date(), meses = 7): PeriodoConsulta[] {
+    const inicio = new Date(hoy.getFullYear(), hoy.getMonth() - meses, hoy.getDate());
+    const out: PeriodoConsulta[] = [];
+    let cursor = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    let fin = hoy;
+    while (fin >= inicio) {
+        const desde = cursor < inicio ? inicio : cursor;
+        out.push({ start: fechaLocal(desde), end: fechaLocal(fin) });
+        fin = new Date(cursor.getFullYear(), cursor.getMonth(), 0); // último día del mes anterior
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1);
+    }
+    return out;
+}
+
+/** Meses 'YYYY-MM' → periodos completos (el mes en curso solo hasta hoy), del más reciente al más antiguo. */
+export function periodosDeMeses(meses: string[], hoy: Date = new Date()): PeriodoConsulta[] {
+    const hoyStr = fechaLocal(hoy);
+    return [...new Set(meses)].sort().reverse().map(m => {
+        const [y, mo] = m.split('-').map(Number);
+        const ultimo = fechaLocal(new Date(y, mo, 0));
+        return { start: `${m}-01`, end: ultimo > hoyStr ? hoyStr : ultimo };
+    }).filter(p => p.start <= hoyStr);
+}
+
+/**
+ * Descarga los informes de Transportando mes a mes. Por defecto consulta de hoy a 7 meses
+ * atrás empezando por lo más reciente; `periodos` permite consultar solo meses puntuales
+ * (p. ej. los que aún tienen pendientes, en el cron de la noche).
  */
 export const scrapeTransportandoReports = async (
-    reportType: 'manifiestos' | 'recaudos' | 'egresos' | 'preoperacional' = 'manifiestos'
+    reportType: 'manifiestos' | 'recaudos' | 'egresos' | 'preoperacional' = 'manifiestos',
+    periodos?: PeriodoConsulta[]
 ): Promise<string[]> => {
     const logs: string[] = [];
     activeScraperLogs.length = 0; // Clear previous logs
@@ -108,45 +145,20 @@ export const scrapeTransportandoReports = async (
 
         // 3. CALCULAR LOS MESES/PERIODOS A CONSULTAR
         const currentDate = new Date();
-        const currentYear = currentDate.getFullYear();
-        const currentMonth = currentDate.getMonth(); // 0 = Enero, 11 = Diciembre
+        let monthsToQuery: PeriodoConsulta[];
 
-        // Formatea fecha en hora local Colombia (YYYY-MM-DD) sin desfase UTC
-        const toLocalDateStr = (d: Date): string => {
-            const y = d.getFullYear();
-            const mo = String(d.getMonth() + 1).padStart(2, '0');
-            const dy = String(d.getDate()).padStart(2, '0');
-            return `${y}-${mo}-${dy}`;
-        };
-
-        const monthsToQuery: {start: string, end: string}[] = [];
-
-        if (reportType === 'preoperacional') {
+        if (periodos) {
+            monthsToQuery = periodos;
+        } else if (reportType === 'preoperacional') {
             // Para preoperacional, consultar ayer y hoy
             const ayer = new Date();
             ayer.setDate(ayer.getDate() - 1);
-            monthsToQuery.push({
-                start: toLocalDateStr(ayer),
-                end: toLocalDateStr(currentDate)
-            });
+            monthsToQuery = [{ start: fechaLocal(ayer), end: fechaLocal(currentDate) }];
         } else {
-            for (let m = 0; m <= currentMonth; m++) {
-                const firstDay = new Date(currentYear, m, 1);
-                let lastDay = new Date(currentYear, m + 1, 0); // Último día del mes
-
-                // Si es el mes actual, consultar hasta hoy
-                if (m === currentMonth) {
-                    lastDay = currentDate;
-                }
-
-                monthsToQuery.push({
-                    start: toLocalDateStr(firstDay),
-                    end: toLocalDateStr(lastDay),
-                });
-            }
+            monthsToQuery = periodosRecientes(currentDate, 7);
         }
 
-        log(`Se realizarán ${monthsToQuery.length} consultas por mes.`);
+        log(`Se realizarán ${monthsToQuery.length} consultas por mes (de lo más reciente a lo más antiguo): ${monthsToQuery.map(p => `${p.start}→${p.end}`).join(', ')}`);
 
         // Función para esperar un archivo en la carpeta de descargas
         const waitForDownload = async (downloadDir: string, timeout = 60000): Promise<string> => {
