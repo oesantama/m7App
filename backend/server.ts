@@ -254,18 +254,22 @@ app.listen(PORT, () => {
     return;
   }
 
-  // Inicializar scheduler SÓLO en el leader worker
-  initScheduler();
+  if (process.env.DISABLE_CRON === 'true') {
+    console.log('[ORBIT-BOOT] CRONs y Schedulers DESHABILITADOS por configuración (DISABLE_CRON=true). Entorno de pruebas limpio.');
+  } else {
+    // Inicializar scheduler SÓLO en el leader worker
+    initScheduler();
 
-  // Mensajería GH: cola de subida a Drive + alertas de envíos atrasados
-  import('./services/gh-mensajeria-alertas.service.js').then(m => m.startMensajeriaCron()).catch(e =>
-    console.warn('[ORBIT-BOOT] Cron mensajería GH no iniciado:', e.message)
-  );
+    // Mensajería GH: cola de subida a Drive + alertas de envíos atrasados
+    import('./services/gh-mensajeria-alertas.service.js').then(m => m.startMensajeriaCron()).catch(e =>
+      console.warn('[ORBIT-BOOT] Cron mensajería GH no iniciado:', e.message)
+    );
 
-  // Cron de alertas de vencimiento de documentos HV
-  import('./services/hv-alertas.service.js').then(m => m.startAlertasCron()).catch(e =>
-    console.warn('[ORBIT-BOOT] HV alertas cron no iniciado:', e.message)
-  );
+    // Cron de alertas de vencimiento de documentos HV
+    import('./services/hv-alertas.service.js').then(m => m.startAlertasCron()).catch(e =>
+      console.warn('[ORBIT-BOOT] HV alertas cron no iniciado:', e.message)
+    );
+  }
 
   // FLUJO DE ARRANQUE CRÍTICO M7 — solo Worker 1 (o modo standalone en dev)
   console.log('[ORBIT-BOOT] Iniciando secuencia de servicios y verificación de migraciones...');
