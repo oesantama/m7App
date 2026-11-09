@@ -928,6 +928,155 @@ export async function cancelGuideB2B(req: ExitoApiRequest, res: Response) {
 }
 
 /**
+ * 7.5 Actualización de datos de entrega de Guía (PATCH / PUT /api/v1/guides/:guideNumber)
+ */
+export async function updateGuideB2B(req: ExitoApiRequest, res: Response) {
+  const start = Date.now();
+  const correlationId = req.correlationId || randomUUID();
+  const ambiente = req.exitoAmbiente || 'PROD';
+  const isSandbox = Boolean(req.isExitoSandbox);
+
+  try {
+    const body = req.body || {};
+    const headerIn = body.header || {};
+    const dataIn = body.data?.data || body.data || body;
+    const guideNumber = String(
+      req.params.guideNumber || dataIn.numero_guia || dataIn.guideNumber || ''
+    ).trim();
+    const transactionId =
+      headerIn.transactionId || body.transactionId || dataIn.transactionId || correlationId;
+
+    if (!guideNumber) {
+      return res.status(400).json({
+        transactionId,
+        timestamp: new Date().toISOString(),
+        result: 'ERROR',
+        code: 'MISSING_GUIDE_NUMBER',
+        message: 'El número de guía es obligatorio en el parámetro o cuerpo de la petición.',
+      });
+    }
+
+    const guiaRes = await pool.query(
+      `SELECT * FROM exito_msj_guias WHERE (numero_guia = $1 OR tracking_token = $1) LIMIT 1`,
+      [guideNumber]
+    );
+
+    if (guiaRes.rows.length === 0) {
+      return res.status(404).json({
+        transactionId,
+        timestamp: new Date().toISOString(),
+        result: 'ERROR',
+        code: 'GUIDE_NOT_FOUND',
+        message: `La guía ${guideNumber} no existe en el sistema.`,
+      });
+    }
+
+    const guia = guiaRes.rows[0];
+
+    const estadosModificables = [
+      'CREADA',
+      'ESPERA_RECOGIDA',
+      'DISPONIBLE',
+      'PROGRAMADO_RECOGIDA',
+      'RECOGIDO_TIENDA',
+      'EN_ALMACEN',
+    ];
+    if (!estadosModificables.includes(guia.estado_operativo)) {
+      return res.status(409).json({
+        transactionId,
+        timestamp: new Date().toISOString(),
+        result: 'ERROR',
+        code: 'GUIDE_NOT_MODIFIABLE_IN_CURRENT_STATE',
+        message: `No es posible actualizar la guía en su estado actual (${guia.estado_operativo}). Ya se encuentra en reparto o finalizada.`,
+      });
+    }
+
+    const nombreDestinatario =
+      dataIn.nombre_destinatario || dataIn.recipientName || guia.nombre_destinatario;
+    const direccionDestinatario =
+      dataIn.direccion_destinatario || dataIn.recipientAddress || guia.direccion_destinatario;
+    const telefonoDestinatario =
+      dataIn.telefono_destinatario || dataIn.recipientPhone || guia.telefono_destinatario;
+    const barrioDestinatario =
+      dataIn.barrio_destinatario || dataIn.recipientNeighborhood || guia.barrio_destinatario;
+    const notasEntrega =
+      dataIn.notas_entrega || dataIn.deliveryNotes || dataIn.observaciones || guia.notas_entrega;
+
+    await pool.query(
+      `UPDATE exito_msj_guias
+       SET nombre_destinatario = $1,
+           direccion_destinatario = $2,
+           telefono_destinatario = $3,
+           barrio_destinatario = $4,
+           notas_entrega = $5,
+           updated_at = NOW()
+       WHERE id = $6`,
+      [nombreDestinatario, direccionDestinatario, telefonoDestinatario, barrioDestinatario, notasEntrega, guia.id]
+    );
+
+    await pool.query(
+      `INSERT INTO exito_msj_guia_historial (
+        guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+        origen_cambio, observacion, usuario_id, usuario_nombre, ip_origen
+      ) VALUES ($1,$2,$3,$3,$4,'API_GO_EXITO',$5,'GO_EXITO','API Go Éxito v2.0',$6)`,
+      [
+        guia.id,
+        guia.numero_guia,
+        guia.estado_operativo,
+        guia.id_guia_exito || '1',
+        `Datos de destinatario y entrega actualizados vía API B2B`,
+        req.ip || null,
+      ]
+    );
+
+    await ExitoSyncService.logApiMetric({
+      transactionId,
+      correlationId,
+      direction: 'INBOUND',
+      operation: 'UPDATE_GUIDE',
+      endpoint: `/api/v1/guides/${guideNumber}`,
+      method: req.method || 'PATCH',
+      httpStatus: 200,
+      result: 'OK',
+      code: 'GUIDE_UPDATED',
+      durationMs: Date.now() - start,
+      guideNumber: guia.numero_guia,
+      orderNumber: guia.numero_pedido,
+      ipSource: req.ip,
+      ambiente,
+      isSandbox,
+    });
+
+    return res.status(200).json({
+      transactionId,
+      timestamp: new Date().toISOString(),
+      result: 'OK',
+      code: 'GUIDE_UPDATED',
+      message: 'Guía actualizada exitosamente.',
+      data: {
+        guideNumber: guia.numero_guia,
+        orderNumber: guia.numero_pedido,
+        status: guia.estado_operativo,
+        recipientName: nombreDestinatario,
+        recipientAddress: direccionDestinatario,
+        recipientPhone: telefonoDestinatario,
+        recipientNeighborhood: barrioDestinatario,
+        deliveryNotes: notasEntrega,
+        updatedAt: new Date().toISOString(),
+      },
+    });
+  } catch (err: any) {
+    return res.status(500).json({
+      transactionId: correlationId,
+      timestamp: new Date().toISOString(),
+      result: 'ERROR',
+      code: 'INTERNAL_ERROR',
+      message: err.message,
+    });
+  }
+}
+
+/**
  * 7.1 Consulta / Reimpresión de Rótulo / Etiqueta (GET /api/v1/guides/:guideNumber/label)
  */
 export async function getGuideLabelB2B(req: ExitoApiRequest, res: Response) {

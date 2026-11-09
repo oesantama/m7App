@@ -822,11 +822,9 @@ html_content = f'''<!DOCTYPE html>
     </tbody>
   </table>
 
-  <h2>7.4. Consulta Síncrona de Trazabilidad</h2>
-  <p><strong>Endpoint:</strong> <code>GET /api/v1/guides/{{guideNumber}}</code></p>
-  <p>
-    Devuelve el estado operativo en tiempo real, histórico cronológico de cambios de estado, y enlaces a las evidencias fotográficas y firmas custodiadas en Google Drive.
-  </p>
+  <h2>7.4. Consulta Síncrona y Actualización de Guía</h2>
+  <p><strong>Consulta:</strong> <code>GET /api/v1/guides/{{guideNumber}}</code> — Devuelve el estado operativo en tiempo real, histórico cronológico de cambios de estado, y enlaces a las evidencias fotográficas y firmas custodiadas en Google Drive.</p>
+  <p><strong>Actualización:</strong> <code>PATCH / PUT /api/v1/guides/{{guideNumber}}</code> — Permite actualizar datos de destinatario, dirección corregida, teléfono o notas de entrega antes de que la guía sea despachada a ruta de reparto.</p>
 </div>
 
 <!-- ========================================== -->

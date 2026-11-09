@@ -12,6 +12,7 @@ import {
   createGuideB2B,
   createPickupB2B,
   cancelGuideB2B,
+  updateGuideB2B,
   getGuideLabelB2B,
   getGuideStatusB2B,
   getDashboardAndMetrics,
@@ -65,6 +66,10 @@ exitoB2BRouter.post('/pickups', createPickupB2B);
 // 7.3 Anulación idempotente de guía
 exitoB2BRouter.post('/guides/:guideNumber/cancel', cancelGuideB2B);
 exitoB2BRouter.post('/guides/cancel', cancelGuideB2B);
+
+// 7.5 Actualización de datos de guía antes de reparto (PATCH / PUT)
+exitoB2BRouter.patch('/guides/:guideNumber', updateGuideB2B);
+exitoB2BRouter.put('/guides/:guideNumber', updateGuideB2B);
 
 // Consulta síncrona de estado, historial y soportes en Google Drive
 exitoB2BRouter.get('/guides/:guideNumber', getGuideStatusB2B);

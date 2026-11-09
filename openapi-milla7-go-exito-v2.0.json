@@ -296,6 +296,50 @@
             "description": "Guía no encontrada"
           }
         }
+      },
+      "patch": {
+        "summary": "Actualización de Datos de Entrega de Guía antes de Reparto",
+        "tags": [
+          "Go Éxito B2B"
+        ],
+        "parameters": [
+          {
+            "name": "guideNumber",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "recipientName": { "type": "string" },
+                  "recipientAddress": { "type": "string" },
+                  "recipientPhone": { "type": "string" },
+                  "recipientNeighborhood": { "type": "string" },
+                  "deliveryNotes": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Guía actualizada exitosamente"
+          },
+          "404": {
+            "description": "Guía no encontrada"
+          },
+          "409": {
+            "description": "Guía no modificable en su estado actual"
+          }
+        }
       }
     }
   }
