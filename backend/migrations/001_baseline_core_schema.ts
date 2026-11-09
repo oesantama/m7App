@@ -13,13 +13,8 @@ export const migration001: Migration = {
       ) as exists;
     `);
 
-    const hasUsersTable = tableCheck.rows[0]?.exists;
-    if (hasUsersTable) {
-      console.log('[M7-MIGRATION-001] Base de datos existente detectada. Esquema base consolidado.');
-      return;
-    }
-
-    console.log('[M7-MIGRATION-001] Base de datos limpia detectada. Inicializando tablas maestras nucleares...');
+    // Asegurar creación idempotente de todas las tablas base maestras nucleares
+    console.log('[M7-MIGRATION-001] Verificando e inicializando tablas maestras nucleares...');
 
     // Tablas maestras iniciales
     await client.query(`
