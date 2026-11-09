@@ -3,8 +3,9 @@ import base64
 import os
 import subprocess
 
-with open('public/logo-m7.png', 'rb') as f:
-    logo_base64 = base64.b64encode(f.read()).decode('utf-8')
+with open('utils/logoMillaSiete.ts', 'r') as f:
+    text = f.read()
+logo_base64 = text.split("'")[1].split(',')[1]
 
 html_content = f'''<!DOCTYPE html>
 <html lang="es">
@@ -237,8 +238,8 @@ html_content = f'''<!DOCTYPE html>
   table.data-table {{
     width: 100%;
     border-collapse: collapse;
-    margin: 8px 0 14px 0;
-    font-size: 8.5pt;
+    margin: 4px 0 8px 0;
+    font-size: 8pt;
   }}
 
   table.data-table th {{
@@ -246,13 +247,13 @@ html_content = f'''<!DOCTYPE html>
     color: #ffffff;
     font-weight: 700;
     text-align: left;
-    padding: 6px 9px;
+    padding: 4px 8px;
     border: 1px solid #0f2d59;
-    font-size: 8.5pt;
+    font-size: 8pt;
   }}
 
   table.data-table td {{
-    padding: 5px 8px;
+    padding: 3.5px 7px;
     border: 1px solid #cbd5e1;
     vertical-align: top;
   }}
@@ -298,19 +299,19 @@ html_content = f'''<!DOCTYPE html>
   .toc-table {{
     width: 100%;
     border-collapse: collapse;
-    margin: 12px 0 20px 0;
-    font-size: 9pt;
+    margin: 6px 0 10px 0;
+    font-size: 8.5pt;
   }}
 
   .toc-table td {{
-    padding: 6px 8px;
+    padding: 2.5px 6px;
     border-bottom: 1px dotted #cbd5e1;
   }}
 
   .toc-table .toc-num {{
     font-weight: 700;
     color: #0284c7;
-    width: 35px;
+    width: 30px;
   }}
 
   .toc-table .toc-title {{
@@ -321,8 +322,8 @@ html_content = f'''<!DOCTYPE html>
   .toc-table .toc-page {{
     text-align: right;
     font-weight: 700;
-    color: #64748b;
-    width: 45px;
+    color: #0284c7;
+    width: 30px;
   }}
 
   .notice-box {{
@@ -374,7 +375,7 @@ html_content = f'''<!DOCTYPE html>
       </tr>
       <tr>
         <td class="label">Alcance Operativo:</td>
-        <td class="value">Recogida en Tiendas Éxito, Despacho Urbano, Entregas Same Day / Next Day y Devoluciones</td>
+        <td class="value">Recogida nocturna en tiendas Éxito con doble pistoleo, consolidación en bodega Milla 7 y distribución diurna al cliente final.</td>
       </tr>
       <tr>
         <td class="label">Clasificación:</td>
@@ -406,22 +407,22 @@ html_content = f'''<!DOCTYPE html>
 
   <h1>Tabla de Contenido / Índice</h1>
   <table class="toc-table">
-    <tr><td class="toc-num">1.</td><td class="toc-title">Control del documento</td><td class="toc-page">Pág. 2</td></tr>
-    <tr><td class="toc-num">2.</td><td class="toc-title">Objetivo general</td><td class="toc-page">Pág. 3</td></tr>
-    <tr><td class="toc-num">3.</td><td class="toc-title">Alcance operativo (Misma Ciudad / Urbano)</td><td class="toc-page">Pág. 3</td></tr>
-    <tr><td class="toc-num">4.</td><td class="toc-title">Principios técnicos obligatorios (Seguridad y PII)</td><td class="toc-page">Pág. 3</td></tr>
-    <tr><td class="toc-num">5.</td><td class="toc-title">Modelo de integración y arquitectura de carpetas Drive</td><td class="toc-page">Pág. 4</td></tr>
-    <tr><td class="toc-num">6.</td><td class="toc-title">Contrato técnico (Encabezados, Formato JSON y Códigos HTTP)</td><td class="toc-page">Pág. 4</td></tr>
-    <tr><td class="toc-num">7.</td><td class="toc-title">Servicios funcionales B2B</td><td class="toc-page">Pág. 5</td></tr>
-    <tr><td class="toc-num"></td><td class="toc-title" style="padding-left: 20px;">7.1 Creación de guía y rótulo térmico on-demand</td><td class="toc-page">Pág. 5</td></tr>
-    <tr><td class="toc-num"></td><td class="toc-title" style="padding-left: 20px;">7.2 Solicitud de recogida en nodo tienda (COLLECT_GUIDE)</td><td class="toc-page">Pág. 6</td></tr>
-    <tr><td class="toc-num"></td><td class="toc-title" style="padding-left: 20px;">7.3 Anulación de guía e idempotencia</td><td class="toc-page">Pág. 6</td></tr>
-    <tr><td class="toc-num"></td><td class="toc-title" style="padding-left: 20px;">7.4 Notificación de tracking saliente / Webhook hacia Go Éxito</td><td class="toc-page">Pág. 7</td></tr>
-    <tr><td class="toc-num">8.</td><td class="toc-title">Disponibilidad, concurrencia y límites (SLO / Rate Limit)</td><td class="toc-page">Pág. 7</td></tr>
-    <tr><td class="toc-num">9.</td><td class="toc-title">Resiliencia, reintentos escalonados y Circuit Breaker</td><td class="toc-page">Pág. 8</td></tr>
-    <tr><td class="toc-num">10.</td><td class="toc-title">Alertas operativas automáticas (WhatsApp y Correo)</td><td class="toc-page">Pág. 8</td></tr>
-    <tr><td class="toc-num">11.</td><td class="toc-title">Especificaciones físicas de rótulos térmicos (4x6" vs 10x10 cm)</td><td class="toc-page">Pág. 9</td></tr>
-    <tr><td class="toc-num">12.</td><td class="toc-title">Alineación de ambientes (QA / Sandbox vs Producción)</td><td class="toc-page">Pág. 9</td></tr>
+    <tr><td class="toc-num">1.</td><td class="toc-title">Control del documento</td><td class="toc-page">2</td></tr>
+    <tr><td class="toc-num">2.</td><td class="toc-title">Objetivo general</td><td class="toc-page">3</td></tr>
+    <tr><td class="toc-num">3.</td><td class="toc-title">Alcance operativo (Recogida nocturna y distribución diurna)</td><td class="toc-page">3</td></tr>
+    <tr><td class="toc-num">4.</td><td class="toc-title">Principios técnicos obligatorios (Seguridad y PII)</td><td class="toc-page">3</td></tr>
+    <tr><td class="toc-num">5.</td><td class="toc-title">Modelo de integración y arquitectura de carpetas Drive</td><td class="toc-page">4</td></tr>
+    <tr><td class="toc-num">6.</td><td class="toc-title">Contrato técnico (Encabezados, Formato JSON y Códigos HTTP)</td><td class="toc-page">4</td></tr>
+    <tr><td class="toc-num">7.</td><td class="toc-title">Servicios funcionales B2B</td><td class="toc-page">5</td></tr>
+    <tr><td class="toc-num"></td><td class="toc-title" style="padding-left: 20px;">7.1 Creación de guía y rótulo térmico on-demand</td><td class="toc-page">5</td></tr>
+    <tr><td class="toc-num"></td><td class="toc-title" style="padding-left: 20px;">7.2 Solicitud de recogida en nodo tienda (COLLECT_GUIDE)</td><td class="toc-page">6</td></tr>
+    <tr><td class="toc-num"></td><td class="toc-title" style="padding-left: 20px;">7.3 Anulación de guía e idempotencia</td><td class="toc-page">6</td></tr>
+    <tr><td class="toc-num"></td><td class="toc-title" style="padding-left: 20px;">7.4 Notificación de tracking saliente / Webhook hacia Go Éxito</td><td class="toc-page">7</td></tr>
+    <tr><td class="toc-num">8.</td><td class="toc-title">Disponibilidad, concurrencia y límites (SLO / Rate Limit)</td><td class="toc-page">7</td></tr>
+    <tr><td class="toc-num">9.</td><td class="toc-title">Resiliencia, reintentos escalonados y Circuit Breaker</td><td class="toc-page">8</td></tr>
+    <tr><td class="toc-num">10.</td><td class="toc-title">Alertas operativas automáticas (WhatsApp y Correo)</td><td class="toc-page">8</td></tr>
+    <tr><td class="toc-num">11.</td><td class="toc-title">Especificaciones físicas de rótulos térmicos (4x6" vs 10x10 cm)</td><td class="toc-page">9</td></tr>
+    <tr><td class="toc-num">12.</td><td class="toc-title">Alineación de ambientes (QA / Sandbox vs Producción)</td><td class="toc-page">9</td></tr>
   </table>
 
   <h1>1. Control del Documento</h1>
@@ -485,16 +486,29 @@ html_content = f'''<!DOCTYPE html>
     Establecer el marco arquitectónico, funcional y de seguridad para la integración de servicios entre la plataforma <strong>Go Éxito v2.0</strong> (Grupo Éxito) y el núcleo logístico <strong>OrbitM7</strong> (Milla 7 Logistics S.A.S.). Esta integración permite la creación desatendida de guías de mensajería urbana, generación e impresión de rótulos térmicos estandarizados, asignación dinámica de flota inhouse, confirmación de recogida en tiendas, trazabilidad en tiempo real vía Webhook y gestión de devoluciones al nodo local.
   </p>
 
-  <h1>3. Alcance Operativo (Misma Ciudad / Urbano)</h1>
+  <h1>3. Alcance Operativo (Recogida Nocturna y Distribución Diurna)</h1>
   <p>
-    La presente especificación aplica exclusivamente a operaciones de <strong>última milla urbana (misma ciudad)</strong> bajo dos modalidades de servicio:
+    La presente especificación establece el modelo de operación logística de última milla urbana bajo un ciclo continuo de alta eficiencia y estricto control de custodia:
   </p>
   <ul>
-    <li><strong>Same Day (Mismo Día):</strong> Pedidos generados con corte operativo (11:00 AM) para recogida en tienda en horas de la mañana y entrega al cliente final en la tarde/noche del mismo día.</li>
-    <li><strong>Next Day (Día Siguiente):</strong> Pedidos recogidos durante la tarde en tiendas Éxito, ingresados y verificados en el almacén de consolidación de Milla 7, y distribuidos en ruta urbana a primera hora de la mañana siguiente.</li>
+    <li>
+      <strong>Recolección Nocturna Multitnodo:</strong> Durante las horas de la noche se despachan los vehículos de Milla 7 para efectuar el recorrido por los diferentes nodos y almacenes de Grupo Éxito asignados.
+    </li>
+    <li>
+      <strong>Primer Pistoleo en Tienda / Nodo:</strong> Al momento de subir la mercancía al vehículo, el conductor ejecuta el <strong>pistoleo unitario obligatorio</strong> de cada guía/paquete contra el sistema, garantizando la verificación en sitio y generando el acta digital de remisión firmada por el encargado del nodo.
+    </li>
+    <li>
+      <strong>Traslado y Recepción en Bodega Milla 7 (Segundo Pistoleo):</strong> La carga es transportada hacia el almacén central de Milla 7. Al descargar los vehículos, el personal de bodega realiza un <strong>segundo pistoleo de recepción</strong> de cada paquete, confirmando la custodia íntegra de la carga e identificando oportunamente cualquier novedad.
+    </li>
+    <li>
+      <strong>Organización de Rutas y Cross-docking en Madrugada:</strong> Los paquetes recepcionados se procesan en cross-docking y se organizan en rutas optimizadas de distribución inteligente según zonas y sectores de cobertura.
+    </li>
+    <li>
+      <strong>Distribución y Entrega Diurna al Cliente Final:</strong> Durante el transcurso del día siguiente, la flota de reparto ejecuta la entrega en el domicilio del cliente final con captura de evidencia digital (firma en pantalla, geolocalización y fotografía), transmitiendo el estado en tiempo real vía Webhook hacia Go Éxito.
+    </li>
   </ul>
   <div class="notice-box">
-    <strong>Aclaración Operativa:</strong> Al tratarse de mensajería urbana local, los estados de transporte nacional (como <em>Id Guía = 3: En Transporte</em> o <em>Id Guía = 4: En Reexpedición</em>) no aplican. Milla 7 recibe el paquete directamente en la tienda y lo entrega en el domicilio del cliente sin intermediación de troncales nacionales.
+    <strong>Aclaración Operativa de Mensajería Urbana:</strong> Al tratarse de mensajería urbana local sin intermediación de redes troncales interdepartamentales, los estados de transporte nacional (como <em>Id Guía = 3: En Transporte</em> o <em>Id Guía = 4: En Reexpedición</em>) no aplican. Milla 7 recibe el paquete directamente en el nodo de origen y lo entrega al cliente final en el destino urbano.
   </div>
 
   <h1>4. Principios Técnicos Obligatorios</h1>
@@ -1066,3 +1080,4 @@ with open('DOCUMENTO_TECNICO_INTEGRACION_MILLA7_GO_EXITO_V2.html', 'w', encoding
     f.write(html_content)
 
 print("HTML generado exitosamente.")
+

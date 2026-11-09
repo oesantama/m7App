@@ -65,23 +65,37 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false,
 }));
 
-// CORS restrictivo: solo dominios conocidos en producción
+// CORS restrictivo: dominios conocidos en producción y sandbox
 const allowedOrigins = [
   'https://orbitm7.m7apps.com',
   'https://www.orbitm7.m7apps.com',
+  'https://m7apps.com',
+  'https://www.m7apps.com',
+  'https://devsm7.santamariapp.com',
   'http://localhost:3000',
   'http://127.0.0.1:3000',
   'http://localhost:5173',
+  'http://127.0.0.1:5173',
 ];
+if (process.env.APP_URL && !allowedOrigins.includes(process.env.APP_URL)) {
+  allowedOrigins.push(process.env.APP_URL);
+}
+if (process.env.PUBLIC_API_URL && !allowedOrigins.includes(process.env.PUBLIC_API_URL)) {
+  allowedOrigins.push(process.env.PUBLIC_API_URL);
+}
+
 app.use(cors({
   origin: (origin, callback) => {
-    // Permitir siempre localhost y requests sin origin para desarrollo/testing
+    // Permitir siempre requests sin origin (curl, server-to-server, mobile) y desarrollo local
     if (!origin || origin.includes('localhost') || origin.includes('127.0.0.1')) {
       return callback(null, true);
     }
-    // En producción, validar contra la whitelist
+    // En producción y sandbox, validar contra la whitelist o subdominios autorizados
     if (process.env.NODE_ENV === 'production') {
-      if (allowedOrigins.includes(origin)) return callback(null, true);
+      const isAllowed = allowedOrigins.includes(origin) ||
+        origin.endsWith('.santamariapp.com') ||
+        origin.endsWith('.m7apps.com');
+      if (isAllowed) return callback(null, true);
       return callback(new Error(`CORS: Origen no permitido — ${origin}`));
     }
     // En otros entornos permitimos todo
