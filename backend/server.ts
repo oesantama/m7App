@@ -186,8 +186,10 @@ app.use('/api', (req, res, next) => {
     '/it-activos/script/dl/',
     '/gh-perfiles-cargo-publico',
     '/whatsapp/webhook',
-    '/v1/guides',
-    '/v1/pickups'
+    '/v1',
+    '/exito-mensajeria/openapi.json',
+    '/exito-mensajeria/guias/por-numero',
+    '/exito-mensajeria/planillas'
   ];
   
   if (publicPaths.some(p => p === '/' ? req.path === '/' : req.path.startsWith(p))) {

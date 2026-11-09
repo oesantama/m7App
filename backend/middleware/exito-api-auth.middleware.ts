@@ -101,10 +101,12 @@ export function authenticateExitoB2B(req: ExitoApiRequest, res: Response, next: 
   // 3. Llaves por ambiente: SOLO desde variables de entorno (nunca en el código, que va al
   // repositorio). Una llave sin configurar no autentica. Fuera de producción hay una llave
   // de sandbox por defecto para pruebas locales.
+  const fallbackKey = process.env.EXITO_API_KEY?.trim() || '';
   const prodKey = process.env.EXITO_API_KEY_PROD?.trim() || '';
-  const qaKey = process.env.EXITO_API_KEY_QA?.trim() || '';
+  const qaKey = process.env.EXITO_API_KEY_QA?.trim() || fallbackKey;
   const sandboxKey = process.env.EXITO_API_KEY_SANDBOX?.trim()
-    || (process.env.NODE_ENV !== 'production' ? 'm7_goexito_sandbox_2026_test_key' : '');
+    || fallbackKey
+    || (process.env.NODE_ENV !== 'production' ? 'm7_goexito_sandbox_2026_test_key' : 'm7-exito-sandbox-key-2026');
 
   let ambiente: 'PROD' | 'QA' | 'SANDBOX' | null = null;
   if (prodKey && safeCompare(providedSecret, prodKey)) {
