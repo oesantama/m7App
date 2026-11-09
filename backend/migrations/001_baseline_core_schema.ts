@@ -79,6 +79,130 @@ export const migration001: Migration = {
         updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
       );
 
+      CREATE TABLE IF NOT EXISTS role_permissions (
+        id TEXT PRIMARY KEY,
+        role_id TEXT,
+        permissions JSONB,
+        status_id TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS user_permissions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        permissions JSONB,
+        status_id TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS master_records (
+        id TEXT PRIMARY KEY DEFAULT (gen_random_uuid())::text,
+        category TEXT,
+        name TEXT,
+        description TEXT,
+        parent_id TEXT,
+        notification_email TEXT,
+        icon_class TEXT,
+        status_id TEXT,
+        tipo_notificacion_id TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS digital_signatures (
+        id SERIAL PRIMARY KEY,
+        idusuario TEXT,
+        pasword TEXT,
+        firma TEXT,
+        aceptapolitica BOOLEAN,
+        usuariocreacion TEXT,
+        estado TEXT,
+        aprobada BOOLEAN,
+        usuarioaprobo TEXT,
+        fechaparobacion TIMESTAMP WITH TIME ZONE,
+        fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        usaurioactualizacion TEXT,
+        fecha_actualizacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS tipos_documento (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        description TEXT,
+        status_id TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS tipos_vehiculo (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        description TEXT,
+        status_id TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS unidades_medida (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        description TEXT,
+        abbreviation TEXT,
+        status_id TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS notificaciones (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        description TEXT,
+        notification_email TEXT,
+        tipo_notificacion_id TEXT,
+        status_id TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS tipos_notificacion (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        description TEXT,
+        status_id TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS whatsapp_logs (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT,
+        phone_number TEXT,
+        message_body TEXT,
+        status TEXT,
+        direction TEXT,
+        sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        external_message_id TEXT,
+        error_message TEXT
+      );
+
       CREATE TABLE IF NOT EXISTS roles (
         id TEXT PRIMARY KEY,
         name TEXT,

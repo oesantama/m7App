@@ -234,6 +234,16 @@ export const migration007: Migration = {
     // ── PERFIL MENSAJERO ──────────────────────────────────────────────────────
     // Al crear un usuario con este rol, user.controller copia estos permisos a user_permissions.
     await client.query(`
+      CREATE TABLE IF NOT EXISTS role_permissions (
+        id TEXT PRIMARY KEY,
+        role_id TEXT,
+        permissions JSONB,
+        status_id TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
       INSERT INTO roles (id, name, status_id) VALUES ('ROL-04', 'MENSAJERO', 'EST-01')
       ON CONFLICT (id) DO NOTHING;
     `);
