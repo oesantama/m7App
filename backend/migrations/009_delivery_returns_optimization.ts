@@ -12,6 +12,7 @@ export const migration009: Migration = {
 
     // 2. Poblar retroactivamente client_id en delivery_returns usando documentos existentes
     try {
+      await client.query(`SAVEPOINT sp_mig009_bf`);
       await client.query(`
         UPDATE delivery_returns dr
         SET client_id = dl.client_id
@@ -20,7 +21,9 @@ export const migration009: Migration = {
         WHERE TRIM(UPPER(COALESCE(NULLIF(di.invoice,''), di.order_number))) = TRIM(UPPER(dr.invoice_id))
           AND dr.client_id IS NULL;
       `);
+      await client.query(`RELEASE SAVEPOINT sp_mig009_bf`);
     } catch (err: any) {
+      await client.query(`ROLLBACK TO SAVEPOINT sp_mig009_bf`);
       console.warn(`[M7-MIGRATION-009] Aviso en backfill de client_id: ${err.message}`);
     }
 
@@ -37,10 +40,15 @@ export const migration009: Migration = {
       `CREATE INDEX IF NOT EXISTS idx_document_l_payments_inv_upper ON document_l_payments (TRIM(UPPER(invoice)))`
     ];
 
-    for (const sql of statements) {
+    for (let i = 0; i < statements.length; i++) {
+      const sql = statements[i];
+      const sp = `sp_mig009_idx_${i}`;
       try {
+        await client.query(`SAVEPOINT ${sp}`);
         await client.query(sql);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
       } catch (err: any) {
+        await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
         console.warn(`[M7-MIGRATION-009] Aviso al crear índice: ${err.message}`);
       }
     }

@@ -39,10 +39,15 @@ export const migration004: Migration = {
         ORDER BY vehicle_id, updated_at DESC;`
     ];
 
-    for (const sql of statements) {
+    for (let i = 0; i < statements.length; i++) {
+      const sql = statements[i];
+      const sp = `sp_mig004_${i}`;
       try {
+        await client.query(`SAVEPOINT ${sp}`);
         await client.query(sql);
+        await client.query(`RELEASE SAVEPOINT ${sp}`);
       } catch (err: any) {
+        await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
         console.warn(`[M7-MIGRATION-004] Aviso al crear índice/vista: ${err.message}`);
       }
     }
