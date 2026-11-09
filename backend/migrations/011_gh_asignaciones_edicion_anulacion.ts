@@ -44,18 +44,25 @@ export const migration011: Migration = {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_gh_asig_serial_asig ON gh_asignaciones_personal_serial (asignacion_id)`);
 
     // Seriales de las asignaciones existentes (misma transacción ⇒ misma marca de tiempo)
-    await client.query(`
-      INSERT INTO gh_asignaciones_personal_serial (asignacion_id, elemento_id, serial)
-      SELECT a.id, s.elemento_id, s.serial
-      FROM gh_asignaciones_personal a
-      JOIN gh_asignaciones_personal_detalle d ON d.asignacion_id = a.id
-      JOIN gh_inventario_serial_elemento s
-        ON s.elemento_id = d.elemento_id
-       AND s.personal_id = a.personal_id
-       AND s.estado_serial = 'ASIGNADO'
-       AND s.fecha_asignacion = a.fecha_control
-      ON CONFLICT (asignacion_id, serial) DO NOTHING;
-    `);
+    try {
+      await client.query(`SAVEPOINT sp_mig011`);
+      await client.query(`
+        INSERT INTO gh_asignaciones_personal_serial (asignacion_id, elemento_id, serial)
+        SELECT a.id, s.elemento_id, s.serial
+        FROM gh_asignaciones_personal a
+        JOIN gh_asignaciones_personal_detalle d ON d.asignacion_id = a.id
+        JOIN gh_inventario_serial_elemento s
+          ON s.elemento_id = d.elemento_id
+         AND s.personal_id = a.personal_id
+         AND s.estado_serial = 'ASIGNADO'
+         AND s.fecha_asignacion = a.fecha_control
+        ON CONFLICT (asignacion_id, serial) DO NOTHING;
+      `);
+      await client.query(`RELEASE SAVEPOINT sp_mig011`);
+    } catch (err: any) {
+      await client.query(`ROLLBACK TO SAVEPOINT sp_mig011`);
+      console.warn(`[M7-MIGRATION-011] Aviso en backfill de seriales personal: ${err.message}`);
+    }
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS gh_asignaciones_personal_historial (
