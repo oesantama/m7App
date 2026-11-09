@@ -50,6 +50,37 @@ export function periodosDeMeses(meses: string[], hoy: Date = new Date()): Period
     }).filter(p => p.start <= hoyStr);
 }
 
+const sumarDias = (dia: string, n: number): string => {
+    const [y, m, d] = dia.split('-').map(Number);
+    return fechaLocal(new Date(y, m - 1, d + n));
+};
+
+/**
+ * Transportando solo devuelve en pantalla informes de hasta 1.000 registros; si se pasa, lo
+ * envía por CORREO (HTTP 202) y el bot no recibe nada. Por eso los manifiestos se piden en
+ * tramos de `dias` días (≈100 manifiestos/día → ~500 por tramo), del más reciente al más antiguo.
+ */
+export function dividirPeriodo(p: PeriodoConsulta, dias = 5): PeriodoConsulta[] {
+    const out: PeriodoConsulta[] = [];
+    let fin = p.end;
+    while (fin >= p.start) {
+        const ini = sumarDias(fin, -(dias - 1));
+        out.push({ start: ini < p.start ? p.start : ini, end: fin });
+        fin = sumarDias(ini, -1);
+    }
+    return out;
+}
+
+/** Parte un periodo en dos mitades (la más reciente primero). Null si es de un solo día. */
+export function partirEnDos(p: PeriodoConsulta): PeriodoConsulta[] | null {
+    if (p.start >= p.end) return null;
+    const [y1, m1, d1] = p.start.split('-').map(Number);
+    const [y2, m2, d2] = p.end.split('-').map(Number);
+    const dias = Math.round((new Date(y2, m2 - 1, d2).getTime() - new Date(y1, m1 - 1, d1).getTime()) / 86400000);
+    const medio = sumarDias(p.start, Math.floor(dias / 2));
+    return [{ start: sumarDias(medio, 1), end: p.end }, { start: p.start, end: medio }];
+}
+
 /**
  * Descarga los informes de Transportando mes a mes. Por defecto consulta de hoy a 7 meses
  * atrás empezando por lo más reciente; `periodos` permite consultar solo meses puntuales
@@ -180,7 +211,11 @@ export const scrapeTransportandoReports = async (
             monthsToQuery = periodosRecientes(currentDate, 7);
         }
 
-        log(`Se realizarán ${monthsToQuery.length} consultas por mes (de lo más reciente a lo más antiguo): ${monthsToQuery.map(p => `${p.start}→${p.end}`).join(', ')}`);
+        if (reportType === 'manifiestos') {
+            monthsToQuery = monthsToQuery.flatMap(p => dividirPeriodo(p, 5));
+        }
+
+        log(`Se realizarán ${monthsToQuery.length} consultas${reportType === 'manifiestos' ? ' (tramos de 5 días por el límite de 1.000 registros de Transportando)' : ' por mes'} (de lo más reciente a lo más antiguo): ${monthsToQuery.map(p => `${p.start}→${p.end}`).join(', ')}`);
 
         // Función para esperar un archivo en la carpeta de descargas
         const waitForDownload = async (downloadDir: string, timeout = 60000): Promise<string> => {
@@ -211,8 +246,12 @@ export const scrapeTransportandoReports = async (
             return res;
         };
 
-        for (const [index, { start, end }] of monthsToQuery.entries()) {
-            log(`Procesando periodo: ${start} al ${end} (${index + 1}/${monthsToQuery.length})...`);
+        const cola: PeriodoConsulta[] = [...monthsToQuery];
+        let index = -1;
+        while (cola.length > 0) {
+            const { start, end } = cola.shift()!;
+            index++;
+            log(`Procesando periodo: ${start} al ${end} (${index + 1}/${index + 1 + cola.length})...`);
 
             // Recargar la página en iteraciones posteriores para asegurar un DOM limpio y evitar detached frames
             if (index > 0) {
@@ -420,8 +459,16 @@ export const scrapeTransportandoReports = async (
                 // cargue el resultado real — detectarlo antes es un falso positivo que cancela el mes.
                 let excelButtonFound = false;
                 let noDataFound = false;
+                let enviadoPorCorreo = false;
                 for (let i = 0; i < 45; i++) {
                     await new Promise(r => setTimeout(r, 1000));
+
+                    // 0. Transportando manda el informe por correo si supera 1.000 registros
+                    enviadoPorCorreo = await page.evaluate(() => {
+                        const avisos = Array.from(document.querySelectorAll('.el-message, .el-notification, .el-message-box, .el-alert'));
+                        return avisos.some(a => (a.textContent || '').toLowerCase().includes('enviado por correo'));
+                    });
+                    if (enviadoPorCorreo) break;
 
                     // 1. Verificar si apareció el botón de Excel (prioridad máxima)
                     excelButtonFound = await page.evaluate(() => {
@@ -462,6 +509,17 @@ export const scrapeTransportandoReports = async (
                             break;
                         }
                     }
+                }
+
+                if (enviadoPorCorreo) {
+                    const mitades = partirEnDos({ start, end });
+                    if (mitades) {
+                        log(`AVISO: Transportando envió ${start}→${end} por correo (más de 1.000 registros). Se parte en ${mitades.map(m => `${m.start}→${m.end}`).join(' y ')} y se reintenta.`);
+                        cola.unshift(...mitades);
+                    } else {
+                        log(`ERROR: El día ${start} supera 1.000 registros y Transportando solo lo envía por correo; no se pudo importar.`);
+                    }
+                    continue;
                 }
 
                 if (noDataFound) {

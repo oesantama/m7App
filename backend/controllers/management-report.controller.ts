@@ -208,7 +208,7 @@ export const getReports = async (req: Request, res: Response) => {
     const limit = parseInt(req.query.limit as string) || 10;
     const offset = (page - 1) * limit;
 
-    const { ocNumber, manifestNumber, plate, clientName, clientNames, fromDate, toDate, sortBy, sortDirection } = req.query;
+    const { ocNumber, manifestNumber, plate, clientName, clientNames, fromDate, toDate, sortBy, sortDirection, pendingInvoice } = req.query;
 
     const conditions: string[] = [];
     const values: any[] = [];
@@ -258,6 +258,15 @@ export const getReports = async (req: Request, res: Response) => {
     if (toDate) {
       conditions.push(`(manifest_date AT TIME ZONE 'America/Bogota')::date <= $${counter++}`);
       values.push(toDate);
+    }
+
+    // Pendiente por facturar: misma regla que el informe (no anulado y sin factura CxC válida)
+    if (String(pendingInvoice) === 'true') {
+      conditions.push(`UPPER(TRIM(COALESCE(manifest_status, ''))) NOT IN ('ANULADO', 'ANULADA')`);
+      conditions.push(`(
+        UPPER(TRIM(COALESCE(invoice_cxc, ''))) IN ('', '0', 'S/I', 'N/A', 'NO APLICA')
+        OR UPPER(COALESCE(invoice_cxc, '')) LIKE '%SIN FACTURA%'
+      )`);
     }
 
     const whereClause = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';

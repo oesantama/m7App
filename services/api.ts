@@ -1533,6 +1533,7 @@ export const api = {
     toDate?: string;
     sortBy?: string;
     sortDirection?: string;
+    pendingInvoice?: boolean;
   }) => {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
@@ -1546,6 +1547,7 @@ export const api = {
     if (params.toDate) qs.append('toDate', params.toDate);
     if (params.sortBy) qs.append('sortBy', params.sortBy);
     if (params.sortDirection) qs.append('sortDirection', params.sortDirection);
+    if (params.pendingInvoice) qs.append('pendingInvoice', 'true');
     return fetchJson(`${API_URL}/management-reports?${qs.toString()}`);
   },
 

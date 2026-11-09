@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('puppeteer', () => ({ default: {} }));
-const { periodosRecientes, periodosDeMeses } = await import('../services/scraper.service.js');
+const { periodosRecientes, periodosDeMeses, dividirPeriodo, partirEnDos } = await import('../services/scraper.service.js');
 
 describe('Periodos de consulta Transportando', () => {
   it('de hoy a 7 meses atrás, de lo más reciente a lo más antiguo', () => {
@@ -35,4 +35,30 @@ describe('Periodos de consulta Transportando', () => {
       { start: '2026-06-01', end: '2026-06-30' },
     ]);
   });
+});
+
+describe('tramos para el límite de 1.000 registros de Transportando', () => {
+    it('divide un mes en tramos de 5 días del más reciente al más antiguo', () => {
+        const t = dividirPeriodo({ start: '2026-10-01', end: '2026-10-31' }, 5);
+        expect(t[0]).toEqual({ start: '2026-10-27', end: '2026-10-31' });
+        expect(t[t.length - 1]).toEqual({ start: '2026-10-01', end: '2026-10-01' });
+        expect(t).toHaveLength(7);
+    });
+    it('respeta el cambio de mes y periodos cortos', () => {
+        expect(dividirPeriodo({ start: '2026-11-01', end: '2026-11-09' }, 5)).toEqual([
+            { start: '2026-11-05', end: '2026-11-09' },
+            { start: '2026-11-01', end: '2026-11-04' },
+        ]);
+    });
+    it('parte un tramo en dos mitades y no parte un solo día', () => {
+        expect(partirEnDos({ start: '2026-10-27', end: '2026-10-31' })).toEqual([
+            { start: '2026-10-30', end: '2026-10-31' },
+            { start: '2026-10-27', end: '2026-10-29' },
+        ]);
+        expect(partirEnDos({ start: '2026-10-27', end: '2026-10-28' })).toEqual([
+            { start: '2026-10-28', end: '2026-10-28' },
+            { start: '2026-10-27', end: '2026-10-27' },
+        ]);
+        expect(partirEnDos({ start: '2026-10-27', end: '2026-10-27' })).toBeNull();
+    });
 });

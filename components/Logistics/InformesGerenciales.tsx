@@ -16,6 +16,7 @@ import { DataTable, ColumnDef } from '../shared/DataTable';
 import { TabCargar } from '../Gerencia/TabCargar';
 import { TabConsultas } from '../Gerencia/TabConsultas';
 import { TabTdmVentas } from '../Gerencia/TabTdmVentas';
+import { TabPendienteFacturar } from '../Gerencia/TabPendienteFacturar';
 
 interface ManagementOrder {
   oc_number: string;
@@ -183,7 +184,7 @@ function calcIntReal(rawPct: number, clientName?: string, dateStr?: string): num
 }
 
 export const InformesGerenciales: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'informes' | 'consultas' | 'cargar'>('informes');
+  const [activeTab, setActiveTab] = useState<'informes' | 'consultas' | 'cargar' | 'pendienteFacturar'>('informes');
 
   // Helper to download an element as an image
   const downloadAsImage = async (elementId: string, filename: string) => {
@@ -2009,10 +2010,17 @@ export const InformesGerenciales: React.FC = () => {
         tdmClient = 'PREBEL';
       }
 
-      if (targetClient !== 'GENERAL' && providerClient !== targetClient && tdmClient !== targetClient) {
+      // Nombre corto tal como lo muestra la tabla "Ventas Clientes General" (LTSA, AJV CALI, ...)
+      const rawClientName = r.client_name ? String(r.client_name).trim() : 'S/I';
+      let shortClient = String(toShortClientName(rawClientName, clients) || rawClientName).trim().toUpperCase();
+      if (shortClient.includes('PREBEL')) {
+        shortClient = 'PREBEL';
+      }
+
+      if (targetClient !== 'GENERAL' && providerClient !== targetClient && tdmClient !== targetClient && shortClient !== targetClient) {
         return;
       }
-      const client = providerClient === targetClient ? providerClient : tdmClient;
+      const client = providerClient === targetClient ? providerClient : (shortClient === targetClient ? shortClient : tdmClient);
 
       const plate = r.plate ? String(r.plate).trim().toUpperCase() : 'SIN PLACA';
 
@@ -2060,7 +2068,8 @@ export const InformesGerenciales: React.FC = () => {
       const clientObj = clients.find(c => String(c.id).trim().toUpperCase() === String(r.client_id || '').trim().toUpperCase());
       const clientBaseName = clientObj ? String(clientObj.name).trim().toUpperCase() : String(r.client_id || 'S/I').trim().toUpperCase();
       const rowClient = `TDM ${clientBaseName}`;
-      if (targetClient !== 'GENERAL' && rowClient !== targetClient) return;
+      const rowClientShort = String(toShortClientName(rowClient, clients) || rowClient).trim().toUpperCase();
+      if (targetClient !== 'GENERAL' && rowClient !== targetClient && rowClientShort !== targetClient) return;
       const plate = r.placa ? String(r.placa).trim().toUpperCase() : 'SIN PLACA';
       const cobrar = Number(r.valor_cobrar) || 0;
       const pagar = Number(r.valor_pagar) || 0;
@@ -2165,10 +2174,17 @@ export const InformesGerenciales: React.FC = () => {
         tdmClient = 'PREBEL';
       }
 
-      if (targetClient !== 'GENERAL' && providerClient !== targetClient && tdmClient !== targetClient) {
+      // Nombre corto tal como lo muestra la tabla "Ventas Clientes General" (LTSA, AJV CALI, ...)
+      const rawClientName = r.client_name ? String(r.client_name).trim() : 'S/I';
+      let shortClient = String(toShortClientName(rawClientName, clients) || rawClientName).trim().toUpperCase();
+      if (shortClient.includes('PREBEL')) {
+        shortClient = 'PREBEL';
+      }
+
+      if (targetClient !== 'GENERAL' && providerClient !== targetClient && tdmClient !== targetClient && shortClient !== targetClient) {
         return;
       }
-      const client = providerClient === targetClient ? providerClient : tdmClient;
+      const client = providerClient === targetClient ? providerClient : (shortClient === targetClient ? shortClient : tdmClient);
 
       const plate = r.plate ? String(r.plate).trim().toUpperCase() : 'SIN PLACA';
 
@@ -2227,7 +2243,8 @@ export const InformesGerenciales: React.FC = () => {
       const clientObj = clients.find(c => String(c.id).trim().toUpperCase() === String(r.client_id || '').trim().toUpperCase());
       const clientBaseName = clientObj ? String(clientObj.name).trim().toUpperCase() : String(r.client_id || 'S/I').trim().toUpperCase();
       const rowClient = `TDM ${clientBaseName}`;
-      if (targetClient !== 'GENERAL' && rowClient !== targetClient) return;
+      const rowClientShort = String(toShortClientName(rowClient, clients) || rowClient).trim().toUpperCase();
+      if (targetClient !== 'GENERAL' && rowClient !== targetClient && rowClientShort !== targetClient) return;
       const plate = r.placa ? String(r.placa).trim().toUpperCase() : 'SIN PLACA';
       const cobrar = Number(r.valor_cobrar) || 0;
       const mapKey = targetClient === 'GENERAL' ? `${plate}_${rowClient}` : plate;
@@ -2933,6 +2950,18 @@ export const InformesGerenciales: React.FC = () => {
         >
           <Upload size={14} />
           <span>Cargar Información</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('pendienteFacturar')}
+          className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'pendienteFacturar'
+              ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/50'
+              : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/50'
+          }`}
+        >
+          <FileText size={14} />
+          <span>Pendiente por Facturar</span>
         </button>
       </div>
 
@@ -5419,6 +5448,11 @@ export const InformesGerenciales: React.FC = () => {
           formatDate={formatDate}
           formatMoney={formatMoney}
         />
+      )}
+
+      {/* TAB 4: PENDIENTE POR FACTURAR (por cliente único, varios o todos) */}
+      {activeTab === 'pendienteFacturar' && (
+        <TabPendienteFacturar managementClients={managementClients} />
       )}
 
       {/* TAB 3: CARGAR INFORMACION TAB PANEL */}
