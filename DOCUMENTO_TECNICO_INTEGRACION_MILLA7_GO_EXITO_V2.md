@@ -210,8 +210,10 @@ Dado que **Milla Siete** realiza la recogida en los nodos/tiendas del Grupo Éxi
 
 | Recurso | Valor / Configuración QA |
 | :--- | :--- |
-| **Base URL Ambiente QA / Sandbox** | `https://orbitm7.m7apps.com/api/v1` |
-| **Especificación OpenAPI 3.0.3 (JSON)** | `https://orbitm7.m7apps.com/api/exito-mensajeria/openapi.json` *(También adjunta a este correo)* |
+| **Base URL Ambiente QA / Sandbox** | `https://devsm7.santamariapp.com/api/v1` |
+| **Base URL Ambiente Producción** | `https://apiapps.m7apps.com/api/v1` |
+| **Especificación OpenAPI 3.0.3 (JSON)** | `https://devsm7.santamariapp.com/api/exito-mensajeria/openapi.json` *(También adjunta a este correo)* |
+| **Portal Web Operativo QA (Inhouse/Rutas)** | `https://devsm7.santamariapp.com/exito-mensajeria-inhouse` |
 | **Header de Autenticación QA** | `x-api-key: m7-exito-sandbox-key-2026` |
 | **Header de Ambiente** | `x-exito-env: SANDBOX` *(o `QA`)* |
 | **Header de Trazabilidad** | `x-correlation-id: <UUID-v4>` |

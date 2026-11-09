@@ -717,10 +717,12 @@ export const migration012: Migration = {
     // Otorgar permisos de vista/operación de PAG-84 al rol CONDUCTORES (ROL-03) y PAG-83/84 a ADMIN (ROL-02)
     await client.query(`
       INSERT INTO alertas_whatsapp (id, name, description, cron_expression, tipo_evento, adjunto_tipo, status_id) VALUES
-        ('WA-EXITO-NOVEDAD',    'Éxito Mensajería: Novedad Operativa',       'Alerta inmediata cuando un conductor o bodega reporta novedad en guía Éxito', '0 8 * * *', 'EXITO_NOVEDAD',    'ninguno', 'EST-01'),
-        ('WA-EXITO-RECHAZO',    'Éxito Mensajería: Rechazo de Entrega',      'Alerta prioritaria cuando el destinatario rechaza el pedido Éxito',          '0 8 * * *', 'EXITO_RECHAZO',    'ninguno', 'EST-01'),
-        ('WA-EXITO-DEVOLUCION', 'Éxito Mensajería: Guía en Devolución',      'Alerta cuando una guía pasa a estado Devolución (Id guía = 9)',             '0 8 * * *', 'EXITO_DEVOLUCION', 'ninguno', 'EST-01'),
-        ('WA-EXITO-DLQ',        'Éxito Mensajería: Alerta Técnica DLQ (P1)', 'Alerta crítica cuando un evento de tracking supera 24h y entra en DLQ',     '0 8 * * *', 'EXITO_DLQ',        'ninguno', 'EST-01')
+        ('WA-EXITO-RECOGIDA',          'Éxito Mensajería: Recogida en Punto / Tienda',              'Alerta inmediata por correo y WhatsApp cuando el conductor recoge guías en tienda Éxito',  '0 8 * * *', 'EXITO_RECOGIDA_PUNTO',    'ninguno', 'EST-01'),
+        ('WA-EXITO-RECEPCION-ALMACEN', 'Éxito Mensajería: Recepción en Almacén Milla 7',            'Alerta inmediata por correo y WhatsApp cuando las guías son recibidas/pistoleadas en M7', '0 8 * * *', 'EXITO_RECEPCION_ALMACEN', 'ninguno', 'EST-01'),
+        ('WA-EXITO-NOVEDAD',           'Éxito Mensajería: Novedad Operativa',                       'Alerta inmediata cuando un conductor o bodega reporta novedad en guía Éxito',             '0 8 * * *', 'EXITO_NOVEDAD',           'ninguno', 'EST-01'),
+        ('WA-EXITO-RECHAZO',           'Éxito Mensajería: Rechazo de Entrega',                      'Alerta prioritaria cuando el destinatario rechaza el pedido Éxito',                         '0 8 * * *', 'EXITO_RECHAZO',           'ninguno', 'EST-01'),
+        ('WA-EXITO-DEVOLUCION',        'Éxito Mensajería: Guía en Devolución',                      'Alerta cuando una guía pasa a estado Devolución (Id guía = 9)',                            '0 8 * * *', 'EXITO_DEVOLUCION',        'ninguno', 'EST-01'),
+        ('WA-EXITO-DLQ',               'Éxito Mensajería: Alerta Técnica DLQ (P1)',                 'Alerta crítica cuando un evento de tracking supera 24h y entra en DLQ',                    '0 8 * * *', 'EXITO_DLQ',               'ninguno', 'EST-01')
       ON CONFLICT (id) DO UPDATE SET
         name = EXCLUDED.name,
         description = EXCLUDED.description,

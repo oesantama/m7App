@@ -11,12 +11,12 @@
   },
   "servers": [
     {
-      "url": "https://orbitm7.m7apps.com",
-      "description": "Producción / Principal (HTTPS TLS 1.2+)"
+      "url": "https://devsm7.santamariapp.com",
+      "description": "Ambiente Sandbox / QA Dedicado (HTTPS TLS 1.3 - Let's Encrypt)"
     },
     {
-      "url": "http://localhost:8080",
-      "description": "Desarrollo / Sandbox Local"
+      "url": "https://apiapps.m7apps.com",
+      "description": "Ambiente de Producción Milla 7 Logistics (HTTPS TLS 1.3)"
     }
   ],
   "security": [

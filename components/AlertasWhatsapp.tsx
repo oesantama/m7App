@@ -31,7 +31,17 @@ const CANALES: { value: Canal; label: string }[] = [
 /** Tipos cuyo informe puede ir general o filtrado por cliente para cada destinatario. */
 const TIPOS_CON_ALCANCE = ['PREOPERACIONAL', 'FACTURACION_PENDIENTE', 'CIERRE_FACT', 'SOBRECOSTO'];
 /** Tipos que generan su propio mensaje (la plantilla es opcional). */
-const TIPOS_MENSAJE_AUTOMATICO = ['PREOPERACIONAL', 'FACTURACION_PENDIENTE', 'SIN_OPERACION_DIARIA'];
+const TIPOS_MENSAJE_AUTOMATICO = [
+  'PREOPERACIONAL',
+  'FACTURACION_PENDIENTE',
+  'SIN_OPERACION_DIARIA',
+  'EXITO_RECOGIDA_PUNTO',
+  'EXITO_RECEPCION_ALMACEN',
+  'EXITO_NOVEDAD',
+  'EXITO_RECHAZO',
+  'EXITO_DEVOLUCION',
+  'EXITO_DLQ',
+];
 
 const nuevoDestinatario = (): Destinatario => ({
   _key: `n-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -67,6 +77,12 @@ const TIPOS_EVENTO = [
   { value: 'SIN_OPERACION_DIARIA', label: 'Sin Operación Diaria (6:30 AM)' },
   { value: 'PREOPERACIONAL', label: 'Informe Preoperacional (PDF)' },
   { value: 'FACTURACION_PENDIENTE', label: 'Facturación Pendiente (Excel)' },
+  { value: 'EXITO_RECOGIDA_PUNTO',    label: 'Éxito: Recogida en Punto / Tienda' },
+  { value: 'EXITO_RECEPCION_ALMACEN', label: 'Éxito: Recepción en Almacén Milla 7' },
+  { value: 'EXITO_NOVEDAD',           label: 'Éxito: Novedad Operativa' },
+  { value: 'EXITO_RECHAZO',           label: 'Éxito: Rechazo de Entrega' },
+  { value: 'EXITO_DEVOLUCION',        label: 'Éxito: Guía en Devolución' },
+  { value: 'EXITO_DLQ',               label: 'Éxito: Alerta Técnica DLQ (P1)' },
 ];
 
 const ADJUNTO_TIPOS = [

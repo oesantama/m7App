@@ -1809,6 +1809,27 @@ export async function confirmWarehouseReception(req: any, res: Response) {
       }
     }
 
+    // Disparar Alerta Operativa: Recepción en Almacén Milla 7 (Correo y WhatsApp a destinatarios configurados)
+    try {
+      const infoGuiaRes = await pool.query(
+        `SELECT g.numero_guia, g.numero_pedido, g.cant_cajas, n.nombre AS nodo_nombre
+         FROM exito_msj_guias g
+         LEFT JOIN exito_msj_nodos n ON n.id = g.nodo_id
+         WHERE g.id = ANY($1::bigint[]) LIMIT 10`,
+        [guiaIds]
+      );
+      const muestraGuias = infoGuiaRes.rows.map((r: any) => `• Guía ${r.numero_guia} | Pedido: ${r.numero_pedido} (${r.cant_cajas || 1} cj)`).join('\n');
+      sendExitoOperationalAlert(
+        'EXITO_RECEPCION_ALMACEN',
+        `🏢 *RECEPCIÓN EN ALMACÉN MILLA 7*\n` +
+        `Total Guías Recibidas: *${guiaIds.length}*\n` +
+        `Responsable Bodega: *${userName}*\n` +
+        `Observación: ${observacion || 'Verificado y pistoleado en almacén urbano Milla 7'}\n\n` +
+        `Detalle de Guías:\n${muestraGuias}\n\n` +
+        `Fecha: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}`
+      ).catch(() => {});
+    } catch { }
+
     return res.json({
       success: true,
       receivedCount: guiaIds.length,
@@ -3412,6 +3433,24 @@ export async function completeDriverStorePickup(req: any, res: Response) {
          AND estado = 'PROGRAMADO'`,
       [finalPlaca, guias.length, codigoRecogida]
     );
+
+    // Disparar Alerta Operativa: Recogida en Punto / Tienda Éxito (Correo y WhatsApp a destinatarios configurados)
+    try {
+      const detalleGuias = guias.slice(0, 10).map((g: any) => `• Guía ${g.numero_guia} | Pedido: ${g.numero_pedido} (${g.cant_cajas || 1} cj)`).join('\n');
+      sendExitoOperationalAlert(
+        'EXITO_RECOGIDA_PUNTO',
+        `📦 *RECOGIDA EN PUNTO / TIENDA ÉXITO COMPLETADA*\n` +
+        `Código Recogida: *${codigoRecogida}*\n` +
+        `Nodo/Tienda: *${primeraGuia.nodo_nombre || 'NODO ÉXITO'}*\n` +
+        `Placa Asignada: *${finalPlaca}*\n` +
+        `Conductor: *${finalConductorNombre}*\n` +
+        `Total Guías Recogidas: *${guias.length}*\n` +
+        `Total Cajas/Paquetes: *${totalUnidades}*\n` +
+        `Remisión Digital PDF: ${remisionOnDemandUrl}\n\n` +
+        `Muestra de Guías Recogidas:\n${detalleGuias}\n\n` +
+        `Fecha: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}`
+      ).catch(() => {});
+    } catch { }
 
     return res.json({
       success: true,
