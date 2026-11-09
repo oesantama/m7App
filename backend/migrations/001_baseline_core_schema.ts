@@ -23,6 +23,62 @@ export const migration001: Migration = {
 
     // Tablas maestras iniciales
     await client.query(`
+      CREATE TABLE IF NOT EXISTS estados (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        description TEXT,
+        status_id TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS marcas (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        description TEXT,
+        status_id TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS prov_cliente (
+        documento TEXT PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        contacto TEXT,
+        email TEXT,
+        representante TEXT,
+        estado TEXT DEFAULT 'EST-01',
+        usuario_creacion TEXT,
+        fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        client_mappings JSONB DEFAULT '[]'
+      );
+
+      CREATE TABLE IF NOT EXISTS assignments (
+        id SERIAL PRIMARY KEY,
+        vehicle_id TEXT,
+        driver_id TEXT,
+        client_id TEXT,
+        is_active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS picking_assignments (
+        id SERIAL PRIMARY KEY,
+        invoice_id TEXT,
+        leader_id TEXT,
+        helper_ids JSONB DEFAULT '[]',
+        status TEXT DEFAULT 'PENDIENTE',
+        created_by TEXT,
+        started_at TIMESTAMP WITH TIME ZONE,
+        completed_at TIMESTAMP WITH TIME ZONE,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS roles (
         id TEXT PRIMARY KEY,
         name TEXT,

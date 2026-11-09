@@ -93,6 +93,34 @@ export const migration003: Migration = {
         fecha_completado TIMESTAMP WITH TIME ZONE
       );
 
+      CREATE TABLE IF NOT EXISTS gh_areas (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(255) NOT NULL,
+        estado VARCHAR(50) DEFAULT 'ACTIVO',
+        usuario_control VARCHAR(255),
+        fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS gh_personal (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(255) NOT NULL,
+        cedula VARCHAR(50) UNIQUE NOT NULL,
+        cargo VARCHAR(255),
+        eps VARCHAR(255),
+        afp VARCHAR(255),
+        celular_personal VARCHAR(50),
+        correo_personal VARCHAR(255),
+        celular_corporativo VARCHAR(50),
+        correo_corporativo VARCHAR(255),
+        jefe_inmediato_id INTEGER,
+        area_trabajo_id INTEGER,
+        es_jefe BOOLEAN DEFAULT FALSE,
+        fecha_ingreso DATE,
+        estado VARCHAR(50) DEFAULT 'ACTIVO',
+        usuario_control VARCHAR(255),
+        fecha_control TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
       CREATE TABLE IF NOT EXISTS gh_perfiles_cargo (
         id SERIAL PRIMARY KEY,
         cargo_id INTEGER NOT NULL,

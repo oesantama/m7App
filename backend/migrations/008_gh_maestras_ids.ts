@@ -33,6 +33,29 @@ export const migration008: Migration = {
 
     // ── Activos ──
     await client.query(`
+      CREATE TABLE IF NOT EXISTS marcas (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        description TEXT,
+        status_id TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS prov_cliente (
+        documento TEXT PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        contacto TEXT,
+        email TEXT,
+        representante TEXT,
+        estado TEXT DEFAULT 'EST-01',
+        usuario_creacion TEXT,
+        fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        client_mappings JSONB DEFAULT '[]'
+      );
+
       ALTER TABLE gh_activos
         ADD COLUMN IF NOT EXISTS marca_id TEXT REFERENCES marcas(id) ON DELETE SET NULL,
         ADD COLUMN IF NOT EXISTS proveedor_id TEXT REFERENCES prov_cliente(documento) ON UPDATE CASCADE ON DELETE SET NULL,

@@ -7,6 +7,19 @@ export const migration005: Migration = {
   up: async (client: PoolClient) => {
     // 1. Estados
     await client.query(`
+      CREATE TABLE IF NOT EXISTS estados (
+        id TEXT PRIMARY KEY,
+        name TEXT,
+        description TEXT,
+        status_id TEXT,
+        created_by TEXT,
+        updated_by TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
       INSERT INTO estados (id, name, status_id) VALUES
       ('EST-01', 'ACTIVO',          'EST-01'),
       ('EST-02', 'INACTIVO',        'EST-01'),
