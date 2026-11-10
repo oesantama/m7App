@@ -26,6 +26,8 @@ interface DataTableProps<T> {
   excelSheetName?: string;
   onExportExcel?: (exportRows: Record<string, any>[], sortedData: T[]) => void;
   renderExpandedRow?: (row: T) => React.ReactNode;
+  // Clic en la fila (ignora clics sobre botones, enlaces y campos dentro de la fila)
+  onRowClick?: (row: T) => void;
   
   // Opciones de Server-Side
   serverSide?: boolean;
@@ -66,6 +68,7 @@ export function DataTable<T extends Record<string, any>>({
   excelSheetName = 'Datos',
   onExportExcel,
   renderExpandedRow,
+  onRowClick,
   serverSide = false,
   totalRows,
   currentPage: externalCurrentPage,
@@ -319,8 +322,11 @@ export function DataTable<T extends Record<string, any>>({
     return (
       <React.Fragment key={rowId}>
         <tr
-          className={`hover:bg-slate-50/70 transition-colors group ${renderExpandedRow ? 'cursor-pointer' : ''}`}
-          onClick={() => renderExpandedRow && toggleRow(rowId)}
+          className={`hover:bg-slate-50/70 transition-colors group ${renderExpandedRow || onRowClick ? 'cursor-pointer' : ''}`}
+          onClick={(e) => {
+            if (renderExpandedRow) { toggleRow(rowId); return; }
+            if (onRowClick && !(e.target as HTMLElement).closest('button, a, input, select, textarea, label')) onRowClick(row);
+          }}
         >
           {selectable && (
             <td className="px-4 py-4 align-top" onClick={e => e.stopPropagation()}>

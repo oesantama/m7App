@@ -710,6 +710,15 @@ export const api = {
     body: JSON.stringify({ motivo })
   }),
   getGhHistorialAsignacion: (id: number | string) => fetchJson(`${API_URL}/gh-entradas-salidas/asignaciones/${id}/historial`),
+  // Informe: elementos en poder del personal entregados hace más de X meses
+  getGhInformeAntiguedad: (params: { meses: number; operacion?: string; personal_id?: string | number; elemento_id?: string | number; incluir_sin_soporte?: boolean }) => {
+    const q = new URLSearchParams({ meses: String(params.meses) });
+    if (params.operacion) q.set('operacion', params.operacion);
+    if (params.personal_id) q.set('personal_id', String(params.personal_id));
+    if (params.elemento_id) q.set('elemento_id', String(params.elemento_id));
+    if (params.incluir_sin_soporte) q.set('incluir_sin_soporte', 'true');
+    return fetchJson(`${API_URL}/gh-entradas-salidas/informes/antiguedad?${q.toString()}`);
+  },
   getGhPersonalInventario: (personalId: number | string) => fetchJson(`${API_URL}/gh-entradas-salidas/personal-inventario/${personalId}`),
   getGhPersonalSerials: (personalId: number | string, elementoId: number | string) => fetchJson(`${API_URL}/gh-entradas-salidas/personal-serials/${personalId}/${elementoId}`),
   getGhInventarioBodega: (params?: { elemento_id?: string | number }) => {

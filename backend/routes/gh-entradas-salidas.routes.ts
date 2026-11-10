@@ -10,7 +10,7 @@ import {
     getDevoluciones, createDevolucionPersonal, firmarDevolucion, generateDevolucionActaPDF,
     getPersonalInventario, getPersonalSerials,
     getInventarioBodega, getInventarioPersonal,
-    getUltimaEntregaElemento
+    getUltimaEntregaElemento, getInformeAntiguedad
 } from '../controllers/gh-entradas-salidas.controller.js';
 import { requirePermission, authenticateToken } from '../middleware/auth.middleware.js';
 
@@ -35,6 +35,8 @@ router.delete('/asignaciones/:id', requirePermission(['MASTER_INVENTARIO_GH', 'A
 router.get('/asignaciones/:id/historial', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH', 'CONSULTA_INVENTARIO_GH'], 'view'), getHistorialAsignacion);
 router.get('/asignaciones/:id/acta', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH', 'CONSULTA_INVENTARIO_GH'], 'view'), generateAsignacionActaPDF);
 router.get('/ultima-entrega/:personal_id/:elemento_id', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH', 'ENTREGAS_SALIDAS_GH'], 'view'), getUltimaEntregaElemento);
+
+router.get('/informes/antiguedad', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH', 'CONSULTA_INVENTARIO_GH'], 'view'), getInformeAntiguedad);
 
 router.get('/devoluciones', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH'], 'view'), getDevoluciones);
 router.post('/devoluciones', requirePermission(['MASTER_INVENTARIO_GH', 'ASIGNACION_DEVOLUCION_GH'], 'create'), createDevolucionPersonal);

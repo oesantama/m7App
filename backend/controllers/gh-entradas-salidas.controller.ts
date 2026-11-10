@@ -434,9 +434,15 @@ export const getAsignaciones = async (req: Request, res: Response) => {
             SELECT a.id, a.numero_asignacion, a.personal_id, a.autorizado_por, a.fecha, a.observaciones, a.usuario_control, a.fecha_control,
                    COALESCE(a.firma_estado, 'PENDIENTE') as firma_estado, a.fecha_firma, a.firmado_por,
                    a.estado, a.anulada_por, a.fecha_anulacion, a.motivo_anulacion, a.editada_por, a.fecha_edicion,
-                   p.nombre as personal_nombre, p.cedula as personal_documento
+                   p.nombre as personal_nombre, p.cedula as personal_documento,
+                   p.cargo as personal_cargo, p.operacion as personal_operacion, p.placa as personal_placa, p.estado as personal_estado,
+                   rep.id as devolucion_reposicion_id, rep.numero_devolucion as devolucion_reposicion_numero
             FROM gh_asignaciones_personal a
             LEFT JOIN gh_personal p ON a.personal_id = p.id
+            LEFT JOIN LATERAL (
+                SELECT dv.id, dv.numero_devolucion FROM gh_devoluciones_personal dv
+                WHERE dv.asignacion_id = a.id ORDER BY (dv.estado = 'ACTIVA') DESC, dv.id DESC LIMIT 1
+            ) rep ON true
         `;
         const whereClause: string[] = [];
         const params: any[] = [];
@@ -467,6 +473,10 @@ export const getAsignaciones = async (req: Request, res: Response) => {
         for (const row of result.rows) {
             const detQuery = `
                 SELECT d.id, d.elemento_id, d.cantidad, e.nombre as elemento_nombre, e.es_serializado,
+                       d.reposicion, COALESCE(d.cantidad_devuelta, 0) as cantidad_devuelta, d.observacion_reposicion,
+                       (SELECT ARRAY_AGG(s.serial ORDER BY s.serial) FROM gh_devoluciones_personal_serial s
+                          JOIN gh_devoluciones_personal dv ON dv.id = s.devolucion_id
+                         WHERE dv.asignacion_id = d.asignacion_id AND s.elemento_id = d.elemento_id) as serials_devueltos,
                        COALESCE(
                          (SELECT ARRAY_AGG(x.serial ORDER BY x.serial) FROM gh_asignaciones_personal_serial x WHERE x.asignacion_id = d.asignacion_id AND x.elemento_id = d.elemento_id),
                          (SELECT ARRAY_AGG(serial) FROM gh_inventario_serial_elemento WHERE elemento_id = d.elemento_id AND personal_id = $2 AND estado_serial = 'ASIGNADO')
@@ -474,6 +484,7 @@ export const getAsignaciones = async (req: Request, res: Response) => {
                 FROM gh_asignaciones_personal_detalle d
                 LEFT JOIN gh_elementos e ON d.elemento_id = e.id
                 WHERE d.asignacion_id = $1
+                ORDER BY d.id
             `;
             const details = await pool.query(detQuery, [row.id, row.personal_id]);
             assignments.push({ ...row, details: details.rows });
@@ -518,6 +529,9 @@ export const createAsignacionPersonal = async (req: Request, res: Response) => {
         ]);
         const asignacionId = resAsignacion.rows[0].id;
 
+        // Primero lo que devuelve (reposición), luego lo que recibe: así el saldo no se infla
+        await aplicarReposicion(client, { id: asignacionId, numero_asignacion, fecha }, Number(personal_id), items,
+            usuarioDe(req, usuario_control), null);
         await aplicarItemsAsignacion(client, asignacionId, Number(personal_id), items);
 
         await client.query('COMMIT');
@@ -554,10 +568,13 @@ async function aplicarItemsAsignacion(client: any, asignacionId: number, persona
 
             // Insert detail
             const insDetailSql = `
-                INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad) 
-                VALUES ($1, $2, $3)
+                INSERT INTO gh_asignaciones_personal_detalle (asignacion_id, elemento_id, cantidad, reposicion, cantidad_devuelta, observacion_reposicion)
+                VALUES ($1, $2, $3, $4, $5, $6)
             `;
-            await client.query(insDetailSql, [asignacionId, item.elemento_id, item.cantidad]);
+            await client.query(insDetailSql, [
+                asignacionId, item.elemento_id, item.cantidad,
+                item.reposicion || null, Number(item.cantidad_devuelta) || 0, item.observacion_reposicion || null,
+            ]);
 
             // Update Warehouse Stock
             await client.query('UPDATE gh_inventario_elemento SET stock = stock - $1 WHERE elemento_id = $2', [item.cantidad, item.elemento_id]);
@@ -611,19 +628,222 @@ async function cargarAsignacionBloqueada(client: any, id: number) {
     if (!r.rows.length) throw Object.assign(new Error('Asignación no encontrada.'), { status: 404 });
     const asig = r.rows[0];
     const det = await client.query(
-        `SELECT d.elemento_id, d.cantidad, e.nombre AS elemento_nombre, COALESCE(e.es_serializado, false) AS es_serializado
+        `SELECT d.elemento_id, d.cantidad, d.reposicion, COALESCE(d.cantidad_devuelta, 0) AS cantidad_devuelta, d.observacion_reposicion,
+                e.nombre AS elemento_nombre, COALESCE(e.es_serializado, false) AS es_serializado
          FROM gh_asignaciones_personal_detalle d LEFT JOIN gh_elementos e ON e.id = d.elemento_id
          WHERE d.asignacion_id = $1 ORDER BY d.id`, [id]);
     const ser = await client.query(
         `SELECT elemento_id, serial FROM gh_asignaciones_personal_serial WHERE asignacion_id = $1`, [id]);
+    const serDev = await client.query(
+        `SELECT s.elemento_id, s.serial FROM gh_devoluciones_personal_serial s
+         JOIN gh_devoluciones_personal dv ON dv.id = s.devolucion_id
+         WHERE dv.asignacion_id = $1 AND dv.estado = 'ACTIVA'`, [id]);
     const items = det.rows.map((d: any) => ({
         elemento_id: d.elemento_id,
         nombre: d.elemento_nombre,
         es_serializado: d.es_serializado,
         cantidad: Number(d.cantidad),
         serials: ser.rows.filter((x: any) => Number(x.elemento_id) === Number(d.elemento_id)).map((x: any) => x.serial),
+        reposicion: d.reposicion || null,
+        cantidad_devuelta: Number(d.cantidad_devuelta) || 0,
+        observacion_reposicion: d.observacion_reposicion || null,
+        serials_devueltos: serDev.rows.filter((x: any) => Number(x.elemento_id) === Number(d.elemento_id)).map((x: any) => x.serial),
     }));
     return { asig, items };
+}
+
+// ─── Devoluciones: movimientos compartidos (manual y por reposición en una asignación) ───
+
+const DESTINOS_DEVOLUCION = ['BODEGA', 'BAJA'];
+
+/**
+ * Aplica los elementos de una devolución: descuenta al colaborador y, según el destino,
+ * BODEGA → vuelve al stock de bodega (seriales DISPONIBLES) | BAJA → sale del inventario (seriales en BAJA).
+ * Registra los seriales exactos devueltos en gh_devoluciones_personal_serial.
+ */
+async function aplicarItemsDevolucion(client: any, devolucionId: number, personalId: number, items: any[]) {
+    for (const item of items) {
+        const destino = DESTINOS_DEVOLUCION.includes(item.destino) ? item.destino : 'BODEGA';
+        const cantidad = Number(item.cantidad);
+        if (!cantidad || cantidad <= 0) throw new Error('La cantidad a devolver debe ser mayor a 0.');
+
+        const stockCheck = await client.query(
+            'SELECT stock FROM gh_inventario_personal WHERE personal_id = $1 AND elemento_id = $2 FOR UPDATE',
+            [personalId, item.elemento_id]);
+        const currentStock = stockCheck.rows.length > 0 ? Number(stockCheck.rows[0].stock) : 0;
+        if (currentStock < cantidad) {
+            throw new Error(`El personal no posee suficiente stock de este elemento. Disponible: ${currentStock}, Solicitado a devolver: ${cantidad}`);
+        }
+
+        await client.query(
+            'INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad, destino) VALUES ($1, $2, $3, $4)',
+            [devolucionId, item.elemento_id, cantidad, destino]);
+
+        await client.query(
+            'UPDATE gh_inventario_personal SET stock = stock - $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE personal_id = $2 AND elemento_id = $3',
+            [cantidad, personalId, item.elemento_id]);
+
+        if (destino === 'BODEGA') {
+            const whCheck = await client.query('SELECT id FROM gh_inventario_elemento WHERE elemento_id = $1 FOR UPDATE', [item.elemento_id]);
+            if (whCheck.rows.length > 0) {
+                await client.query('UPDATE gh_inventario_elemento SET stock = stock + $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE elemento_id = $2', [cantidad, item.elemento_id]);
+            } else {
+                await client.query('INSERT INTO gh_inventario_elemento (elemento_id, stock) VALUES ($1, $2)', [item.elemento_id, cantidad]);
+            }
+        }
+
+        const serials: string[] = Array.isArray(item.serials) ? item.serials : [];
+        if (serials.length > 0) {
+            if (serials.length !== cantidad) {
+                throw new Error(`La cantidad de seriales (${serials.length}) no coincide con la cantidad a devolver (${cantidad}).`);
+            }
+            for (const serial of serials) {
+                const rawSerial = String(serial).trim().toUpperCase();
+                const checkSerial = await client.query(
+                    'SELECT id, estado_serial, personal_id FROM gh_inventario_serial_elemento WHERE serial = $1 AND elemento_id = $2 FOR UPDATE',
+                    [rawSerial, item.elemento_id]);
+                if (checkSerial.rows.length === 0) throw new Error(`El serial "${rawSerial}" no existe en el inventario.`);
+                if (checkSerial.rows[0].estado_serial !== 'ASIGNADO' || Number(checkSerial.rows[0].personal_id) !== personalId) {
+                    throw new Error(`El serial "${rawSerial}" no está asignado a esta persona.`);
+                }
+                await client.query(
+                    `UPDATE gh_inventario_serial_elemento SET estado_serial = $1, personal_id = NULL, fecha_asignacion = NULL
+                     WHERE serial = $2 AND elemento_id = $3`,
+                    [destino === 'BAJA' ? 'BAJA' : 'DISPONIBLE', rawSerial, item.elemento_id]);
+                await client.query(
+                    'INSERT INTO gh_devoluciones_personal_serial (devolucion_id, elemento_id, serial) VALUES ($1, $2, $3) ON CONFLICT (devolucion_id, serial) DO NOTHING',
+                    [devolucionId, item.elemento_id, rawSerial]);
+            }
+        }
+    }
+}
+
+/**
+ * Revierte la devolución automática (reposición) de una asignación: el colaborador recupera lo devuelto,
+ * bodega lo descuenta (si fue a BODEGA) y los seriales vuelven a su nombre. Verifica antes que lo devuelto
+ * siga disponible (no se haya entregado a otra persona). Con conservar=true deja el detalle como registro
+ * y marca la devolución ANULADA; si no, borra el detalle para volver a aplicarlo (edición).
+ * Devuelve el id de la devolución vinculada (o null).
+ */
+async function revertirDevolucionVinculada(client: any, asignacionId: number, conservar: boolean): Promise<number | null> {
+    const dv = await client.query(
+        `SELECT id, personal_id FROM gh_devoluciones_personal WHERE asignacion_id = $1 AND estado = 'ACTIVA' FOR UPDATE`, [asignacionId]);
+    if (!dv.rows.length) return null;
+    const devId = Number(dv.rows[0].id);
+    const personalId = Number(dv.rows[0].personal_id);
+    const det = await client.query(
+        `SELECT d.elemento_id, d.cantidad, d.destino, e.nombre AS elemento_nombre
+         FROM gh_devoluciones_personal_detalle d LEFT JOIN gh_elementos e ON e.id = d.elemento_id WHERE d.devolucion_id = $1`, [devId]);
+    const ser = await client.query('SELECT elemento_id, serial FROM gh_devoluciones_personal_serial WHERE devolucion_id = $1', [devId]);
+
+    // Verificar primero
+    for (const d of det.rows) {
+        const cant = Number(d.cantidad);
+        if (d.destino === 'BODEGA') {
+            const wh = await client.query('SELECT stock FROM gh_inventario_elemento WHERE elemento_id = $1 FOR UPDATE', [d.elemento_id]);
+            const enBodega = wh.rows.length ? Number(wh.rows[0].stock) : 0;
+            if (enBodega < cant) {
+                throw Object.assign(new Error(
+                    `No se puede modificar: las ${cant} unidad(es) devueltas de "${d.elemento_nombre}" ya no están en bodega (hay ${enBodega}).`), { status: 409 });
+            }
+        }
+        for (const s of ser.rows.filter((x: any) => Number(x.elemento_id) === Number(d.elemento_id))) {
+            const sr = await client.query(
+                'SELECT estado_serial FROM gh_inventario_serial_elemento WHERE serial = $1 AND elemento_id = $2 FOR UPDATE', [s.serial, d.elemento_id]);
+            const esperado = d.destino === 'BAJA' ? 'BAJA' : 'DISPONIBLE';
+            if (!sr.rows.length || sr.rows[0].estado_serial !== esperado) {
+                throw Object.assign(new Error(
+                    `No se puede modificar: el serial devuelto "${s.serial}" ya tuvo otro movimiento.`), { status: 409 });
+            }
+        }
+    }
+    // Revertir
+    for (const d of det.rows) {
+        const cant = Number(d.cantidad);
+        if (d.destino === 'BODEGA') {
+            await client.query('UPDATE gh_inventario_elemento SET stock = stock - $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE elemento_id = $2', [cant, d.elemento_id]);
+        }
+        const pc = await client.query('SELECT id FROM gh_inventario_personal WHERE personal_id = $1 AND elemento_id = $2 FOR UPDATE', [personalId, d.elemento_id]);
+        if (pc.rows.length) {
+            await client.query('UPDATE gh_inventario_personal SET stock = stock + $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE personal_id = $2 AND elemento_id = $3', [cant, personalId, d.elemento_id]);
+        } else {
+            await client.query('INSERT INTO gh_inventario_personal (personal_id, elemento_id, stock) VALUES ($1, $2, $3)', [personalId, d.elemento_id, cant]);
+        }
+        for (const s of ser.rows.filter((x: any) => Number(x.elemento_id) === Number(d.elemento_id))) {
+            await client.query(
+                `UPDATE gh_inventario_serial_elemento SET estado_serial = 'ASIGNADO', personal_id = $1, fecha_asignacion = CURRENT_TIMESTAMP
+                 WHERE serial = $2 AND elemento_id = $3`, [personalId, s.serial, d.elemento_id]);
+        }
+    }
+    if (conservar) {
+        await client.query(`UPDATE gh_devoluciones_personal SET estado = 'ANULADA' WHERE id = $1`, [devId]);
+    } else {
+        await client.query('DELETE FROM gh_devoluciones_personal_serial WHERE devolucion_id = $1', [devId]);
+        await client.query('DELETE FROM gh_devoluciones_personal_detalle WHERE devolucion_id = $1', [devId]);
+    }
+    return devId;
+}
+
+/**
+ * Valida y aplica la reposición de cada elemento de una asignación ANTES de entregar lo nuevo.
+ * Si el colaborador ya tiene saldo del elemento es obligatorio indicar qué pasa con el anterior:
+ *   BODEGA / BAJA → se crea (o reutiliza) la devolución vinculada a la asignación y se descuenta su saldo.
+ *   NO_DEVUELVE   → queda registrado con observación obligatoria; el saldo se acumula a sabiendas.
+ * Normaliza los campos de reposición en `items` (los deja en null si no tenía saldo).
+ */
+async function aplicarReposicion(client: any, asig: { id: number; numero_asignacion: string; fecha: any }, personalId: number,
+    items: any[], usuario: string, devIdExistente: number | null) {
+    const devolver: any[] = [];
+    for (const item of items) {
+        const st = await client.query(
+            'SELECT stock FROM gh_inventario_personal WHERE personal_id = $1 AND elemento_id = $2', [personalId, item.elemento_id]);
+        const tenencia = st.rows.length ? Number(st.rows[0].stock) : 0;
+        const nombre = item.nombre || `elemento ${item.elemento_id}`;
+        if (tenencia <= 0) {
+            item.reposicion = null; item.cantidad_devuelta = 0; item.observacion_reposicion = null; item.serials_devueltos = [];
+            continue;
+        }
+        const rep = item.reposicion;
+        if (!['BODEGA', 'BAJA', 'NO_DEVUELVE'].includes(rep)) {
+            throw new Error(`El colaborador ya tiene ${tenencia} unidad(es) de "${nombre}". Indique si devuelve el elemento anterior (a bodega o para baja) o si no lo entrega. Si no ve esa opción, recargue la página (Ctrl+Shift+R).`);
+        }
+        if (rep === 'NO_DEVUELVE') {
+            if (!String(item.observacion_reposicion || '').trim()) {
+                throw new Error(`Indique por qué no devuelve el elemento anterior de "${nombre}".`);
+            }
+            item.cantidad_devuelta = 0; item.serials_devueltos = [];
+            continue;
+        }
+        const cant = Number(item.cantidad_devuelta) || 0;
+        if (cant <= 0 || cant > tenencia) {
+            throw new Error(`La cantidad devuelta de "${nombre}" debe estar entre 1 y ${tenencia} (saldo actual del colaborador).`);
+        }
+        const serials = Array.isArray(item.serials_devueltos) ? item.serials_devueltos.filter(Boolean) : [];
+        if (item.es_serializado && serials.length !== cant) {
+            throw new Error(`Seleccione los ${cant} serial(es) que devuelve de "${nombre}".`);
+        }
+        item.cantidad_devuelta = cant;
+        devolver.push({ elemento_id: item.elemento_id, cantidad: cant, serials, destino: rep });
+    }
+
+    if (!devolver.length) {
+        if (devIdExistente) await client.query('DELETE FROM gh_devoluciones_personal WHERE id = $1', [devIdExistente]);
+        return;
+    }
+    let devId = devIdExistente;
+    const motivo = `Reposición por asignación ${asig.numero_asignacion}`;
+    if (devId) {
+        await client.query(
+            'UPDATE gh_devoluciones_personal SET personal_id = $1, fecha = $2, motivo = $3 WHERE id = $4',
+            [personalId, asig.fecha, motivo, devId]);
+    } else {
+        const ins = await client.query(
+            `INSERT INTO gh_devoluciones_personal (numero_devolucion, personal_id, motivo, fecha, usuario_control, firma_estado, asignacion_id)
+             VALUES ($1, $2, $3, $4, $5, 'PENDIENTE', $6) RETURNING id`,
+            [`${asig.numero_asignacion}-REP`, personalId, motivo, asig.fecha, usuario, asig.id]);
+        devId = Number(ins.rows[0].id);
+    }
+    await aplicarItemsDevolucion(client, devId, personalId, devolver);
 }
 
 /** Solo se modifica una asignación ACTIVA y con firma PENDIENTE: firmada es inmodificable. */
@@ -694,7 +914,11 @@ const fotoAsignacion = (asig: any, items: any[]) => ({
     autorizado_por: asig.autorizado_por,
     fecha: asig.fecha,
     observaciones: asig.observaciones,
-    items: items.map(i => ({ elemento_id: i.elemento_id, nombre: i.nombre, cantidad: i.cantidad, serials: i.serials })),
+    items: items.map(i => ({
+        elemento_id: i.elemento_id, nombre: i.nombre, cantidad: i.cantidad, serials: i.serials,
+        reposicion: i.reposicion || null, cantidad_devuelta: i.cantidad_devuelta || 0,
+        observacion_reposicion: i.observacion_reposicion || null, serials_devueltos: i.serials_devueltos || [],
+    })),
 });
 
 const usuarioDe = (req: Request, fallback?: string) =>
@@ -717,6 +941,7 @@ export const updateAsignacionPersonal = async (req: Request, res: Response) => {
 
         // 1. Revertir lo que hizo la versión anterior (con validación de movimientos posteriores)
         await revertirItemsAsignacion(client, asig, antes);
+        const devVinculada = await revertirDevolucionVinculada(client, id, false);
         await client.query('DELETE FROM gh_asignaciones_personal_detalle WHERE asignacion_id = $1', [id]);
         await client.query('DELETE FROM gh_asignaciones_personal_serial WHERE asignacion_id = $1', [id]);
 
@@ -727,6 +952,7 @@ export const updateAsignacionPersonal = async (req: Request, res: Response) => {
                  editada_por = $5, fecha_edicion = CURRENT_TIMESTAMP
              WHERE id = $6`,
             [Number(personal_id), String(autorizado_por).trim(), fecha, observaciones || null, usuario, id]);
+        await aplicarReposicion(client, { id, numero_asignacion: asig.numero_asignacion, fecha }, Number(personal_id), items, usuario, devVinculada);
         await aplicarItemsAsignacion(client, id, Number(personal_id), items);
 
         // 3. Historial con la foto completa del antes y el después
@@ -760,6 +986,7 @@ export const anularAsignacionPersonal = async (req: Request, res: Response) => {
         const { asig, items } = await cargarAsignacionBloqueada(client, id);
         validarModificable(asig);
         await revertirItemsAsignacion(client, asig, items);
+        await revertirDevolucionVinculada(client, id, true);
         // El detalle y los seriales se CONSERVAN: son el registro de lo que se había asignado
         await client.query(
             `UPDATE gh_asignaciones_personal
@@ -800,9 +1027,12 @@ export const getDevoluciones = async (req: Request, res: Response) => {
         let query = `
             SELECT d.id, d.numero_devolucion, d.personal_id, d.motivo, d.fecha, d.usuario_control, d.fecha_control,
                    COALESCE(d.firma_estado, 'PENDIENTE') as firma_estado, d.fecha_firma, d.firmado_por,
-                   p.nombre as personal_nombre, p.cedula as personal_documento
+                   COALESCE(d.estado, 'ACTIVA') as estado, d.asignacion_id, ao.numero_asignacion as asignacion_origen_numero,
+                   p.nombre as personal_nombre, p.cedula as personal_documento,
+                   p.cargo as personal_cargo, p.operacion as personal_operacion, p.placa as personal_placa, p.estado as personal_estado
             FROM gh_devoluciones_personal d
             LEFT JOIN gh_personal p ON d.personal_id = p.id
+            LEFT JOIN gh_asignaciones_personal ao ON ao.id = d.asignacion_id
         `;
         const whereClause: string[] = [];
         const params: any[] = [];
@@ -832,13 +1062,16 @@ export const getDevoluciones = async (req: Request, res: Response) => {
         const returns: any[] = [];
         for (const row of result.rows) {
             const detQuery = `
-                SELECT d.id, d.elemento_id, d.cantidad, e.nombre as elemento_nombre, e.es_serializado,
-                       (SELECT ARRAY_AGG(serial) FROM gh_inventario_serial_elemento WHERE elemento_id = d.elemento_id AND personal_id = $2 AND estado_serial = 'DISPONIBLE') as serials
+                SELECT d.id, d.elemento_id, d.cantidad, COALESCE(d.destino, 'BODEGA') as destino,
+                       e.nombre as elemento_nombre, e.es_serializado,
+                       (SELECT ARRAY_AGG(s.serial ORDER BY s.serial) FROM gh_devoluciones_personal_serial s
+                         WHERE s.devolucion_id = d.devolucion_id AND s.elemento_id = d.elemento_id) as serials
                 FROM gh_devoluciones_personal_detalle d
                 LEFT JOIN gh_elementos e ON d.elemento_id = e.id
                 WHERE d.devolucion_id = $1
-            `; // Wait, let's keep details standard and not search returning serials if not tracked in returns detail, but we can query them anyway!
-            const details = await pool.query(detQuery, [row.id, row.personal_id]);
+                ORDER BY d.id
+            `;
+            const details = await pool.query(detQuery, [row.id]);
             returns.push({ ...row, details: details.rows });
         }
 
@@ -893,61 +1126,7 @@ export const createDevolucionPersonal = async (req: Request, res: Response) => {
         ]);
         const devolucionId = resDevolucion.rows[0].id;
 
-        for (const item of items) {
-            // Lock personal stock
-            await client.query('SELECT id FROM gh_inventario_personal WHERE personal_id = $1 AND elemento_id = $2 FOR UPDATE', [Number(personal_id), item.elemento_id]);
-
-            // Get current personal stock
-            const stockCheck = await client.query('SELECT stock FROM gh_inventario_personal WHERE personal_id = $1 AND elemento_id = $2', [Number(personal_id), item.elemento_id]);
-            const currentStock = stockCheck.rows.length > 0 ? stockCheck.rows[0].stock : 0;
-
-            if (currentStock < item.cantidad) {
-                throw new Error(`El personal no posee suficiente stock de este elemento. Disponible: ${currentStock}, Solicitado a devolver: ${item.cantidad}`);
-            }
-
-            // Insert detail
-            const insDetail = `
-                INSERT INTO gh_devoluciones_personal_detalle (devolucion_id, elemento_id, cantidad) 
-                VALUES ($1, $2, $3)
-            `;
-            await client.query(insDetail, [devolucionId, item.elemento_id, item.cantidad]);
-
-            // Update Personal Stock
-            await client.query('UPDATE gh_inventario_personal SET stock = stock - $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE personal_id = $2 AND elemento_id = $3', [item.cantidad, Number(personal_id), item.elemento_id]);
-
-            // Update Warehouse Stock (Upsert)
-            const whCheck = await client.query('SELECT id FROM gh_inventario_elemento WHERE elemento_id = $1 FOR UPDATE', [item.elemento_id]);
-            if (whCheck.rows.length > 0) {
-                await client.query('UPDATE gh_inventario_elemento SET stock = stock + $1, fecha_actualizacion = CURRENT_TIMESTAMP WHERE elemento_id = $2', [item.cantidad, item.elemento_id]);
-            } else {
-                await client.query('INSERT INTO gh_inventario_elemento (elemento_id, stock) VALUES ($1, $2)', [item.elemento_id, item.cantidad]);
-            }
-
-            // Handle Serials
-            if (item.serials && Array.isArray(item.serials) && item.serials.length > 0) {
-                if (item.serials.length !== item.cantidad) {
-                    throw new Error(`La cantidad de seriales (${item.serials.length}) no coincide con la cantidad a devolver (${item.cantidad}).`);
-                }
-
-                for (const serial of item.serials) {
-                    const rawSerial = serial.trim().toUpperCase();
-                    // Verify if this serial exists and is ASIGNADO to this person
-                    const checkSerial = await client.query('SELECT id, estado_serial, personal_id FROM gh_inventario_serial_elemento WHERE serial = $1 AND elemento_id = $2 FOR UPDATE', [rawSerial, item.elemento_id]);
-                    if (checkSerial.rows.length === 0) {
-                        throw new Error(`El serial "${rawSerial}" no existe en el inventario.`);
-                    }
-                    if (checkSerial.rows[0].estado_serial !== 'ASIGNADO' || Number(checkSerial.rows[0].personal_id) !== Number(personal_id)) {
-                        throw new Error(`El serial "${rawSerial}" no está asignado a esta persona.`);
-                    }
-
-                    // Update serial state back to DISPONIBLE and remove association
-                    await client.query(
-                        "UPDATE gh_inventario_serial_elemento SET estado_serial = 'DISPONIBLE', personal_id = NULL, fecha_asignacion = NULL WHERE serial = $1", 
-                        [rawSerial]
-                    );
-                }
-            }
-        }
+        await aplicarItemsDevolucion(client, devolucionId, Number(personal_id), items);
 
         await client.query('COMMIT');
         res.json({ success: true, data: resDevolucion.rows[0] });
@@ -1039,6 +1218,13 @@ export const firmarAsignacion = async (req: Request, res: Response) => {
             [firmado_por || personalDocumento, Number(id)]
         );
 
+        if (firmado.rowCount) {
+            // La devolución por reposición hace parte de la misma acta: queda firmada con la asignación
+            await pool.query(
+                `UPDATE gh_devoluciones_personal SET firma_estado = 'FIRMADO', fecha_firma = NOW(), firmado_por = $1
+                 WHERE asignacion_id = $2 AND estado = 'ACTIVA' AND COALESCE(firma_estado, 'PENDIENTE') <> 'FIRMADO'`,
+                [firmado_por || personalDocumento, Number(id)]);
+        }
         if (!firmado.rowCount) {
             return res.status(409).json({ success: false, error: 'La asignación cambió mientras se firmaba (fue anulada o ya estaba firmada). Actualice la lista.' });
         }
@@ -1060,7 +1246,7 @@ export const firmarDevolucion = async (req: Request, res: Response) => {
 
     try {
         const devCheck = await pool.query(
-            `SELECT d.id, d.firma_estado, p.cedula as personal_documento, p.nombre as personal_nombre
+            `SELECT d.id, d.firma_estado, d.estado, p.cedula as personal_documento, p.nombre as personal_nombre
              FROM gh_devoluciones_personal d
              JOIN gh_personal p ON d.personal_id = p.id
              WHERE d.id = $1`,
@@ -1070,6 +1256,9 @@ export const firmarDevolucion = async (req: Request, res: Response) => {
             return res.status(404).json({ success: false, error: 'Devolución no encontrada.' });
         }
         const dev = devCheck.rows[0];
+        if (dev.estado === 'ANULADA') {
+            return res.status(400).json({ success: false, error: 'Esta devolución fue anulada: no se puede firmar.' });
+        }
         if (dev.firma_estado === 'FIRMADO') {
             return res.status(400).json({ success: false, error: 'Esta devolución ya fue firmada.' });
         }
@@ -1742,3 +1931,85 @@ export const getUltimaEntregaElemento = async (req: Request, res: Response) => {
     }
 };
 
+
+// ─── GET /api/gh-entradas-salidas/informes/antiguedad ───
+// Elementos en poder del personal entregados hace más de X meses, por operación, funcionario o general.
+// El saldo actual se reparte en las entregas más recientes (las devoluciones consumen primero lo más antiguo):
+// lo que queda "en poder" de una entrega con fecha anterior al corte cuenta como antigüedad vencida.
+// Unidades del saldo sin entrega registrada (cargues iniciales) se informan como "sin soporte".
+export const getInformeAntiguedad = async (req: Request, res: Response) => {
+    const meses = Math.max(0, Math.min(240, Number(req.query.meses) || 0));
+    const { operacion, personal_id, elemento_id, incluir_sin_soporte } = req.query;
+    try {
+        const params: any[] = [meses];
+        const filtros: string[] = [];
+        if (operacion) {
+            params.push(String(operacion).trim().toUpperCase());
+            filtros.push(`UPPER(TRIM(COALESCE(p.operacion, ''))) = $${params.length}`);
+        }
+        if (personal_id) {
+            params.push(Number(personal_id));
+            filtros.push(`i.personal_id = $${params.length}`);
+        }
+        if (elemento_id) {
+            params.push(Number(elemento_id));
+            filtros.push(`i.elemento_id = $${params.length}`);
+        }
+        const sinSoporte = String(incluir_sin_soporte) === 'true';
+
+        const sql = `
+            WITH inv AS (
+                SELECT i.personal_id, i.elemento_id, i.stock
+                FROM gh_inventario_personal i
+                LEFT JOIN gh_personal p ON p.id = i.personal_id
+                WHERE i.stock > 0 ${filtros.length ? 'AND ' + filtros.join(' AND ') : ''}
+            ),
+            ent AS (
+                SELECT a.personal_id, d.elemento_id, a.id AS asignacion_id, a.numero_asignacion, a.fecha, d.cantidad,
+                       SUM(d.cantidad) OVER (PARTITION BY a.personal_id, d.elemento_id ORDER BY a.fecha DESC, a.id DESC) AS acum
+                FROM gh_asignaciones_personal a
+                JOIN gh_asignaciones_personal_detalle d ON d.asignacion_id = a.id
+                JOIN inv ON inv.personal_id = a.personal_id AND inv.elemento_id = d.elemento_id
+                WHERE COALESCE(a.estado, 'ACTIVA') = 'ACTIVA'
+            ),
+            lotes AS (
+                SELECT e.*, LEAST(e.cantidad, inv.stock - (e.acum - e.cantidad)) AS en_poder
+                FROM ent e JOIN inv ON inv.personal_id = e.personal_id AND inv.elemento_id = e.elemento_id
+                WHERE e.acum - e.cantidad < inv.stock
+            ),
+            res AS (
+                SELECT inv.personal_id, inv.elemento_id, inv.stock,
+                       COALESCE(SUM(l.en_poder), 0)::int AS con_soporte,
+                       COALESCE(SUM(l.en_poder) FILTER (WHERE l.fecha <= (CURRENT_DATE - make_interval(months => $1::int))::date), 0)::int AS unidades_vencidas,
+                       MIN(l.fecha) AS fecha_mas_antigua,
+                       MAX(l.fecha) AS fecha_ultima_entrega,
+                       COALESCE(JSON_AGG(JSON_BUILD_OBJECT('asignacion_id', l.asignacion_id, 'numero', l.numero_asignacion,
+                                         'fecha', l.fecha, 'en_poder', l.en_poder) ORDER BY l.fecha, l.asignacion_id)
+                                FILTER (WHERE l.asignacion_id IS NOT NULL), '[]') AS entregas
+                FROM inv LEFT JOIN lotes l ON l.personal_id = inv.personal_id AND l.elemento_id = inv.elemento_id
+                GROUP BY inv.personal_id, inv.elemento_id, inv.stock
+            )
+            SELECT r.*, (r.stock - r.con_soporte)::int AS sin_soporte,
+                   CASE WHEN r.fecha_mas_antigua IS NULL THEN NULL
+                        ELSE (EXTRACT(YEAR FROM AGE(CURRENT_DATE, r.fecha_mas_antigua)) * 12
+                              + EXTRACT(MONTH FROM AGE(CURRENT_DATE, r.fecha_mas_antigua)))::int END AS meses_antiguedad,
+                   p.nombre AS personal_nombre, p.cedula AS personal_documento, p.cargo AS personal_cargo,
+                   UPPER(TRIM(COALESCE(p.operacion, ''))) AS personal_operacion, p.placa AS personal_placa, p.estado AS personal_estado,
+                   e.nombre AS elemento_nombre, COALESCE(e.es_serializado, false) AS es_serializado
+            FROM res r
+            LEFT JOIN gh_personal p ON p.id = r.personal_id
+            LEFT JOIN gh_elementos e ON e.id = r.elemento_id
+            WHERE r.unidades_vencidas > 0 ${sinSoporte ? 'OR r.stock - r.con_soporte > 0' : ''}
+            ORDER BY r.fecha_mas_antigua NULLS FIRST, p.nombre, e.nombre
+        `;
+        const result = await pool.query(sql, params);
+
+        const ops = await pool.query(
+            `SELECT DISTINCT UPPER(TRIM(operacion)) AS operacion FROM gh_personal
+             WHERE COALESCE(TRIM(operacion), '') <> '' ORDER BY 1`);
+        res.json({ success: true, data: result.rows, operaciones: ops.rows.map((r: any) => r.operacion), meses });
+    } catch (error: any) {
+        console.error('Error informe antigüedad GH:', error);
+        res.status(500).json({ success: false, error: 'Error del servidor' });
+    }
+};

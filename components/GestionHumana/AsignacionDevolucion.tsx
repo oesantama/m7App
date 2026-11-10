@@ -8,6 +8,7 @@ import { formatDate } from '../../utils/formatting';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import AsignacionInformes from './AsignacionInformes';
 import {
   ArrowLeftRight,
   Search,
@@ -34,92 +35,17 @@ import {
   FileDown,
   Lock,
   Ban,
-  History
+  History,
+  BarChart3,
+  Undo2,
+  PackageX
 } from 'lucide-react';
 
 interface Props {
   user: User;
 }
 
-interface SearchableSelectProps {
-  options: { value: string | number; label: string }[];
-  value: string | number;
-  onChange: (val: string) => void;
-  placeholder: string;
-  disabled?: boolean;
-}
-
-const SearchableSelect: React.FC<SearchableSelectProps> = ({ options, value, onChange, placeholder, disabled }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
-
-  const selectedOpt = options.find(o => o.value.toString() === value?.toString());
-
-  const filteredOptions = options.filter(o => 
-    o.label.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const handleToggle = () => {
-    if (disabled) return;
-    setIsOpen(!isOpen);
-    setSearch('');
-  };
-
-  return (
-    <div className="relative w-full">
-      <div 
-        onClick={handleToggle}
-        className={`w-full flex items-center justify-between px-4 py-2.5 bg-white border border-slate-200 rounded-xl cursor-pointer focus-within:ring-2 focus-within:ring-slate-900 ${disabled ? 'bg-slate-50 opacity-60 cursor-not-allowed text-slate-400' : 'text-slate-700'}`}
-      >
-        <span className={`text-xs font-semibold ${selectedOpt ? 'text-slate-800' : 'text-slate-400'}`}>
-          {selectedOpt ? selectedOpt.label : placeholder}
-        </span>
-        <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
-      </div>
-
-      {isOpen && (
-        <>
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 max-h-60 overflow-hidden flex flex-col animate-in fade-in slide-in-from-top-1 duration-150">
-            <div className="p-2 border-b border-slate-100 flex items-center gap-2 bg-slate-50 shrink-0">
-              <Search size={12} className="text-slate-400 shrink-0" />
-              <input
-                type="text"
-                autoFocus
-                placeholder="Buscar..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full bg-transparent border-none outline-none text-xs font-bold text-slate-700 uppercase"
-              />
-            </div>
-            
-            <div className="overflow-y-auto custom-scrollbar flex-1 max-h-48">
-              {filteredOptions.length === 0 ? (
-                <div className="p-3 text-center text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                  Sin resultados
-                </div>
-              ) : (
-                filteredOptions.map(opt => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => {
-                      onChange(opt.value.toString());
-                      setIsOpen(false);
-                    }}
-                    className={`w-full text-left px-4 py-2 text-xs font-bold uppercase transition-colors block ${opt.value.toString() === value?.toString() ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-50'}`}
-                  >
-                    {opt.label}
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
+import SearchableSelect from './shared/SearchableSelect';
 
 const calcularTiempoTranscurrido = (fechaUltimaStr: string, fechaActualStr?: string) => {
   const start = new Date(fechaUltimaStr);
@@ -176,8 +102,96 @@ const calcularTiempoTranscurrido = (fechaUltimaStr: string, fechaActualStr?: str
   };
 };
 
+/** La columna de acciones va de primera para que siempre esté a la vista. */
+const accionesPrimero = (cols: ColumnDef<any>[]) => {
+  const acc = cols.filter(c => c.key === 'acciones');
+  return [...acc, ...cols.filter(c => c.key !== 'acciones')];
+};
+
+/** Encabezado completo de un movimiento (asignación o devolución) para el modal de detalle. */
+const DetalleEncabezado: React.FC<{ d: any; esAsig: boolean }> = ({ d, esAsig }) => {
+  const fechaHora = (v: any) => (v ? new Date(v).toLocaleString('es-CO') : '—');
+  const firmado = d.firma_estado === 'FIRMADO';
+  const anulada = d.estado === 'ANULADA';
+  const Campo = ({ label, value, wide }: { label: string; value: React.ReactNode; wide?: boolean }) => (
+    <div className={wide ? 'md:col-span-2' : ''}>
+      <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{label}</div>
+      <div className="text-xs font-bold text-slate-800 mt-0.5 break-words">{value || '—'}</div>
+    </div>
+  );
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        <span className={`px-2.5 py-1 rounded-lg border text-[10px] font-black uppercase ${anulada ? 'bg-slate-100 border-slate-300 text-slate-600' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+          {anulada ? 'Anulada' : 'Activa'}
+        </span>
+        <span className={`px-2.5 py-1 rounded-lg border text-[10px] font-black uppercase ${firmado ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+          Firma: {firmado ? 'Firmado' : 'Pendiente'}
+        </span>
+        {esAsig && d.devolucion_reposicion_numero && (
+          <span className="px-2.5 py-1 rounded-lg border text-[10px] font-black uppercase bg-rose-50 border-rose-200 text-rose-700">
+            Devolución por reposición: {d.devolucion_reposicion_numero}
+          </span>
+        )}
+        {!esAsig && d.asignacion_origen_numero && (
+          <span className="px-2.5 py-1 rounded-lg border text-[10px] font-black uppercase bg-indigo-50 border-indigo-200 text-indigo-700">
+            Generada por la asignación {d.asignacion_origen_numero}
+          </span>
+        )}
+      </div>
+
+      <div className="bg-slate-50 rounded-2xl border border-slate-200/70 p-5 space-y-4">
+        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Encabezado</h4>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Campo label="ID interno" value={`#${d.id}`} />
+          <Campo label={esAsig ? 'N° asignación' : 'N° devolución'} value={esAsig ? d.numero_asignacion : d.numero_devolucion} />
+          <Campo label="Fecha de operación" value={formatDate(d.fecha)} />
+          {esAsig ? <Campo label="Autorizado por" value={d.autorizado_por} /> : <Campo label="Motivo" value={d.motivo} />}
+          <Campo label="Registrado por" value={d.usuario_control} />
+          <Campo label="Fecha de registro" value={fechaHora(d.fecha_control)} />
+          <Campo label="Firmado por" value={firmado ? d.firmado_por : 'Pendiente'} />
+          <Campo label="Fecha de firma" value={firmado ? fechaHora(d.fecha_firma) : '—'} />
+          {d.editada_por && <Campo label="Última edición" value={`${d.editada_por} · ${fechaHora(d.fecha_edicion)}`} wide />}
+          {anulada && d.anulada_por && <Campo label="Anulada por" value={`${d.anulada_por} · ${fechaHora(d.fecha_anulacion)}`} wide />}
+        </div>
+      </div>
+
+      <div className="bg-slate-50 rounded-2xl border border-slate-200/70 p-5 space-y-4">
+        <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Funcionario</h4>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Campo label="Nombre" value={d.personal_nombre} wide />
+          <Campo label="Cédula" value={d.personal_documento} />
+          <Campo label="Cargo" value={d.personal_cargo} />
+          <Campo label="Operación" value={d.personal_operacion} />
+          <Campo label="Placa" value={d.personal_placa} />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/** Qué pasó con el elemento anterior al entregar este (reposición). */
+const ReposicionBadge: React.FC<{ item: any }> = ({ item }) => {
+  const r = item?.reposicion;
+  const devueltos = (item?.serials_devueltos || []).filter(Boolean);
+  if (!r) return <span className="text-[10px] text-slate-400 uppercase font-black">Sin reposición</span>;
+  const cls = r === 'BODEGA' ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+    : r === 'BAJA' ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-amber-50 border-amber-200 text-amber-700';
+  const txt = r === 'BODEGA' ? `Devuelve ${item.cantidad_devuelta} a bodega`
+    : r === 'BAJA' ? `Devuelve ${item.cantidad_devuelta} para baja` : 'No devuelve';
+  return (
+    <div className="space-y-1">
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[9px] font-black uppercase ${cls}`}>
+        {r === 'BAJA' ? <PackageX size={10} /> : <Undo2 size={10} />} {txt}
+      </span>
+      {devueltos.length > 0 && <div className="text-[9px] text-slate-500 font-bold">Seriales: {devueltos.join(', ')}</div>}
+      {item.observacion_reposicion && <div className="text-[9px] text-slate-500 font-medium italic">{item.observacion_reposicion}</div>}
+    </div>
+  );
+};
+
 const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
-  const [activeTab, setActiveTab] = useState<'asignaciones' | 'devoluciones'>('asignaciones');
+  const [activeTab, setActiveTab] = useState<'asignaciones' | 'devoluciones' | 'informes'>('asignaciones');
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -255,6 +269,13 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
     cantidadUltima: number;
     textoTiempo: string;
     pendingItemToAdd: any | null;
+    // Reposición: saldo que el colaborador ya tiene del elemento y qué pasa con él
+    tenencia?: number;
+    serialesPersona?: string[];
+    reposicion?: '' | 'BODEGA' | 'BAJA' | 'NO_DEVUELVE';
+    cantidadDevuelta?: number;
+    serialsDevueltos?: string[];
+    observacionReposicion?: string;
   }>({
     isOpen: false,
     personalNombre: '',
@@ -275,7 +296,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
   /** Una asignación se puede editar/anular solo si está activa y la firma sigue pendiente. */
   const esModificable = (a: any) => a && a.estado !== 'ANULADA' && a.firma_estado !== 'FIRMADO';
 
-  const asignacionesColumns = React.useMemo<ColumnDef<any>[]>(() => [
+  const asignacionesColumns = React.useMemo<ColumnDef<any>[]>(() => accionesPrimero([
     {
       header: 'ID',
       key: 'id',
@@ -360,7 +381,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       key: 'acciones',
       sortable: false,
       render: (asig) => (
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-start gap-2">
           <button
             onClick={() => exportToPDF(asig)}
             title="Exportar PDF"
@@ -405,9 +426,9 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
         </div>
       )
     }
-  ], [user, canEdit, canDelete]);
+  ]), [user, canEdit, canDelete]);
 
-  const devolucionesColumns = React.useMemo<ColumnDef<any>[]>(() => [
+  const devolucionesColumns = React.useMemo<ColumnDef<any>[]>(() => accionesPrimero([
     {
       header: 'ID',
       key: 'id',
@@ -488,7 +509,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       key: 'acciones',
       sortable: false,
       render: (dev) => (
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-start gap-2">
           <button
             onClick={() => exportToPDF(dev)}
             title="Exportar PDF"
@@ -505,7 +526,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
         </div>
       )
     }
-  ], [user, canEdit]);
+  ]), [user, canEdit]);
 
   // Auto-focus barcode input
   useEffect(() => {
@@ -518,7 +539,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
   }, [showModal, selectedElement, scannedSerials]);
 
   useEffect(() => {
-    loadTabRecords();
+    if (activeTab !== 'informes') loadTabRecords();
     loadDropdowns();
   }, [activeTab]);
 
@@ -764,7 +785,8 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       nombre: selectedElement.nombre,
       es_serializado: selectedElement.es_serializado,
       cantidad: qty,
-      serials: selectedElement.es_serializado ? [...scannedSerials] : []
+      serials: selectedElement.es_serializado ? [...scannedSerials] : [],
+      ...(activeTab === 'devoluciones' ? { destino: 'BODEGA' } : {})
     };
 
     // If activeTab is asignaciones and personal_id is selected, query last delivery date
@@ -773,7 +795,24 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       const personalNombre = personalObj?.nombre || 'Colaborador';
 
       try {
-        const res = await api.getGhUltimaEntregaElemento(formHeader.personal_id, selectedElement.id, editingAsig?.id);
+        const [res, invRes] = await Promise.all([
+          api.getGhUltimaEntregaElemento(formHeader.personal_id, selectedElement.id, editingAsig?.id),
+          api.getGhPersonalInventario(formHeader.personal_id).catch(() => ({ success: false, data: [] })),
+        ]);
+        // Saldo que ya tiene el colaborador ANTES de esta asignación (en edición se descuenta lo que
+        // entregó esta misma asignación y se suma lo que devolvió por reposición)
+        const inv = (invRes?.data || []).find((x: any) => String(x.elemento_id) === String(selectedElement.id));
+        const orig = editingAsig && String(editingAsig.personal_id) === String(formHeader.personal_id) ? originalDe(selectedElement.id) : null;
+        const tenencia = Math.max(0, Number(inv?.stock || 0) - Number(orig?.cantidad || 0) + Number(orig?.cantidad_devuelta || 0));
+        let serialesPersona: string[] = [];
+        if (tenencia > 0 && selectedElement.es_serializado) {
+          try {
+            const sr = await api.getGhPersonalSerials(formHeader.personal_id, selectedElement.id);
+            const propios = new Set((orig?.serials || []).map((x: string) => String(x).toUpperCase()));
+            serialesPersona = (sr?.data || []).map((x: any) => String(x.serial).toUpperCase()).filter((x: string) => !propios.has(x));
+            (orig?.serials_devueltos || []).forEach((x: string) => { if (!serialesPersona.includes(x)) serialesPersona.push(x); });
+          } catch { /* sin seriales */ }
+        }
         if (res.success) {
           const fechaActual = formHeader.fecha || new Date().toISOString().split('T')[0];
           let textoTiempo = '';
@@ -798,7 +837,13 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
             numeroAsignacion: numeroAsig,
             cantidadUltima: cantUlt,
             textoTiempo,
-            pendingItemToAdd: newItem
+            pendingItemToAdd: newItem,
+            tenencia,
+            serialesPersona,
+            reposicion: orig?.reposicion || '',
+            cantidadDevuelta: orig?.reposicion && orig?.reposicion !== 'NO_DEVUELVE' ? Number(orig.cantidad_devuelta) : Math.min(tenencia, qty),
+            serialsDevueltos: (orig?.serials_devueltos || []).filter(Boolean),
+            observacionReposicion: orig?.observacion_reposicion || ''
           });
           return;
         }
@@ -818,8 +863,39 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
   };
 
   const handleConfirmAddFromUltimaEntrega = () => {
-    if (ultimaEntregaModal.pendingItemToAdd) {
-      setFormItems(prev => [...prev, ultimaEntregaModal.pendingItemToAdd]);
+    const m = ultimaEntregaModal;
+    if (m.pendingItemToAdd) {
+      let item = { ...m.pendingItemToAdd, reposicion: null, cantidad_devuelta: 0, serials_devueltos: [], observacion_reposicion: null };
+      if ((m.tenencia || 0) > 0) {
+        if (!m.reposicion) {
+          toast.error('Indique si el colaborador devuelve el elemento anterior.');
+          return;
+        }
+        if (m.reposicion === 'NO_DEVUELVE') {
+          if (!String(m.observacionReposicion || '').trim()) {
+            toast.error('Indique por qué no devuelve el elemento anterior.');
+            return;
+          }
+        } else {
+          const cant = Number(m.cantidadDevuelta) || 0;
+          if (cant < 1 || cant > (m.tenencia || 0)) {
+            toast.error(`La cantidad devuelta debe estar entre 1 y ${m.tenencia}.`);
+            return;
+          }
+          if (m.pendingItemToAdd.es_serializado && (m.serialsDevueltos || []).length !== cant) {
+            toast.error(`Seleccione los ${cant} serial(es) que devuelve.`);
+            return;
+          }
+        }
+        item = {
+          ...item,
+          reposicion: m.reposicion,
+          cantidad_devuelta: m.reposicion === 'NO_DEVUELVE' ? 0 : Number(m.cantidadDevuelta),
+          serials_devueltos: m.reposicion === 'NO_DEVUELVE' ? [] : (m.serialsDevueltos || []),
+          observacion_reposicion: String(m.observacionReposicion || '').trim() || null
+        };
+      }
+      setFormItems(prev => [...prev, item]);
     }
     setSelectedElementId('');
     setSelectedElement(null);
@@ -861,7 +937,11 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       nombre: d.elemento_nombre,
       es_serializado: d.es_serializado,
       cantidad: Number(d.cantidad),
-      serials: d.es_serializado ? (d.serials || []).filter(Boolean) : []
+      serials: d.es_serializado ? (d.serials || []).filter(Boolean) : [],
+      reposicion: d.reposicion || null,
+      cantidad_devuelta: Number(d.cantidad_devuelta) || 0,
+      serials_devueltos: (d.serials_devueltos || []).filter(Boolean),
+      observacion_reposicion: d.observacion_reposicion || null
     })));
     setSelectedElementId('');
     setSelectedElement(null);
@@ -1101,7 +1181,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
           </h1>
           <p className="text-slate-500 font-bold mt-1">Gestión de activos y devoluciones del personal de la empresa</p>
         </div>
-        {canCreate && (
+        {canCreate && activeTab !== 'informes' && (
           <button
             onClick={handleOpenNewModal}
             className="px-6 py-4 bg-slate-900 text-white font-black rounded-2xl hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl text-xs uppercase tracking-wider flex items-center gap-2 group border border-slate-800 active:scale-95"
@@ -1130,9 +1210,22 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
         >
           <UserMinus size={15} className="text-rose-500" /> Devoluciones a Bodega
         </button>
+        {canViewAll && (
+          <button
+            onClick={() => { setActiveTab('informes'); setViewDetail(null); }}
+            className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 ${
+              activeTab === 'informes' ? 'bg-white text-slate-900 shadow-md font-black' : 'text-slate-500 hover:text-slate-900'
+            }`}
+          >
+            <BarChart3 size={15} className="text-amber-500" /> Informes
+          </button>
+        )}
       </div>
 
+      {activeTab === 'informes' && <AsignacionInformes personalList={personalList} />}
+
       {/* Filter panel */}
+      {activeTab !== 'informes' && (<>
       <form onSubmit={handleSearch} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
         <div>
           <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Consultar por ID</label>
@@ -1189,6 +1282,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
         <DataTable
           data={canViewAll ? asignaciones : asignaciones.filter(a => (user.document_number || user.documentNumber) && a.personal_documento === (user.document_number || user.documentNumber))}
           columns={asignacionesColumns}
+          onRowClick={row => setViewDetail(row)}
           searchPlaceholder="Buscar en asignaciones..."
           excelFileName={`GH_Asignaciones_${new Date().toISOString().split('T')[0]}.xlsx`}
           excelSheetName="Asignaciones"
@@ -1197,11 +1291,13 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
         <DataTable
           data={canViewAll ? devoluciones : devoluciones.filter(d => (user.document_number || user.documentNumber) && d.personal_documento === (user.document_number || user.documentNumber))}
           columns={devolucionesColumns}
+          onRowClick={row => setViewDetail(row)}
           searchPlaceholder="Buscar en devoluciones..."
           excelFileName={`GH_Devoluciones_${new Date().toISOString().split('T')[0]}.xlsx`}
           excelSheetName="Devoluciones"
         />
       )}
+      </>)}
 
       {/* Main Creation Modal */}
       {showModal && (
@@ -1487,13 +1583,14 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                         <th className="p-4">Elemento</th>
                         <th className="p-4 text-center">Cantidad</th>
                         <th className="p-4">Seriales</th>
+                        <th className="p-4">{activeTab === 'asignaciones' ? 'Elemento anterior' : 'Destino'}</th>
                         <th className="p-4 text-right pr-6 w-24">Acción</th>
                       </tr>
                     </thead>
                     <tbody>
                       {formItems.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="p-8 text-center text-slate-400 font-bold uppercase tracking-wide">
+                          <td colSpan={6} className="p-8 text-center text-slate-400 font-bold uppercase tracking-wide">
                             Ningún elemento adicionado aún.
                           </td>
                         </tr>
@@ -1514,6 +1611,23 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                                 </div>
                               ) : (
                                 <span className="text-[10px] text-slate-400 uppercase font-black">No Serializado</span>
+                              )}
+                            </td>
+                            <td className="p-4">
+                              {activeTab === 'asignaciones' ? (
+                                <ReposicionBadge item={item} />
+                              ) : (
+                                <div className="w-52">
+                                  <SearchableSelect
+                                    placeholder="Destino"
+                                    value={item.destino || 'BODEGA'}
+                                    onChange={val => setFormItems(formItems.map((it, i) => i === idx ? { ...it, destino: val } : it))}
+                                    options={[
+                                      { value: 'BODEGA', label: 'A bodega (reutilizable)' },
+                                      { value: 'BAJA', label: 'Para baja (deteriorado)' }
+                                    ]}
+                                  />
+                                </div>
                               )}
                             </td>
                             <td className="p-4 text-right pr-6">
@@ -1686,7 +1800,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       {/* Details Modal */}
       {viewDetail && (
         <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden flex flex-col my-8 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-w-4xl rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden flex flex-col my-8 animate-in fade-in zoom-in-95 duration-200">
             <div className={`px-8 py-6 text-white flex justify-between items-center shrink-0 ${activeTab === 'asignaciones' ? 'bg-indigo-600' : 'bg-rose-500'}`}>
               <div className="flex items-center gap-3">
                 <FileText size={24} />
@@ -1701,9 +1815,10 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                 ×
               </button>
             </div>
-            <div className="p-8 overflow-y-auto space-y-6 max-h-[70vh] custom-scrollbar">
+            <div className="p-8 overflow-y-auto space-y-6 max-h-[75vh] custom-scrollbar">
+              <DetalleEncabezado d={viewDetail} esAsig={!!viewDetail.numero_asignacion} />
               <div>
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Elementos:</h4>
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Detalle del movimiento ({viewDetail.details?.length || 0} elemento(s) · {(viewDetail.details || []).reduce((a: number, d: any) => a + Number(d.cantidad || 0), 0)} und):</h4>
                 <div className="bg-white rounded-2xl border border-slate-200/60 overflow-hidden shadow-sm">
                   <table className="w-full text-left text-xs font-semibold text-slate-600">
                     <thead>
@@ -1711,6 +1826,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                         <th className="p-3 pl-5">Elemento</th>
                         <th className="p-3 text-center">Cantidad</th>
                         <th className="p-3">Seriales</th>
+                        <th className="p-3">{viewDetail.numero_asignacion ? 'Elemento anterior' : 'Destino'}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1729,6 +1845,15 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
                               </div>
                             ) : (
                               <span className="text-[10px] text-slate-400 uppercase font-black">N/A (No Serializado)</span>
+                            )}
+                          </td>
+                          <td className="p-3">
+                            {viewDetail.numero_asignacion ? (
+                              <ReposicionBadge item={det} />
+                            ) : (
+                              <span className={`px-2 py-0.5 rounded-lg border text-[9px] font-black uppercase ${det.destino === 'BAJA' ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700'}`}>
+                                {det.destino === 'BAJA' ? 'Para baja' : 'A bodega'}
+                              </span>
                             )}
                           </td>
                         </tr>
@@ -1952,7 +2077,7 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
       {/* Modal Dialog: Notificación / Validación de Última Entrega de Dotación */}
       {ultimaEntregaModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden transform animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-100 max-w-md w-full max-h-[92vh] overflow-y-auto transform animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className={`p-5 text-white flex items-center gap-3 ${ultimaEntregaModal.hasPrevious ? 'bg-gradient-to-r from-amber-500 to-amber-600' : 'bg-gradient-to-r from-indigo-600 to-blue-600'}`}>
               <div className="p-2.5 bg-white/20 backdrop-blur-md rounded-xl text-white">
@@ -2016,12 +2141,95 @@ const AsignacionDevolucion: React.FC<Props> = ({ user }) => {
               )}
             </div>
 
+            {(ultimaEntregaModal.tenencia || 0) > 0 && (
+              <div className="px-6 pb-5 space-y-3">
+                <div className="bg-rose-50 border-2 border-rose-200 rounded-xl p-3.5 space-y-3">
+                  <div className="text-xs font-black uppercase tracking-wide text-rose-900">
+                    El colaborador ya tiene {ultimaEntregaModal.tenencia} und(s) de este elemento
+                  </div>
+                  <p className="text-[11px] text-rose-800 font-medium leading-relaxed">
+                    ¿Devuelve el elemento anterior? Si lo devuelve, se descuenta de su saldo en la misma operación y no se infla su inventario.
+                  </p>
+                  <div className="grid grid-cols-1 gap-2">
+                    {([
+                      ['BODEGA', 'Devuelve a bodega', 'En buen estado: vuelve al stock de bodega.'],
+                      ['BAJA', 'Devuelve para baja', 'Deteriorado: sale del inventario (no vuelve a bodega).'],
+                      ['NO_DEVUELVE', 'No devuelve', 'Se acumula en su saldo. Indique el motivo.'],
+                    ] as const).map(([val, label, desc]) => (
+                      <label key={val} className={`flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition-all ${ultimaEntregaModal.reposicion === val ? 'bg-white border-slate-900 shadow-sm' : 'bg-white/60 border-rose-200 hover:bg-white'}`}>
+                        <input type="radio" name="reposicion" className="mt-0.5" checked={ultimaEntregaModal.reposicion === val}
+                          onChange={() => setUltimaEntregaModal(prev => ({ ...prev, reposicion: val }))} />
+                        <span>
+                          <span className="block text-xs font-black text-slate-900">{label}</span>
+                          <span className="block text-[10px] text-slate-500 font-medium">{desc}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+
+                  {(ultimaEntregaModal.reposicion === 'BODEGA' || ultimaEntregaModal.reposicion === 'BAJA') && (
+                    ultimaEntregaModal.pendingItemToAdd?.es_serializado ? (
+                      <div>
+                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Seriales que devuelve</div>
+                        {(ultimaEntregaModal.serialesPersona || []).length === 0 ? (
+                          <p className="text-[11px] text-slate-500">No hay seriales registrados a su nombre para este elemento.</p>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5">
+                            {(ultimaEntregaModal.serialesPersona || []).map(sr => {
+                              const sel = (ultimaEntregaModal.serialsDevueltos || []).includes(sr);
+                              return (
+                                <button key={sr} type="button"
+                                  onClick={() => setUltimaEntregaModal(prev => {
+                                    const list = sel ? (prev.serialsDevueltos || []).filter(x => x !== sr) : [...(prev.serialsDevueltos || []), sr];
+                                    return { ...prev, serialsDevueltos: list, cantidadDevuelta: list.length };
+                                  })}
+                                  className={`px-2 py-1 rounded-lg border text-[10px] font-black flex items-center gap-1 ${sel ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'}`}>
+                                  <Barcode size={10} /> {sr}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Cantidad que devuelve (máx. {ultimaEntregaModal.tenencia})</div>
+                        <input type="number" min={1} max={ultimaEntregaModal.tenencia}
+                          value={ultimaEntregaModal.cantidadDevuelta ?? 1}
+                          onChange={e => setUltimaEntregaModal(prev => ({ ...prev, cantidadDevuelta: Math.max(1, Math.min(prev.tenencia || 1, Number(e.target.value))) }))}
+                          className="w-32 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-black" />
+                      </div>
+                    )
+                  )}
+
+                  {ultimaEntregaModal.reposicion && (
+                    <div>
+                      <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                        Observación {ultimaEntregaModal.reposicion === 'NO_DEVUELVE' ? '*' : '(opcional)'}
+                      </div>
+                      <textarea rows={2} value={ultimaEntregaModal.observacionReposicion || ''}
+                        onChange={e => setUltimaEntregaModal(prev => ({ ...prev, observacionReposicion: e.target.value }))}
+                        placeholder={ultimaEntregaModal.reposicion === 'NO_DEVUELVE' ? 'Ej: lo perdió, lo conserva para cambio de turno...' : 'Estado del elemento devuelto...'}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium resize-none" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Modal Action Button */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100">
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setUltimaEntregaModal(prev => ({ ...prev, isOpen: false, pendingItemToAdd: null }))}
+                className="py-3 px-5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-xl text-xs uppercase tracking-wider"
+              >
+                Cancelar
+              </button>
               <button
                 type="button"
                 onClick={handleConfirmAddFromUltimaEntrega}
-                className="w-full py-3 px-5 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                className="flex-1 py-3 px-5 bg-slate-900 hover:bg-slate-800 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
               >
                 <CheckCircle2 size={16} className="text-emerald-400" />
                 Aceptar

@@ -12,6 +12,7 @@ import { migration009 } from './009_delivery_returns_optimization.js';
 import { migration010 } from './010_alertas_destinatarios_alcance.js';
 import { migration011 } from './011_gh_asignaciones_edicion_anulacion.js';
 import { migration012 } from './012_exito_mensajeria_schema.js';
+import { migration013 } from './013_gh_asignaciones_reposicion.js';
 
 export const MIGRATIONS_REGISTRY: Migration[] = [
   migration001,
@@ -25,7 +26,8 @@ export const MIGRATIONS_REGISTRY: Migration[] = [
   migration009,
   migration010,
   migration011,
-  migration012
+  migration012,
+  migration013
 ];
 
 const ADVISORY_LOCK_ID = 742910385;
