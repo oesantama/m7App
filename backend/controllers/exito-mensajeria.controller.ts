@@ -117,7 +117,7 @@ export async function createGuideB2B(req: ExitoApiRequest, res: Response) {
 
     // Extraer campos oficiales de la Sección 7.1 del PDF Go Éxito v2.0
     const numeroPedido = String(
-      innerData.numero_pedido || innerData.orderNumber || outerData.orderNumber || ''
+      innerData.numero_pedido || innerData.pedido || innerData.orderNumber || outerData.orderNumber || outerData.pedido || ''
     ).trim();
     const contenedor = String(innerData.contenedor || innerData.container || '').trim();
     const traceIn = String(outerData.trace || innerData.numero_guia || innerData.guideNumber || '').trim();
