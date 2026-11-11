@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import { formatDate } from '../../utils/formatting';
 import { BarChart3, Search, FileSpreadsheet, Users, Package, Clock, AlertTriangle, RefreshCw, ChevronRight } from 'lucide-react';
 import SearchableSelect from './shared/SearchableSelect';
+import MultiSearchableSelect from './shared/MultiSearchableSelect';
 
 type Modo = 'GENERAL' | 'OPERACION' | 'FUNCIONARIO';
 
@@ -21,7 +22,7 @@ interface Props {
  */
 const AsignacionInformes: React.FC<Props> = ({ personalList }) => {
   const [modo, setModo] = useState<Modo>('GENERAL');
-  const [operacion, setOperacion] = useState('');
+  const [operacionesSel, setOperacionesSel] = useState<string[]>([]);
   const [operaciones, setOperaciones] = useState<string[]>([]);
   const [personalId, setPersonalId] = useState('');
   const [meses, setMeses] = useState<number>(6);
@@ -36,14 +37,14 @@ const AsignacionInformes: React.FC<Props> = ({ personalList }) => {
   const [page, setPage] = useState(1);
 
   const consultar = async () => {
-    if (modo === 'OPERACION' && !operacion) { toast.error('Seleccione la operación.'); return; }
+    if (modo === 'OPERACION' && !operacionesSel.length) { toast.error('Seleccione al menos una operación.'); return; }
     if (modo === 'FUNCIONARIO' && !personalId) { toast.error('Seleccione el funcionario.'); return; }
     if (!(meses >= 0)) { toast.error('Indique los meses.'); return; }
     setLoading(true);
     try {
       const res = await api.getGhInformeAntiguedad({
         meses,
-        operacion: modo === 'OPERACION' ? operacion : undefined,
+        operacion: modo === 'OPERACION' ? operacionesSel : undefined,
         personal_id: modo === 'FUNCIONARIO' ? personalId : undefined,
         incluir_sin_soporte: incluirSinSoporte,
       });
@@ -144,7 +145,7 @@ const AsignacionInformes: React.FC<Props> = ({ personalList }) => {
     const ws2 = XLSX.utils.json_to_sheet(detalle);
     ws2['!cols'] = [{ wch: 36 }, { wch: 14 }, { wch: 24 }, { wch: 22 }, { wch: 10 }, { wch: 14 }, { wch: 40 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 12 }, { wch: 14 }, { wch: 60 }];
     XLSX.utils.book_append_sheet(wb, ws2, 'Detalle');
-    const sufijo = modo === 'OPERACION' ? `_${operacion}` : modo === 'FUNCIONARIO' ? `_${visibles[0]?.personal_documento || personalId}` : '_GENERAL';
+    const sufijo = modo === 'OPERACION' ? `_${operacionesSel.length === 1 ? operacionesSel[0] : `${operacionesSel.length}_operaciones`}` : modo === 'FUNCIONARIO' ? `_${visibles[0]?.personal_documento || personalId}` : '_GENERAL';
     XLSX.writeFile(wb, `GH_Antiguedad_Entregas_${mesesConsultados}m${sufijo}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
@@ -176,11 +177,11 @@ const AsignacionInformes: React.FC<Props> = ({ personalList }) => {
 
           {modo === 'OPERACION' && (
             <div className="md:col-span-2">
-              <label className={labelCls}>Operación</label>
-              <SearchableSelect
-                placeholder="Seleccione..."
-                value={operacion}
-                onChange={setOperacion}
+              <label className={labelCls}>Operación(es)</label>
+              <MultiSearchableSelect
+                placeholder="Seleccione una o varias..."
+                values={operacionesSel}
+                onChange={setOperacionesSel}
                 options={operaciones.map(o => ({ value: o, label: o }))}
               />
             </div>

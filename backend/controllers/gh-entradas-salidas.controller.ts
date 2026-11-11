@@ -1943,9 +1943,12 @@ export const getInformeAntiguedad = async (req: Request, res: Response) => {
     try {
         const params: any[] = [meses];
         const filtros: string[] = [];
-        if (operacion) {
-            params.push(String(operacion).trim().toUpperCase());
-            filtros.push(`UPPER(TRIM(COALESCE(p.operacion, ''))) = $${params.length}`);
+        // ?operacion=A&operacion=B (una o varias)
+        const operacionesFiltro = (Array.isArray(operacion) ? operacion : operacion ? [operacion] : [])
+            .map(o => String(o).trim().toUpperCase()).filter(Boolean);
+        if (operacionesFiltro.length) {
+            params.push(operacionesFiltro);
+            filtros.push(`UPPER(TRIM(COALESCE(p.operacion, ''))) = ANY($${params.length}::text[])`);
         }
         if (personal_id) {
             params.push(Number(personal_id));
