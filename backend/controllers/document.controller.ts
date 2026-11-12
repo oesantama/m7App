@@ -2813,6 +2813,7 @@ export const correctDocumentItems = async (req: Request, res: Response) => {
       old: Record<string, any>;
       new: Record<string, any>;
     }> = [];
+    const consolidadosARecalcular = new Set<string>();
 
     for (const item of items) {
       const artId = item.articleId?.trim().toUpperCase();
@@ -2924,7 +2925,25 @@ export const correctDocumentItems = async (req: Request, res: Response) => {
             [docId, artId, inv, field, oldVal == null ? null : String(oldVal), newVal == null ? null : String(newVal), changedBy || 'sistema']
           );
         }
+
+        if (item.expectedQty !== undefined) consolidadosARecalcular.add(`${docId}\u0000${artId}`);
       }
+    }
+
+    // M7-FIX: el consolidado de auditoría (correo de novedades, conteo ciego) guarda su propia
+    // cantidad esperada = SUM(document_items.expected_qty). Si se corrige la cantidad origen hay que
+    // recalcularlo; si no, el reenvío de novedades sigue mostrando la cantidad vieja.
+    for (const key of consolidadosARecalcular) {
+      const [docId, artId] = key.split('\u0000');
+      await client.query(
+        `UPDATE document_consolidated_items dci
+            SET expected_qty = COALESCE((
+                  SELECT SUM(di.expected_qty) FROM document_items di
+                   WHERE di.document_id = dci.document_id AND di.article_id = dci.article_id
+                ), 0)
+          WHERE dci.document_id = $1 AND dci.article_id = $2`,
+        [docId, artId]
+      );
     }
 
     if (dryRun) {
