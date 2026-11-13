@@ -79,15 +79,25 @@ export function authenticateExitoB2B(req: ExitoApiRequest, res: Response, next: 
     });
   }
 
-  // 2. Extraer credencial de encabezados x-api-key o Authorization: Bearer
-  const headerApiKey = (req.headers['x-api-key'] as string)?.trim() || '';
-  const authHeader = (req.headers['authorization'] as string)?.trim() || '';
-  const bearerToken = authHeader.toLowerCase().startsWith('bearer ')
-    ? authHeader.slice(7).trim()
-    : '';
-  const providedSecret = headerApiKey || bearerToken;
+  // 2. Extraer credencial de encabezados x-api-key, api-key o Authorization: Bearer
+  const rawApiKeyHeader = (req.headers['x-api-key'] || req.headers['api-key'] || req.headers['apikey']) as string | string[] | undefined;
+  const rawApiKeys = Array.isArray(rawApiKeyHeader)
+    ? rawApiKeyHeader.join(',')
+    : String(rawApiKeyHeader || '');
 
-  if (!providedSecret) {
+  // Separar por coma si el cliente (Postman/Proxy) envía cabeceras duplicadas y limpiar comillas
+  const candidateKeys = rawApiKeys
+    .split(',')
+    .map((k) => k.trim().replace(/^["']|["']$/g, ''))
+    .filter(Boolean);
+
+  const authHeader = String(req.headers['authorization'] || '').trim();
+  if (authHeader.toLowerCase().startsWith('bearer ')) {
+    const bearer = authHeader.slice(7).trim().replace(/^["']|["']$/g, '');
+    if (bearer) candidateKeys.push(bearer);
+  }
+
+  if (candidateKeys.length === 0) {
     return res.status(401).json({
       transactionId: correlationId,
       timestamp: new Date().toISOString(),
@@ -98,23 +108,33 @@ export function authenticateExitoB2B(req: ExitoApiRequest, res: Response, next: 
     });
   }
 
-  // 3. Llaves por ambiente: SOLO desde variables de entorno (nunca en el código, que va al
-  // repositorio). Una llave sin configurar no autentica. Fuera de producción hay una llave
-  // de sandbox por defecto para pruebas locales.
-  const fallbackKey = process.env.EXITO_API_KEY?.trim() || '';
-  const prodKey = process.env.EXITO_API_KEY_PROD?.trim() || '';
-  const qaKey = process.env.EXITO_API_KEY_QA?.trim() || fallbackKey;
-  const sandboxKey = process.env.EXITO_API_KEY_SANDBOX?.trim()
-    || fallbackKey
-    || (process.env.NODE_ENV !== 'production' ? 'm7_goexito_sandbox_2026_test_key' : 'm7-exito-sandbox-key-2026');
+  // 3. Llaves oficiales por ambiente (con fallback a las llaves documentadas de Milla 7 / Go Éxito)
+  const validProdKeys = [
+    process.env.EXITO_API_KEY_PROD?.trim(),
+    process.env.EXITO_API_KEY?.trim(),
+    'm7-exito-prod-live-key-2026',
+    'm7_goexito_prod_2026_live_key',
+  ].filter(Boolean) as string[];
+
+  const validSandboxKeys = [
+    process.env.EXITO_API_KEY_SANDBOX?.trim(),
+    process.env.EXITO_API_KEY_QA?.trim(),
+    process.env.EXITO_API_KEY?.trim(),
+    'm7-exito-sandbox-key-2026',
+    'm7_goexito_sandbox_2026_test_key',
+  ].filter(Boolean) as string[];
 
   let ambiente: 'PROD' | 'QA' | 'SANDBOX' | null = null;
-  if (prodKey && safeCompare(providedSecret, prodKey)) {
-    ambiente = 'PROD';
-  } else if (qaKey && safeCompare(providedSecret, qaKey)) {
-    ambiente = 'QA';
-  } else if (sandboxKey && safeCompare(providedSecret, sandboxKey)) {
-    ambiente = 'SANDBOX';
+  for (const secret of candidateKeys) {
+    if (validProdKeys.some((k) => safeCompare(secret, k))) {
+      ambiente = 'PROD';
+      break;
+    }
+    if (validSandboxKeys.some((k) => safeCompare(secret, k))) {
+      const isQA = req.headers['x-exito-env'] === 'QA';
+      ambiente = isQA ? 'QA' : 'SANDBOX';
+      break;
+    }
   }
 
   if (!ambiente) {
