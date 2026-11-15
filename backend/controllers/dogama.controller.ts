@@ -4,6 +4,7 @@ import nodemailer from 'nodemailer';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import { sendEmail } from '../services/notification.service.js';
+import { marcarAsunto } from '../utils/entorno.util.js';
 
 // ── CONFECCIONISTAS ───────────────────────────────────────────────────────────
 
@@ -574,7 +575,7 @@ export const testEmailSend = async (req: Request, res: Response) => {
       await transport.sendMail({
         from: `"Dogama M7" <${cfg.email}>`,
         to: cfg.email,
-        subject: '✅ Correo de prueba - Dogama M7',
+        subject: marcarAsunto('✅ Correo de prueba - Dogama M7'),
         html: `<p>El correo <strong>${cfg.email}</strong> está correctamente vinculado a Dogama M7.</p>`,
       });
     } else {
@@ -590,7 +591,7 @@ export const testEmailSend = async (req: Request, res: Response) => {
 
       await axios.post('https://graph.microsoft.com/v1.0/me/sendMail', {
         message: {
-          subject: '✅ Correo de prueba - Dogama M7',
+          subject: marcarAsunto('✅ Correo de prueba - Dogama M7'),
           body: { contentType: 'HTML', content: `<p>El correo <strong>${cfg.email}</strong> está correctamente vinculado a Dogama M7.</p>` },
           toRecipients: [{ emailAddress: { address: cfg.email } }],
         },
@@ -1857,7 +1858,7 @@ export const sendSingleNotifCorreo = async (id: number): Promise<{ success: bool
       await transport.sendMail({
         from: `"Milla 7 Logística" <${cfg.email}>`,
         to: toEmail,
-        subject,
+        subject: marcarAsunto(subject),
         html: htmlBody,
       });
     } else {
@@ -1874,7 +1875,7 @@ export const sendSingleNotifCorreo = async (id: number): Promise<{ success: bool
       );
       await axios.post('https://graph.microsoft.com/v1.0/me/sendMail', {
         message: {
-          subject,
+          subject: marcarAsunto(subject),
           body: { contentType: 'HTML', content: htmlBody },
           toRecipients: [{ emailAddress: { address: toEmail } }],
         },

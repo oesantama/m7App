@@ -3,6 +3,7 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import pool from '../config/database.js';
+import { marcarWhatsApp } from '../utils/entorno.util.js';
 
 dotenv.config();
 
@@ -281,6 +282,7 @@ export class EvolutionService {
      * Envía texto usando el nombre de instancia directamente (sin prefijo user_)
      */
     async sendMessageDirect(instanceName: string, number: string, text: string) {
+        text = marcarWhatsApp(text)!;
         const cleanNumber = number.replace(/\D/g, '');
         const finalNumber = cleanNumber.length === 10 ? '57' + cleanNumber : cleanNumber;
         try {
@@ -302,6 +304,7 @@ export class EvolutionService {
      * Evolution v2 requiere base64 puro (sin el prefijo data:...;base64,)
      */
     async sendMediaDirect(instanceName: string, number: string, base64: string, fileName: string, caption?: string) {
+        caption = marcarWhatsApp(caption || fileName);
         const cleanNumber = number.replace(/\D/g, '');
         const finalNumber = cleanNumber.length === 10 ? '57' + cleanNumber : cleanNumber;
         // Documentos por extensión (PDF, Excel, Word, CSV…) — sin esto un .xlsx salía como "imagen"
@@ -371,6 +374,7 @@ export class EvolutionService {
      * Envía mensaje de texto
      */
     async sendMessage(userId: string, number: string, text: string) {
+        text = marcarWhatsApp(text)!;
         const sessionName = `user_${userId}`;
         const cleanNumber = number.replace(/\D/g, '');
         const finalNumber = cleanNumber.length === 10 ? '57' + cleanNumber : cleanNumber;
@@ -393,6 +397,7 @@ export class EvolutionService {
      * Envía media (Imagen, PDF, Audio)
      */
     async sendMedia(userId: string, number: string, base64: string, fileName: string, caption?: string) {
+        caption = marcarWhatsApp(caption || fileName);
         const sessionName = `user_${userId}`;
         const cleanNumber = number.replace(/\D/g, '');
         const finalNumber = cleanNumber.length === 10 ? '57' + cleanNumber : cleanNumber;

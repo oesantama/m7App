@@ -7,6 +7,7 @@
 import cron from 'node-cron';
 import pool from '../config/database.js';
 import * as nodemailer from 'nodemailer';
+import { marcarAsunto } from '../utils/entorno.util.js';
 
 const ALERTAS_ENABLED = process.env.HV_ALERTAS_EMAIL_ENABLED !== 'false';
 const ALERT_INTERVALS = [90, 30, 15, 7]; // días antes del vencimiento
@@ -133,7 +134,7 @@ async function enviarEmailAlerta(doc: DocumentoAlerta, diasRestantes: number) {
     await transporter.sendMail({
         from: `"OrbitM7 Alertas" <${process.env.SMTP_USER}>`,
         to: destinos.join(','),
-        subject: asunto,
+        subject: marcarAsunto(asunto),
         html: cuerpo,
     });
 }

@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import { Resend } from 'resend';
 import { evolutionService } from './evolution.service.js';
+import { marcarAsunto } from '../utils/entorno.util.js';
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ export const sendEmail = async (
   attachments?: any[],
   options?: EmailOptions
 ) => {
+  subject = marcarAsunto(subject);
   if (process.env.EMAIL_ENABLED !== 'true') {
     console.log('[M7-EMAIL] Envío desactivado en .env');
     return;
