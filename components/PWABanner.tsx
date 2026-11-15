@@ -10,17 +10,14 @@ const PWABanner: React.FC = () => {
     updateServiceWorker,
   } = useRegisterSW({
     onRegistered(r) {
-      console.log('SW Registered:', r);
       if (r) {
         // Check for updates in the background every 5 minutes
         setInterval(() => {
-          r.update().catch(err => console.error('Error checking for SW update:', err));
+          r.update().catch(() => {});
         }, 5 * 60 * 1000);
       }
     },
-    onRegisterError(error) {
-      console.log('SW registration error', error);
-    },
+    onRegisterError() {},
   });
 
   // 1. Version check on mount: If the version compiled in __APP_VERSION__ is different
