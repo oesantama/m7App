@@ -12,7 +12,9 @@
 
 import { Request, Response } from 'express';
 import crypto, { randomUUID } from 'crypto';
-import pool from '../config/database.js';
+import fs from 'fs';
+import path from 'path';
+import pool, { withTransaction } from '../config/database.js';
 import { ExitoApiRequest } from '../middleware/exito-api-auth.middleware.js';
 import { ExitoDriveService, base64ToBuffer } from '../services/exito-drive.service.js';
 import { ExitoPdfService } from '../services/exito-pdf.service.js';
@@ -22,6 +24,7 @@ import {
   sendExitoOperationalAlert,
 } from '../services/exito-sync.service.js';
 import { buildExitoOpenApiSpec } from '../services/exito-openapi.service.js';
+import { ExitoEmailService } from '../services/exito-email.service.js';
 import { nowColombiaISO, todayColombiaStr } from '../utils/date.util.js';
 
 /**
@@ -67,7 +70,23 @@ function prepareDriveEvidenceAsync(
     const buffer = base64ToBuffer(base64Data);
     const sha256 = crypto.createHash('sha256').update(buffer).digest('hex');
     const mockFileId = `DRV_${sha256.slice(0, 20)}`;
-    const mockUrl = `https://drive.google.com/file/d/${mockFileId}/view`;
+
+    // Guardar copia local persistente para visualización inmediata en app web y móvil
+    let localUrl = `https://drive.google.com/file/d/${mockFileId}/view`;
+    try {
+      const isPng = base64Data.startsWith('data:image/png');
+      const ext = isPng ? 'png' : 'jpg';
+      const cleanGuia = String(options.numeroGuia || 'GUIA').replace(/[^a-zA-Z0-9_-]/g, '_');
+      const fileName = `${cleanGuia}_${options.tipoEvidencia}_${sha256.slice(0, 8)}.${ext}`;
+      const uploadsDir = path.resolve(process.cwd(), 'public', 'uploads', 'exito');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      fs.writeFileSync(path.join(uploadsDir, fileName), buffer);
+      localUrl = `/uploads/exito/${fileName}`;
+    } catch (e: any) {
+      console.warn('[LOCAL-EVIDENCE-WRITE] No se pudo guardar copia local:', e?.message);
+    }
 
     // Subida asíncrona en segundo plano sin retener al conductor en la calle
     setImmediate(async () => {
@@ -84,7 +103,7 @@ function prepareDriveEvidenceAsync(
       }
     });
 
-    return { driveFileId: mockFileId, driveUrl: mockUrl };
+    return { driveFileId: mockFileId, driveUrl: localUrl };
   } catch (err: any) {
     console.warn(`[DRIVE-PREPARE] Error al procesar buffer base64:`, err?.message);
     const fallbackId = `DRV_${Date.now()}`;
@@ -120,7 +139,7 @@ export async function createGuideB2B(req: ExitoApiRequest, res: Response) {
       innerData.numero_pedido || innerData.pedido || innerData.orderNumber || outerData.orderNumber || outerData.pedido || ''
     ).trim();
     const contenedor = String(innerData.contenedor || innerData.container || '').trim();
-    const traceIn = String(outerData.trace || innerData.numero_guia || innerData.guideNumber || '').trim();
+    const clientAssignedGuide = String(innerData.numero_guia || innerData.guideNumber || '').trim();
     const nombreDestinatario = String(
       innerData.nombre_destinatario || innerData.recipientName || ''
     ).trim();
@@ -193,7 +212,12 @@ export async function createGuideB2B(req: ExitoApiRequest, res: Response) {
         ambiente,
         isSandbox,
       });
-      return res.status(200).json(cached);
+      res.setHeader('x-idempotent-replay', 'true');
+      return res.status(200).json({
+        ...cached,
+        code: 'IDEMPOTENT_REPLAY',
+        message: 'Respuesta recuperada por Idempotency-Key (transacción ya procesada previamente).',
+      });
     }
 
     // 2. Resolver el Nodo / Dependencia Local de Grupo Éxito
@@ -231,7 +255,7 @@ export async function createGuideB2B(req: ExitoApiRequest, res: Response) {
     // 3. Generar números únicos de Guía y Remisión
     const randomSuffix = Math.floor(10000 + Math.random() * 90000);
     const numeroGuia =
-      traceIn || `${isSandbox ? 'SBX-' : 'M7E-'}${Date.now().toString().slice(-6)}${randomSuffix}`;
+      clientAssignedGuide || `${isSandbox ? 'SBX-' : 'M7E-'}${Date.now().toString().slice(-6)}${randomSuffix}`;
     const codigoRemision = `REM-${Date.now().toString().slice(-7)}-${randomSuffix}`;
 
     const tipoOperacion = resolveOperationType(
@@ -251,6 +275,27 @@ export async function createGuideB2B(req: ExitoApiRequest, res: Response) {
     const pesoKg = parseFloat(String(innerData.peso || '1')) || 1;
     const pesoVolumetrico = parseFloat(String(innerData.peso_volumetrico || '0')) || 0;
     const valorDeclarado = parseFloat(String(innerData.valor_declarado || '0')) || 0;
+
+    const initialPaquetes: Array<{
+      numero_paquete: number;
+      codigo_barra_paquete: string;
+      descripcion: string;
+      peso_kg: number;
+      alto_cm: number;
+      ancho_cm: number;
+      largo_cm: number;
+    }> = [];
+    for (let i = 1; i <= cantCajas; i++) {
+      initialPaquetes.push({
+        numero_paquete: i,
+        codigo_barra_paquete: `${numeroGuia}-${String(i).padStart(2, '0')}`,
+        descripcion: innerData.contenido || `Caja ${i} de ${cantCajas}`,
+        peso_kg: Number((pesoKg / cantCajas).toFixed(3)),
+        alto_cm: altoCm,
+        ancho_cm: anchoCm,
+        largo_cm: largoCm,
+      });
+    }
 
     // 4. Generar Rótulo PDF en memoria RAM (On-Demand para responder a Go Éxito, CERO subida a Drive)
     const labelResult = await ExitoPdfService.generateGuideLabelOnDemand({
@@ -279,188 +324,192 @@ export async function createGuideB2B(req: ExitoApiRequest, res: Response) {
       contenido: innerData.contenido || 'MERCANCIA GENERAL EXITO',
       observaciones: innerData.observaciones || null,
       is_sandbox: isSandbox,
-    });
+    }, initialPaquetes);
 
     const rotuloExpiraAt = nowColombiaISO(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
 
-    // 5. Persistir guía en PostgreSQL (solo URLs y File IDs de Google Drive)
-    const insertRes = await pool.query(
-      `INSERT INTO exito_msj_guias (
-        numero_guia, codigo_remision, numero_pedido, contenedor, modalidad_pedido,
-        tipo_servicio, tipo_operacion, generador, centro_costos, cuenta_contable,
-        application_id, transaction_id_creacion, correlation_id, ambiente, is_sandbox, origen_creacion,
-        nodo_id, codigo_dependencia, nombre_remitente, nit_remitente, direccion_remitente,
-        barrio_remitente, ciudad_remitente_dane, ciudad_remitente_nombre, departamento_remitente,
-        telefono_remitente, celular_remitente,
-        nombre_destinatario, nit_destinatario, div_destinatario, direccion_destinatario,
-        barrio_destinatario, ciudad_destinatario_dane, ciudad_destinatario_nombre,
-        departamento_destinatario, telefono_destinatario, celular_destinatario, correo_destinatario,
-        cant_cajas, alto_cm, ancho_cm, largo_cm, peso_kg, peso_volumetrico, valor_declarado,
-        contenido, observaciones,
-        rotulo_pdf_url, rotulo_drive_id, rotulo_expira_at,
-        estado_operativo, estado_id, id_guia_exito, exito_sync_status, created_by
-      ) VALUES (
-        $1,$2,$3,$4,$5,
-        $6,$7,$8,$9,$10,
-        $11,$12,$13,$14,$15,'API_EXITO',
-        $16,$17,$18,$19,$20,
-        $21,$22,$23,$24,
-        $25,$26,
-        $27,$28,$29,$30,
-        $31,$32,$33,
-        $34,$35,$36,$37,
-        $38,$39,$40,$41,$42,$43,$44,
-        $45,$46,
-        $47,$48,$49,
-        'ESPERA_RECOGIDA','EST-30','1','SINCRONIZADO','API_GO_EXITO'
-      ) RETURNING id`,
-      [
-        numeroGuia,
-        codigoRemision,
-        numeroPedido,
-        contenedor || null,
-        modalidadPedido,
-        String(innerData.tipo_servicio || '0'),
-        tipoOperacion,
-        innerData.generador || 'Exito.com',
-        innerData.centro_costos || nodo.centro_costos_default || '723364',
-        innerData.cuenta_contable || null,
-        applicationId,
-        transactionId,
-        correlationId,
-        ambiente,
-        isSandbox,
-        nodo.id,
-        codigoDependencia,
-        innerData.nombre_remitente || nodo.nombre,
-        innerData.nit_remitente || nodo.nit_remitente,
-        innerData.direccion_remitente || nodo.direccion,
-        innerData.barrio_remitente || nodo.barrio,
-        innerData.ciudad_remitente || nodo.ciudad_dane,
-        nodo.ciudad_nombre || 'MEDELLÍN',
-        innerData.departamento_remitente || nodo.departamento,
-        innerData.telefono_remitente || nodo.contacto_telefono,
-        innerData.celular_remitente || nodo.contacto_celular,
-        nombreDestinatario,
-        innerData.nit_destinatario || null,
-        innerData.div_destinatario || '0',
-        direccionDestinatario,
-        innerData.barrio_destinatario || 'URBANO',
-        innerData.ciudad_destinatario || nodo.ciudad_dane,
-        innerData.ciudad_destinatario_nombre || nodo.ciudad_nombre || 'MEDELLÍN',
-        innerData.departamento_destinatario || nodo.departamento || 'ANTIOQUIA',
-        innerData.telefono_destinatario || null,
-        innerData.celular_destinatario || null,
-        innerData.correo_destinatario || null,
-        cantCajas,
-        altoCm,
-        anchoCm,
-        largoCm,
-        pesoKg,
-        pesoVolumetrico,
-        valorDeclarado,
-        innerData.contenido || 'MERCANCIA GENERAL EXITO',
-        innerData.observaciones || null,
-        labelResult.dynamicLabelUrl,
-        null,
-        rotuloExpiraAt,
-      ]
-    );
-
-    const guiaId = Number(insertRes.rows[0].id);
-
-    // Crear registros de paquetes/cajas individuales
-    for (let i = 1; i <= cantCajas; i++) {
-      await pool.query(
-        `INSERT INTO exito_msj_guia_paquetes (
-          guia_id, numero_paquete, codigo_barra_paquete, descripcion, peso_kg, alto_cm, ancho_cm, largo_cm
-        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-        ON CONFLICT (guia_id, numero_paquete) DO NOTHING`,
+    // 5. Persistir guía en PostgreSQL dentro de una transacción ACID atómica
+    const { guiaId, responsePayload } = await withTransaction(async (client) => {
+      const insertRes = await client.query(
+        `INSERT INTO exito_msj_guias (
+          numero_guia, codigo_remision, numero_pedido, contenedor, modalidad_pedido,
+          tipo_servicio, tipo_operacion, generador, centro_costos, cuenta_contable,
+          application_id, transaction_id_creacion, correlation_id, ambiente, is_sandbox, origen_creacion,
+          nodo_id, codigo_dependencia, nombre_remitente, nit_remitente, direccion_remitente,
+          barrio_remitente, ciudad_remitente_dane, ciudad_remitente_nombre, departamento_remitente,
+          telefono_remitente, celular_remitente,
+          nombre_destinatario, nit_destinatario, div_destinatario, direccion_destinatario,
+          barrio_destinatario, ciudad_destinatario_dane, ciudad_destinatario_nombre,
+          departamento_destinatario, telefono_destinatario, celular_destinatario, correo_destinatario,
+          cant_cajas, alto_cm, ancho_cm, largo_cm, peso_kg, peso_volumetrico, valor_declarado,
+          contenido, observaciones,
+          rotulo_pdf_url, rotulo_drive_id, rotulo_expira_at,
+          estado_operativo, estado_id, id_guia_exito, exito_sync_status, created_by
+        ) VALUES (
+          $1,$2,$3,$4,$5,
+          $6,$7,$8,$9,$10,
+          $11,$12,$13,$14,$15,'API_EXITO',
+          $16,$17,$18,$19,$20,
+          $21,$22,$23,$24,
+          $25,$26,
+          $27,$28,$29,$30,
+          $31,$32,$33,
+          $34,$35,$36,$37,
+          $38,$39,$40,$41,$42,$43,$44,
+          $45,$46,
+          $47,$48,$49,
+          'ESPERA_RECOGIDA','EST-30','1','SINCRONIZADO','API_GO_EXITO'
+        ) RETURNING id`,
         [
-          guiaId,
-          i,
-          `${numeroGuia}-${String(i).padStart(2, '0')}`,
-          innerData.contenido || `Caja ${i} de ${cantCajas}`,
-          Number((pesoKg / cantCajas).toFixed(3)),
+          numeroGuia,
+          codigoRemision,
+          numeroPedido,
+          contenedor || null,
+          modalidadPedido,
+          String(innerData.tipo_servicio || '0'),
+          tipoOperacion,
+          innerData.generador || 'Exito.com',
+          innerData.centro_costos || nodo.centro_costos_default || '723364',
+          innerData.cuenta_contable || null,
+          applicationId,
+          transactionId,
+          correlationId,
+          ambiente,
+          isSandbox,
+          nodo.id,
+          codigoDependencia,
+          innerData.nombre_remitente || nodo.nombre,
+          innerData.nit_remitente || nodo.nit_remitente,
+          innerData.direccion_remitente || nodo.direccion,
+          innerData.barrio_remitente || nodo.barrio,
+          innerData.ciudad_remitente || nodo.ciudad_dane,
+          nodo.ciudad_nombre || 'MEDELLÍN',
+          innerData.departamento_remitente || nodo.departamento,
+          innerData.telefono_remitente || nodo.contacto_telefono,
+          innerData.celular_remitente || nodo.contacto_celular,
+          nombreDestinatario,
+          innerData.nit_destinatario || null,
+          innerData.div_destinatario || '0',
+          direccionDestinatario,
+          innerData.barrio_destinatario || 'URBANO',
+          innerData.ciudad_destinatario || nodo.ciudad_dane,
+          innerData.ciudad_destinatario_nombre || nodo.ciudad_nombre || 'MEDELLÍN',
+          innerData.departamento_destinatario || nodo.departamento || 'ANTIOQUIA',
+          innerData.telefono_destinatario || null,
+          innerData.celular_destinatario || null,
+          innerData.correo_destinatario || null,
+          cantCajas,
           altoCm,
           anchoCm,
           largoCm,
+          pesoKg,
+          pesoVolumetrico,
+          valorDeclarado,
+          innerData.contenido || 'MERCANCIA GENERAL EXITO',
+          innerData.observaciones || null,
+          labelResult.dynamicLabelUrl,
+          null,
+          rotuloExpiraAt,
         ]
       );
-    }
 
-    // Registrar historial inmutable
-    await pool.query(
-      `INSERT INTO exito_msj_guia_historial (
-        guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-        origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id,
-        usuario_id, usuario_nombre, ip_origen
-      ) VALUES ($1,$2,NULL,'ESPERA_RECOGIDA','1','API_GO_EXITO',$3,$4,$5,'GO_EXITO','API Go Éxito v2.0',$6)`,
-      [
-        guiaId,
-        numeroGuia,
-        `Guía creada (${tipoOperacion}). Modalidad: ${modalidadPedido}. Rótulo disponible bajo demanda.`,
-        labelResult.dynamicLabelUrl,
-        null,
-        req.ip || null,
-      ]
-    );
+      const gid = Number(insertRes.rows[0].id);
 
-    // 6. Construir respuesta 100% compatible con Go Éxito v2.0 (Sección 7.1 páginas 5 y 8)
-    const responsePayload = {
-      transactionId,
-      timestamp: nowColombiaISO(),
-      result: 'OK',
-      code: 'GUIDE_CREATED',
-      message: 'Guía creada exitosamente. Rótulo PDF generado en memoria bajo demanda.',
-      header: {
-        applicationId,
-        hostname: 'orbitm7.m7apps.com',
-        transactionDate: nowColombiaISO(),
+      // Crear registros de paquetes/cajas individuales
+      for (let i = 1; i <= cantCajas; i++) {
+        await client.query(
+          `INSERT INTO exito_msj_guia_paquetes (
+            guia_id, numero_paquete, codigo_barra_paquete, descripcion, peso_kg, alto_cm, ancho_cm, largo_cm
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          ON CONFLICT (guia_id, numero_paquete) DO NOTHING`,
+          [
+            gid,
+            i,
+            `${numeroGuia}-${String(i).padStart(2, '0')}`,
+            innerData.contenido || `Caja ${i} de ${cantCajas}`,
+            Number((pesoKg / cantCajas).toFixed(3)),
+            altoCm,
+            anchoCm,
+            largoCm,
+          ]
+        );
+      }
+
+      // Registrar historial inmutable
+      await client.query(
+        `INSERT INTO exito_msj_guia_historial (
+          guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+          origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id,
+          usuario_id, usuario_nombre, ip_origen
+        ) VALUES ($1,$2,NULL,'ESPERA_RECOGIDA','1','API_GO_EXITO',$3,$4,$5,'GO_EXITO','API Go Éxito v2.0',$6)`,
+        [
+          gid,
+          numeroGuia,
+          `Guía creada (${tipoOperacion}). Modalidad: ${modalidadPedido}. Rótulo disponible bajo demanda.`,
+          labelResult.dynamicLabelUrl,
+          null,
+          req.ip || null,
+        ]
+      );
+
+      // 6. Construir respuesta 100% compatible con Go Éxito v2.0 (Sección 7.1 páginas 5 y 8)
+      const resPayload = {
         transactionId,
-        errors: [],
-      },
-      data: {
-        guideNumber: numeroGuia,
-        shipmentId: String(guiaId),
-        orderNumber: numeroPedido,
-        container: contenedor || null,
-        operationType: tipoOperacion,
-        status: '1',
-        statusDescription: 'Guía generada',
-        label: {
-          format: 'PDF',
-          url: labelResult.dynamicLabelUrl,
-          driveFileId: null,
-          expiresAt: rotuloExpiraAt,
+        timestamp: nowColombiaISO(),
+        result: 'OK',
+        code: 'GUIDE_CREATED',
+        message: 'Guía creada exitosamente. Rótulo PDF generado en memoria bajo demanda.',
+        header: {
+          applicationId,
+          hostname: 'orbitm7.m7apps.com',
+          transactionDate: nowColombiaISO(),
+          transactionId,
+          errors: [],
         },
-        PAQUETERA_CREATE_GUIDE_RESPONSE: {
-          url_terceros: labelResult.dynamicLabelUrl,
-          pdf_guia: 'found',
-          referencia: numeroGuia,
-          codigo_remision: codigoRemision,
-          __hashCodeCalc: false,
-          id_remision: guiaId,
+        data: {
+          guideNumber: numeroGuia,
+          shipmentId: String(gid),
+          orderNumber: numeroPedido,
+          container: contenedor || null,
+          operationType: tipoOperacion,
+          status: '1',
+          statusDescription: 'Guía generada',
+          label: {
+            format: 'PDF',
+            url: labelResult.dynamicLabelUrl,
+            driveFileId: null,
+            expiresAt: rotuloExpiraAt,
+          },
+          PAQUETERA_CREATE_GUIDE_RESPONSE: {
+            url_terceros: labelResult.dynamicLabelUrl,
+            pdf_guia: 'found',
+            referencia: numeroGuia,
+            codigo_remision: codigoRemision,
+            __hashCodeCalc: false,
+            id_remision: gid,
+          },
+          PAQUETERA_GET_LABELS_RESPONSE: {
+            error: false,
+            rotulosRd: '',
+            rotulos: labelResult.pdfBase64,
+            url_rotulo_drive: labelResult.dynamicLabelUrl,
+            __hashCodeCalc: false,
+            errorMessage: '',
+          },
         },
-        PAQUETERA_GET_LABELS_RESPONSE: {
-          error: false,
-          rotulosRd: '',
-          rotulos: labelResult.pdfBase64,
-          url_rotulo_drive: labelResult.dynamicLabelUrl,
-          __hashCodeCalc: false,
-          errorMessage: '',
-        },
-      },
-    };
+      };
 
-    // Guardar en tabla de Idempotencia (>= 48h)
-    await pool.query(
-      `INSERT INTO exito_msj_idempotency_keys (
-        idempotency_key, operation_type, business_key, transaction_id, http_status, response_json, ambiente
-      ) VALUES ($1,'CREATE_GUIDE',$2,$3,201,$4,$5)
-      ON CONFLICT (idempotency_key, operation_type, ambiente) DO NOTHING`,
-      [idempotencyKey, numeroGuia, transactionId, JSON.stringify(responsePayload), ambiente]
-    );
+      // Guardar en tabla de Idempotencia (>= 48h)
+      await client.query(
+        `INSERT INTO exito_msj_idempotency_keys (
+          idempotency_key, operation_type, business_key, transaction_id, http_status, response_json, ambiente
+        ) VALUES ($1,'CREATE_GUIDE',$2,$3,201,$4,$5)
+        ON CONFLICT (idempotency_key, operation_type, ambiente) DO NOTHING`,
+        [idempotencyKey, numeroGuia, transactionId, JSON.stringify(resPayload), ambiente]
+      );
+
+      return { guiaId: gid, responsePayload: resPayload };
+    });
 
     await ExitoSyncService.logApiMetric({
       transactionId,
@@ -522,15 +571,23 @@ export async function createPickupB2B(req: ExitoApiRequest, res: Response) {
 
   try {
     const body = req.body || {};
-    const headerIn = body.header || {};
-    const outerData = body.data || body;
+    const collectWrapper = body.COLLECT_GUIDE || body.collectGuide || body;
+    const headerIn = collectWrapper.header || body.header || {};
+    const outerData = collectWrapper.data || collectWrapper;
     const innerData = outerData.data || outerData;
 
     const transactionId =
       headerIn.transactionId || outerData.transactionId || body.transactionId || correlationId;
-    const referencia = String(
+    let referencia = String(
       innerData.referencia || innerData.guiaInicial || innerData.guideNumber || ''
     ).trim();
+
+    if (!referencia && Array.isArray(innerData.guias) && innerData.guias.length > 0) {
+      referencia = String(innerData.guias[0]).trim();
+    } else if (!referencia && typeof innerData.guias === 'string') {
+      referencia = innerData.guias.trim();
+    }
+
     const fechaRecogida = String(
       innerData.fechaRecogida || new Date().toISOString().slice(0, 10)
     ).slice(0, 10);
@@ -572,121 +629,125 @@ export async function createPickupB2B(req: ExitoApiRequest, res: Response) {
     const guia = guiaRes.rows[0] || null;
     const pickupCode = `PKP-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
 
-    const insPickup = await pool.query(
-      `INSERT INTO exito_msj_solicitudes_recogida (
-        pickup_code, referencia, guia_inicial, guia_id, nodo_id, modalidad, producto,
-        fecha_recogida, ciudad_origen_dane, ciudad_destino_dane, direccion_origen,
-        direccion_destinatario, nombre_empresa, nombre_contacto, telefono_contacto,
-        persona_autoriza, telefono_autoriza, unidades, valor_declarado, datafono,
-        destino_notificacion, status, transaction_id, idempotency_key, raw_payload, is_sandbox
-      ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,
-        $8,$9,$10,$11,
-        $12,$13,$14,$15,
-        $16,$17,$18,$19,$20,
-        $21,'ACCEPTED',$22,$23,$24,$25
-      ) RETURNING id, pickup_code`,
-      [
-        pickupCode,
-        referencia,
-        innerData.guiaInicial || referencia,
-        guia?.id || null,
-        guia?.nodo_id || null,
-        Number(innerData.modalidad || 1),
-        Number(innerData.producto || 4),
-        fechaRecogida,
-        innerData.ciudadOrigen || '05001000',
-        innerData.ciudadDestino || '05001000',
-        innerData.direccion || '',
-        innerData.direccionDestinatario || '',
-        innerData.nombreEmpresa || 'GRUPO ÉXITO',
-        innerData.nombreContacto || '',
-        innerData.telefonoContacto || '',
-        innerData.personaAutoriza || '',
-        innerData.telefonoAutoriza || '',
-        Number(innerData.unidades || 1),
-        Number(innerData.valorDeclarado || 0),
-        Boolean(innerData.datafono),
-        innerData.destinoNotificacion || null,
-        transactionId,
-        idempotencyKey,
-        JSON.stringify(ExitoSyncService ? innerData : {}),
-        isSandbox,
-      ]
-    );
-
-    // Si la guía estaba en ESPERA_RECOGIDA, actualizarla a DISPONIBLE (Id paquete=4, Id guía=1)
-    if (guia && guia.estado_operativo === 'ESPERA_RECOGIDA') {
-      await pool.query(
-        `UPDATE exito_msj_guias
-         SET estado_operativo = 'DISPONIBLE',
-             estado_id = 'EST-31',
-             solicitud_recogida_id = $2,
-             fecha_recogida_programada = $3,
-             unidades_recogidas = COALESCE($4, cant_cajas),
-             requiere_datafono = $5,
-             updated_at = NOW()
-         WHERE id = $1`,
+    const responsePayload = await withTransaction(async (client) => {
+      const insPickup = await client.query(
+        `INSERT INTO exito_msj_solicitudes_recogida (
+          pickup_code, referencia, guia_inicial, guia_id, nodo_id, modalidad, producto,
+          fecha_recogida, ciudad_origen_dane, ciudad_destino_dane, direccion_origen,
+          direccion_destinatario, nombre_empresa, nombre_contacto, telefono_contacto,
+          persona_autoriza, telefono_autoriza, unidades, valor_declarado, datafono,
+          destino_notificacion, status, transaction_id, idempotency_key, raw_payload, is_sandbox
+        ) VALUES (
+          $1,$2,$3,$4,$5,$6,$7,
+          $8,$9,$10,$11,
+          $12,$13,$14,$15,
+          $16,$17,$18,$19,$20,
+          $21,'ACCEPTED',$22,$23,$24,$25
+        ) RETURNING id, pickup_code`,
         [
-          guia.id,
-          insPickup.rows[0].id,
-          fechaRecogida,
-          Number(innerData.unidades || 1),
-          Boolean(innerData.datafono),
-        ]
-      );
-
-      await pool.query(
-        `INSERT INTO exito_msj_guia_historial (
-          guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-          origen_cambio, observacion, usuario_id, usuario_nombre, ip_origen
-        ) VALUES ($1,$2,'ESPERA_RECOGIDA','DISPONIBLE','1','API_GO_EXITO',$3,'GO_EXITO','API Go Éxito v2.0',$4)`,
-        [
-          guia.id,
-          guia.numero_guia,
-          `Solicitud de recogida COLLECT_GUIDE (${pickupCode}) programada para ${fechaRecogida}.`,
-          req.ip || null,
-        ]
-      );
-    }
-
-    const responsePayload = {
-      transactionId,
-      timestamp: new Date().toISOString(),
-      result: 'OK',
-      code: 'PICKUP_SCHEDULED',
-      message: 'Recogida programada exitosamente en nodo local.',
-      header: {
-        applicationId: headerIn.applicationId || 'GO_EXITO',
-        hostname: 'orbitm7.m7apps.com',
-        transactionDate: new Date().toISOString(),
-        transactionId,
-        errors: [],
-      },
-      data: {
-        pickupId: pickupCode,
-        status: 'ACCEPTED',
-        scheduledDate: fechaRecogida,
-        reference: referencia,
-        message: 'Recogida programada',
-        PAQUETERA_COLLECT_GUIDE_RESPONSE: {
-          recogida: pickupCode,
-          estado: 'ACEPTADA',
-          fecha_programada: fechaRecogida,
+          pickupCode,
           referencia,
-          error: false,
-          errorMessage: '',
-        },
-      },
-    };
+          innerData.guiaInicial || referencia,
+          guia?.id || null,
+          guia?.nodo_id || null,
+          Number(innerData.modalidad || 1),
+          Number(innerData.producto || 4),
+          fechaRecogida,
+          innerData.ciudadOrigen || '05001000',
+          innerData.ciudadDestino || '05001000',
+          innerData.direccion || '',
+          innerData.direccionDestinatario || '',
+          innerData.nombreEmpresa || 'GRUPO ÉXITO',
+          innerData.nombreContacto || '',
+          innerData.telefonoContacto || '',
+          innerData.personaAutoriza || '',
+          innerData.telefonoAutoriza || '',
+          Number(innerData.unidades || 1),
+          Number(innerData.valorDeclarado || 0),
+          Boolean(innerData.datafono),
+          innerData.destinoNotificacion || null,
+          transactionId,
+          idempotencyKey,
+          JSON.stringify(ExitoSyncService ? innerData : {}),
+          isSandbox,
+        ]
+      );
 
-    await pool.query(
-      `INSERT INTO exito_msj_idempotency_keys (
-        idempotency_key, operation_type, business_key, transaction_id, http_status, response_json, ambiente
-      ) VALUES ($1,'COLLECT_GUIDE',$2,$3,200,$4,$5)
-      ON CONFLICT (idempotency_key, operation_type, ambiente) DO NOTHING`,
-      [idempotencyKey, referencia, transactionId, JSON.stringify(responsePayload), ambiente]
-    );
+      // Si la guía estaba en ESPERA_RECOGIDA, actualizarla a DISPONIBLE (Id paquete=4, Id guía=1)
+      if (guia && guia.estado_operativo === 'ESPERA_RECOGIDA') {
+        await client.query(
+          `UPDATE exito_msj_guias
+           SET estado_operativo = 'DISPONIBLE',
+               estado_id = 'EST-31',
+               solicitud_recogida_id = $2,
+               fecha_recogida_programada = $3,
+               unidades_recogidas = COALESCE($4, cant_cajas),
+               requiere_datafono = $5,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [
+            guia.id,
+            insPickup.rows[0].id,
+            fechaRecogida,
+            Number(innerData.unidades || 1),
+            Boolean(innerData.datafono),
+          ]
+        );
+
+        await client.query(
+          `INSERT INTO exito_msj_guia_historial (
+            guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+            origen_cambio, observacion, usuario_id, usuario_nombre, ip_origen
+          ) VALUES ($1,$2,'ESPERA_RECOGIDA','DISPONIBLE','1','API_GO_EXITO',$3,'GO_EXITO','API Go Éxito v2.0',$4)`,
+          [
+            guia.id,
+            guia.numero_guia,
+            `Solicitud de recogida COLLECT_GUIDE (${pickupCode}) programada para ${fechaRecogida}.`,
+            req.ip || null,
+          ]
+        );
+      }
+
+      const resPayload = {
+        transactionId,
+        timestamp: new Date().toISOString(),
+        result: 'OK',
+        code: 'PICKUP_SCHEDULED',
+        message: 'Recogida programada exitosamente en nodo local.',
+        header: {
+          applicationId: headerIn.applicationId || 'GO_EXITO',
+          hostname: 'orbitm7.m7apps.com',
+          transactionDate: new Date().toISOString(),
+          transactionId,
+          errors: [],
+        },
+        data: {
+          pickupId: pickupCode,
+          status: 'ACCEPTED',
+          scheduledDate: fechaRecogida,
+          reference: referencia,
+          message: 'Recogida programada',
+          PAQUETERA_COLLECT_GUIDE_RESPONSE: {
+            recogida: pickupCode,
+            estado: 'ACEPTADA',
+            fecha_programada: fechaRecogida,
+            referencia,
+            error: false,
+            errorMessage: '',
+          },
+        },
+      };
+
+      await client.query(
+        `INSERT INTO exito_msj_idempotency_keys (
+          idempotency_key, operation_type, business_key, transaction_id, http_status, response_json, ambiente
+        ) VALUES ($1,'COLLECT_GUIDE',$2,$3,200,$4,$5)
+        ON CONFLICT (idempotency_key, operation_type, ambiente) DO NOTHING`,
+        [idempotencyKey, referencia, transactionId, JSON.stringify(resPayload), ambiente]
+      );
+
+      return resPayload;
+    });
 
     await ExitoSyncService.logApiMetric({
       transactionId,
@@ -842,33 +903,35 @@ export async function cancelGuideB2B(req: ExitoApiRequest, res: Response) {
 
     const cancellationDate = new Date().toISOString();
 
-    await pool.query(
-      `UPDATE exito_msj_guias
-       SET estado_operativo = 'ANULADO',
-           estado_id = 'EST-29',
-           id_guia_exito = '7',
-           fecha_anulacion = $2,
-           reason_code_anulacion = $3,
-           motivo_anulacion = $4,
-           anulado_por = 'API_GO_EXITO',
-           updated_at = NOW()
-       WHERE id = $1`,
-      [guia.id, cancellationDate, reasonCode, reason]
-    );
+    await withTransaction(async (client) => {
+      await client.query(
+        `UPDATE exito_msj_guias
+         SET estado_operativo = 'ANULADO',
+             estado_id = 'EST-29',
+             id_guia_exito = '7',
+             fecha_anulacion = $2,
+             reason_code_anulacion = $3,
+             motivo_anulacion = $4,
+             anulado_por = 'API_GO_EXITO',
+             updated_at = NOW()
+         WHERE id = $1`,
+        [guia.id, cancellationDate, reasonCode, reason]
+      );
 
-    await pool.query(
-      `INSERT INTO exito_msj_guia_historial (
-        guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-        origen_cambio, observacion, usuario_id, usuario_nombre, ip_origen
-      ) VALUES ($1,$2,$3,'ANULADO','7','API_GO_EXITO',$4,'GO_EXITO','API Go Éxito v2.0',$5)`,
-      [
-        guia.id,
-        guia.numero_guia,
-        guia.estado_operativo,
-        `Guía anulada vía API (${reasonCode}): ${reason}`,
-        req.ip || null,
-      ]
-    );
+      await client.query(
+        `INSERT INTO exito_msj_guia_historial (
+          guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+          origen_cambio, observacion, usuario_id, usuario_nombre, ip_origen
+        ) VALUES ($1,$2,$3,'ANULADO','7','API_GO_EXITO',$4,'GO_EXITO','API Go Éxito v2.0',$5)`,
+        [
+          guia.id,
+          guia.numero_guia,
+          guia.estado_operativo,
+          `Guía anulada vía API (${reasonCode}): ${reason}`,
+          req.ip || null,
+        ]
+      );
+    });
 
     // Encolar notificación de estado 7 ("Cancelado") al webhook de tracking
     await ExitoSyncService.enqueueAndDispatchTrackingEvent({
@@ -909,7 +972,8 @@ export async function cancelGuideB2B(req: ExitoApiRequest, res: Response) {
       data: {
         guideNumber: guia.numero_guia,
         orderNumber: guia.numero_pedido,
-        status: 'CANCELLED',
+        status: '7',
+        statusDescription: 'Cancelado',
         idGuiaExito: '7',
         reasonCode,
         cancellationDate,
@@ -957,7 +1021,7 @@ export async function updateGuideB2B(req: ExitoApiRequest, res: Response) {
     }
 
     const guiaRes = await pool.query(
-      `SELECT * FROM exito_msj_guias WHERE (numero_guia = $1 OR tracking_token = $1) LIMIT 1`,
+      `SELECT * FROM exito_msj_guias WHERE (numero_guia = $1 OR numero_pedido = $1) LIMIT 1`,
       [guideNumber]
     );
 
@@ -992,42 +1056,47 @@ export async function updateGuideB2B(req: ExitoApiRequest, res: Response) {
     }
 
     const nombreDestinatario =
-      dataIn.nombre_destinatario || dataIn.recipientName || guia.nombre_destinatario;
+      dataIn.nombre_destinatario || dataIn.recipientName || dataIn.nombreDestinatario || guia.nombre_destinatario;
     const direccionDestinatario =
-      dataIn.direccion_destinatario || dataIn.recipientAddress || guia.direccion_destinatario;
+      dataIn.direccion_destinatario || dataIn.recipientAddress || dataIn.direccionDestinatario || guia.direccion_destinatario;
     const telefonoDestinatario =
-      dataIn.telefono_destinatario || dataIn.recipientPhone || guia.telefono_destinatario;
+      dataIn.telefono_destinatario || dataIn.recipientPhone || dataIn.telefonoDestinatario || guia.telefono_destinatario;
+    const celularDestinatario =
+      dataIn.celular_destinatario || dataIn.recipientCell || dataIn.celularDestinatario || guia.celular_destinatario;
     const barrioDestinatario =
-      dataIn.barrio_destinatario || dataIn.recipientNeighborhood || guia.barrio_destinatario;
+      dataIn.barrio_destinatario || dataIn.recipientNeighborhood || dataIn.barrioDestinatario || guia.barrio_destinatario;
     const notasEntrega =
-      dataIn.notas_entrega || dataIn.deliveryNotes || dataIn.observaciones || guia.notas_entrega;
+      dataIn.notas_entrega || dataIn.deliveryNotes || dataIn.observaciones || dataIn.notes || guia.notas_entrega;
 
-    await pool.query(
-      `UPDATE exito_msj_guias
-       SET nombre_destinatario = $1,
-           direccion_destinatario = $2,
-           telefono_destinatario = $3,
-           barrio_destinatario = $4,
-           notas_entrega = $5,
-           updated_at = NOW()
-       WHERE id = $6`,
-      [nombreDestinatario, direccionDestinatario, telefonoDestinatario, barrioDestinatario, notasEntrega, guia.id]
-    );
+    await withTransaction(async (client) => {
+      await client.query(
+        `UPDATE exito_msj_guias
+         SET nombre_destinatario = $1,
+             direccion_destinatario = $2,
+             telefono_destinatario = $3,
+             celular_destinatario = COALESCE($4, celular_destinatario),
+             barrio_destinatario = $5,
+             observaciones = COALESCE($6, observaciones),
+             updated_at = NOW()
+         WHERE id = $7`,
+        [nombreDestinatario, direccionDestinatario, telefonoDestinatario, celularDestinatario, barrioDestinatario, notasEntrega, guia.id]
+      );
 
-    await pool.query(
-      `INSERT INTO exito_msj_guia_historial (
-        guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-        origen_cambio, observacion, usuario_id, usuario_nombre, ip_origen
-      ) VALUES ($1,$2,$3,$3,$4,'API_GO_EXITO',$5,'GO_EXITO','API Go Éxito v2.0',$6)`,
-      [
-        guia.id,
-        guia.numero_guia,
-        guia.estado_operativo,
-        guia.id_guia_exito || '1',
-        `Datos de destinatario y entrega actualizados vía API B2B`,
-        req.ip || null,
-      ]
-    );
+      await client.query(
+        `INSERT INTO exito_msj_guia_historial (
+          guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+          origen_cambio, observacion, usuario_id, usuario_nombre, ip_origen
+        ) VALUES ($1,$2,$3,$3,$4,'API_GO_EXITO',$5,'GO_EXITO','API Go Éxito v2.0',$6)`,
+        [
+          guia.id,
+          guia.numero_guia,
+          guia.estado_operativo,
+          guia.id_guia_exito || '1',
+          `Datos de destinatario y entrega actualizados vía API B2B`,
+          req.ip || null,
+        ]
+      );
+    });
 
     await ExitoSyncService.logApiMetric({
       transactionId,
@@ -1101,7 +1170,11 @@ export async function getGuideLabelB2B(req: ExitoApiRequest, res: Response) {
     }
 
     const guia = guiaRes.rows[0];
-    const generated = await ExitoPdfService.generateGuideLabelOnDemand(guia);
+    const paquetesRes = await pool.query(
+      `SELECT * FROM exito_msj_guia_paquetes WHERE guia_id = $1 ORDER BY numero_paquete ASC`,
+      [guia.id]
+    );
+    const generated = await ExitoPdfService.generateGuideLabelOnDemand(guia, paquetesRes.rows);
     const pdfBase64 = generated.pdfBase64;
     const dynamicUrl = generated.dynamicLabelUrl;
 
@@ -1187,7 +1260,11 @@ export async function renderGuideLabelPdfOnDemand(req: Request, res: Response) {
     }
 
     const guia = guiaRes.rows[0];
-    const generated = await ExitoPdfService.generateGuideLabelOnDemand(guia);
+    const paquetesRes = await pool.query(
+      `SELECT * FROM exito_msj_guia_paquetes WHERE guia_id = $1 ORDER BY numero_paquete ASC`,
+      [guia.id]
+    );
+    const generated = await ExitoPdfService.generateGuideLabelOnDemand(guia, paquetesRes.rows);
 
     if (req.query.json === 'true') {
       return res.json({
@@ -1272,7 +1349,7 @@ export async function getGuideStatusB2B(req: ExitoApiRequest, res: Response) {
       transactionId: correlationId,
       timestamp: new Date().toISOString(),
       result: 'OK',
-      code: 'GUIDE_STATUS_OK',
+      code: 'STATUS_RETRIEVED',
       message: 'Consulta de estado exitosa.',
       data: {
         guide: g.numero_guia,
@@ -1584,77 +1661,80 @@ export async function createManualGuideInhouse(req: any, res: Response) {
 
     const dynamicLabelUrl = `/api/exito-mensajeria/guias/por-numero/${encodeURIComponent(numeroGuia)}/rotulo.pdf`;
 
-    const ins = await pool.query(
-      `INSERT INTO exito_msj_guias (
-        numero_guia, codigo_remision, numero_pedido, contenedor, modalidad_pedido,
-        tipo_operacion, ambiente, is_sandbox, origen_creacion,
-        nodo_id, codigo_dependencia, nombre_remitente, nit_remitente, direccion_remitente,
-        ciudad_remitente_dane, ciudad_remitente_nombre, departamento_remitente,
-        nombre_destinatario, nit_destinatario, direccion_destinatario, barrio_destinatario,
-        ciudad_destinatario_nombre, telefono_destinatario, celular_destinatario, correo_destinatario,
-        cant_cajas, peso_kg, valor_declarado, contenido, observaciones,
-        rotulo_pdf_url, rotulo_drive_id, estado_operativo, estado_id, id_guia_exito, created_by
-      ) VALUES (
-        $1,$2,$3,$4,$5,
-        $6,$7,$8,'MANUAL_INHOUSE',
-        $9,$10,$11,$12,$13,
-        $14,$15,$16,
-        $17,$18,$19,$20,
-        $21,$22,$23,$24,
-        $25,$26,$27,$28,$29,
-        $30,$31,'DISPONIBLE','EST-31','1',$32
-      ) RETURNING *`,
-      [
-        numeroGuia,
-        codigoRemision,
-        numeroPedido,
-        b.contenedor || `CONT-${numeroGuia}`,
-        b.modalidad_pedido || 'FIRME',
-        tipoOperacion,
-        isSandbox ? 'SANDBOX' : 'PROD',
-        isSandbox,
-        nodo.id,
-        nodo.codigo_dependencia,
-        nodo.nombre,
-        nodo.nit_remitente,
-        nodo.direccion,
-        nodo.ciudad_dane,
-        nodo.ciudad_nombre,
-        nodo.departamento,
-        b.nombre_destinatario,
-        b.nit_destinatario || null,
-        b.direccion_destinatario,
-        b.barrio_destinatario || 'URBANO',
-        b.ciudad_destinatario_nombre || nodo.ciudad_nombre,
-        b.telefono_destinatario || null,
-        b.celular_destinatario || null,
-        b.correo_destinatario || null,
-        cantCajas,
-        Number(b.peso_kg || 2),
-        Number(b.valor_declarado || 100000),
-        b.contenido || 'MERCANCÍA ÉXITO',
-        b.observaciones || null,
-        dynamicLabelUrl,
-        null,
-        req.user?.name || req.user?.email || 'INHOUSE',
-      ]
-    );
+    const guia = await withTransaction(async (client) => {
+      const ins = await client.query(
+        `INSERT INTO exito_msj_guias (
+          numero_guia, codigo_remision, numero_pedido, contenedor, modalidad_pedido,
+          tipo_operacion, ambiente, is_sandbox, origen_creacion,
+          nodo_id, codigo_dependencia, nombre_remitente, nit_remitente, direccion_remitente,
+          ciudad_remitente_dane, ciudad_remitente_nombre, departamento_remitente,
+          nombre_destinatario, nit_destinatario, direccion_destinatario, barrio_destinatario,
+          ciudad_destinatario_nombre, telefono_destinatario, celular_destinatario, correo_destinatario,
+          cant_cajas, peso_kg, valor_declarado, contenido, observaciones,
+          rotulo_pdf_url, rotulo_drive_id, estado_operativo, estado_id, id_guia_exito, created_by
+        ) VALUES (
+          $1,$2,$3,$4,$5,
+          $6,$7,$8,'MANUAL_INHOUSE',
+          $9,$10,$11,$12,$13,
+          $14,$15,$16,
+          $17,$18,$19,$20,
+          $21,$22,$23,$24,
+          $25,$26,$27,$28,$29,
+          $30,$31,'DISPONIBLE','EST-31','1',$32
+        ) RETURNING *`,
+        [
+          numeroGuia,
+          codigoRemision,
+          numeroPedido,
+          b.contenedor || `CONT-${numeroGuia}`,
+          b.modalidad_pedido || 'FIRME',
+          tipoOperacion,
+          isSandbox ? 'SANDBOX' : 'PROD',
+          isSandbox,
+          nodo.id,
+          nodo.codigo_dependencia,
+          nodo.nombre,
+          nodo.nit_remitente,
+          nodo.direccion,
+          nodo.ciudad_dane,
+          nodo.ciudad_nombre,
+          nodo.departamento,
+          b.nombre_destinatario,
+          b.nit_destinatario || null,
+          b.direccion_destinatario,
+          b.barrio_destinatario || 'URBANO',
+          b.ciudad_destinatario_nombre || nodo.ciudad_nombre,
+          b.telefono_destinatario || null,
+          b.celular_destinatario || null,
+          b.correo_destinatario || null,
+          cantCajas,
+          Number(b.peso_kg || 2),
+          Number(b.valor_declarado || 100000),
+          b.contenido || 'MERCANCÍA ÉXITO',
+          b.observaciones || null,
+          dynamicLabelUrl,
+          null,
+          req.user?.name || req.user?.email || 'INHOUSE',
+        ]
+      );
 
-    const guia = ins.rows[0];
-    await pool.query(
-      `INSERT INTO exito_msj_guia_historial (
-        guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-        origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id, usuario_nombre
-      ) VALUES ($1,$2,NULL,'DISPONIBLE','1','MANUAL_INHOUSE',$3,$4,$5,$6)`,
-      [
-        guia.id,
-        guia.numero_guia,
-        'Guía creada manualmente en Inhouse (Rótulo PDF disponible bajo demanda sin ocupar Drive).',
-        dynamicLabelUrl,
-        null,
-        req.user?.name || 'INHOUSE',
-      ]
-    );
+      const g = ins.rows[0];
+      await client.query(
+        `INSERT INTO exito_msj_guia_historial (
+          guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+          origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id, usuario_nombre
+        ) VALUES ($1,$2,NULL,'DISPONIBLE','1','MANUAL_INHOUSE',$3,$4,$5,$6)`,
+        [
+          g.id,
+          g.numero_guia,
+          'Guía creada manualmente en Inhouse (Rótulo PDF disponible bajo demanda sin ocupar Drive).',
+          dynamicLabelUrl,
+          null,
+          req.user?.name || 'INHOUSE',
+        ]
+      );
+      return g;
+    });
 
     return res.status(201).json({ success: true, guia });
   } catch (err: any) {
@@ -1697,81 +1777,94 @@ export async function assignPickupVehicle(req: any, res: Response) {
 
     const cleanNodoIds = nodoIds.map((n: any) => Number(n)).filter((n: number) => n > 0);
 
-    await pool.query(
-      `UPDATE exito_msj_nodos
-       SET vehiculo_recogida_id = $2,
-           placa_recogida = $3,
-           conductor_recogida_id = $4,
-           cedula_conductor_recogida = $5,
-           nombre_conductor_recogida = $6,
-           fecha_asignacion_recogida = CURRENT_DATE,
-           updated_by = $7,
-           updated_at = NOW()
-       WHERE id = ANY($1::int[])`,
-      [
-        cleanNodoIds,
-        veh?.id || vehiculoId,
-        resolvedPlate,
-        drv?.id || conductorId,
-        resolvedDriverCedula,
-        resolvedDriverName,
-        userName,
-      ]
-    );
+    const nodosResumenText = (
+      await pool.query(
+        `SELECT codigo_dependencia, nombre FROM exito_msj_nodos WHERE id = ANY($1::int[]) ORDER BY codigo_dependencia ASC`,
+        [cleanNodoIds]
+      )
+    ).rows
+      .map((n: any) => `Nodo ${n.codigo_dependencia} (${n.nombre})`)
+      .join(', ');
 
-    // Asegurar que las guías en ESPERA_RECOGIDA de esos nodos queden en DISPONIBLE para ser recogidas
-    const updGuias = await pool.query(
-      `UPDATE exito_msj_guias
-       SET estado_operativo = 'DISPONIBLE',
-           estado_id = 'EST-31',
-           fecha_recogida_programada = COALESCE(fecha_recogida_programada, CURRENT_DATE),
-           updated_by = $2,
-           updated_at = NOW()
-       WHERE nodo_id = ANY($1::int[])
-         AND estado_operativo = 'ESPERA_RECOGIDA'
-         AND deleted_at IS NULL`,
-      [cleanNodoIds, userName]
-    );
+    const { updGuias, nodosUpdated, progIns } = await withTransaction(async (client) => {
+      await client.query(
+        `UPDATE exito_msj_nodos
+         SET vehiculo_recogida_id = $2,
+             placa_recogida = $3,
+             conductor_recogida_id = $4,
+             cedula_conductor_recogida = $5,
+             nombre_conductor_recogida = $6,
+             fecha_asignacion_recogida = CURRENT_DATE,
+             updated_by = $7,
+             updated_at = NOW()
+         WHERE id = ANY($1::int[])`,
+        [
+          cleanNodoIds,
+          veh?.id || vehiculoId,
+          resolvedPlate,
+          drv?.id || conductorId,
+          resolvedDriverCedula,
+          resolvedDriverName,
+          userName,
+        ]
+      );
 
-    const nodosUpdated = await pool.query(
-      `SELECT id, codigo_dependencia, nombre, direccion, placa_recogida, nombre_conductor_recogida, cedula_conductor_recogida, fecha_asignacion_recogida, updated_at
-       FROM exito_msj_nodos
-       WHERE id = ANY($1::int[])
-       ORDER BY codigo_dependencia ASC`,
-      [cleanNodoIds]
-    );
+      // Asegurar que las guías en ESPERA_RECOGIDA de esos nodos queden en DISPONIBLE para ser recogidas
+      const upd = await client.query(
+        `UPDATE exito_msj_guias
+         SET estado_operativo = 'DISPONIBLE',
+             estado_id = 'EST-31',
+             fecha_recogida_programada = COALESCE(fecha_recogida_programada, CURRENT_DATE),
+             updated_by = $2,
+             updated_at = NOW()
+         WHERE nodo_id = ANY($1::int[])
+           AND estado_operativo = 'ESPERA_RECOGIDA'
+           AND deleted_at IS NULL`,
+        [cleanNodoIds, userName]
+      );
+
+      const nUpd = await client.query(
+        `SELECT id, codigo_dependencia, nombre, direccion, placa_recogida, nombre_conductor_recogida, cedula_conductor_recogida, fecha_asignacion_recogida, updated_at
+         FROM exito_msj_nodos
+         WHERE id = ANY($1::int[])
+         ORDER BY codigo_dependencia ASC`,
+        [cleanNodoIds]
+      );
+
+      // Marcar programaciones anteriores abiertas de la misma placa como REPROGRAMADO y crear la nueva programación activa en el histórico
+      await client.query(
+        `UPDATE exito_msj_programacion_recogidas
+         SET estado = 'REPROGRAMADO', updated_at = NOW()
+         WHERE UPPER(placa) = UPPER($1) AND estado = 'PROGRAMADO'`,
+        [resolvedPlate]
+      );
+
+      const codigoProg = `PRG-EX-${resolvedPlate}-${Date.now().toString().slice(-5)}`;
+      const pIns = await client.query(
+        `INSERT INTO exito_msj_programacion_recogidas (
+          codigo_programacion, vehiculo_id, placa, conductor_id, conductor_nombre, conductor_cedula,
+          nodo_ids, nodos_resumen, estado, asignado_por
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'PROGRAMADO',$9)
+        RETURNING *`,
+        [
+          codigoProg,
+          veh?.id || vehiculoId,
+          resolvedPlate,
+          drv?.id || conductorId,
+          resolvedDriverName,
+          resolvedDriverCedula,
+          cleanNodoIds,
+          nodosResumenText,
+          userName,
+        ]
+      );
+
+      return { updGuias: upd, nodosUpdated: nUpd, progIns: pIns };
+    });
 
     const nodosResumen = nodosUpdated.rows
       .map((n: any) => `Nodo ${n.codigo_dependencia} (${n.nombre})`)
       .join(', ');
-
-    // Marcar programaciones anteriores abiertas de la misma placa como REPROGRAMADO y crear la nueva programación activa en el histórico
-    await pool.query(
-      `UPDATE exito_msj_programacion_recogidas
-       SET estado = 'REPROGRAMADO', updated_at = NOW()
-       WHERE UPPER(placa) = UPPER($1) AND estado = 'PROGRAMADO'`,
-      [resolvedPlate]
-    );
-
-    const codigoProg = `PRG-EX-${resolvedPlate}-${Date.now().toString().slice(-5)}`;
-    const progIns = await pool.query(
-      `INSERT INTO exito_msj_programacion_recogidas (
-        codigo_programacion, vehiculo_id, placa, conductor_id, conductor_nombre, conductor_cedula,
-        nodo_ids, nodos_resumen, estado, asignado_por
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'PROGRAMADO',$9)
-      RETURNING *`,
-      [
-        codigoProg,
-        veh?.id || vehiculoId,
-        resolvedPlate,
-        drv?.id || conductorId,
-        resolvedDriverName,
-        resolvedDriverCedula,
-        cleanNodoIds,
-        nodosResumen,
-        userName,
-      ]
-    );
 
     const historialProgramacion = await pool.query(
       `SELECT * FROM exito_msj_programacion_recogidas ORDER BY created_at DESC LIMIT 50`
@@ -1824,16 +1917,22 @@ export async function getWarehouseReceptionData(req: Request, res: Response) {
       LIMIT 60
     `);
 
-    // 2. Consultar guías de la remisión/placa seleccionada o todas las que están en RECOGIDA_TIENDA
+    // 2. Consultar guías de la remisión/placa seleccionada. Por defecto SOLO muestra las que están en RECOGIDA_TIENDA (pendientes de recibir en bodega)
+    const soloPendientes = req.query.soloPendientes !== 'false';
     const params: any[] = [];
-    const where: string[] = [`g.deleted_at IS NULL`, `g.estado_operativo IN ('RECOGIDA_TIENDA', 'EN_ALMACEN')`];
+    const where: string[] = [`g.deleted_at IS NULL`];
+
+    if (soloPendientes) {
+      where.push(`g.estado_operativo = 'RECOGIDA_TIENDA'`);
+    } else {
+      where.push(`g.estado_operativo IN ('RECOGIDA_TIENDA', 'EN_ALMACEN')`);
+    }
+
     if (sandboxFilterG) where.push(`g.is_sandbox = FALSE`);
 
     if (recogidaId && recogidaId !== 'TODAS') {
       params.push(Number(recogidaId));
       where.push(`g.recogida_id = $${params.length}`);
-    } else {
-      where.push(`g.estado_operativo = 'RECOGIDA_TIENDA'`);
     }
 
     if (placa && String(placa).trim() && placa !== 'TODAS') {
@@ -1886,12 +1985,21 @@ export async function getWarehouseReceptionData(req: Request, res: Response) {
       direccion_destino: g.direccion_destinatario,
     }));
 
+    const emailConfig = await ExitoEmailService.getConfig().catch(() => null);
+
     return res.json({
       success: true,
       remisiones: remisionesMapped,
       remisionesRecogida: remisionesMapped,
       guiasPendientes: guiasMapped,
       guias: guiasMapped,
+      emailConfig: {
+        tieneCorreosRecepcion: (emailConfig?.recepcionAlmacen?.length || 0) > 0,
+        recepcionAlmacenCount: emailConfig?.recepcionAlmacen?.length || 0,
+        tieneCorreosRecogida: (emailConfig?.recogidaTienda?.length || 0) > 0,
+        recogidaTiendaCount: emailConfig?.recogidaTienda?.length || 0,
+        habilitado: emailConfig?.habilitado !== false,
+      },
     });
   } catch (err: any) {
     console.error('[EXITO-WAREHOUSE-DATA]', err);
@@ -1910,78 +2018,113 @@ export async function confirmWarehouseReception(req: any, res: Response) {
     }
     const userName = req.user?.name || req.user?.email || 'BODEGA_M7';
 
-    await pool.query(
-      `UPDATE exito_msj_guias
-       SET estado_operativo = 'EN_ALMACEN',
-           estado_id = 'EST-33',
-           fecha_ingreso_almacen = NOW(),
-           updated_by = $2,
-           updated_at = NOW()
-       WHERE id = ANY($1::bigint[])`,
-      [guiaIds, userName]
-    );
-
-    await pool.query(
-      `UPDATE exito_msj_guia_paquetes
-       SET verificado_almacen = TRUE
-       WHERE guia_id = ANY($1::bigint[])`,
-      [guiaIds]
-    );
-
-    await pool.query(
-      `INSERT INTO exito_msj_guia_historial (
-        guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-        origen_cambio, observacion, usuario_nombre
-      )
-      SELECT id, numero_guia, estado_operativo, 'EN_ALMACEN', '2',
-             'RECEPCION_BODEGA_LOCAL', $2, $3
-      FROM exito_msj_guias WHERE id = ANY($1::bigint[])`,
-      [
-        guiaIds,
-        observacion || 'Recibido y pistoleado en almacén urbano Milla 7 (control local misma ciudad).',
-        userName,
-      ]
-    );
-
-    if (recogidaId) {
-      const pendRes = await pool.query(
-        `SELECT COUNT(*)::int AS pend FROM exito_msj_guias WHERE recogida_id = $1 AND estado_operativo = 'RECOGIDA_TIENDA'`,
-        [Number(recogidaId)]
+    await withTransaction(async (client) => {
+      await client.query(
+        `UPDATE exito_msj_guias
+         SET estado_operativo = 'EN_ALMACEN',
+             estado_id = 'EST-33',
+             fecha_ingreso_almacen = NOW(),
+             updated_by = $2,
+             updated_at = NOW()
+         WHERE id = ANY($1::bigint[])`,
+        [guiaIds, userName]
       );
-      if ((pendRes.rows[0]?.pend || 0) === 0) {
-        await pool.query(
-          `UPDATE exito_msj_recogidas
-           SET recibido_almacen = TRUE, fecha_recepcion_almacen = NOW(), recibido_almacen_por = $2
-           WHERE id = $1`,
-          [Number(recogidaId), userName]
-        );
-      }
-    }
 
-    // Disparar Alerta Operativa: Recepción en Almacén Milla 7 (Correo y WhatsApp a destinatarios configurados)
-    try {
-      const infoGuiaRes = await pool.query(
-        `SELECT g.numero_guia, g.numero_pedido, g.cant_cajas, n.nombre AS nodo_nombre
-         FROM exito_msj_guias g
-         LEFT JOIN exito_msj_nodos n ON n.id = g.nodo_id
-         WHERE g.id = ANY($1::bigint[]) LIMIT 10`,
+      await client.query(
+        `UPDATE exito_msj_guia_paquetes
+         SET verificado_almacen = TRUE
+         WHERE guia_id = ANY($1::bigint[])`,
         [guiaIds]
       );
-      const muestraGuias = infoGuiaRes.rows.map((r: any) => `• Guía ${r.numero_guia} | Pedido: ${r.numero_pedido} (${r.cant_cajas || 1} cj)`).join('\n');
+
+      await client.query(
+        `INSERT INTO exito_msj_guia_historial (
+          guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+          origen_cambio, observacion, usuario_nombre
+        )
+        SELECT id, numero_guia, estado_operativo, 'EN_ALMACEN', '2',
+               'RECEPCION_BODEGA_LOCAL', $2, $3
+        FROM exito_msj_guias WHERE id = ANY($1::bigint[])`,
+        [
+          guiaIds,
+          observacion || 'Recibido y pistoleado en almacén urbano Milla 7 (control local misma ciudad).',
+          userName,
+        ]
+      );
+
+      if (recogidaId) {
+        const pendRes = await client.query(
+          `SELECT COUNT(*)::int AS pend FROM exito_msj_guias WHERE recogida_id = $1 AND estado_operativo = 'RECOGIDA_TIENDA'`,
+          [Number(recogidaId)]
+        );
+        if ((pendRes.rows[0]?.pend || 0) === 0) {
+          await client.query(
+            `UPDATE exito_msj_recogidas
+             SET recibido_almacen = TRUE, fecha_recepcion_almacen = NOW(), recibido_almacen_por = $2
+             WHERE id = $1`,
+            [Number(recogidaId), userName]
+          );
+        }
+      }
+    });
+
+    // Disparar Notificación Formal por Correo de Recepción en Almacén M7
+    let emailResult: { sent: boolean; emails: string[]; warning?: string } = {
+      sent: false,
+      emails: [],
+      warning: undefined,
+    };
+
+    try {
+      const infoGuiaRes = await pool.query(
+        `SELECT g.numero_guia, g.numero_pedido, g.cant_cajas, g.peso_kg,
+                g.nombre_destinatario, g.barrio_destinatario, g.ciudad_destinatario_nombre,
+                n.nombre AS nodo_nombre, r.codigo_recogida,
+                COALESCE(r.placa_vehiculo, v.plate, n.placa_recogida, 'SIN-PLACA') AS placa_recogida
+         FROM exito_msj_guias g
+         LEFT JOIN exito_msj_nodos n ON n.id = g.nodo_id
+         LEFT JOIN exito_msj_recogidas r ON r.id = g.recogida_id
+         LEFT JOIN vehicles v ON v.id = g.vehiculo_recogida_id
+         WHERE g.id = ANY($1::bigint[])`,
+        [guiaIds]
+      );
+
+      const primera = infoGuiaRes.rows[0] || {};
+      const totalCajasRecibidas = infoGuiaRes.rows.reduce(
+        (acc: number, r: any) => acc + (parseInt(String(r.cant_cajas || '1'), 10) || 1),
+        0
+      );
+
+      emailResult = await ExitoEmailService.notifyWarehouseReception({
+        responsableBodega: userName,
+        totalGuias: guiaIds.length,
+        totalCajas: totalCajasRecibidas,
+        observaciones: observacion || 'Verificado y pistoleado en almacén urbano Milla 7',
+        recogidaId: recogidaId ? Number(recogidaId) : undefined,
+        codigoRecogida: primera.codigo_recogida,
+        placa: primera.placa_recogida,
+        nodoNombre: primera.nodo_nombre,
+        guias: infoGuiaRes.rows,
+      });
+
       sendExitoOperationalAlert(
         'EXITO_RECEPCION_ALMACEN',
         `🏢 *RECEPCIÓN EN ALMACÉN MILLA 7*\n` +
         `Total Guías Recibidas: *${guiaIds.length}*\n` +
         `Responsable Bodega: *${userName}*\n` +
         `Observación: ${observacion || 'Verificado y pistoleado en almacén urbano Milla 7'}\n\n` +
-        `Detalle de Guías:\n${muestraGuias}\n\n` +
         `Fecha: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}`
       ).catch(() => {});
-    } catch { }
+    } catch (err: any) {
+      console.error('[EXITO-WAREHOUSE-RECEPTION-EMAIL]', err.message);
+    }
 
     return res.json({
       success: true,
       receivedCount: guiaIds.length,
+      emailNotified: emailResult.sent,
+      emailRecipients: emailResult.emails,
+      emailWarning: emailResult.warning,
       message: `${guiaIds.length} guía(s) recibidas y verificadas en almacén urbano Milla 7.`,
     });
   } catch (err: any) {
@@ -2268,26 +2411,41 @@ export async function createUrbanDeliveryRoute(req: any, res: Response) {
       conductorMostrar = ruta.nombre_conductor || ruta.conductor_id || '';
       cedulaConductor = ruta.cedula_conductor || '';
       tienePlacaAsignada = Boolean(placaMostrar);
+    }
 
-      // Si al adicionar guías también enviaron una placa para esta ruta
-      if (vehiculoId && String(vehiculoId).trim()) {
-        const [vehRes, drvRes] = await Promise.all([
-          pool.query(`SELECT id, plate FROM vehicles WHERE id = $1 OR UPPER(plate) = UPPER($1) LIMIT 1`, [
-            String(vehiculoId).trim(),
-          ]),
-          conductorId
-            ? pool.query(`SELECT id, name, document_number FROM drivers WHERE id = $1 LIMIT 1`, [
-                String(conductorId).trim(),
-              ])
-            : Promise.resolve({ rows: [] as any[] }),
-        ]);
-        placaMostrar = (vehRes.rows[0]?.plate || String(vehiculoId)).toUpperCase();
-        if (drvRes.rows[0]) {
-          conductorMostrar = drvRes.rows[0].name;
-          cedulaConductor = drvRes.rows[0].document_number || '';
-        }
-        tienePlacaAsignada = true;
-        const updR = await pool.query(
+    let resolvedVehId: string | null = null;
+    let resolvedDrvId: string | null = null;
+
+    if (vehiculoId && String(vehiculoId).trim()) {
+      const [vehRes, drvRes] = await Promise.all([
+        pool.query(`SELECT id, plate FROM vehicles WHERE id = $1 OR UPPER(plate) = UPPER($1) LIMIT 1`, [
+          String(vehiculoId).trim(),
+        ]),
+        conductorId && String(conductorId).trim()
+          ? pool.query(`SELECT id, name, document_number FROM drivers WHERE id = $1 LIMIT 1`, [
+              String(conductorId).trim(),
+            ])
+          : Promise.resolve({ rows: [] as any[] }),
+      ]);
+
+      resolvedVehId = vehRes.rows[0]?.id || String(vehiculoId).trim();
+      resolvedDrvId = drvRes.rows[0]?.id || (conductorId ? String(conductorId).trim() : null);
+      placaMostrar = (vehRes.rows[0]?.plate || String(vehiculoId)).toUpperCase();
+      if (drvRes.rows[0]) {
+        conductorMostrar = drvRes.rows[0].name;
+        cedulaConductor = drvRes.rows[0].document_number || '';
+      } else if (!conductorMostrar && conductorId) {
+        conductorMostrar = String(conductorId);
+      }
+      tienePlacaAsignada = true;
+    }
+
+    const trackingEventsToDispatch: any[] = [];
+
+    const finalRuta = await withTransaction(async (client) => {
+      let r = ruta;
+      if (r && vehiculoId && String(vehiculoId).trim()) {
+        const updR = await client.query(
           `UPDATE exito_msj_rutas
            SET vehiculo_id = $2,
                conductor_id = COALESCE($3, conductor_id),
@@ -2299,161 +2457,148 @@ export async function createUrbanDeliveryRoute(req: any, res: Response) {
            WHERE id = $1
            RETURNING *`,
           [
-            ruta.id,
-            vehRes.rows[0]?.id || String(vehiculoId).trim(),
-            drvRes.rows[0]?.id || (conductorId ? String(conductorId).trim() : null),
+            r.id,
+            resolvedVehId || String(vehiculoId).trim(),
+            resolvedDrvId || (conductorId ? String(conductorId).trim() : null),
             placaMostrar,
             conductorMostrar,
             cedulaConductor,
           ]
         );
-        ruta = updR.rows[0];
-      }
-    } else {
-      let vehIdReal: string | null = null;
-      let drvIdReal: string | null = null;
+        r = updR.rows[0];
+      } else if (!r) {
+        const codigoRuta = `RUT-EX-${Date.now().toString().slice(-6)}`;
+        const isSandbox = Boolean(guias[0].is_sandbox);
+        const dynamicPlanillaUrl = `/api/exito-mensajeria/planillas/${encodeURIComponent(codigoRuta)}/pdf`;
 
-      if (vehiculoId && String(vehiculoId).trim()) {
-        const [vehRes, drvRes] = await Promise.all([
-          pool.query(`SELECT id, plate FROM vehicles WHERE id = $1 OR UPPER(plate) = UPPER($1) LIMIT 1`, [
-            String(vehiculoId).trim(),
-          ]),
-          conductorId && String(conductorId).trim()
-            ? pool.query(`SELECT id, name, document_number FROM drivers WHERE id = $1 LIMIT 1`, [
-                String(conductorId).trim(),
-              ])
-            : Promise.resolve({ rows: [] as any[] }),
-        ]);
-
-        vehIdReal = vehRes.rows[0]?.id || String(vehiculoId).trim();
-        drvIdReal = drvRes.rows[0]?.id || (conductorId ? String(conductorId).trim() : null);
-        placaMostrar = (vehRes.rows[0]?.plate || String(vehiculoId)).toUpperCase();
-        conductorMostrar = drvRes.rows[0]?.name || (conductorId ? String(conductorId) : 'Conductor por definir');
-        cedulaConductor = drvRes.rows[0]?.document_number || '';
-        tienePlacaAsignada = true;
-      }
-
-      const codigoRuta = `RUT-EX-${Date.now().toString().slice(-6)}`;
-      const isSandbox = Boolean(guias[0].is_sandbox);
-      const dynamicPlanillaUrl = `/api/exito-mensajeria/planillas/${encodeURIComponent(codigoRuta)}/pdf`;
-
-      const rutaIns = await pool.query(
-        `INSERT INTO exito_msj_rutas (
-          codigo_ruta, nombre, fecha_ruta, tipo_operacion, vehiculo_id, conductor_id,
-          placa_vehiculo, nombre_conductor, cedula_conductor,
-          total_guias, remision_ruta_pdf_url, remision_ruta_drive_id, estado, observaciones, is_sandbox, created_by
-        ) VALUES ($1,$2,CURRENT_DATE,$3,$4,$5,$6,$7,$8,$9,$10,NULL,$11,$12,$13,$14)
-        RETURNING *`,
-        [
-          codigoRuta,
-          nombreRuta || `Ruta Urbana ${guias[0]?.barrio_destinatario || 'General'}`,
-          tipoOperacion === 'SAME_DAY' ? 'SAME_DAY' : 'NEXT_DAY',
-          vehIdReal,
-          drvIdReal,
-          placaMostrar || null,
-          conductorMostrar || null,
-          cedulaConductor || null,
-          guias.length,
-          dynamicPlanillaUrl,
-          tienePlacaAsignada ? 'EN_REPARTO' : 'ACTIVA',
-          observaciones || null,
-          isSandbox,
-          userName,
-        ]
-      );
-      ruta = rutaIns.rows[0];
-    }
-
-    const dynamicPlanillaUrl = `/api/exito-mensajeria/planillas/${encodeURIComponent(ruta.codigo_ruta)}/pdf`;
-
-    for (let i = 0; i < guias.length; i++) {
-      const g = guias[i];
-      await pool.query(
-        `INSERT INTO exito_msj_ruta_guias (ruta_id, guia_id, orden_parada, estado_parada)
-         VALUES ($1,$2,$3,'PENDIENTE')
-         ON CONFLICT (ruta_id, guia_id) DO NOTHING`,
-        [ruta.id, g.id, i + 1]
-      );
-
-      if (tienePlacaAsignada) {
-        await pool.query(
-          `UPDATE exito_msj_guias
-           SET estado_operativo = 'EN_RUTA',
-               estado_id = 'EST-35',
-               id_guia_exito = '5',
-               ruta_actual_id = $2,
-               vehiculo_entrega_id = $3,
-               conductor_entrega_id = $4,
-               remision_pdf_url = $5,
-               fecha_salida_ruta = COALESCE(fecha_salida_ruta, NOW()),
-               updated_by = $6,
-               updated_at = NOW()
-           WHERE id = $1`,
-          [g.id, ruta.id, ruta.vehiculo_id, ruta.conductor_id, dynamicPlanillaUrl, userName]
-        );
-
-        await pool.query(
-          `INSERT INTO exito_msj_guia_historial (
-            guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-            origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id, usuario_nombre
-          ) VALUES ($1,$2,$3,'EN_RUTA','5','DESPACHO_RUTA_URBANA',$4,$5,NULL,$6)`,
+        const rutaIns = await client.query(
+          `INSERT INTO exito_msj_rutas (
+            codigo_ruta, nombre, fecha_ruta, tipo_operacion, vehiculo_id, conductor_id,
+            placa_vehiculo, nombre_conductor, cedula_conductor,
+            total_guias, remision_ruta_pdf_url, remision_ruta_drive_id, estado, observaciones, is_sandbox, created_by
+          ) VALUES ($1,$2,CURRENT_DATE,$3,$4,$5,$6,$7,$8,$9,$10,NULL,$11,$12,$13,$14)
+          RETURNING *`,
           [
-            g.id,
-            g.numero_guia,
-            g.estado_operativo,
-            `En reparto urbano (${ruta.codigo_ruta}) - Placa ${placaMostrar} (${conductorMostrar}).`,
+            codigoRuta,
+            nombreRuta || `Ruta Urbana ${guias[0]?.barrio_destinatario || 'General'}`,
+            tipoOperacion === 'SAME_DAY' ? 'SAME_DAY' : 'NEXT_DAY',
+            resolvedVehId,
+            resolvedDrvId,
+            placaMostrar || null,
+            conductorMostrar || null,
+            cedulaConductor || null,
+            guias.length,
             dynamicPlanillaUrl,
+            tienePlacaAsignada ? 'EN_REPARTO' : 'ACTIVA',
+            observaciones || null,
+            isSandbox,
             userName,
           ]
         );
-
-        // Notificar estado 5 ("En reparto") al webhook de Go Éxito
-        await ExitoSyncService.enqueueAndDispatchTrackingEvent({
-          guiaId: Number(g.id),
-          numeroGuia: g.numero_guia,
-          numeroPedido: g.numero_pedido,
-          codigoInterno: 'EN_RUTA',
-          idGuiaStatus: '5',
-          observation: `En reparto urbano (${ruta.codigo_ruta}) - Placa ${placaMostrar}.`,
-          ambiente: g.ambiente,
-          isSandbox: Boolean(g.is_sandbox),
-        });
-      } else {
-        await pool.query(
-          `UPDATE exito_msj_guias
-           SET ruta_actual_id = $2,
-               remision_pdf_url = $3,
-               updated_by = $4,
-               updated_at = NOW()
-           WHERE id = $1`,
-          [g.id, ruta.id, dynamicPlanillaUrl, userName]
-        );
-
-        await pool.query(
-          `INSERT INTO exito_msj_guia_historial (
-            guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-            origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id, usuario_nombre
-          ) VALUES ($1,$2,$3,$3,$4,'AGRUPACION_RUTA_ALMACEN',$5,$6,NULL,$7)`,
-          [
-            g.id,
-            g.numero_guia,
-            g.estado_operativo,
-            g.id_guia_exito || '2',
-            `Agrupada en ruta ${ruta.codigo_ruta} (${ruta.nombre}) en espera de asignación de placa de reparto.`,
-            dynamicPlanillaUrl,
-            userName,
-          ]
-        );
+        r = rutaIns.rows[0];
       }
-    }
 
-    await pool.query(
-      `UPDATE exito_msj_rutas
-       SET total_guias = (SELECT COUNT(*)::int FROM exito_msj_guias WHERE ruta_actual_id = $1 AND deleted_at IS NULL),
-           updated_at = NOW()
-       WHERE id = $1`,
-      [ruta.id]
-    );
+      const dynamicPlanillaUrl = `/api/exito-mensajeria/planillas/${encodeURIComponent(r.codigo_ruta)}/pdf`;
+
+      for (let i = 0; i < guias.length; i++) {
+        const g = guias[i];
+        await client.query(
+          `INSERT INTO exito_msj_ruta_guias (ruta_id, guia_id, orden_parada, estado_parada)
+           VALUES ($1,$2,$3,'PENDIENTE')
+           ON CONFLICT (ruta_id, guia_id) DO NOTHING`,
+          [r.id, g.id, i + 1]
+        );
+
+        if (tienePlacaAsignada) {
+          await client.query(
+            `UPDATE exito_msj_guias
+             SET estado_operativo = 'EN_RUTA',
+                 estado_id = 'EST-35',
+                 id_guia_exito = '5',
+                 ruta_actual_id = $2,
+                 vehiculo_entrega_id = $3,
+                 conductor_entrega_id = $4,
+                 remision_pdf_url = $5,
+                 fecha_salida_ruta = COALESCE(fecha_salida_ruta, NOW()),
+                 updated_by = $6,
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [g.id, r.id, r.vehiculo_id, r.conductor_id, dynamicPlanillaUrl, userName]
+          );
+
+          await client.query(
+            `INSERT INTO exito_msj_guia_historial (
+              guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+              origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id, usuario_nombre
+            ) VALUES ($1,$2,$3,'EN_RUTA','5','DESPACHO_RUTA_URBANA',$4,$5,NULL,$6)`,
+            [
+              g.id,
+              g.numero_guia,
+              g.estado_operativo,
+              `En reparto urbano (${r.codigo_ruta}) - Placa ${placaMostrar} (${conductorMostrar}).`,
+              dynamicPlanillaUrl,
+              userName,
+            ]
+          );
+
+          trackingEventsToDispatch.push({
+            guiaId: Number(g.id),
+            numeroGuia: g.numero_guia,
+            numeroPedido: g.numero_pedido,
+            codigoInterno: 'EN_RUTA',
+            idGuiaStatus: '5',
+            observation: `En reparto urbano (${r.codigo_ruta}) - Placa ${placaMostrar}.`,
+            ambiente: g.ambiente,
+            isSandbox: Boolean(g.is_sandbox),
+          });
+        } else {
+          await client.query(
+            `UPDATE exito_msj_guias
+             SET ruta_actual_id = $2,
+                 remision_pdf_url = $3,
+                 updated_by = $4,
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [g.id, r.id, dynamicPlanillaUrl, userName]
+          );
+
+          await client.query(
+            `INSERT INTO exito_msj_guia_historial (
+              guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+              origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id, usuario_nombre
+            ) VALUES ($1,$2,$3,$3,$4,'AGRUPACION_RUTA_ALMACEN',$5,$6,NULL,$7)`,
+            [
+              g.id,
+              g.numero_guia,
+              g.estado_operativo,
+              g.id_guia_exito || '2',
+              `Agrupada en ruta ${r.codigo_ruta} (${r.nombre}) en espera de asignación de placa de reparto.`,
+              dynamicPlanillaUrl,
+              userName,
+            ]
+          );
+        }
+      }
+
+      await client.query(
+        `UPDATE exito_msj_rutas
+         SET total_guias = (SELECT COUNT(*)::int FROM exito_msj_guias WHERE ruta_actual_id = $1 AND deleted_at IS NULL),
+             updated_at = NOW()
+         WHERE id = $1`,
+        [r.id]
+      );
+
+      return r;
+    });
+
+    ruta = finalRuta;
+
+    // Disparar webhooks solo tras confirmar el COMMIT en base de datos
+    for (const evt of trackingEventsToDispatch) {
+      await ExitoSyncService.enqueueAndDispatchTrackingEvent(evt).catch((e: any) =>
+        console.warn('[EXITO-DISPATCH-SYNC-WARN]', e.message)
+      );
+    }
 
     return res.status(201).json({
       success: true,
@@ -2461,7 +2606,7 @@ export async function createUrbanDeliveryRoute(req: any, res: Response) {
       codigoRuta: ruta.codigo_ruta,
       codigoDocumento: ruta.codigo_ruta,
       tienePlacaAsignada,
-      remisionPdfUrl: dynamicPlanillaUrl,
+      remisionPdfUrl: ruta.remision_ruta_pdf_url || `/api/exito-mensajeria/planillas/${encodeURIComponent(ruta.codigo_ruta)}/pdf`,
       message: tienePlacaAsignada
         ? `Ruta ${ruta.codigo_ruta} despachada a Placa ${placaMostrar} con ${guias.length} guía(s).`
         : `Ruta ${ruta.codigo_ruta} armada con ${guias.length} guía(s) sin placa. Puede adicionar/quitar guías y asignarle placa cuando disponga.`,
@@ -2514,79 +2659,90 @@ export async function manageUrbanDeliveryRoute(req: any, res: Response) {
       const nuevaCedula = drvRes.rows[0]?.document_number || ruta.cedula_conductor || '';
       const placaAnterior = ruta.placa_vehiculo || 'SIN PLACA';
 
-      const updRuta = await pool.query(
-        `UPDATE exito_msj_rutas
-         SET vehiculo_id = $2,
-             conductor_id = $3,
-             placa_vehiculo = $4,
-             nombre_conductor = $5,
-             cedula_conductor = $6,
-             nombre = COALESCE(NULLIF($7, ''), nombre),
-             estado = 'EN_REPARTO',
-             updated_at = NOW()
-         WHERE id = $1
-         RETURNING *`,
-        [rutaId, vehIdReal, drvIdReal, nuevaPlaca, nuevoConductor, nuevaCedula, nombreRuta || '']
-      );
-      ruta = updRuta.rows[0];
+      const trackingEventsToDispatch: any[] = [];
+      let updatedGuidesCount = 0;
 
-      const guiasRutaRes = await pool.query(
-        `SELECT * FROM exito_msj_guias
-         WHERE ruta_actual_id = $1 AND deleted_at IS NULL
-           AND estado_operativo NOT IN ('ENTREGADO', 'DEVUELTO_TIENDA', 'ANULADO')`,
-        [rutaId]
-      );
-
-      for (const g of guiasRutaRes.rows) {
-        const estabaEnAlmacen = g.estado_operativo !== 'EN_RUTA';
-        await pool.query(
-          `UPDATE exito_msj_guias
-           SET estado_operativo = 'EN_RUTA',
-               estado_id = 'EST-35',
-               id_guia_exito = '5',
-               vehiculo_entrega_id = $2,
-               conductor_entrega_id = $3,
-               remision_pdf_url = $4,
-               fecha_salida_ruta = COALESCE(fecha_salida_ruta, NOW()),
-               updated_by = $5,
+      ruta = await withTransaction(async (client) => {
+        const updRuta = await client.query(
+          `UPDATE exito_msj_rutas
+           SET vehiculo_id = $2,
+               conductor_id = $3,
+               placa_vehiculo = $4,
+               nombre_conductor = $5,
+               cedula_conductor = $6,
+               nombre = COALESCE(NULLIF($7, ''), nombre),
+               estado = 'EN_REPARTO',
                updated_at = NOW()
-           WHERE id = $1`,
-          [g.id, vehIdReal, drvIdReal, dynamicPlanillaUrl, userName]
+           WHERE id = $1
+           RETURNING *`,
+          [rutaId, vehIdReal, drvIdReal, nuevaPlaca, nuevoConductor, nuevaCedula, nombreRuta || '']
         );
 
-        await pool.query(
-          `INSERT INTO exito_msj_guia_historial (
-            guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-            origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id, usuario_nombre
-          ) VALUES ($1,$2,$3,'EN_RUTA','5','ASIGNACION_CAMBIO_PLACA_RUTA',$4,$5,NULL,$6)`,
-          [
-            g.id,
-            g.numero_guia,
-            g.estado_operativo,
-            `Asignación/Cambio de placa en ruta ${ruta.codigo_ruta}: ${placaAnterior} -> Placa ${nuevaPlaca} (${nuevoConductor}).`,
-            dynamicPlanillaUrl,
-            userName,
-          ]
+        const guiasRutaRes = await client.query(
+          `SELECT * FROM exito_msj_guias
+           WHERE ruta_actual_id = $1 AND deleted_at IS NULL
+             AND estado_operativo NOT IN ('ENTREGADO', 'DEVUELTO_TIENDA', 'ANULADO')`,
+          [rutaId]
         );
+        updatedGuidesCount = guiasRutaRes.rows.length;
 
-        if (estabaEnAlmacen) {
-          await ExitoSyncService.enqueueAndDispatchTrackingEvent({
-            guiaId: Number(g.id),
-            numeroGuia: g.numero_guia,
-            numeroPedido: g.numero_pedido,
-            codigoInterno: 'EN_RUTA',
-            idGuiaStatus: '5',
-            observation: `En reparto urbano (${ruta.codigo_ruta}) - Placa ${nuevaPlaca}.`,
-            ambiente: g.ambiente,
-            isSandbox: Boolean(g.is_sandbox),
-          });
+        for (const g of guiasRutaRes.rows) {
+          const estabaEnAlmacen = g.estado_operativo !== 'EN_RUTA';
+          await client.query(
+            `UPDATE exito_msj_guias
+             SET estado_operativo = 'EN_RUTA',
+                 estado_id = 'EST-35',
+                 id_guia_exito = '5',
+                 vehiculo_entrega_id = $2,
+                 conductor_entrega_id = $3,
+                 remision_pdf_url = $4,
+                 fecha_salida_ruta = COALESCE(fecha_salida_ruta, NOW()),
+                 updated_by = $5,
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [g.id, vehIdReal, drvIdReal, dynamicPlanillaUrl, userName]
+          );
+
+          await client.query(
+            `INSERT INTO exito_msj_guia_historial (
+              guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+              origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id, usuario_nombre
+            ) VALUES ($1,$2,$3,'EN_RUTA','5','ASIGNACION_CAMBIO_PLACA_RUTA',$4,$5,NULL,$6)`,
+            [
+              g.id,
+              g.numero_guia,
+              g.estado_operativo,
+              `Asignación/Cambio de placa en ruta ${ruta.codigo_ruta}: ${placaAnterior} -> Placa ${nuevaPlaca} (${nuevoConductor}).`,
+              dynamicPlanillaUrl,
+              userName,
+            ]
+          );
+
+          if (estabaEnAlmacen) {
+            trackingEventsToDispatch.push({
+              guiaId: Number(g.id),
+              numeroGuia: g.numero_guia,
+              numeroPedido: g.numero_pedido,
+              codigoInterno: 'EN_RUTA',
+              idGuiaStatus: '5',
+              observation: `En reparto urbano (${ruta.codigo_ruta}) - Placa ${nuevaPlaca}.`,
+              ambiente: g.ambiente,
+              isSandbox: Boolean(g.is_sandbox),
+            });
+          }
         }
+
+        return updRuta.rows[0];
+      });
+
+      for (const event of trackingEventsToDispatch) {
+        await ExitoSyncService.enqueueAndDispatchTrackingEvent(event);
       }
 
       return res.json({
         success: true,
         ruta,
-        message: `Placa ${nuevaPlaca} (${nuevoConductor}) asignada a toda la ruta ${ruta.codigo_ruta} (${guiasRutaRes.rows.length} guía(s) actualizadas).`,
+        message: `Placa ${nuevaPlaca} (${nuevoConductor}) asignada a toda la ruta ${ruta.codigo_ruta} (${updatedGuidesCount} guía(s) actualizadas).`,
       });
     }
 
@@ -2604,49 +2760,51 @@ export async function manageUrbanDeliveryRoute(req: any, res: Response) {
         return res.status(404).json({ error: 'Las guías seleccionadas ya no pertenecen a esta ruta.' });
       }
 
-      await pool.query(
-        `DELETE FROM exito_msj_ruta_guias WHERE ruta_id = $1 AND guia_id = ANY($2::bigint[])`,
-        [rutaId, guiaIds]
-      );
+      await withTransaction(async (client) => {
+        await client.query(
+          `DELETE FROM exito_msj_ruta_guias WHERE ruta_id = $1 AND guia_id = ANY($2::bigint[])`,
+          [rutaId, guiaIds]
+        );
 
-      for (const g of guiasAQuitar.rows) {
-        await pool.query(
-          `UPDATE exito_msj_guias
-           SET estado_operativo = 'EN_ALMACEN',
-               estado_id = 'EST-33',
-               id_guia_exito = '2',
-               ruta_actual_id = NULL,
-               vehiculo_entrega_id = NULL,
-               conductor_entrega_id = NULL,
-               fecha_salida_ruta = NULL,
-               updated_by = $2,
+        for (const g of guiasAQuitar.rows) {
+          await client.query(
+            `UPDATE exito_msj_guias
+             SET estado_operativo = 'EN_ALMACEN',
+                 estado_id = 'EST-33',
+                 id_guia_exito = '2',
+                 ruta_actual_id = NULL,
+                 vehiculo_entrega_id = NULL,
+                 conductor_entrega_id = NULL,
+                 fecha_salida_ruta = NULL,
+                 updated_by = $2,
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [g.id, userName]
+          );
+
+          await client.query(
+            `INSERT INTO exito_msj_guia_historial (
+              guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+              origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id, usuario_nombre
+            ) VALUES ($1,$2,$3,'EN_ALMACEN','2','RETIRO_DE_RUTA_INHOUSE',$4,NULL,NULL,$5)`,
+            [
+              g.id,
+              g.numero_guia,
+              g.estado_operativo,
+              `Guía retirada de la ruta ${ruta.codigo_ruta} y devuelta a disponibilidad en Almacén M7 por ${userName}.`,
+              userName,
+            ]
+          );
+        }
+
+        await client.query(
+          `UPDATE exito_msj_rutas
+           SET total_guias = (SELECT COUNT(*)::int FROM exito_msj_guias WHERE ruta_actual_id = $1 AND deleted_at IS NULL),
                updated_at = NOW()
            WHERE id = $1`,
-          [g.id, userName]
+          [rutaId]
         );
-
-        await pool.query(
-          `INSERT INTO exito_msj_guia_historial (
-            guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-            origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id, usuario_nombre
-          ) VALUES ($1,$2,$3,'EN_ALMACEN','2','RETIRO_DE_RUTA_INHOUSE',$4,NULL,NULL,$5)`,
-          [
-            g.id,
-            g.numero_guia,
-            g.estado_operativo,
-            `Guía retirada de la ruta ${ruta.codigo_ruta} y devuelta a disponibilidad en Almacén M7 por ${userName}.`,
-            userName,
-          ]
-        );
-      }
-
-      await pool.query(
-        `UPDATE exito_msj_rutas
-         SET total_guias = (SELECT COUNT(*)::int FROM exito_msj_guias WHERE ruta_actual_id = $1 AND deleted_at IS NULL),
-             updated_at = NOW()
-         WHERE id = $1`,
-        [rutaId]
-      );
+      });
 
       return res.json({
         success: true,
@@ -2672,8 +2830,10 @@ export async function manageUrbanDeliveryRoute(req: any, res: Response) {
         });
       }
 
-      await pool.query(`DELETE FROM exito_msj_ruta_guias WHERE ruta_id = $1`, [rutaId]);
-      await pool.query(`DELETE FROM exito_msj_rutas WHERE id = $1`, [rutaId]);
+      await withTransaction(async (client) => {
+        await client.query(`DELETE FROM exito_msj_ruta_guias WHERE ruta_id = $1`, [rutaId]);
+        await client.query(`DELETE FROM exito_msj_rutas WHERE id = $1`, [rutaId]);
+      });
 
       return res.json({
         success: true,
@@ -2885,48 +3045,50 @@ export async function manualStateChangeInhouse(req: any, res: Response) {
       driveFileId = up.driveFileId;
     }
 
-    await pool.query(
-      `UPDATE exito_msj_guias
-       SET estado_operativo = $2,
-           estado_id = $3,
-           id_guia_exito = $4,
-           foto_url = COALESCE($5, foto_url),
-           fecha_entrega_real = CASE WHEN $2 = 'ENTREGADO' THEN NOW() ELSE fecha_entrega_real END,
-           fecha_anulacion = CASE WHEN $2 = 'ANULADO' THEN NOW() ELSE fecha_anulacion END,
-           motivo_anulacion = CASE WHEN $2 = 'ANULADO' THEN $6 ELSE motivo_anulacion END,
-           anulado_por = CASE WHEN $2 = 'ANULADO' THEN $7 ELSE anulado_por END,
-           updated_by = $7,
-           updated_at = NOW()
-       WHERE id = $1`,
-      [
-        guiaId,
-        nuevoEstado,
-        est.estado_id,
-        est.id_guia_transportadora,
-        driveUrl,
-        observacion || 'Cambio manual por contingencia en Inhouse',
-        userName,
-      ]
-    );
+    await withTransaction(async (client) => {
+      await client.query(
+        `UPDATE exito_msj_guias
+         SET estado_operativo = $2,
+             estado_id = $3,
+             id_guia_exito = $4,
+             foto_url = COALESCE($5, foto_url),
+             fecha_entrega_real = CASE WHEN $2 = 'ENTREGADO' THEN NOW() ELSE fecha_entrega_real END,
+             fecha_anulacion = CASE WHEN $2 = 'ANULADO' THEN NOW() ELSE fecha_anulacion END,
+             motivo_anulacion = CASE WHEN $2 = 'ANULADO' THEN $6 ELSE motivo_anulacion END,
+             anulado_por = CASE WHEN $2 = 'ANULADO' THEN $7 ELSE anulado_por END,
+             updated_by = $7,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [
+          guiaId,
+          nuevoEstado,
+          est.estado_id,
+          est.id_guia_transportadora,
+          driveUrl,
+          observacion || 'Cambio manual por contingencia en Inhouse',
+          userName,
+        ]
+      );
 
-    await pool.query(
-      `INSERT INTO exito_msj_guia_historial (
-        guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-        origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id, usuario_nombre, ip_origen
-      ) VALUES ($1,$2,$3,$4,$5,'CONTINGENCIA_MANUAL_INHOUSE',$6,$7,$8,$9,$10)`,
-      [
-        guiaId,
-        guia.numero_guia,
-        guia.estado_operativo,
-        nuevoEstado,
-        est.id_guia_transportadora,
-        observacion || 'Actualización manual desde panel Inhouse',
-        driveUrl,
-        driveFileId,
-        userName,
-        req.ip || null,
-      ]
-    );
+      await client.query(
+        `INSERT INTO exito_msj_guia_historial (
+          guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+          origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id, usuario_nombre, ip_origen
+        ) VALUES ($1,$2,$3,$4,$5,'CONTINGENCIA_MANUAL_INHOUSE',$6,$7,$8,$9,$10)`,
+        [
+          guiaId,
+          guia.numero_guia,
+          guia.estado_operativo,
+          nuevoEstado,
+          est.id_guia_transportadora,
+          observacion || 'Actualización manual desde panel Inhouse',
+          driveUrl,
+          driveFileId,
+          userName,
+          req.ip || null,
+        ]
+      );
+    });
 
     let syncResult: any = null;
     if (notificarExito && est.notificar_webhook) {
@@ -3430,144 +3592,154 @@ export async function completeDriverStorePickup(req: any, res: Response) {
       }
     );
 
-    // 2. Crear registro maestro de recogida (con placa y conductor estampados para Recepción Almacén PAG-85)
+    // 2. Crear registro maestro de recogida y actualizar guías atómicamente en transacción ACID
     const totalUnidades = guias.reduce((acc: number, g: any) => acc + Number(g.cant_cajas || 1), 0);
-    const recIns = await pool.query(
-      `INSERT INTO exito_msj_recogidas (
-        codigo_recogida, nodo_id, vehiculo_id, placa_vehiculo, conductor_id, nombre_conductor, cedula_conductor,
-        tipo_operacion, total_guias_esperadas, total_guias_recogidas, total_unidades_recogidas,
-        nombre_funcionario_tienda, cedula_funcionario_tienda, observaciones,
-        foto_url, foto_drive_id, firma_drive_id, firma_url, remision_pdf_url, remision_drive_id,
-        latitud, longitud, estado, recibido_almacen, is_sandbox, created_by
-      ) VALUES (
-        $1,$2,$3,$4,$5,$6,$7,
-        $8,$9,$10,$11,
-        $12,$13,$14,
-        $15,$16,$17,$18,$19,NULL,
-        $20,$21,'COMPLETADA',FALSE,$22,$23
-      ) RETURNING *`,
-      [
-        codigoRecogida,
-        nodoId || primeraGuia.nodo_id,
-        finalVehiculoId,
-        finalPlaca,
-        finalConductorId,
-        finalConductorNombre,
-        finalConductorCedula,
-        tipoOp,
-        guias.length + (Array.isArray(guiaIdsFaltantes) ? guiaIdsFaltantes.length : 0),
-        guias.length,
-        totalUnidades,
-        nombreFuncionarioTienda || 'Encargado Tienda',
-        cedulaFuncionarioTienda || null,
-        observaciones || null,
-        fotoDrive.driveUrl,
-        fotoDrive.driveFileId,
-        firmaDrive.driveFileId,
-        firmaDrive.driveUrl,
-        remisionOnDemandUrl,
-        latitud || null,
-        longitud || null,
-        isSandbox,
-        finalConductorNombre,
-      ]
-    );
+    const trackingEventsToDispatch: any[] = [];
 
-    const recogida = recIns.rows[0];
-
-    // 3. Actualizar cada guía recogida a RECOGIDA_TIENDA (Id guía = 2), estampar la placa/conductor que la recogió y despachar Webhook a Go Éxito
-    for (const g of guias) {
-      await pool.query(
-        `UPDATE exito_msj_guias
-         SET estado_operativo = 'RECOGIDA_TIENDA',
-             estado_id = 'EST-32',
-             id_guia_exito = '2',
-             recogida_id = $2,
-             vehiculo_recogida_id = $3,
-             conductor_recogida_id = $4,
-             foto_recogida_url = $5,
-             foto_recogida_drive_id = $6,
-             foto_url = COALESCE(foto_url, $5),
-             firma_drive_id = $7,
-             remision_pdf_url = $8,
-             unidades_recogidas = cant_cajas,
-             fecha_recogida_tienda = NOW(),
-             updated_by = $9,
-             updated_at = NOW()
-         WHERE id = $1`,
+    const recogida = await withTransaction(async (client) => {
+      const recIns = await client.query(
+        `INSERT INTO exito_msj_recogidas (
+          codigo_recogida, nodo_id, vehiculo_id, placa_vehiculo, conductor_id, nombre_conductor, cedula_conductor,
+          tipo_operacion, total_guias_esperadas, total_guias_recogidas, total_unidades_recogidas,
+          nombre_funcionario_tienda, cedula_funcionario_tienda, observaciones,
+          foto_url, foto_drive_id, firma_drive_id, firma_url, remision_pdf_url, remision_drive_id,
+          latitud, longitud, estado, recibido_almacen, is_sandbox, created_by
+        ) VALUES (
+          $1,$2,$3,$4,$5,$6,$7,
+          $8,$9,$10,$11,
+          $12,$13,$14,
+          $15,$16,$17,$18,$19,NULL,
+          $20,$21,'COMPLETADA',FALSE,$22,$23
+        ) RETURNING *`,
         [
-          g.id,
-          recogida.id,
-          finalVehiculoId || finalPlaca,
+          codigoRecogida,
+          nodoId || primeraGuia.nodo_id,
+          finalVehiculoId,
+          finalPlaca,
           finalConductorId,
+          finalConductorNombre,
+          finalConductorCedula,
+          tipoOp,
+          guias.length + (Array.isArray(guiaIdsFaltantes) ? guiaIdsFaltantes.length : 0),
+          guias.length,
+          totalUnidades,
+          nombreFuncionarioTienda || 'Encargado Tienda',
+          cedulaFuncionarioTienda || null,
+          observaciones || null,
           fotoDrive.driveUrl,
           fotoDrive.driveFileId,
           firmaDrive.driveFileId,
+          firmaDrive.driveUrl,
           remisionOnDemandUrl,
-          finalConductorNombre,
-        ]
-      );
-
-      await pool.query(
-        `UPDATE exito_msj_guia_paquetes SET verificado_recogida = TRUE WHERE guia_id = $1`,
-        [g.id]
-      );
-
-      await pool.query(
-        `INSERT INTO exito_msj_guia_historial (
-          guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-          origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id,
-          latitud, longitud, usuario_nombre
-        ) VALUES ($1,$2,$3,'RECOGIDA_TIENDA','2','CHECKOUT_CONDUCTOR_TIENDA',$4,$5,$6,$7,$8,$9)`,
-        [
-          g.id,
-          g.numero_guia,
-          g.estado_operativo,
-          `Paquete recogido en tienda por placa ${finalPlaca} (${codigoRecogida}). Foto Drive: ${fotoDrive.driveUrl}`,
-          fotoDrive.driveUrl,
-          fotoDrive.driveFileId,
           latitud || null,
           longitud || null,
+          isSandbox,
           finalConductorNombre,
         ]
       );
 
-      await ExitoSyncService.enqueueAndDispatchTrackingEvent({
-        guiaId: Number(g.id),
-        numeroGuia: g.numero_guia,
-        numeroPedido: g.numero_pedido,
-        codigoInterno: 'RECOGIDA_TIENDA',
-        idGuiaStatus: '2',
-        observation: `Paquete recogido en nodo local por placa ${finalPlaca} (${codigoRecogida}).`,
-        ambiente: g.ambiente,
-        isSandbox: Boolean(g.is_sandbox),
-      });
-    }
+      const rec = recIns.rows[0];
 
-    // 4. Si quedaron guías faltantes en tienda, registrar novedad automática
-    if (Array.isArray(guiaIdsFaltantes) && guiaIdsFaltantes.length > 0) {
-      for (const fid of guiaIdsFaltantes) {
-        await pool.query(
+      // 3. Actualizar cada guía recogida a RECOGIDA_TIENDA (Id guía = 2), estampar la placa/conductor que la recogió
+      for (const g of guias) {
+        await client.query(
           `UPDATE exito_msj_guias
-           SET tiene_novedad_activa = TRUE,
-               ultima_novedad_texto = 'Diferencia en recogida: Paquete no entregado por la tienda en Checkout',
+           SET estado_operativo = 'RECOGIDA_TIENDA',
+               estado_id = 'EST-32',
+               id_guia_exito = '2',
+               recogida_id = $2,
+               vehiculo_recogida_id = $3,
+               conductor_recogida_id = $4,
+               foto_recogida_url = $5,
+               foto_recogida_drive_id = $6,
+               foto_url = COALESCE(foto_url, $5),
+               firma_drive_id = $7,
+               remision_pdf_url = $8,
+               unidades_recogidas = cant_cajas,
+               fecha_recogida_tienda = NOW(),
+               updated_by = $9,
                updated_at = NOW()
            WHERE id = $1`,
-          [fid]
-        );
-        await pool.query(
-          `INSERT INTO exito_msj_novedades (
-            guia_id, codigo_novedad, reason_code_exito, etapa, descripcion, foto_url, foto_drive_id, created_by
-          ) VALUES ($1,'NOV-DIF-RECOGIDA','PICKUP_DIFFERENCE','RECOGIDA',$2,$3,$4,$5)`,
           [
-            fid,
-            `Paquete no entregado por el nodo en el Checkout ${codigoRecogida} (Placa ${finalPlaca}).`,
+            g.id,
+            rec.id,
+            finalVehiculoId || finalPlaca,
+            finalConductorId,
             fotoDrive.driveUrl,
             fotoDrive.driveFileId,
+            firmaDrive.driveFileId,
+            remisionOnDemandUrl,
             finalConductorNombre,
           ]
         );
+
+        await client.query(
+          `UPDATE exito_msj_guia_paquetes SET verificado_recogida = TRUE WHERE guia_id = $1`,
+          [g.id]
+        );
+
+        await client.query(
+          `INSERT INTO exito_msj_guia_historial (
+            guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+            origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id,
+            latitud, longitud, usuario_nombre
+          ) VALUES ($1,$2,$3,'RECOGIDA_TIENDA','2','CHECKOUT_CONDUCTOR_TIENDA',$4,$5,$6,$7,$8,$9)`,
+          [
+            g.id,
+            g.numero_guia,
+            g.estado_operativo,
+            `Paquete recogido en tienda por placa ${finalPlaca} (${codigoRecogida}). Foto Drive: ${fotoDrive.driveUrl}`,
+            fotoDrive.driveUrl,
+            fotoDrive.driveFileId,
+            latitud || null,
+            longitud || null,
+            finalConductorNombre,
+          ]
+        );
+
+        trackingEventsToDispatch.push({
+          guiaId: Number(g.id),
+          numeroGuia: g.numero_guia,
+          numeroPedido: g.numero_pedido,
+          codigoInterno: 'RECOGIDA_TIENDA',
+          idGuiaStatus: '2',
+          observation: `Paquete recogido en nodo local por placa ${finalPlaca} (${codigoRecogida}).`,
+          ambiente: g.ambiente,
+          isSandbox: Boolean(g.is_sandbox),
+        });
       }
+
+      // 4. Si quedaron guías faltantes en tienda, registrar novedad automática
+      if (Array.isArray(guiaIdsFaltantes) && guiaIdsFaltantes.length > 0) {
+        for (const fid of guiaIdsFaltantes) {
+          await client.query(
+            `UPDATE exito_msj_guias
+             SET tiene_novedad_activa = TRUE,
+                 ultima_novedad_texto = 'Diferencia en recogida: Paquete no entregado por la tienda en Checkout',
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [fid]
+          );
+          await client.query(
+            `INSERT INTO exito_msj_novedades (
+              guia_id, codigo_novedad, reason_code_exito, etapa, descripcion, foto_url, foto_drive_id, created_by
+            ) VALUES ($1,'NOV-DIF-RECOGIDA','PICKUP_DIFFERENCE','RECOGIDA',$2,$3,$4,$5)`,
+            [
+              fid,
+              `Paquete no entregado por el nodo en el Checkout ${codigoRecogida} (Placa ${finalPlaca}).`,
+              fotoDrive.driveUrl,
+              fotoDrive.driveFileId,
+              finalConductorNombre,
+            ]
+          );
+        }
+      }
+
+      return rec;
+    });
+
+    for (const evt of trackingEventsToDispatch) {
+      await ExitoSyncService.enqueueAndDispatchTrackingEvent(evt).catch(() => {});
     }
 
     // 5. Actualizar programación activa de esta placa en el histórico a RECOGIDA_COMPLETADA
@@ -3583,9 +3755,29 @@ export async function completeDriverStorePickup(req: any, res: Response) {
       [finalPlaca, guias.length, codigoRecogida]
     );
 
-    // Disparar Alerta Operativa: Recogida en Punto / Tienda Éxito (Correo y WhatsApp a destinatarios configurados)
+    // Disparar Notificación Formal por Correo de Recogida en Tienda Éxito
+    let emailResult: { sent: boolean; emails: string[]; warning?: string } = {
+      sent: false,
+      emails: [],
+      warning: undefined,
+    };
+
     try {
-      const detalleGuias = guias.slice(0, 10).map((g: any) => `• Guía ${g.numero_guia} | Pedido: ${g.numero_pedido} (${g.cant_cajas || 1} cj)`).join('\n');
+      emailResult = await ExitoEmailService.notifyPickupCompleted({
+        codigoRecogida,
+        nodoNombre: primeraGuia.nodo_nombre || 'NODO ÉXITO',
+        codigoDependencia: primeraGuia.codigo_dependencia,
+        placa: finalPlaca,
+        conductorNombre: finalConductorNombre,
+        conductorCedula: finalConductorCedula,
+        totalGuias: guias.length,
+        totalCajas: totalUnidades,
+        guias,
+        remisionUrl: remisionOnDemandUrl,
+        fotoDriveUrl: fotoDrive.driveUrl,
+        nodoId: primeraGuia.nodo_id,
+      });
+
       sendExitoOperationalAlert(
         'EXITO_RECOGIDA_PUNTO',
         `📦 *RECOGIDA EN PUNTO / TIENDA ÉXITO COMPLETADA*\n` +
@@ -3595,11 +3787,11 @@ export async function completeDriverStorePickup(req: any, res: Response) {
         `Conductor: *${finalConductorNombre}*\n` +
         `Total Guías Recogidas: *${guias.length}*\n` +
         `Total Cajas/Paquetes: *${totalUnidades}*\n` +
-        `Remisión Digital PDF: ${remisionOnDemandUrl}\n\n` +
-        `Muestra de Guías Recogidas:\n${detalleGuias}\n\n` +
         `Fecha: ${new Date().toLocaleString('es-CO', { timeZone: 'America/Bogota' })}`
       ).catch(() => {});
-    } catch { }
+    } catch (err: any) {
+      console.error('[EXITO-DRIVER-PICKUP-EMAIL]', err.message);
+    }
 
     return res.json({
       success: true,
@@ -3608,6 +3800,9 @@ export async function completeDriverStorePickup(req: any, res: Response) {
       placaVehiculo: finalPlaca,
       fotoDriveUrl: fotoDrive.driveUrl,
       remisionPdfUrl: remisionOnDemandUrl,
+      emailNotified: emailResult.sent,
+      emailRecipients: emailResult.emails,
+      emailWarning: emailResult.warning,
       message: `¡Recogida completada (${codigoRecogida}) con placa ${finalPlaca}! ${guias.length} paquete(s) listos para recibir en Almacén M7 y sincronizados con Go Éxito (Id guía = 2).`,
     });
   } catch (err: any) {
@@ -3711,107 +3906,115 @@ export async function completeDriverDelivery(req: any, res: Response) {
 
     const numIntento = Number(guia.intentos_entrega || 0) + 1;
 
-    await pool.query(
-      `INSERT INTO exito_msj_intentos_entrega (
-        guia_id, ruta_id, numero_intento, resultado, conductor_id, vehiculo_id,
-        receptor_nombre, receptor_documento, observaciones,
-        foto_url, foto_drive_id, foto_rotulo_url, foto_rotulo_drive_id,
-        firma_drive_id, firma_url, latitud, longitud, created_by
-      ) VALUES (
-        $1,$2,$3,'EXITOSO',$4,$5,
-        $6,$7,$8,
-        $9,$10,$11,$12,
-        $13,$14,$15,$16,$17
-      )`,
-      [
-        guia.id,
-        guia.ruta_actual_id || null,
-        numIntento,
-        guia.conductor_entrega_id || null,
-        guia.vehiculo_entrega_id || null,
-        receptorNombre || guia.nombre_destinatario,
-        receptorDocumento || guia.nit_destinatario || null,
-        observaciones || 'Entrega exitosa al destinatario',
-        fotoEntregaDrive.driveUrl,
-        fotoEntregaDrive.driveFileId,
-        fotoRotuloDrive?.driveUrl || null,
-        fotoRotuloDrive?.driveFileId || null,
-        firmaDrive.driveFileId,
-        firmaDrive.driveUrl,
-        latitud || null,
-        longitud || null,
-        userName,
-      ]
-    );
-
-    await pool.query(
-      `UPDATE exito_msj_guias
-       SET estado_operativo = 'ENTREGADO',
-           estado_id = 'EST-12',
-           id_guia_exito = '6',
-           intentos_entrega = $2,
-           receptor_nombre = $3,
-           receptor_documento = $4,
-           foto_url = $5,
-           foto_entrega_url = $5,
-           foto_entrega_drive_id = $6,
-           foto_rotulo_entrega_url = COALESCE($7, foto_rotulo_entrega_url),
-           foto_rotulo_entrega_drive_id = COALESCE($8, foto_rotulo_entrega_drive_id),
-           firma_drive_id = $9,
-           firma_entrega_url = $10,
-           tiene_novedad_activa = FALSE,
-           fecha_entrega_real = NOW(),
-           updated_by = $11,
-           updated_at = NOW()
-       WHERE id = $1`,
-      [
-        guia.id,
-        numIntento,
-        receptorNombre || guia.nombre_destinatario,
-        receptorDocumento || guia.nit_destinatario || null,
-        fotoEntregaDrive.driveUrl,
-        fotoEntregaDrive.driveFileId,
-        fotoRotuloDrive?.driveUrl || null,
-        fotoRotuloDrive?.driveFileId || null,
-        firmaDrive.driveFileId,
-        firmaDrive.driveUrl,
-        userName,
-      ]
-    );
-
-    if (guia.ruta_actual_id) {
-      await pool.query(
-        `UPDATE exito_msj_ruta_guias
-         SET estado_parada = 'ENTREGADA', completed_at = NOW()
-         WHERE ruta_id = $1 AND guia_id = $2`,
-        [guia.ruta_actual_id, guia.id]
+    await withTransaction(async (client) => {
+      await client.query(
+        `INSERT INTO exito_msj_intentos_entrega (
+          guia_id, ruta_id, numero_intento, resultado, conductor_id, vehiculo_id,
+          receptor_nombre, receptor_documento, observaciones,
+          foto_url, foto_drive_id, foto_rotulo_url, foto_rotulo_drive_id,
+          firma_drive_id, firma_url, latitud, longitud, created_by
+        ) VALUES (
+          $1,$2,$3,'EXITOSO',$4,$5,
+          $6,$7,$8,
+          $9,$10,$11,$12,
+          $13,$14,$15,$16,$17
+        )`,
+        [
+          guia.id,
+          guia.ruta_actual_id || null,
+          numIntento,
+          guia.conductor_entrega_id || null,
+          guia.vehiculo_entrega_id || null,
+          receptorNombre || guia.nombre_destinatario,
+          receptorDocumento || guia.nit_destinatario || null,
+          observaciones || 'Entrega exitosa al destinatario',
+          fotoEntregaDrive.driveUrl,
+          fotoEntregaDrive.driveFileId,
+          fotoRotuloDrive?.driveUrl || null,
+          fotoRotuloDrive?.driveFileId || null,
+          firmaDrive.driveFileId,
+          firmaDrive.driveUrl,
+          latitud || null,
+          longitud || null,
+          userName,
+        ]
       );
-      await pool.query(
-        `UPDATE exito_msj_rutas
-         SET guias_entregadas = guias_entregadas + 1, updated_at = NOW()
+
+      const obsFinal = observaciones
+        ? `${observaciones} (Recibió: ${receptorNombre || guia.nombre_destinatario})`
+        : `Entregado a ${receptorNombre || guia.nombre_destinatario}`;
+
+      await client.query(
+        `UPDATE exito_msj_guias
+         SET estado_operativo = 'ENTREGADO',
+             estado_id = 'EST-12',
+             id_guia_exito = '6',
+             intentos_entrega = $2,
+             receptor_nombre = $3,
+             receptor_documento = $4,
+             observaciones = COALESCE($12, observaciones),
+             foto_url = $5,
+             foto_entrega_url = $5,
+             foto_entrega_drive_id = $6,
+             foto_rotulo_entrega_url = COALESCE($7, foto_rotulo_entrega_url),
+             foto_rotulo_entrega_drive_id = COALESCE($8, foto_rotulo_entrega_drive_id),
+             firma_drive_id = $9,
+             firma_entrega_url = $10,
+             tiene_novedad_activa = FALSE,
+             fecha_entrega_real = NOW(),
+             updated_by = $11,
+             updated_at = NOW()
          WHERE id = $1`,
-        [guia.ruta_actual_id]
+        [
+          guia.id,
+          numIntento,
+          receptorNombre || guia.nombre_destinatario,
+          receptorDocumento || guia.nit_destinatario || null,
+          fotoEntregaDrive.driveUrl,
+          fotoEntregaDrive.driveFileId,
+          fotoRotuloDrive?.driveUrl || null,
+          fotoRotuloDrive?.driveFileId || null,
+          firmaDrive.driveFileId,
+          firmaDrive.driveUrl,
+          userName,
+          obsFinal,
+        ]
       );
-    }
 
-    await pool.query(
-      `INSERT INTO exito_msj_guia_historial (
-        guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-        origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id,
-        latitud, longitud, usuario_nombre
-      ) VALUES ($1,$2,$3,'ENTREGADO','6','ENTREGA_CONDUCTOR',$4,$5,$6,$7,$8,$9)`,
-      [
-        guia.id,
-        guia.numero_guia,
-        guia.estado_operativo,
-        `Entregado a ${receptorNombre || guia.nombre_destinatario}. Foto Drive: ${fotoEntregaDrive.driveUrl}`,
-        fotoEntregaDrive.driveUrl,
-        fotoEntregaDrive.driveFileId,
-        latitud || null,
-        longitud || null,
-        userName,
-      ]
-    );
+      if (guia.ruta_actual_id) {
+        await client.query(
+          `UPDATE exito_msj_ruta_guias
+           SET estado_parada = 'ENTREGADA', completed_at = NOW()
+           WHERE ruta_id = $1 AND guia_id = $2`,
+          [guia.ruta_actual_id, guia.id]
+        );
+        await client.query(
+          `UPDATE exito_msj_rutas
+           SET guias_entregadas = guias_entregadas + 1, updated_at = NOW()
+           WHERE id = $1`,
+          [guia.ruta_actual_id]
+        );
+      }
+
+      await client.query(
+        `INSERT INTO exito_msj_guia_historial (
+          guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+          origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id,
+          latitud, longitud, usuario_nombre
+        ) VALUES ($1,$2,$3,'ENTREGADO','6','ENTREGA_CONDUCTOR',$4,$5,$6,$7,$8,$9)`,
+        [
+          guia.id,
+          guia.numero_guia,
+          guia.estado_operativo,
+          `${obsFinal}. Foto Drive: ${fotoEntregaDrive.driveUrl}`,
+          fotoEntregaDrive.driveUrl,
+          fotoEntregaDrive.driveFileId,
+          latitud || null,
+          longitud || null,
+          userName,
+        ]
+      );
+    });
 
     const syncRes = await ExitoSyncService.enqueueAndDispatchTrackingEvent({
       guiaId: Number(guia.id),
@@ -3819,7 +4022,7 @@ export async function completeDriverDelivery(req: any, res: Response) {
       numeroPedido: guia.numero_pedido,
       codigoInterno: 'ENTREGADO',
       idGuiaStatus: '6',
-      observation: `Entregado a ${receptorNombre || guia.nombre_destinatario}. Evidencia Drive: ${fotoEntregaDrive.driveUrl}`,
+      observation: `${observaciones ? observaciones + '. ' : ''}Entregado a ${receptorNombre || guia.nombre_destinatario}. Evidencia Drive: ${fotoEntregaDrive.driveUrl}`,
       ambiente: guia.ambiente,
       isSandbox,
     });
@@ -3909,84 +4112,86 @@ export async function reportDriverNovelty(req: any, res: Response) {
     const idGuiaWebhook = pasaADevolucion ? '9' : String(cat.id_guia_webhook || '5');
     const textoNovedad = `${cat.nombre_interno}${descripcion ? `: ${descripcion}` : ''} (Intento #${numIntento})`;
 
-    await pool.query(
-      `INSERT INTO exito_msj_intentos_entrega (
-        guia_id, ruta_id, numero_intento, resultado, conductor_id, vehiculo_id,
-        novedad_catalogo_id, observaciones, foto_url, foto_drive_id, latitud, longitud, created_by
-      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-      [
-        guia.id,
-        guia.ruta_actual_id || null,
-        numIntento,
-        cat.es_rechazo_definitivo ? 'RECHAZADO' : 'FALLIDO',
-        guia.conductor_entrega_id || null,
-        guia.vehiculo_entrega_id || null,
-        cat.id || null,
-        textoNovedad,
-        fotoDriveUrl,
-        fotoDriveId,
-        latitud || null,
-        longitud || null,
-        userName,
-      ]
-    );
+    await withTransaction(async (client) => {
+      await client.query(
+        `INSERT INTO exito_msj_intentos_entrega (
+          guia_id, ruta_id, numero_intento, resultado, conductor_id, vehiculo_id,
+          novedad_catalogo_id, observaciones, foto_url, foto_drive_id, latitud, longitud, created_by
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+        [
+          guia.id,
+          guia.ruta_actual_id || null,
+          numIntento,
+          cat.es_rechazo_definitivo ? 'RECHAZADO' : 'FALLIDO',
+          guia.conductor_entrega_id || null,
+          guia.vehiculo_entrega_id || null,
+          cat.id || null,
+          textoNovedad,
+          fotoDriveUrl,
+          fotoDriveId,
+          latitud || null,
+          longitud || null,
+          userName,
+        ]
+      );
 
-    await pool.query(
-      `INSERT INTO exito_msj_novedades (
-        guia_id, catalogo_novedad_id, codigo_novedad, reason_code_exito,
-        etapa, descripcion, foto_url, foto_drive_id, latitud, longitud,
-        alerta_enviada, is_sandbox, created_by
-      ) VALUES ($1,$2,$3,$4,'ENTREGA',$5,$6,$7,$8,$9,TRUE,$10,$11)`,
-      [
-        guia.id,
-        cat.id || null,
-        cat.codigo_novedad,
-        cat.reason_code_exito,
-        textoNovedad,
-        fotoDriveUrl,
-        fotoDriveId,
-        latitud || null,
-        longitud || null,
-        isSandbox,
-        userName,
-      ]
-    );
+      await client.query(
+        `INSERT INTO exito_msj_novedades (
+          guia_id, catalogo_novedad_id, codigo_novedad, reason_code_exito,
+          etapa, descripcion, foto_url, foto_drive_id, latitud, longitud,
+          alerta_enviada, is_sandbox, created_by
+        ) VALUES ($1,$2,$3,$4,'ENTREGA',$5,$6,$7,$8,$9,TRUE,$10,$11)`,
+        [
+          guia.id,
+          cat.id || null,
+          cat.codigo_novedad,
+          cat.reason_code_exito,
+          textoNovedad,
+          fotoDriveUrl,
+          fotoDriveId,
+          latitud || null,
+          longitud || null,
+          isSandbox,
+          userName,
+        ]
+      );
 
-    await pool.query(
-      `UPDATE exito_msj_guias
-       SET estado_operativo = $2,
-           estado_id = $3,
-           id_guia_exito = $4,
-           intentos_entrega = $5,
-           tiene_novedad_activa = TRUE,
-           ultima_novedad_texto = $6,
-           foto_url = COALESCE($7, foto_url),
-           updated_by = $8,
-           updated_at = NOW()
-       WHERE id = $1`,
-      [guia.id, nuevoEstado, nuevoEstadoId, idGuiaWebhook, numIntento, textoNovedad, fotoDriveUrl, userName]
-    );
+      await client.query(
+        `UPDATE exito_msj_guias
+         SET estado_operativo = $2,
+             estado_id = $3,
+             id_guia_exito = $4,
+             intentos_entrega = $5,
+             tiene_novedad_activa = TRUE,
+             ultima_novedad_texto = $6,
+             foto_url = COALESCE($7, foto_url),
+             updated_by = $8,
+             updated_at = NOW()
+         WHERE id = $1`,
+        [guia.id, nuevoEstado, nuevoEstadoId, idGuiaWebhook, numIntento, textoNovedad, fotoDriveUrl, userName]
+      );
 
-    await pool.query(
-      `INSERT INTO exito_msj_guia_historial (
-        guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-        origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id,
-        latitud, longitud, usuario_nombre
-      ) VALUES ($1,$2,$3,$4,$5,'NOVEDAD_CONDUCTOR',$6,$7,$8,$9,$10,$11)`,
-      [
-        guia.id,
-        guia.numero_guia,
-        guia.estado_operativo,
-        nuevoEstado,
-        idGuiaWebhook,
-        textoNovedad,
-        fotoDriveUrl,
-        fotoDriveId,
-        latitud || null,
-        longitud || null,
-        userName,
-      ]
-    );
+      await client.query(
+        `INSERT INTO exito_msj_guia_historial (
+          guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+          origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id,
+          latitud, longitud, usuario_nombre
+        ) VALUES ($1,$2,$3,$4,$5,'NOVEDAD_CONDUCTOR',$6,$7,$8,$9,$10,$11)`,
+        [
+          guia.id,
+          guia.numero_guia,
+          guia.estado_operativo,
+          nuevoEstado,
+          idGuiaWebhook,
+          textoNovedad,
+          fotoDriveUrl,
+          fotoDriveId,
+          latitud || null,
+          longitud || null,
+          userName,
+        ]
+      );
+    });
 
     // Notificar a Go Éxito (si pasó a Devolución envía 9; si es intento fallido envía observación con reason_code)
     const syncRes = await ExitoSyncService.enqueueAndDispatchTrackingEvent({
@@ -4132,61 +4337,67 @@ export async function createReturnBatch(req: any, res: Response) {
       isSandbox,
     });
 
-    const loteIns = await pool.query(
-      `INSERT INTO exito_msj_devoluciones_lotes (
-        codigo_lote, nodo_id, fecha_programada, vehiculo_id, conductor_id,
-        total_guias, nombre_receptor_exito, cedula_receptor_exito,
-        foto_url, foto_drive_id, firma_drive_id, firma_url,
-        remision_pdf_url, remision_drive_id, estado, observaciones,
-        is_sandbox, created_by, entregado_at
-      ) VALUES (
-        $1,$2,CURRENT_DATE,$3,$4,
-        $5,$6,$7,
-        $8,$9,$10,$11,
-        $12,$13,$14,$15,
-        $16,$17,CASE WHEN $10 IS NOT NULL THEN NOW() ELSE NULL END
-      ) RETURNING *`,
-      [
-        codigoLote,
-        nodoId || primera.nodo_id,
-        vehiculoId || null,
-        conductorId || null,
-        guias.length,
-        nombreReceptorExito || null,
-        cedulaReceptorExito || null,
-        fotoDriveUrl,
-        fotoDriveId,
-        firmaDriveId,
-        firmaDriveUrl,
-        remisionDrive.driveUrl,
-        remisionDrive.driveFileId,
-        firmaDriveId ? 'ENTREGADO_EXITO' : 'EN_PROCESO',
-        observaciones || null,
-        isSandbox,
-        userName,
-      ]
-    );
+    const lote = await withTransaction(async (client) => {
+      const loteIns = await client.query(
+        `INSERT INTO exito_msj_devoluciones_lotes (
+          codigo_lote, nodo_id, fecha_programada, vehiculo_id, conductor_id,
+          total_guias, nombre_receptor_exito, cedula_receptor_exito,
+          foto_url, foto_drive_id, firma_drive_id, firma_url,
+          remision_pdf_url, remision_drive_id, estado, observaciones,
+          is_sandbox, created_by, entregado_at
+        ) VALUES (
+          $1,$2,CURRENT_DATE,$3,$4,
+          $5,$6,$7,
+          $8,$9,$10,$11,
+          $12,$13,$14,$15,
+          $16,$17,CASE WHEN $10 IS NOT NULL THEN NOW() ELSE NULL END
+        ) RETURNING *`,
+        [
+          codigoLote,
+          nodoId || primera.nodo_id,
+          vehiculoId || null,
+          conductorId || null,
+          guias.length,
+          nombreReceptorExito || null,
+          cedulaReceptorExito || null,
+          fotoDriveUrl,
+          fotoDriveId,
+          firmaDriveId,
+          firmaDriveUrl,
+          remisionDrive.driveUrl,
+          remisionDrive.driveFileId,
+          firmaDriveId ? 'ENTREGADO_EXITO' : 'EN_PROCESO',
+          observaciones || null,
+          isSandbox,
+          userName,
+        ]
+      );
 
-    const lote = loteIns.rows[0];
+      const loteRecord = loteIns.rows[0];
+
+      for (const g of guias) {
+        await client.query(
+          `INSERT INTO exito_msj_devoluciones_items (lote_id, guia_id, motivo_devolucion)
+           VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
+          [loteRecord.id, g.id, g.ultima_novedad_texto || 'Devolución programada a nodo Éxito']
+        );
+
+        await client.query(
+          `UPDATE exito_msj_guias
+           SET estado_operativo = 'DEVOLUCION',
+               estado_id = 'EST-13',
+               id_guia_exito = '9',
+               remision_pdf_url = $2,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [g.id, remisionDrive.driveUrl]
+        );
+      }
+
+      return loteRecord;
+    });
 
     for (const g of guias) {
-      await pool.query(
-        `INSERT INTO exito_msj_devoluciones_items (lote_id, guia_id, motivo_devolucion)
-         VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
-        [lote.id, g.id, g.ultima_novedad_texto || 'Devolución programada a nodo Éxito']
-      );
-
-      await pool.query(
-        `UPDATE exito_msj_guias
-         SET estado_operativo = 'DEVOLUCION',
-             estado_id = 'EST-13',
-             id_guia_exito = '9',
-             remision_pdf_url = $2,
-             updated_at = NOW()
-         WHERE id = $1`,
-        [g.id, remisionDrive.driveUrl]
-      );
-
       await ExitoSyncService.enqueueAndDispatchTrackingEvent({
         guiaId: Number(g.id),
         numeroGuia: g.numero_guia,
@@ -4385,74 +4596,77 @@ export async function simulateSandboxGuideFromExito(req: any, res: Response) {
 
       const dynamicLabelUrl = `/api/exito-mensajeria/guias/por-numero/${encodeURIComponent(numeroGuia)}/rotulo.pdf`;
 
-      const ins = await pool.query(
-        `INSERT INTO exito_msj_guias (
-          numero_guia, codigo_remision, numero_pedido, contenedor, modalidad_pedido,
-          tipo_servicio, tipo_operacion, ambiente, is_sandbox, origen_creacion,
-          nodo_id, codigo_dependencia, nombre_remitente, nit_remitente, direccion_remitente,
-          ciudad_remitente_dane, ciudad_remitente_nombre, departamento_remitente,
-          nombre_destinatario, nit_destinatario, direccion_destinatario, barrio_destinatario,
-          ciudad_destinatario_dane, ciudad_destinatario_nombre, departamento_destinatario,
-          telefono_destinatario, celular_destinatario,
-          cant_cajas, peso_kg, alto_cm, ancho_cm, largo_cm, valor_declarado,
-          contenido, observaciones,
-          rotulo_pdf_url, rotulo_drive_id,
-          estado_operativo, estado_id, id_guia_exito, created_by
-        ) VALUES (
-          $1,$2,$3,$4,$5,
-          '1',$6,'SANDBOX',TRUE,'SANDBOX',
-          $7,$8,$9,$10,$11,
-          $12,$13,$14,
-          $15,$16,$17,$18,
-          $12,$13,$14,
-          $19,$19,
-          $20,3.5,30,25,40,185000,
-          'MERCANCÍA SIMULADA GO ÉXITO v2.0 (SANDBOX)',
-          'Entregar en portería - Prueba Sandbox Misma Ciudad',
-          $21,$22,
-          'DISPONIBLE','EST-31','1',$23
-        ) RETURNING *`,
-        [
-          numeroGuia,
-          codigoRemision,
-          numeroPedido,
-          contenedor,
-          modalidadPedido,
-          tipoOperacion === 'SAME_DAY' ? 'SAME_DAY' : 'NEXT_DAY',
-          nodo.id,
-          nodo.codigo_dependencia,
-          nodo.nombre,
-          nodo.nit_remitente,
-          nodo.direccion,
-          nodo.ciudad_dane,
-          nodo.ciudad_nombre,
-          nodo.departamento,
-          cli.nombre,
-          `103765${suffix}`,
-          cli.dir,
-          cli.barrio,
-          cli.tel,
-          (i % 2) + 1,
-          dynamicLabelUrl,
-          null,
-          req.user?.name || 'SANDBOX_SIMULATOR',
-        ]
-      );
+      const g = await withTransaction(async (client) => {
+        const ins = await client.query(
+          `INSERT INTO exito_msj_guias (
+            numero_guia, codigo_remision, numero_pedido, contenedor, modalidad_pedido,
+            tipo_servicio, tipo_operacion, ambiente, is_sandbox, origen_creacion,
+            nodo_id, codigo_dependencia, nombre_remitente, nit_remitente, direccion_remitente,
+            ciudad_remitente_dane, ciudad_remitente_nombre, departamento_remitente,
+            nombre_destinatario, nit_destinatario, direccion_destinatario, barrio_destinatario,
+            ciudad_destinatario_dane, ciudad_destinatario_nombre, departamento_destinatario,
+            telefono_destinatario, celular_destinatario,
+            cant_cajas, peso_kg, alto_cm, ancho_cm, largo_cm, valor_declarado,
+            contenido, observaciones,
+            rotulo_pdf_url, rotulo_drive_id,
+            estado_operativo, estado_id, id_guia_exito, created_by
+          ) VALUES (
+            $1,$2,$3,$4,$5,
+            '1',$6,'SANDBOX',TRUE,'SANDBOX',
+            $7,$8,$9,$10,$11,
+            $12,$13,$14,
+            $15,$16,$17,$18,
+            $12,$13,$14,
+            $19,$19,
+            $20,3.5,30,25,40,185000,
+            'MERCANCÍA SIMULADA GO ÉXITO v2.0 (SANDBOX)',
+            'Entregar en portería - Prueba Sandbox Misma Ciudad',
+            $21,$22,
+            'DISPONIBLE','EST-31','1',$23
+          ) RETURNING *`,
+          [
+            numeroGuia,
+            codigoRemision,
+            numeroPedido,
+            contenedor,
+            modalidadPedido,
+            tipoOperacion === 'SAME_DAY' ? 'SAME_DAY' : 'NEXT_DAY',
+            nodo.id,
+            nodo.codigo_dependencia,
+            nodo.nombre,
+            nodo.nit_remitente,
+            nodo.direccion,
+            nodo.ciudad_dane,
+            nodo.ciudad_nombre,
+            nodo.departamento,
+            cli.nombre,
+            `103765${suffix}`,
+            cli.dir,
+            cli.barrio,
+            cli.tel,
+            (i % 2) + 1,
+            dynamicLabelUrl,
+            null,
+            req.user?.name || 'SANDBOX_SIMULATOR',
+          ]
+        );
 
-      const g = ins.rows[0];
-      await pool.query(
-        `INSERT INTO exito_msj_guia_historial (
-          guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
-          origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id, usuario_nombre
-        ) VALUES ($1,$2,NULL,'DISPONIBLE','1','SANDBOX_SIMULATOR',$3,$4,$5,'SIMULADOR GO ÉXITO v2.0')`,
-        [
-          g.id,
-          g.numero_guia,
-          'Guía Sandbox creada (Rótulo PDF bajo demanda sin ocupar Google Drive).',
-          dynamicLabelUrl,
-          null,
-        ]
-      );
+        const created = ins.rows[0];
+        await client.query(
+          `INSERT INTO exito_msj_guia_historial (
+            guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+            origen_cambio, observacion, evidencia_drive_url, evidencia_drive_id, usuario_nombre
+          ) VALUES ($1,$2,NULL,'DISPONIBLE','1','SANDBOX_SIMULATOR',$3,$4,$5,'SIMULADOR GO ÉXITO v2.0')`,
+          [
+            created.id,
+            created.numero_guia,
+            'Guía Sandbox creada (Rótulo PDF bajo demanda sin ocupar Google Drive).',
+            dynamicLabelUrl,
+            null,
+          ]
+        );
+        return created;
+      });
 
       createdGuides.push(g);
     }
@@ -4474,17 +4688,20 @@ export async function simulateSandboxGuideFromExito(req: any, res: Response) {
  */
 export async function resetSandboxEnvironment(req: Request, res: Response) {
   try {
-    const delGuias = await pool.query(`DELETE FROM exito_msj_guias WHERE is_sandbox = TRUE`);
-    await pool.query(`DELETE FROM exito_msj_solicitudes_recogida WHERE is_sandbox = TRUE`);
-    await pool.query(`DELETE FROM exito_msj_recogidas WHERE is_sandbox = TRUE`);
-    await pool.query(`DELETE FROM exito_msj_rutas WHERE is_sandbox = TRUE`);
-    await pool.query(`DELETE FROM exito_msj_devoluciones_lotes WHERE is_sandbox = TRUE`);
-    await pool.query(`DELETE FROM exito_msj_idempotency_keys WHERE ambiente = 'SANDBOX'`);
-    await pool.query(`DELETE FROM exito_msj_api_metrics_logs WHERE is_sandbox = TRUE`);
+    const deletedGuides = await withTransaction(async (client) => {
+      const delGuias = await client.query(`DELETE FROM exito_msj_guias WHERE is_sandbox = TRUE`);
+      await client.query(`DELETE FROM exito_msj_solicitudes_recogida WHERE is_sandbox = TRUE`);
+      await client.query(`DELETE FROM exito_msj_recogidas WHERE is_sandbox = TRUE`);
+      await client.query(`DELETE FROM exito_msj_rutas WHERE is_sandbox = TRUE`);
+      await client.query(`DELETE FROM exito_msj_devoluciones_lotes WHERE is_sandbox = TRUE`);
+      await client.query(`DELETE FROM exito_msj_idempotency_keys WHERE ambiente = 'SANDBOX'`);
+      await client.query(`DELETE FROM exito_msj_api_metrics_logs WHERE is_sandbox = TRUE`);
+      return delGuias.rowCount || 0;
+    });
 
     return res.json({
       success: true,
-      deletedGuides: delGuias.rowCount || 0,
+      deletedGuides,
       message: 'Entorno de pruebas (SANDBOX) reiniciado limpiamente. Datos de producción intactos.',
     });
   } catch (err: any) {
@@ -4500,4 +4717,92 @@ export async function getOpenApiSpecJson(req: Request, res: Response) {
   const host = req.get('host') || 'orbitm7.m7apps.com';
   const spec = buildExitoOpenApiSpec(`${proto}://${host}`);
   return res.json(spec);
+}
+
+/**
+ * Consulta la configuración de correos para notificaciones de recogida y almacén
+ */
+export async function getNotificationEmailsConfig(req: Request, res: Response) {
+  try {
+    const config = await ExitoEmailService.getConfig();
+    return res.json({ success: true, config });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * Guarda o actualiza los correos de notificación de recogida y recepción en almacén
+ */
+export async function saveNotificationEmailsConfig(req: Request, res: Response) {
+  try {
+    const { recogidaTienda, recepcionAlmacen, habilitado } = req.body || {};
+    const userName = (req as any).user?.name || (req as any).user?.email || 'ADMIN';
+    const config = await ExitoEmailService.saveConfig(
+      { recogidaTienda, recepcionAlmacen, habilitado },
+      userName
+    );
+    return res.json({
+      success: true,
+      config,
+      message: 'Configuración de correos de notificación actualizada con éxito.',
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * Envía un correo de prueba a una dirección especificada para verificar SMTP
+ */
+export async function testNotificationEmail(req: Request, res: Response) {
+  try {
+    const { email, tipo = 'RECEPCION_ALMACEN' } = req.body || {};
+    if (!email || !String(email).includes('@')) {
+      return res.status(400).json({ error: 'Proporcione un correo electrónico válido.' });
+    }
+
+    const testGuias = [
+      {
+        numero_guia: 'M7E-TEST-001',
+        numero_pedido: 'PED-PRUEBA-1234',
+        nombre_destinatario: 'Cliente Prueba Éxito',
+        barrio_destinatario: 'El Poblado',
+        ciudad_destinatario_nombre: 'Medellín',
+        cant_cajas: 2,
+        peso_kg: 3.5,
+      },
+    ];
+
+    if (tipo === 'RECOGIDA_TIENDA') {
+      await ExitoEmailService.notifyPickupCompleted({
+        codigoRecogida: 'REC-EX-TEST-001',
+        nodoNombre: 'ÉXITO POBLADO',
+        codigoDependencia: '0054',
+        placa: 'TEST-01',
+        conductorNombre: 'Conductor Prueba M7',
+        totalGuias: 1,
+        totalCajas: 2,
+        guias: testGuias,
+      });
+    } else {
+      await ExitoEmailService.notifyWarehouseReception({
+        responsableBodega: (req as any).user?.name || 'Operador Bodega',
+        totalGuias: 1,
+        totalCajas: 2,
+        observaciones: 'Prueba de verificación de alertas por correo Milla 7',
+        codigoRecogida: 'REC-EX-TEST-001',
+        placa: 'TEST-01',
+        nodoNombre: 'ÉXITO POBLADO',
+        guias: testGuias,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Correo de prueba enviado satisfactoriamente.`,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
 }

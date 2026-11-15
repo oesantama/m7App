@@ -186,6 +186,7 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
   const [fotoRotuloB64, setFotoRotuloB64] = useState<string>('');
   const [nombreReceptor, setNombreReceptor] = useState<string>('');
   const [cedulaReceptor, setCedulaReceptor] = useState<string>('');
+  const [observacionesEntrega, setObservacionesEntrega] = useState<string>('');
 
   // Flujo Novedad (2 pasos simples)
   const [causalSeleccionada, setCausalSeleccionada] = useState<any | null>(null);
@@ -477,6 +478,7 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
           firmaClienteBase64: firmaB64,
           receptorNombre: nombreReceptor || guiaActiva.nombre_destinatario,
           receptorDocumento: cedulaReceptor || guiaActiva.nit_destinatario,
+          observaciones: observacionesEntrega || undefined,
         }),
       });
       const data = await res.json();
@@ -486,6 +488,7 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
       setGuiaActiva(null);
       setFotoEntregaB64('');
       setFotoRotuloB64('');
+      setObservacionesEntrega('');
       setPasoEntrega(1);
       setModoPrincipal('inicio');
       validarPlacaYCargarTareas(placaValidada, cedulaInput);
@@ -1441,6 +1444,19 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
                 value={nombreReceptor}
                 onChange={(e) => setNombreReceptor(e.target.value)}
                 className="w-full mt-1 px-4 py-3.5 bg-slate-50 border-2 border-slate-300 rounded-2xl text-lg font-bold"
+              />
+            </div>
+
+            <div>
+              <label className="text-base font-black text-slate-800">
+                Observaciones de la Entrega (Opcional):
+              </label>
+              <textarea
+                rows={2}
+                value={observacionesEntrega}
+                onChange={(e) => setObservacionesEntrega(e.target.value)}
+                placeholder="Observaciones adicionales (ej: Recibió en portería, vigilancia, segundo piso, etc.)..."
+                className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-slate-300 rounded-2xl text-base font-medium placeholder:text-slate-400 focus:outline-none focus:border-emerald-600"
               />
             </div>
 

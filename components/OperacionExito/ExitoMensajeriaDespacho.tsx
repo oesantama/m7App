@@ -23,6 +23,10 @@ import {
   X,
   AlertTriangle,
   HelpCircle,
+  Camera,
+  Eye,
+  ExternalLink,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 interface Props {
@@ -262,6 +266,7 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
   const [conductorCambioRuta, setConductorCambioRuta] = useState<string>('');
   const [scanAdicionarARuta, setScanAdicionarARuta] = useState<string>('');
   const [detalleGuiaModal, setDetalleGuiaModal] = useState<any | null>(null);
+  const [fotoPreviewModal, setFotoPreviewModal] = useState<{ url: string; titulo: string } | null>(null);
 
   const cargarSugerenciasYCatalogos = useCallback(async () => {
     setLoading(true);
@@ -1702,6 +1707,328 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
               </div>
             </div>
 
+            {/* Sincronización Go Éxito y Observaciones */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-amber-950 uppercase text-[10px]">
+                    ⚡ Estado Go Éxito & Homologación
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-200 text-amber-900">
+                    ID Guía Éxito: {detalleGuiaModal.guia.id_guia_exito || '1'}
+                  </span>
+                </div>
+                <div className="text-slate-900 font-bold">
+                  {detalleGuiaModal.guia.estado_transportadora || detalleGuiaModal.guia.estado_operativo}
+                </div>
+                <div className="text-[11px] text-amber-800">
+                  Cola Webhook:{' '}
+                  <span className="font-black">
+                    {detalleGuiaModal.guia.exito_sync_status || 'PENDIENTE'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-slate-100 border border-slate-200 space-y-1.5">
+                <span className="font-black text-slate-800 uppercase text-[10px]">
+                  📝 Observaciones Registradas
+                </span>
+                <div className="text-slate-900 text-xs italic bg-white p-2 rounded-xl border border-slate-200 min-h-[42px]">
+                  {detalleGuiaModal.guia.observaciones ||
+                    detalleGuiaModal.intentos?.[0]?.observaciones ||
+                    detalleGuiaModal.novedades?.[0]?.descripcion ||
+                    'Sin observaciones adicionales'}
+                </div>
+                {(detalleGuiaModal.guia.persona_recibe || detalleGuiaModal.intentos?.[0]?.persona_recibe) && (
+                  <div className="text-[11px] text-slate-700">
+                    <strong>Receptor:</strong>{' '}
+                    {detalleGuiaModal.guia.persona_recibe || detalleGuiaModal.intentos?.[0]?.persona_recibe}
+                    {detalleGuiaModal.guia.cedula_recibe
+                      ? ` (CC: ${detalleGuiaModal.guia.cedula_recibe})`
+                      : detalleGuiaModal.intentos?.[0]?.documento_recibe
+                      ? ` (CC: ${detalleGuiaModal.intentos[0].documento_recibe})`
+                      : ''}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* SECCIÓN DE EVIDENCIAS Y FOTOGRAFÍAS */}
+            {(() => {
+              const fotoEntrega =
+                detalleGuiaModal.guia.foto_entrega_url ||
+                detalleGuiaModal.guia.foto_url ||
+                detalleGuiaModal.intentos?.[0]?.foto_url;
+              const firmaEntrega =
+                detalleGuiaModal.guia.firma_entrega_url ||
+                detalleGuiaModal.intentos?.[0]?.firma_url;
+              const fotoRotulo =
+                detalleGuiaModal.guia.foto_rotulo_entrega_url ||
+                detalleGuiaModal.intentos?.[0]?.foto_rotulo_url;
+              const fotoNovedad = detalleGuiaModal.novedades?.[0]?.foto_url;
+              const fotoRecogida = detalleGuiaModal.guia.foto_recogida_url;
+
+              const hayEvidencias =
+                fotoEntrega || firmaEntrega || fotoRotulo || fotoNovedad || fotoRecogida;
+
+              return (
+                <div className="space-y-2 p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-black uppercase text-slate-800 flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-indigo-600" />
+                      Evidencias Digitales & Fotografías ({hayEvidencias ? 'Disponibles' : 'Sin fotos registradas'})
+                    </div>
+                  </div>
+
+                  {!hayEvidencias ? (
+                    <div className="text-xs text-slate-500 py-3 text-center">
+                      No se han capturado fotos de entrega ni novedades para esta guía todavía.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                      {fotoEntrega && (
+                        <div className="p-2 bg-white rounded-xl border border-slate-200 space-y-1.5 text-center shadow-sm">
+                          <div className="text-[10px] font-black uppercase text-emerald-700 truncate">
+                            📸 Foto Entrega
+                          </div>
+                          <div
+                            onClick={() =>
+                              setFotoPreviewModal({
+                                url: fotoEntrega,
+                                titulo: `Foto de Entrega - Guía ${detalleGuiaModal.guia.numero_guia}`,
+                              })
+                            }
+                            className="w-full h-24 bg-slate-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-85 transition relative group flex items-center justify-center border border-slate-200"
+                          >
+                            <img
+                              src={fotoEntrega}
+                              alt="Foto Entrega"
+                              className="w-full h-full object-cover"
+                              onError={(e: any) => {
+                                e.target.onerror = null;
+                                e.target.src = 'https://placehold.co/400x300?text=Foto+Drive';
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[11px] font-bold transition">
+                              <Eye className="w-4 h-4 mr-1" /> Ver
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-center gap-2 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFotoPreviewModal({
+                                  url: fotoEntrega,
+                                  titulo: `Foto de Entrega - Guía ${detalleGuiaModal.guia.numero_guia}`,
+                                })
+                              }
+                              className="text-[10px] text-indigo-600 font-bold hover:underline inline-flex items-center gap-0.5"
+                            >
+                              <Eye className="w-3 h-3" /> Ampliar
+                            </button>
+                            {fotoEntrega.includes('drive.google.com') && (
+                              <a
+                                href={fotoEntrega}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] text-emerald-600 font-bold hover:underline inline-flex items-center gap-0.5"
+                              >
+                                <ExternalLink className="w-3 h-3" /> Drive
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {firmaEntrega && (
+                        <div className="p-2 bg-white rounded-xl border border-slate-200 space-y-1.5 text-center shadow-sm">
+                          <div className="text-[10px] font-black uppercase text-blue-700 truncate">
+                            ✍️ Firma Receptor
+                          </div>
+                          <div
+                            onClick={() =>
+                              setFotoPreviewModal({
+                                url: firmaEntrega,
+                                titulo: `Firma Receptor - Guía ${detalleGuiaModal.guia.numero_guia}`,
+                              })
+                            }
+                            className="w-full h-24 bg-slate-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-85 transition relative group flex items-center justify-center border border-slate-200"
+                          >
+                            <img
+                              src={firmaEntrega}
+                              alt="Firma Receptor"
+                              className="w-full h-full object-contain p-1 bg-white"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[11px] font-bold transition">
+                              <Eye className="w-4 h-4 mr-1" /> Ver
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-center gap-2 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFotoPreviewModal({
+                                  url: firmaEntrega,
+                                  titulo: `Firma Receptor - Guía ${detalleGuiaModal.guia.numero_guia}`,
+                                })
+                              }
+                              className="text-[10px] text-indigo-600 font-bold hover:underline inline-flex items-center gap-0.5"
+                            >
+                              <Eye className="w-3 h-3" /> Ampliar
+                            </button>
+                            {firmaEntrega.includes('drive.google.com') && (
+                              <a
+                                href={firmaEntrega}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] text-blue-600 font-bold hover:underline inline-flex items-center gap-0.5"
+                              >
+                                <ExternalLink className="w-3 h-3" /> Drive
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {fotoRotulo && (
+                        <div className="p-2 bg-white rounded-xl border border-slate-200 space-y-1.5 text-center shadow-sm">
+                          <div className="text-[10px] font-black uppercase text-indigo-700 truncate">
+                            🏷️ Foto Rótulo
+                          </div>
+                          <div
+                            onClick={() =>
+                              setFotoPreviewModal({
+                                url: fotoRotulo,
+                                titulo: `Foto del Rótulo - Guía ${detalleGuiaModal.guia.numero_guia}`,
+                              })
+                            }
+                            className="w-full h-24 bg-slate-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-85 transition relative group flex items-center justify-center border border-slate-200"
+                          >
+                            <img
+                              src={fotoRotulo}
+                              alt="Foto Rótulo"
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[11px] font-bold transition">
+                              <Eye className="w-4 h-4 mr-1" /> Ver
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-center gap-2 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFotoPreviewModal({
+                                  url: fotoRotulo,
+                                  titulo: `Foto del Rótulo - Guía ${detalleGuiaModal.guia.numero_guia}`,
+                                })
+                              }
+                              className="text-[10px] text-indigo-600 font-bold hover:underline inline-flex items-center gap-0.5"
+                            >
+                              <Eye className="w-3 h-3" /> Ampliar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {fotoNovedad && (
+                        <div className="p-2 bg-rose-50 rounded-xl border border-rose-200 space-y-1.5 text-center shadow-sm">
+                          <div className="text-[10px] font-black uppercase text-rose-700 truncate">
+                            ⚠️ Foto Novedad
+                          </div>
+                          <div
+                            onClick={() =>
+                              setFotoPreviewModal({
+                                url: fotoNovedad,
+                                titulo: `Foto de Novedad - Guía ${detalleGuiaModal.guia.numero_guia}`,
+                              })
+                            }
+                            className="w-full h-24 bg-white rounded-lg overflow-hidden cursor-pointer hover:opacity-85 transition relative group flex items-center justify-center border border-rose-200"
+                          >
+                            <img
+                              src={fotoNovedad}
+                              alt="Foto Novedad"
+                              className="w-full h-full object-cover"
+                              onError={(e: any) => {
+                                e.target.onerror = null;
+                                e.target.src = 'https://placehold.co/400x300?text=Foto+Novedad';
+                              }}
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[11px] font-bold transition">
+                              <Eye className="w-4 h-4 mr-1" /> Ver
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-center gap-2 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFotoPreviewModal({
+                                  url: fotoNovedad,
+                                  titulo: `Foto de Novedad - Guía ${detalleGuiaModal.guia.numero_guia}`,
+                                })
+                              }
+                              className="text-[10px] text-rose-600 font-bold hover:underline inline-flex items-center gap-0.5"
+                            >
+                              <Eye className="w-3 h-3" /> Ampliar
+                            </button>
+                            {fotoNovedad.includes('drive.google.com') && (
+                              <a
+                                href={fotoNovedad}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[10px] text-rose-600 font-bold hover:underline inline-flex items-center gap-0.5"
+                              >
+                                <ExternalLink className="w-3 h-3" /> Drive
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {fotoRecogida && (
+                        <div className="p-2 bg-white rounded-xl border border-slate-200 space-y-1.5 text-center shadow-sm">
+                          <div className="text-[10px] font-black uppercase text-blue-700 truncate">
+                            📦 Foto Tienda
+                          </div>
+                          <div
+                            onClick={() =>
+                              setFotoPreviewModal({
+                                url: fotoRecogida,
+                                titulo: `Foto de Recogida en Tienda - Guía ${detalleGuiaModal.guia.numero_guia}`,
+                              })
+                            }
+                            className="w-full h-24 bg-slate-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-85 transition relative group flex items-center justify-center border border-slate-200"
+                          >
+                            <img
+                              src={fotoRecogida}
+                              alt="Foto Recogida"
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[11px] font-bold transition">
+                              <Eye className="w-4 h-4 mr-1" /> Ver
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-center gap-2 pt-0.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setFotoPreviewModal({
+                                  url: fotoRecogida,
+                                  titulo: `Foto de Recogida en Tienda - Guía ${detalleGuiaModal.guia.numero_guia}`,
+                                })
+                              }
+                              className="text-[10px] text-indigo-600 font-bold hover:underline inline-flex items-center gap-0.5"
+                            >
+                              <Eye className="w-3 h-3" /> Ampliar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
             <div className="space-y-2">
               <div className="text-xs font-black uppercase text-slate-700">
                 Bitácora Cronológica de Movimientos (Hora Oficial de Colombia):
@@ -1717,6 +2044,32 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
                         {h.estado_anterior || 'INICIO'} &rarr; {h.estado_nuevo}
                       </div>
                       <div className="text-slate-600 text-[11px]">{h.observacion}</div>
+                      {h.evidencia_drive_url && (
+                        <div className="pt-1 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setFotoPreviewModal({
+                                url: h.evidencia_drive_url,
+                                titulo: `Evidencia: ${h.estado_nuevo} - Guía ${detalleGuiaModal.guia.numero_guia}`,
+                              })
+                            }
+                            className="inline-flex items-center gap-1 text-[11px] text-indigo-700 hover:underline font-bold"
+                          >
+                            <Camera className="w-3.5 h-3.5" /> Ver Foto / Evidencia
+                          </button>
+                          {h.evidencia_drive_url.includes('drive.google.com') && (
+                            <a
+                              href={h.evidencia_drive_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:underline font-bold"
+                            >
+                              <ExternalLink className="w-3 h-3" /> Drive
+                            </a>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="text-right text-[10px] text-slate-500 shrink-0">
                       <div className="font-bold">{h.usuario_nombre}</div>
@@ -1726,6 +2079,50 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL LIGHTBOX PARA VISUALIZACIÓN EN GRANDE DE FOTOGRAFÍAS */}
+      {fotoPreviewModal && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4"
+          onClick={() => setFotoPreviewModal(null)}
+        >
+          <div
+            className="max-w-4xl w-full max-h-[90vh] flex flex-col items-center space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between text-white px-2">
+              <div className="font-bold text-sm truncate flex items-center gap-2">
+                <ImageIcon className="w-5 h-5 text-indigo-400" />
+                {fotoPreviewModal.titulo}
+              </div>
+              <button
+                type="button"
+                onClick={() => setFotoPreviewModal(null)}
+                className="px-3 py-1 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-bold transition"
+              >
+                Cerrar ✕
+              </button>
+            </div>
+            <div className="w-full max-h-[80vh] flex items-center justify-center bg-black/50 rounded-2xl overflow-hidden p-2">
+              <img
+                src={fotoPreviewModal.url}
+                alt={fotoPreviewModal.titulo}
+                className="max-h-[75vh] max-w-full object-contain rounded-lg shadow-2xl"
+              />
+            </div>
+            {fotoPreviewModal.url.includes('drive.google.com') && (
+              <a
+                href={fotoPreviewModal.url}
+                target="_blank"
+                rel="noreferrer"
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition"
+              >
+                <ExternalLink className="w-4 h-4" /> Abrir imagen original en Google Drive
+              </a>
+            )}
           </div>
         </div>
       )}

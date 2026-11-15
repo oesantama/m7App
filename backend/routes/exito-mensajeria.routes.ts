@@ -45,6 +45,9 @@ import {
   simulateSandboxGuideFromExito,
   resetSandboxEnvironment,
   getOpenApiSpecJson,
+  getNotificationEmailsConfig,
+  saveNotificationEmailsConfig,
+  testNotificationEmail,
 } from '../controllers/exito-mensajeria.controller.js';
 
 // ── 1. ROUTER B2B EXCLUSIVO PARA GO ÉXITO v2.0 (/api/v1/*) ───────────────────
@@ -115,6 +118,11 @@ exitoInternalRouter.post('/conductor/guias/:id/novedad', reportDriverNovelty);
 // Devoluciones Semanales a Nodos Éxito
 exitoInternalRouter.get('/devoluciones', listReturnBatches);
 exitoInternalRouter.post('/devoluciones', createReturnBatch);
+
+// Notificaciones por Correo (Recogida en Tienda Éxito y Recepción en Bodega M7)
+exitoInternalRouter.get('/notificaciones/correos', getNotificationEmailsConfig);
+exitoInternalRouter.post('/notificaciones/correos', saveNotificationEmailsConfig);
+exitoInternalRouter.post('/notificaciones/probar-envio', testNotificationEmail);
 
 // Maestras, Configuración, Inicialización de Google Drive, Sandbox y OpenAPI 3.0.3
 exitoInternalRouter.get('/maestras', getMasterCatalogs);

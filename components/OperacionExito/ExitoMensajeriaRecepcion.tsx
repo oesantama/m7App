@@ -17,6 +17,11 @@ import {
   AlertTriangle,
   CheckSquare,
   Square,
+  Mail,
+  Settings,
+  X,
+  Send,
+  Bell,
 } from 'lucide-react';
 
 interface Props {
@@ -36,6 +41,7 @@ const ExitoMensajeriaRecepcion: React.FC<Props> = ({ onNavigate }) => {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [includeSandbox, setIncludeSandbox] = useState(true);
+  const [soloPendientes, setSoloPendientes] = useState(true);
 
   // Remisiones de recogida y guías pendientes de recepción en almacén
   const [remisiones, setRemisiones] = useState<any[]>([]);
@@ -55,6 +61,23 @@ const ExitoMensajeriaRecepcion: React.FC<Props> = ({ onNavigate }) => {
   // IDs de guías pistoleadas o seleccionadas para ingreso a almacén
   const [verificadasIds, setVerificadasIds] = useState<Set<number>>(new Set());
 
+  // Gestión de correos de notificación de recogida y recepción
+  const [emailSummary, setEmailSummary] = useState<{
+    tieneCorreosRecepcion: boolean;
+    recepcionAlmacenCount: number;
+    tieneCorreosRecogida: boolean;
+    recogidaTiendaCount: number;
+    habilitado: boolean;
+  } | null>(null);
+
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [emailFormRecogida, setEmailFormRecogida] = useState('');
+  const [emailFormRecepcion, setEmailFormRecepcion] = useState('');
+  const [emailFormHabilitado, setEmailFormHabilitado] = useState(true);
+  const [savingEmails, setSavingEmails] = useState(false);
+  const [testEmailInput, setTestEmailInput] = useState('');
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
+
   const scannerRef = useRef<HTMLInputElement | null>(null);
 
   const cargarDatosRecepcion = useCallback(async () => {
@@ -62,6 +85,7 @@ const ExitoMensajeriaRecepcion: React.FC<Props> = ({ onNavigate }) => {
     try {
       const qs = new URLSearchParams({
         includeSandbox: String(includeSandbox),
+        soloPendientes: String(soloPendientes),
       });
       if (selectedRecogidaId !== 'TODAS') {
         qs.set('recogidaId', selectedRecogidaId);
@@ -78,12 +102,80 @@ const ExitoMensajeriaRecepcion: React.FC<Props> = ({ onNavigate }) => {
 
       setRemisiones(data.remisiones || []);
       setGuiasPendientes(data.guiasPendientes || []);
+      if (data.emailConfig) {
+        setEmailSummary(data.emailConfig);
+      }
     } catch (err: any) {
       toast.error(err.message);
     } finally {
       setLoading(false);
     }
-  }, [includeSandbox, selectedRecogidaId, selectedPlaca]);
+  }, [includeSandbox, soloPendientes, selectedRecogidaId, selectedPlaca]);
+
+  const cargarConfiguracionCorreos = async () => {
+    try {
+      const res = await fetch(`${API_URL}/exito-mensajeria/notificaciones/correos`, {
+        headers: authHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok && data.config) {
+        setEmailFormRecogida((data.config.recogidaTienda || []).join(', '));
+        setEmailFormRecepcion((data.config.recepcionAlmacen || []).join(', '));
+        setEmailFormHabilitado(data.config.habilitado !== false);
+      }
+    } catch (err: any) {
+      console.error('Error cargando configuración de correos:', err);
+    }
+  };
+
+  const handleGuardarCorreos = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingEmails(true);
+    try {
+      const res = await fetch(`${API_URL}/exito-mensajeria/notificaciones/correos`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          recogidaTienda: emailFormRecogida,
+          recepcionAlmacen: emailFormRecepcion,
+          habilitado: emailFormHabilitado,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al guardar correos');
+      toast.success('Configuración de correos guardada exitosamente.');
+      setShowEmailModal(false);
+      cargarDatosRecepcion();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSavingEmails(false);
+    }
+  };
+
+  const handleProbarEnvio = async (tipo: 'RECOGIDA_TIENDA' | 'RECEPCION_ALMACEN') => {
+    if (!testEmailInput.trim() || !testEmailInput.includes('@')) {
+      return toast.warning('Ingrese un correo válido para la prueba.');
+    }
+    setSendingTestEmail(true);
+    try {
+      const res = await fetch(`${API_URL}/exito-mensajeria/notificaciones/probar-envio`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          email: testEmailInput.trim(),
+          tipo,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al enviar prueba');
+      toast.success(data.message || 'Correo de prueba enviado con éxito.');
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSendingTestEmail(false);
+    }
+  };
 
   useEffect(() => {
     cargarDatosRecepcion();
@@ -205,11 +297,23 @@ const ExitoMensajeriaRecepcion: React.FC<Props> = ({ onNavigate }) => {
   };
 
   // Confirmar ingreso en Bodega Milla 7 (EST-33 / EN_ALMACEN)
-  const handleConfirmarRecepcionAlmacen = async () => {
-    const idsArray = Array.from(verificadasIds);
+  const handleConfirmarRecepcionAlmacen = async (forcedIds?: number[]) => {
+    let idsArray = forcedIds || Array.from(verificadasIds);
     if (idsArray.length === 0) {
-      return toast.warning('Pistolee o seleccione al menos un paquete antes de confirmar la recepción.');
+      if (guiasFiltradas.length > 0) {
+        const confirmarTodos = window.confirm(
+          `No ha pistoleado paquetes individuales.\n\n¿Desea recibir y confirmar TODOS los ${guiasFiltradas.length} paquetes visibles en el Almacén M7?`
+        );
+        if (confirmarTodos) {
+          idsArray = guiasFiltradas.map((g) => Number(g.id));
+        } else {
+          return;
+        }
+      } else {
+        return toast.warning('Pistolee o seleccione al menos un paquete antes de confirmar la recepción.');
+      }
     }
+
     setSubmitting(true);
     try {
       const res = await fetch(`${API_URL}/exito-mensajeria/guias/recepcion-bodega`, {
@@ -225,7 +329,20 @@ const ExitoMensajeriaRecepcion: React.FC<Props> = ({ onNavigate }) => {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error al registrar recepción en almacén');
 
-      toast.success(data.message);
+      if (data.emailNotified && data.emailRecipients?.length > 0) {
+        toast.success(
+          `✓ ${data.message}\n📧 Notificación por correo enviada a: ${data.emailRecipients.join(', ')}`,
+          { duration: 6000 }
+        );
+      } else if (data.emailWarning === 'NO_EMAILS_CONFIGURED') {
+        toast.warning(
+          `⚠️ ${data.message}\nATENCIÓN: No hay correos registrados para la notificación de recepción en almacén. Ingréselos en "Correos de Notificación".`,
+          { duration: 8000 }
+        );
+      } else {
+        toast.success(data.message);
+      }
+
       setVerificadasIds(new Set());
       setUltimoPistoleo(null);
       cargarDatosRecepcion();
@@ -318,12 +435,47 @@ const ExitoMensajeriaRecepcion: React.FC<Props> = ({ onNavigate }) => {
           <label className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold cursor-pointer">
             <input
               type="checkbox"
+              checked={soloPendientes}
+              onChange={(e) => setSoloPendientes(e.target.checked)}
+              className="rounded accent-purple-500"
+            />
+            Solo Pendientes (Ocultar recibidas)
+          </label>
+
+          <label className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold cursor-pointer">
+            <input
+              type="checkbox"
               checked={includeSandbox}
               onChange={(e) => setIncludeSandbox(e.target.checked)}
               className="rounded"
             />
             Incluir Guías Sandbox
           </label>
+
+          <button
+            onClick={() => {
+              cargarConfiguracionCorreos();
+              setShowEmailModal(true);
+            }}
+            className={`px-4 py-2.5 rounded-xl font-black text-xs flex items-center gap-2 border shadow-lg transition ${
+              emailSummary && !emailSummary.tieneCorreosRecepcion
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30 ring-2 ring-amber-400/40 animate-pulse'
+                : 'bg-purple-600 hover:bg-purple-500 text-white border-purple-500'
+            }`}
+          >
+            <Mail className="w-4 h-4" />
+            <span>CORREOS DE NOTIFICACIÓN</span>
+            {emailSummary && !emailSummary.tieneCorreosRecepcion && (
+              <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black">
+                ⚠️ SIN CORREOS
+              </span>
+            )}
+            {emailSummary && emailSummary.tieneCorreosRecepcion && (
+              <span className="px-2 py-0.5 rounded-full bg-emerald-400 text-slate-950 text-[10px] font-black">
+                {emailSummary.recepcionAlmacenCount}
+              </span>
+            )}
+          </button>
 
           <button
             onClick={cargarDatosRecepcion}
@@ -343,6 +495,38 @@ const ExitoMensajeriaRecepcion: React.FC<Props> = ({ onNavigate }) => {
           )}
         </div>
       </div>
+
+      {/* ALERTA VISIBLE SI NO HAY CORREOS REGISTRADOS */}
+      {emailSummary && (!emailSummary.tieneCorreosRecepcion || !emailSummary.tieneCorreosRecogida) && (
+        <div className="p-4 md:p-5 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start md:items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-md">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="text-sm font-black text-amber-950 uppercase tracking-tight flex items-center gap-2">
+                <span>No hay correos registrados para las notificaciones operativas</span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-black">
+                  ACCIÓN REQUERIDA
+                </span>
+              </div>
+              <p className="text-xs text-amber-900 mt-0.5 leading-relaxed">
+                Cuando se completen recogidas en tiendas Éxito o se reciban paquetes en el almacén de Milla 7, el sistema <strong>no podrá enviar comprobantes por correo</strong> hasta que registre al menos una dirección de destino.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              cargarConfiguracionCorreos();
+              setShowEmailModal(true);
+            }}
+            className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white text-xs font-black flex items-center justify-center gap-2 shrink-0 shadow-md transition"
+          >
+            <Mail className="w-4 h-4" /> REGISTRAR CORREOS AHORA
+          </button>
+        </div>
+      )}
 
       {/* PASO 1: SELECCIONAR PLACA O REMISIÓN DE RECOGIDA */}
       <div className="bg-white rounded-2xl p-4 md:p-5 border border-slate-200 shadow-sm space-y-4">
@@ -668,6 +852,150 @@ const ExitoMensajeriaRecepcion: React.FC<Props> = ({ onNavigate }) => {
           </div>
         )}
       </div>
+
+      {/* MODAL PARA CONFIGURACIÓN DE CORREOS DE NOTIFICACIÓN (RECOGIDA Y ALMACÉN) */}
+      {showEmailModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Cabecera del Modal */}
+            <div className="bg-slate-900 text-white p-5 md:p-6 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-lg">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base md:text-lg font-black tracking-tight">
+                    Correos de Notificación Automática Éxito
+                  </h3>
+                  <p className="text-xs text-slate-300">
+                    Defina los correos a donde llegarán las alertas de recogida en nodo y recepción en almacén.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowEmailModal(false)}
+                className="w-9 h-9 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Formulario */}
+            <form onSubmit={handleGuardarCorreos} className="p-5 md:p-6 space-y-5 overflow-y-auto flex-1">
+              {/* Toggle Habilitado */}
+              <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                <div>
+                  <div className="text-xs font-black uppercase text-slate-900">
+                    Habilitar Envío de Notificaciones por Correo
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Activa o pausa el envío automático de correos en las etapas de recogida y almacén.
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={emailFormHabilitado}
+                    onChange={(e) => setEmailFormHabilitado(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600"></div>
+                </label>
+              </div>
+
+              {/* Correos Recogida en Tienda */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black uppercase text-slate-800 flex items-center justify-between">
+                  <span>1. Correos para Recogida en Tienda / Nodo Éxito</span>
+                  <span className="text-[10px] text-slate-500 font-bold lowercase">Separados por coma</span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={emailFormRecogida}
+                  onChange={(e) => setEmailFormRecogida(e.target.value)}
+                  placeholder="ejemplo@millasiete.com, logistica@exito.com, supervisor@millasiete.com"
+                  className="w-full p-3 rounded-xl border border-slate-300 text-xs font-mono font-medium focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Reciben la remisión de recogida (REC-EX) y el detalle de paquetes cuando el conductor realiza el checkout en el nodo.
+                </p>
+              </div>
+
+              {/* Correos Recepción en Bodega Milla 7 */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-black uppercase text-slate-800 flex items-center justify-between">
+                  <span>2. Correos para Recepción en Bodega Milla 7</span>
+                  <span className="text-[10px] text-slate-500 font-bold lowercase">Separados por coma</span>
+                </label>
+                <textarea
+                  rows={2}
+                  value={emailFormRecepcion}
+                  onChange={(e) => setEmailFormRecepcion(e.target.value)}
+                  placeholder="bodega@millasiete.com, operaciones@millasiete.com, jefealmacen@millasiete.com"
+                  className="w-full p-3 rounded-xl border border-slate-300 text-xs font-mono font-medium focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Reciben el acta de ingreso a bodega cuando los paquetes son verificados y pistoleados para enrutamiento.
+                </p>
+              </div>
+
+              {/* Sección de Prueba de Envío */}
+              <div className="p-4 rounded-2xl bg-purple-50/60 border border-purple-200 space-y-2.5">
+                <div className="text-xs font-black uppercase text-purple-950 flex items-center gap-1.5">
+                  <Send className="w-3.5 h-3.5 text-purple-600" />
+                  Probar Envío de Correo Inmediato
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="email"
+                    value={testEmailInput}
+                    onChange={(e) => setTestEmailInput(e.target.value)}
+                    placeholder="Ingrese su correo para recibir una prueba..."
+                    className="flex-1 px-3 py-2 rounded-xl bg-white border border-purple-300 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  />
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={sendingTestEmail}
+                      onClick={() => handleProbarEnvio('RECOGIDA_TIENDA')}
+                      className="px-3 py-2 rounded-xl bg-white border border-purple-300 hover:bg-purple-100 text-purple-900 text-xs font-black disabled:opacity-50"
+                    >
+                      Probar Recogida
+                    </button>
+                    <button
+                      type="button"
+                      disabled={sendingTestEmail}
+                      onClick={() => handleProbarEnvio('RECEPCION_ALMACEN')}
+                      className="px-3 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white text-xs font-black disabled:opacity-50"
+                    >
+                      Probar Recepción
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Botones de Acción */}
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowEmailModal(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingEmails}
+                  className="px-6 py-2.5 rounded-xl bg-purple-700 hover:bg-purple-600 text-white font-black text-xs shadow-lg flex items-center gap-2 disabled:opacity-50"
+                >
+                  {savingEmails ? 'GUARDANDO...' : 'GUARDAR CONFIGURACIÓN'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

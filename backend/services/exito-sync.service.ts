@@ -317,17 +317,35 @@ export class ExitoSyncService {
     const epochSec = Math.floor(Date.now() / 1000);
     const naturalKey = `${params.numeroGuia}_${params.idGuiaStatus}_${epochSec}_${params.disparadoPor || 'AUTO'}`;
 
-    // Estructura exacta Sección 7.4 de Lineamientos Técnicos Go Éxito v2.0
+    // Mapeo oficial de estados para Grupo Éxito Go Éxito v2.0
+    const statusNames: Record<string, string> = {
+      '1': 'GUIA GENERADA',
+      '2': 'RECOGIDO EN TIENDA',
+      '3': 'EN TRANSPORTE',
+      '4': 'EN CIUDAD DESTINO',
+      '5': 'EN REPARTO',
+      '6': 'ENTREGADO',
+      '7': 'CANCELADO',
+      '8': 'EXTRAVIADO',
+      '9': 'DEVOLUCION',
+      '10': 'NOVEDAD',
+    };
+    const statusName = statusNames[String(params.idGuiaStatus)] || 'ACTUALIZACION TRACKING';
+
+    // Estructura oficial Postman Colección Milla7 Tracking / Go Éxito v2.0
     const webhookPayload = {
       header: {
         transactionId,
         transactionDate: eventDateIso,
-        source: 'PAQUETERA',
+        source: 'MILLA7',
+        eventType: 'TRACKING_UPDATE',
+        version: '1.0',
       },
       data: {
         guide: params.numeroGuia,
         orderNumber: params.numeroPedido,
         status: String(params.idGuiaStatus),
+        statusName,
         eventDate: eventDateIso,
         observation: params.observation || '',
       },
@@ -409,10 +427,16 @@ export class ExitoSyncService {
     const isSandbox = Boolean(item.is_sandbox || item.ambiente === 'SANDBOX');
     const simulate503 = isSandbox && cfg['SANDBOX_SIMULATE_WEBHOOK_503'] === 'true';
 
+    const isQA =
+      item.ambiente === 'QA' ||
+      item.ambiente === 'develop' ||
+      process.env.APP_ENV === 'develop' ||
+      process.env.NODE_ENV === 'staging';
+
     const webhookUrl = isSandbox
       ? cfg['TRACKING_WEBHOOK_URL_SANDBOX'] || 'INTERNAL_SANDBOX_SIMULATOR'
-      : item.ambiente === 'QA'
-        ? process.env.EXITO_WEBHOOK_URL_QA || cfg['TRACKING_WEBHOOK_URL_QA'] || 'INTERNAL_SANDBOX_SIMULATOR'
+      : isQA
+        ? process.env.EXITO_WEBHOOK_URL_QA || cfg['TRACKING_WEBHOOK_URL_QA'] || 'https://lzv2oui8p2.execute-api.us-east-1.amazonaws.com/dev/postelddev'
         : process.env.EXITO_WEBHOOK_URL_PROD || cfg['TRACKING_WEBHOOK_URL_PROD'] || 'INTERNAL_SANDBOX_SIMULATOR';
 
     const attemptNum = Number(item.intentos || 0) + 1;
@@ -446,11 +470,8 @@ export class ExitoSyncService {
       let httpStatus = 200;
       let responseBodyText = '';
 
-      if (
-        webhookUrl === 'INTERNAL_SANDBOX_SIMULATOR' ||
-        (!process.env.EXITO_WEBHOOK_URL_PROD && webhookUrl.includes('lzv2oui8p2.execute-api'))
-      ) {
-        // Simulación local exitosa cuando no hay endpoint externo real conectado aún o es Sandbox
+      if (webhookUrl === 'INTERNAL_SANDBOX_SIMULATOR') {
+        // Simulación local exitosa cuando se configura explícitamente como simulador interno
         httpStatus = 200;
         responseBodyText = JSON.stringify({
           transactionId: item.transaction_id,
@@ -467,17 +488,51 @@ export class ExitoSyncService {
           },
         });
       } else {
-        const outboundKey =
-          process.env.EXITO_OUTBOUND_API_KEY || process.env.EXITO_API_KEY_PROD || 'orbitm7-exito-key';
-        const resp = await axios.post(webhookUrl, item.payload_json, {
+        const outboundKey = isQA
+          ? process.env.EXITO_WEBHOOK_API_KEY_QA || cfg['TRACKING_WEBHOOK_API_KEY_QA'] || '9gLW56ExTU49BaOXFxOiV6JHJ61k6Kku3kkmUdlj'
+          : process.env.EXITO_WEBHOOK_API_KEY_PROD || cfg['TRACKING_WEBHOOK_API_KEY_PROD'] || process.env.EXITO_OUTBOUND_API_KEY || '9gLW56ExTU49BaOXFxOiV6JHJ61k6Kku3kkmUdlj';
+
+        // Normalizar y enriquecer payload según contrato Postman oficial de Grupo Éxito
+        const payloadData =
+          typeof item.payload_json === 'string'
+            ? JSON.parse(item.payload_json)
+            : JSON.parse(JSON.stringify(item.payload_json));
+
+        if (payloadData?.header) {
+          if (!payloadData.header.source || payloadData.header.source === 'PAQUETERA') {
+            payloadData.header.source = 'MILLA7';
+          }
+          payloadData.header.eventType = payloadData.header.eventType || 'TRACKING_UPDATE';
+          payloadData.header.version = payloadData.header.version || '1.0';
+        }
+        if (payloadData?.data) {
+          const statusNames: Record<string, string> = {
+            '1': 'GUIA GENERADA',
+            '2': 'RECOGIDO EN TIENDA',
+            '3': 'EN TRANSPORTE',
+            '4': 'EN CIUDAD DESTINO',
+            '5': 'EN REPARTO',
+            '6': 'ENTREGADO',
+            '7': 'CANCELADO',
+            '8': 'EXTRAVIADO',
+            '9': 'DEVOLUCION',
+            '10': 'NOVEDAD',
+          };
+          if (!payloadData.data.statusName) {
+            payloadData.data.statusName = statusNames[String(payloadData.data.status)] || 'ACTUALIZACION TRACKING';
+          }
+        }
+
+        const resp = await axios.post(webhookUrl, payloadData, {
           timeout: 5000, // Timeout estricto de 5s exigido por Sección 9.1
           headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Encoding': 'gzip, deflate, br',
             'x-api-key': outboundKey,
             'x-correlation-id': item.correlation_id,
             'Idempotency-Key': item.natural_key,
-            'User-Agent': 'OrbitM7-ExitoMensajeria/1.9.65',
+            'User-Agent': 'OrbitM7-ExitoMensajeria/1.9.66',
           },
         });
         httpStatus = resp.status;
