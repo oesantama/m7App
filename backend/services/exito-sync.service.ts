@@ -430,7 +430,7 @@ export class ExitoSyncService {
     const isQA =
       item.ambiente === 'QA' ||
       item.ambiente === 'develop' ||
-      process.env.APP_ENV === 'develop' ||
+      String(process.env.APP_ENV || '').toLowerCase() === 'develop' || // DEVELOP/develop: nunca empujar a Éxito PROD desde pruebas
       process.env.NODE_ENV === 'staging';
 
     const webhookUrl = isSandbox

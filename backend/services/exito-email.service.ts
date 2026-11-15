@@ -10,6 +10,15 @@ import pool from '../config/database.js';
 import { sendEmail } from './notification.service.js';
 import { nowColombiaDateTimeStr } from '../utils/date.util.js';
 
+// URL base de los enlaces en los correos a Éxito. Antes caía por defecto al servidor viejo de
+// sandbox (dominio retirado) incluso en producción si faltaba APP_URL.
+const exitoAppBaseUrl = () =>
+  process.env.APP_URL ||
+  process.env.PUBLIC_API_URL ||
+  (process.env.NODE_ENV === 'production' && String(process.env.APP_ENV || '').toUpperCase() !== 'DEVELOP'
+    ? 'https://orbitm7.m7apps.com'
+    : 'https://devsm7.m7apps.com');
+
 export interface ExitoEmailConfig {
   recogidaTienda: string[];
   recepcionAlmacen: string[];
@@ -199,7 +208,7 @@ export class ExitoEmailService {
     }
 
     const fechaCol = nowColombiaDateTimeStr();
-    const appBaseUrl = process.env.APP_URL || process.env.PUBLIC_API_URL || 'https://devsm7.santamariapp.com';
+    const appBaseUrl = exitoAppBaseUrl();
     const remisionLink = params.remisionUrl
       ? params.remisionUrl.startsWith('http')
         ? params.remisionUrl
@@ -359,7 +368,7 @@ export class ExitoEmailService {
     }
 
     const fechaCol = nowColombiaDateTimeStr();
-    const appBaseUrl = process.env.APP_URL || process.env.PUBLIC_API_URL || 'https://devsm7.santamariapp.com';
+    const appBaseUrl = exitoAppBaseUrl();
 
     const guiasTableRows = params.guias
       .slice(0, 50)

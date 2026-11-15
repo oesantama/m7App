@@ -30,7 +30,7 @@ export const getAppEnvironment = (): 'DEVELOP' | 'PROD' => {
     ) {
       return 'DEVELOP';
     }
-    // Si es orbitm7.m7apps.com o santamariapp.com principal es producción
+    // orbitm7.m7apps.com / apiapps.m7apps.com es producción
     if (host.includes('orbitm7') || host.includes('m7apps.com')) {
       return 'PROD';
     }
