@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { sendEmail } from '../services/notification.service.js';
-import pool from '../config/database.js';
+import pool, { withTransaction } from '../config/database.js';
 
 // --- INITIALIZE DB TABLES ---
 const initializeCyberDb = async () => {
@@ -192,8 +192,10 @@ export const updateCampaign = async (req: Request, res: Response) => {
 export const deleteCampaign = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await pool.query('DELETE FROM cyber_phishing_events WHERE campaign_id = $1', [id]);
-    await pool.query('DELETE FROM cyber_phishing_campaigns WHERE id = $1', [id]);
+    await withTransaction(async (client) => {
+      await client.query('DELETE FROM cyber_phishing_events WHERE campaign_id = $1', [id]);
+      await client.query('DELETE FROM cyber_phishing_campaigns WHERE id = $1', [id]);
+    });
     res.json({ success: true, message: 'Jornada eliminada correctamente' });
   } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });

@@ -51,6 +51,8 @@ if (cluster.isPrimary && process.env.NODE_ENV === 'production') {
 // Leer versión desde package.json
 const pkg = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf8'));
 const APP_VERSION = pkg.version || '1.0.0';
+const APP_ENV = process.env.APP_ENV || (process.env.NODE_ENV === 'production' ? 'PROD' : 'DEVELOP');
+const APP_BUILD = process.env.APP_BUILD || (process.env.BUILD_ID || APP_VERSION);
 
 const app = express();
 
@@ -119,8 +121,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, '..');
 
-// Servir la carpeta public desde la raíz del proyecto
+// Servir la carpeta public y uploads desde la raíz del proyecto
 app.use(express.static(path.join(projectRoot, 'public')));
+app.use('/uploads', express.static(path.join(projectRoot, 'public', 'uploads')));
 
 // Limitador de Intentos de Login — solo estricto en producción
 const loginLimiter = rateLimit({
@@ -156,7 +159,14 @@ app.use('/api/public/hv', hvPublicLimiter);
 let systemReady = false;
 
 app.get('/health', (req, res) => {
-  res.json({ status: 'UP', ready: systemReady, version: APP_VERSION, timestamp: new Date() });
+  res.json({
+    status: 'UP',
+    ready: systemReady,
+    version: APP_VERSION,
+    build: APP_BUILD,
+    env: APP_ENV,
+    timestamp: new Date()
+  });
 });
 
 // /ready: usado por Docker healthcheck — retorna 503 mientras migración no termine

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import pool from '../config/database.js';
+import pool, { withTransaction } from '../config/database.js';
 
 // Middleware-like check (can be used inside controllers too for double safety)
 // Middleware de validación robusta para Administrador
@@ -279,11 +279,13 @@ export const deleteRecord = async (req: any, res: Response) => {
       return res.status(400).json({ error: "Nombre de tabla inválido" });
     }
 
-    if (tableName === 'modules') {
-      await pool.query('DELETE FROM pages WHERE module_id = $1 OR parent_id = $1', [id]);
-    }
+    await withTransaction(async (client) => {
+      if (tableName === 'modules') {
+        await client.query('DELETE FROM pages WHERE module_id = $1 OR parent_id = $1', [id]);
+      }
+      await client.query(`DELETE FROM ${tableName} WHERE id = $1`, [id]);
+    });
 
-    await pool.query(`DELETE FROM ${tableName} WHERE id = $1`, [id]);
     res.json({ success: true, action: 'DELETE' });
   } catch (err: any) {
     console.error('[ADMIN-DELETE]', err.message);
@@ -309,11 +311,12 @@ export const bulkDeleteRecords = async (req: any, res: Response) => {
 
     const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ');
 
-    if (tableName === 'modules') {
-      await pool.query(`DELETE FROM pages WHERE module_id IN (${placeholders}) OR parent_id IN (${placeholders})`, ids);
-    }
-
-    await pool.query(`DELETE FROM ${tableName} WHERE id IN (${placeholders})`, ids);
+    await withTransaction(async (client) => {
+      if (tableName === 'modules') {
+        await client.query(`DELETE FROM pages WHERE module_id IN (${placeholders}) OR parent_id IN (${placeholders})`, ids);
+      }
+      await client.query(`DELETE FROM ${tableName} WHERE id IN (${placeholders})`, ids);
+    });
     
     res.json({ success: true, action: 'BULK_DELETE', count: ids.length });
   } catch (err: any) {

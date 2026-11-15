@@ -32,6 +32,27 @@ export const migration013: Migration = {
     `);
 
     await client.query(`
+      CREATE TABLE IF NOT EXISTS gh_devoluciones_personal (
+        id SERIAL PRIMARY KEY,
+        numero_devolucion VARCHAR(50) NOT NULL UNIQUE,
+        personal_id INTEGER NOT NULL REFERENCES gh_personal(id) ON DELETE CASCADE,
+        motivo TEXT NOT NULL,
+        fecha DATE NOT NULL,
+        usuario_control TEXT,
+        fecha_control TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS gh_devoluciones_personal_detalle (
+        id SERIAL PRIMARY KEY,
+        devolucion_id INTEGER REFERENCES gh_devoluciones_personal(id) ON DELETE CASCADE,
+        elemento_id INTEGER REFERENCES gh_elementos(id) ON DELETE CASCADE,
+        cantidad INTEGER NOT NULL
+      );
+    `);
+
+    await client.query(`
       ALTER TABLE gh_devoluciones_personal
         ADD COLUMN IF NOT EXISTS asignacion_id INTEGER REFERENCES gh_asignaciones_personal(id),
         ADD COLUMN IF NOT EXISTS estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVA'

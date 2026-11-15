@@ -1,6 +1,6 @@
 
 import { Request, Response } from 'express';
-import pool from '../config/database.js';
+import pool, { withTransaction } from '../config/database.js';
 
 export const getUsers = async (req: Request, res: Response) => {
   try {
@@ -63,28 +63,32 @@ export const saveUser = async (req: Request, res: Response) => {
 
         // Detect role change BEFORE updating
         const currentRoleId = check.rows[0]?.role_id;
-
-        await pool.query(`
-          UPDATE users
-          SET email = $2, name = $3, password = $4, role_id = $5, client_ids = $6, status_id = $7,
-              phone = $8, avatar = $9, document_type = $10, document_number = $11, two_factor_enabled = $12,
-              updated_by = $13, updated_at = CURRENT_TIMESTAMP
-          WHERE id = $1
-        `, [u.id, u.email, u.name, newPass, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled, u.updatedBy || 'System']);
-
-        // Solo sincronizar permisos si el rol CAMBIÓ y el usuario pidió heredar del nuevo rol.
-        // Si el rol no cambió o eligió "Conservar actuales", los permisos en user_permissions
-        // permanecen intactos (respeta cambios manuales hechos en Permisos por Usuario).
         const roleActuallyChanged = u.roleId && currentRoleId && String(u.roleId) !== String(currentRoleId);
+
+        let newRolePerms = '{}';
         if (roleActuallyChanged && u.inheritRolePerms !== false) {
             const rolePermsResult = await pool.query('SELECT permissions FROM role_permissions WHERE role_id = $1', [u.roleId]);
-            const newRolePerms = rolePermsResult.rows.length > 0 ? rolePermsResult.rows[0].permissions : '{}';
-            await pool.query('DELETE FROM user_permissions WHERE user_id = $1', [u.id]);
-            await pool.query(`
-              INSERT INTO user_permissions (id, user_id, permissions, status_id)
-              VALUES ($1, $2, $3, $4)
-            `, [`PUS-${u.id}`, u.id, newRolePerms, u.statusId || 'EST-01']);
+            newRolePerms = rolePermsResult.rows.length > 0 ? rolePermsResult.rows[0].permissions : '{}';
         }
+
+        await withTransaction(async (client) => {
+            await client.query(`
+              UPDATE users
+              SET email = $2, name = $3, password = $4, role_id = $5, client_ids = $6, status_id = $7,
+                  phone = $8, avatar = $9, document_type = $10, document_number = $11, two_factor_enabled = $12,
+                  updated_by = $13, updated_at = CURRENT_TIMESTAMP
+              WHERE id = $1
+            `, [u.id, u.email, u.name, newPass, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled, u.updatedBy || 'System']);
+
+            // Solo sincronizar permisos si el rol CAMBIÓ y el usuario pidió heredar del nuevo rol.
+            if (roleActuallyChanged && u.inheritRolePerms !== false) {
+                await client.query('DELETE FROM user_permissions WHERE user_id = $1', [u.id]);
+                await client.query(`
+                  INSERT INTO user_permissions (id, user_id, permissions, status_id)
+                  VALUES ($1, $2, $3, $4)
+                `, [`PUS-${u.id}`, u.id, newRolePerms, u.statusId || 'EST-01']);
+            }
+        });
 
         res.json({ success: true, message: 'Usuario actualizado correctamente' });
     } else {
@@ -100,10 +104,6 @@ export const saveUser = async (req: Request, res: Response) => {
                            ? u.clientIds 
                            : (u.clientId ? [u.clientId] : []);
 
-        await pool.query(`
-          INSERT INTO users (id, email, name, password, role_id, client_ids, status_id, phone, avatar, document_type, document_number, two_factor_enabled)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        `, [u.id, u.email, u.name, hashedPassword, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled]);
         const roleId = u.roleId || u.role_id || 'ROL-02';
         console.log(`[M7-USERS] Inicializando permisos para usuario ${u.id} con rol ${roleId}`);
         
@@ -125,11 +125,18 @@ export const saveUser = async (req: Request, res: Response) => {
             permissionsObj['page_PAG-31_active'] = true;
         }
 
-        await pool.query('DELETE FROM user_permissions WHERE user_id = $1', [u.id]);
-        await pool.query(`
-          INSERT INTO user_permissions (id, user_id, permissions, status_id)
-          VALUES ($1, $2, $3, $4)
-        `, [`PUS-${u.id}`, u.id, JSON.stringify(permissionsObj), u.statusId || 'EST-01']);
+        await withTransaction(async (client) => {
+            await client.query(`
+              INSERT INTO users (id, email, name, password, role_id, client_ids, status_id, phone, avatar, document_type, document_number, two_factor_enabled)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            `, [u.id, u.email, u.name, hashedPassword, u.roleId, clientIds, u.statusId, u.phone, u.avatar, u.documentType, u.documentNumber, u.twoFactorEnabled]);
+
+            await client.query('DELETE FROM user_permissions WHERE user_id = $1', [u.id]);
+            await client.query(`
+              INSERT INTO user_permissions (id, user_id, permissions, status_id)
+              VALUES ($1, $2, $3, $4)
+            `, [`PUS-${u.id}`, u.id, JSON.stringify(permissionsObj), u.statusId || 'EST-01']);
+        });
 
         console.log(`[M7-USERS] ✅ Permisos sincronizados para ${u.email}`);
         res.json({ success: true, message: 'Usuario creado/editado y perfil de permisos sincronizado' });
@@ -150,16 +157,17 @@ export const deleteUser = async (req: Request, res: Response) => {
       return res.status(403).json({ error: "No se puede eliminar al Super Administrador" });
     }
 
-    // Auditoría: Obtener el registro antes de borrar
-    const record = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-    if (record.rows.length > 0) {
-      await pool.query(
-        'INSERT INTO deletion_logs (table_name, record_id, record_data, deleted_by) VALUES ($1, $2, $3, $4)',
-        ['users', id, record.rows[0], deletedBy || 'Unknown']
-      );
-    }
-    
-    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
+    // Auditoría y Eliminación Atómica
+    const result = await withTransaction(async (client) => {
+      const record = await client.query('SELECT * FROM users WHERE id = $1', [id]);
+      if (record.rows.length > 0) {
+        await client.query(
+          'INSERT INTO deletion_logs (table_name, record_id, record_data, deleted_by) VALUES ($1, $2, $3, $4)',
+          ['users', id, record.rows[0], deletedBy || 'Unknown']
+        );
+      }
+      return client.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
+    });
     
     if (result.rowCount === 0) {
       return res.status(404).json({ error: "Usuario no encontrado" });

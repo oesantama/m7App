@@ -1,4 +1,4 @@
-import { Pool, types } from 'pg';
+import { Pool, types, type PoolClient } from 'pg';
 import dotenv from 'dotenv';
 
 // DATE (OID 1082): return raw string "YYYY-MM-DD" to prevent pg from converting
@@ -64,4 +64,36 @@ pool.on('error', (err) => {
   console.error('[M7-DB] Error inesperado en el cliente de base de datos', err);
 });
 
+/**
+ * Ejecuta una operación atómica dentro de una transacción PostgreSQL (ACID).
+ * Si la función completa exitosamente, aplica COMMIT.
+ * Si ocurre cualquier error, ejecuta automáticamente ROLLBACK evitando datos a medias.
+ * Garantiza la liberación (release) del cliente de conexión en el bloque finally.
+ */
+export async function withTransaction<T>(
+  callback: (client: PoolClient) => Promise<T>,
+  existingClient?: PoolClient
+): Promise<T> {
+  if (existingClient) {
+    return await callback(existingClient);
+  }
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await callback(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rbErr) {
+      console.error('[M7-DB-ROLLBACK-ERR] Error al intentar ROLLBACK:', rbErr);
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export { pool };
 export default pool;

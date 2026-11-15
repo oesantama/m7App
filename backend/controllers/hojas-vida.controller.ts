@@ -7,7 +7,7 @@
 import { Request, Response } from 'express';
 import * as jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
-import pool from '../config/database.js';
+import pool, { withTransaction } from '../config/database.js';
 import { uploadDocument, rcloneCat, rcloneAvailable } from '../services/hv-drive.service.js';
 import { convertToPdf, validateUpload } from '../services/hv-convert.service.js';
 import * as path from 'path';
@@ -68,31 +68,40 @@ async function cambiarEstado(
     usuarioId: string | null,
     usuarioNombre: string | null,
     ip: string,
-    observacion?: string
+    observacion?: string,
+    existingClient?: any
 ) {
-    const { rows } = await pool.query(
-        'SELECT estado FROM hv_solicitudes WHERE id=$1', [solicitudId]
-    );
-    const estadoAnt = rows[0]?.estado;
+    const execute = async (c: any) => {
+        const { rows } = await c.query(
+            'SELECT estado FROM hv_solicitudes WHERE id=$1', [solicitudId]
+        );
+        const estadoAnt = rows[0]?.estado;
 
-    const tsField: Record<string, string> = {
-        enviada: 'enviada_at',
-        aprobada: 'aprobada_at',
-        rechazada: 'rechazada_at',
-        completa: 'completada_at',
+        const tsField: Record<string, string> = {
+            enviada: 'enviada_at',
+            aprobada: 'aprobada_at',
+            rechazada: 'rechazada_at',
+            completa: 'completada_at',
+        };
+        const tsUpdate = tsField[estadoNuevo] ? `, ${tsField[estadoNuevo]}=NOW()` : '';
+
+        await c.query(
+            `UPDATE hv_solicitudes SET estado=$1, updated_at=NOW()${tsUpdate} WHERE id=$2`,
+            [estadoNuevo, solicitudId]
+        );
+        await c.query(
+            `INSERT INTO hv_estados_historial
+             (solicitud_id,estado_ant,estado_nuevo,usuario_id,usuario_nombre,usuario_ip,observacion)
+             VALUES($1,$2,$3,$4,$5,$6,$7)`,
+            [solicitudId, estadoAnt, estadoNuevo, usuarioId, usuarioNombre, ip, observacion || null]
+        );
     };
-    const tsUpdate = tsField[estadoNuevo] ? `, ${tsField[estadoNuevo]}=NOW()` : '';
 
-    await pool.query(
-        `UPDATE hv_solicitudes SET estado=$1, updated_at=NOW()${tsUpdate} WHERE id=$2`,
-        [estadoNuevo, solicitudId]
-    );
-    await pool.query(
-        `INSERT INTO hv_estados_historial
-         (solicitud_id,estado_ant,estado_nuevo,usuario_id,usuario_nombre,usuario_ip,observacion)
-         VALUES($1,$2,$3,$4,$5,$6,$7)`,
-        [solicitudId, estadoAnt, estadoNuevo, usuarioId, usuarioNombre, ip, observacion || null]
-    );
+    if (existingClient) {
+        await execute(existingClient);
+    } else {
+        await withTransaction(execute);
+    }
 }
 
 // ─── CATÁLOGOS (GET públicos para el formulario) ──────────────────────────────
@@ -131,23 +140,27 @@ export const crearSolicitud = async (req: Request, res: Response) => {
         const token = crypto.randomBytes(24).toString('base64url');
         const expira = new Date(Date.now() + horas_expiracion * 3600 * 1000);
 
-        const { rows } = await pool.query(
-            `INSERT INTO hv_solicitudes
-             (tipo_entidad,entidad_id,tipo_tercero_id,nombre_entidad,token,token_expira_at,creado_por)
-             VALUES($1,$2,$3,$4,$5,$6,$7)
-             RETURNING *`,
-            [tipo_entidad, entidad_id || null, tipo_tercero_id || null,
-             nombre_entidad || null, token, expira, user.id]
-        );
-        const sol = rows[0];
+        const sol = await withTransaction(async (client) => {
+            const { rows } = await client.query(
+                `INSERT INTO hv_solicitudes
+                 (tipo_entidad,entidad_id,tipo_tercero_id,nombre_entidad,token,token_expira_at,creado_por)
+                 VALUES($1,$2,$3,$4,$5,$6,$7)
+                 RETURNING *`,
+                [tipo_entidad, entidad_id || null, tipo_tercero_id || null,
+                 nombre_entidad || null, token, expira, user.id]
+            );
+            const solRecord = rows[0];
 
-        // Historial inicial
-        await pool.query(
-            `INSERT INTO hv_estados_historial
-             (solicitud_id,estado_ant,estado_nuevo,usuario_id,usuario_nombre,usuario_ip,observacion)
-             VALUES($1,NULL,'creada',$2,$3,$4,'Solicitud creada')`,
-            [sol.id, user.id, user.name, getIp(req)]
-        );
+            // Historial inicial
+            await client.query(
+                `INSERT INTO hv_estados_historial
+                 (solicitud_id,estado_ant,estado_nuevo,usuario_id,usuario_nombre,usuario_ip,observacion)
+                 VALUES($1,NULL,'creada',$2,$3,$4,'Solicitud creada')`,
+                [solRecord.id, user.id, user.name, getIp(req)]
+            );
+
+            return solRecord;
+        });
 
         await registrarAuditoria(sol.id, 'create', 'solicitud', sol.id,
             user.id, user.name, getIp(req), null, { estado: 'creada', tipo_entidad });
@@ -889,22 +902,24 @@ export const subirDocumentoPublico = async (req: Request, res: Response) => {
         let docId: number;
         if (existente.rows.length) {
             const prev = existente.rows[0];
-            // Guardar versión anterior
-            await pool.query(
-                `INSERT INTO hv_documentos_versiones
-                 (documento_id,version,drive_path_ant,drive_link_ant,nombre_archivo_ant,fecha_vencimiento_ant,motivo)
-                 VALUES($1,$2,$3,$4,$5,$6,'Reemplazado desde formulario público')`,
-                [prev.id, prev.version, prev.drive_path, prev.drive_link, prev.nombre_archivo, prev.fecha_vencimiento]
-            );
-            await pool.query(
-                `UPDATE hv_documentos SET
-                 drive_path=$1,drive_link=$2,nombre_archivo=$3,version=version+1,
-                 fecha_vencimiento=$4,estado='pendiente',obs_rechazo=NULL,
-                 subido_at=NOW(),subido_ip=$5,tamanio_bytes=$6,mime_original=$7
-                 WHERE id=$8`,
-                [drivePath, driveLink, nombreFinal, fecha_vencimiento || null,
-                 ip, converted.buffer.length, file.mimetype, prev.id]
-            );
+            await withTransaction(async (client) => {
+                // Guardar versión anterior
+                await client.query(
+                    `INSERT INTO hv_documentos_versiones
+                     (documento_id,version,drive_path_ant,drive_link_ant,nombre_archivo_ant,fecha_vencimiento_ant,motivo)
+                     VALUES($1,$2,$3,$4,$5,$6,'Reemplazado desde formulario público')`,
+                    [prev.id, prev.version, prev.drive_path, prev.drive_link, prev.nombre_archivo, prev.fecha_vencimiento]
+                );
+                await client.query(
+                    `UPDATE hv_documentos SET
+                     drive_path=$1,drive_link=$2,nombre_archivo=$3,version=version+1,
+                     fecha_vencimiento=$4,estado='pendiente',obs_rechazo=NULL,
+                     subido_at=NOW(),subido_ip=$5,tamanio_bytes=$6,mime_original=$7
+                     WHERE id=$8`,
+                    [drivePath, driveLink, nombreFinal, fecha_vencimiento || null,
+                     ip, converted.buffer.length, file.mimetype, prev.id]
+                );
+            });
             docId = prev.id;
         } else {
             const ins = await pool.query(
@@ -961,26 +976,28 @@ export const submitFormularioPublico = async (req: Request, res: Response) => {
 
         const sol = rows[0];
 
-        // Actualizar datos legales y firma
-        await pool.query(
-            `UPDATE hv_solicitudes SET
-             habeas_data_aceptado = $1,
-             habeas_data_ip = $2,
-             habeas_data_timestamp = NOW(),
-             firma_digital_b64 = COALESCE($3, firma_digital_b64),
-             updated_at = NOW()
-             WHERE id = $4`,
-            [Boolean(habeas_data_aceptado), ip, firma_digital_b64 || null, sol.id]
-        );
-
-        await cambiarEstado(sol.id, 'pendiente_aprobacion', null, 'Formulario público', ip,
-            'Formulario enviado por el aspirante/proveedor (Consentimiento y Firma registrados)');
-
-        if (acceso_id) {
-            await pool.query(
-                'UPDATE hv_accesos_link SET fin_at=NOW(), completado=TRUE WHERE id=$1', [acceso_id]
+        // Actualizar datos legales, estado y acceso atómicamente
+        await withTransaction(async (client) => {
+            await client.query(
+                `UPDATE hv_solicitudes SET
+                 habeas_data_aceptado = $1,
+                 habeas_data_ip = $2,
+                 habeas_data_timestamp = NOW(),
+                 firma_digital_b64 = COALESCE($3, firma_digital_b64),
+                 updated_at = NOW()
+                 WHERE id = $4`,
+                [Boolean(habeas_data_aceptado), ip, firma_digital_b64 || null, sol.id]
             );
-        }
+
+            await cambiarEstado(sol.id, 'pendiente_aprobacion', null, 'Formulario público', ip,
+                'Formulario enviado por el aspirante/proveedor (Consentimiento y Firma registrados)', client);
+
+            if (acceso_id) {
+                await client.query(
+                    'UPDATE hv_accesos_link SET fin_at=NOW(), completado=TRUE WHERE id=$1', [acceso_id]
+                );
+            }
+        });
 
         await registrarAuditoria(sol.id, 'submit', 'solicitud', sol.id,
             null, 'Formulario público', ip, null, {
@@ -1012,144 +1029,146 @@ export const sincronizarConFlota = async (req: Request, res: Response) => {
         const docs = docsRes.rows;
         const datos = sol.datos_json || {};
 
-        if (sol.tipo_entidad === 'vehiculo') {
-            const plate = (sol.entidad_id || datos.placa || datos.numero_placa || sol.nombre_entidad || '').toUpperCase().trim();
-            if (!plate) return res.status(400).json({ error: 'No se identificó la placa del vehículo' });
+        await withTransaction(async (client) => {
+            if (sol.tipo_entidad === 'vehiculo') {
+                const plate = (sol.entidad_id || datos.placa || datos.numero_placa || sol.nombre_entidad || '').toUpperCase().trim();
+                if (!plate) throw new Error('No se identificó la placa del vehículo');
 
-            const soatDoc = docs.find((d: any) => /soat/i.test(d.nombre_doc) || /soat/i.test(d.nombre_archivo));
-            const technoDoc = docs.find((d: any) => /tecnomecanica|revision|tecnico/i.test(d.nombre_doc) || /tecnomecanica|rtm/i.test(d.nombre_archivo));
+                const soatDoc = docs.find((d: any) => /soat/i.test(d.nombre_doc) || /soat/i.test(d.nombre_archivo));
+                const technoDoc = docs.find((d: any) => /tecnomecanica|revision|tecnico/i.test(d.nombre_doc) || /tecnomecanica|rtm/i.test(d.nombre_archivo));
 
-            const soatExpiry = soatDoc?.fecha_vencimiento || datos.soat_vencimiento || null;
-            const technoExpiry = technoDoc?.fecha_vencimiento || datos.tecnomecanica_vencimiento || null;
-            const soatPdf = soatDoc?.drive_link || null;
-            const technoPdf = technoDoc?.drive_link || null;
+                const soatExpiry = soatDoc?.fecha_vencimiento || datos.soat_vencimiento || null;
+                const technoExpiry = technoDoc?.fecha_vencimiento || datos.tecnomecanica_vencimiento || null;
+                const soatPdf = soatDoc?.drive_link || null;
+                const technoPdf = technoDoc?.drive_link || null;
 
-            const existingVeh = await pool.query('SELECT id FROM vehicles WHERE plate=$1', [plate]);
-            if (existingVeh.rows.length > 0) {
-                await pool.query(
-                    `UPDATE vehicles SET
-                     brand = COALESCE($1, brand),
-                     owner = COALESCE($2, owner),
-                     model_year = COALESCE($3, model_year),
-                     color = COALESCE($4, color),
-                     vehicle_type = COALESCE($5, vehicle_type),
-                     soat_expiry = COALESCE($6, soat_expiry),
-                     techno_expiry = COALESCE($7, techno_expiry),
-                     soat_pdf = COALESCE($8, soat_pdf),
-                     techno_pdf = COALESCE($9, techno_pdf),
-                     status_id = 'EST-01',
-                     updated_by = $10,
-                     updated_at = NOW()
-                     WHERE plate = $11`,
-                    [
-                        datos.marca || null,
-                        datos.propietario || sol.nombre_entidad || null,
-                        datos.modelo || datos.año || null,
-                        datos.color || null,
-                        datos.tipo_vehiculo || datos.clase_vehiculo || 'Camión',
-                        soatExpiry,
-                        technoExpiry,
-                        soatPdf,
-                        technoPdf,
-                        user.name || 'Admin',
-                        plate
-                    ]
-                );
+                const existingVeh = await client.query('SELECT id FROM vehicles WHERE plate=$1', [plate]);
+                if (existingVeh.rows.length > 0) {
+                    await client.query(
+                        `UPDATE vehicles SET
+                         brand = COALESCE($1, brand),
+                         owner = COALESCE($2, owner),
+                         model_year = COALESCE($3, model_year),
+                         color = COALESCE($4, color),
+                         vehicle_type = COALESCE($5, vehicle_type),
+                         soat_expiry = COALESCE($6, soat_expiry),
+                         techno_expiry = COALESCE($7, techno_expiry),
+                         soat_pdf = COALESCE($8, soat_pdf),
+                         techno_pdf = COALESCE($9, techno_pdf),
+                         status_id = 'EST-01',
+                         updated_by = $10,
+                         updated_at = NOW()
+                         WHERE plate = $11`,
+                        [
+                            datos.marca || null,
+                            datos.propietario || sol.nombre_entidad || null,
+                            datos.modelo || datos.año || null,
+                            datos.color || null,
+                            datos.tipo_vehiculo || datos.clase_vehiculo || 'Camión',
+                            soatExpiry,
+                            technoExpiry,
+                            soatPdf,
+                            technoPdf,
+                            user.name || 'Admin',
+                            plate
+                        ]
+                    );
+                } else {
+                    const vehId = `VEH-${plate}`;
+                    await client.query(
+                        `INSERT INTO vehicles
+                         (id, plate, brand, owner, model_year, color, vehicle_type, soat_expiry, techno_expiry, soat_pdf, techno_pdf, status_id, created_by, updated_by)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'EST-01', $12, $12)`,
+                        [
+                            vehId,
+                            plate,
+                            datos.marca || 'Genérica',
+                            datos.propietario || sol.nombre_entidad || 'Milla 7 S.A.S.',
+                            datos.modelo || datos.año || new Date().getFullYear().toString(),
+                            datos.color || 'Blanco',
+                            datos.tipo_vehiculo || 'Camión',
+                            soatExpiry || new Date(),
+                            technoExpiry || new Date(),
+                            soatPdf,
+                            technoPdf,
+                            user.name || 'Admin'
+                        ]
+                    );
+                }
             } else {
-                const vehId = `VEH-${plate}`;
-                await pool.query(
-                    `INSERT INTO vehicles
-                     (id, plate, brand, owner, model_year, color, vehicle_type, soat_expiry, techno_expiry, soat_pdf, techno_pdf, status_id, created_by, updated_by)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'EST-01', $12, $12)`,
-                    [
-                        vehId,
-                        plate,
-                        datos.marca || 'Genérica',
-                        datos.propietario || sol.nombre_entidad || 'Milla 7 S.A.S.',
-                        datos.modelo || datos.año || new Date().getFullYear().toString(),
-                        datos.color || 'Blanco',
-                        datos.tipo_vehiculo || 'Camión',
-                        soatExpiry || new Date(),
-                        technoExpiry || new Date(),
-                        soatPdf,
-                        technoPdf,
-                        user.name || 'Admin'
-                    ]
-                );
+                // Tercero: Conductor / Propietario / Tenedor
+                const docNum = (sol.entidad_id || datos.cedula || datos.documento_numero || datos.numero_documento || '').trim();
+                const fullName = (sol.nombre_entidad || datos.nombre_completo || `${datos.nombres || ''} ${datos.apellidos || ''}`).trim();
+                const phone = (datos.celular || datos.telefono || '').trim();
+                const email = (datos.correo || datos.email || '').trim();
+
+                const licDoc = docs.find((d: any) => /licencia|pase/i.test(d.nombre_doc) || /licencia/i.test(d.nombre_archivo));
+                const licExpiry = licDoc?.fecha_vencimiento || datos.licencia_vencimiento || null;
+                const licPdf = licDoc?.drive_link || null;
+
+                // 1. Sincronizar en drivers
+                const existingDriver = await client.query('SELECT id FROM drivers WHERE document_number=$1', [docNum]);
+                if (existingDriver.rows.length > 0) {
+                    await client.query(
+                        `UPDATE drivers SET
+                         name = COALESCE($1, name),
+                         phone = COALESCE($2, phone),
+                         license_expiry = COALESCE($3, license_expiry),
+                         license_pdf = COALESCE($4, license_pdf),
+                         status_id = 'EST-01',
+                         updated_by = $5,
+                         updated_at = NOW()
+                         WHERE document_number = $6`,
+                        [fullName, phone, licExpiry, licPdf, user.name || 'Admin', docNum]
+                    );
+                } else {
+                    const drvId = `DRV-${docNum || Date.now()}`;
+                    await client.query(
+                        `INSERT INTO drivers
+                         (id, name, document_type, document_number, phone, license_expiry, license_pdf, status_id, created_by, updated_by)
+                         VALUES ($1, $2, 'CC', $3, $4, $5, $6, 'EST-01', $7, $7)`,
+                        [drvId, fullName, docNum, phone, licExpiry || new Date(), licPdf, user.name || 'Admin']
+                    );
+                }
+
+                // 2. Sincronizar en gh_personal
+                if (docNum && fullName) {
+                    await client.query(
+                        `INSERT INTO gh_personal
+                         (nombre, cedula, cargo, eps, afp, celular_personal, correo_personal, estado)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, 'ACTIVO')
+                         ON CONFLICT (cedula) DO UPDATE SET
+                         nombre = EXCLUDED.nombre,
+                         cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
+                         eps = COALESCE(EXCLUDED.eps, gh_personal.eps),
+                         afp = COALESCE(EXCLUDED.afp, gh_personal.afp),
+                         celular_personal = COALESCE(EXCLUDED.celular_personal, gh_personal.celular_personal),
+                         correo_personal = COALESCE(EXCLUDED.correo_personal, gh_personal.correo_personal),
+                         estado = 'ACTIVO'`,
+                        [
+                            fullName,
+                            docNum,
+                            datos.cargo || 'Conductor',
+                            datos.eps || null,
+                            datos.afp || null,
+                            phone || null,
+                            email || null
+                        ]
+                    );
+                }
             }
-        } else {
-            // Tercero: Conductor / Propietario / Tenedor
-            const docNum = (sol.entidad_id || datos.cedula || datos.documento_numero || datos.numero_documento || '').trim();
-            const fullName = (sol.nombre_entidad || datos.nombre_completo || `${datos.nombres || ''} ${datos.apellidos || ''}`).trim();
-            const phone = (datos.celular || datos.telefono || '').trim();
-            const email = (datos.correo || datos.email || '').trim();
 
-            const licDoc = docs.find((d: any) => /licencia|pase/i.test(d.nombre_doc) || /licencia/i.test(d.nombre_archivo));
-            const licExpiry = licDoc?.fecha_vencimiento || datos.licencia_vencimiento || null;
-            const licPdf = licDoc?.drive_link || null;
-
-            // 1. Sincronizar en drivers
-            const existingDriver = await pool.query('SELECT id FROM drivers WHERE document_number=$1', [docNum]);
-            if (existingDriver.rows.length > 0) {
-                await pool.query(
-                    `UPDATE drivers SET
-                     name = COALESCE($1, name),
-                     phone = COALESCE($2, phone),
-                     license_expiry = COALESCE($3, license_expiry),
-                     license_pdf = COALESCE($4, license_pdf),
-                     status_id = 'EST-01',
-                     updated_by = $5,
-                     updated_at = NOW()
-                     WHERE document_number = $6`,
-                    [fullName, phone, licExpiry, licPdf, user.name || 'Admin', docNum]
-                );
-            } else {
-                const drvId = `DRV-${docNum || Date.now()}`;
-                await pool.query(
-                    `INSERT INTO drivers
-                     (id, name, document_type, document_number, phone, license_expiry, license_pdf, status_id, created_by, updated_by)
-                     VALUES ($1, $2, 'CC', $3, $4, $5, $6, 'EST-01', $7, $7)`,
-                    [drvId, fullName, docNum, phone, licExpiry || new Date(), licPdf, user.name || 'Admin']
-                );
-            }
-
-            // 2. Sincronizar en gh_personal
-            if (docNum && fullName) {
-                await pool.query(
-                    `INSERT INTO gh_personal
-                     (nombre, cedula, cargo, eps, afp, celular_personal, correo_personal, estado)
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, 'ACTIVO')
-                     ON CONFLICT (cedula) DO UPDATE SET
-                     nombre = EXCLUDED.nombre,
-                     cargo = COALESCE(EXCLUDED.cargo, gh_personal.cargo),
-                     eps = COALESCE(EXCLUDED.eps, gh_personal.eps),
-                     afp = COALESCE(EXCLUDED.afp, gh_personal.afp),
-                     celular_personal = COALESCE(EXCLUDED.celular_personal, gh_personal.celular_personal),
-                     correo_personal = COALESCE(EXCLUDED.correo_personal, gh_personal.correo_personal),
-                     estado = 'ACTIVO'`,
-                    [
-                        fullName,
-                        docNum,
-                        datos.cargo || 'Conductor',
-                        datos.eps || null,
-                        datos.afp || null,
-                        phone || null,
-                        email || null
-                    ]
-                );
-            }
-        }
-
-        // Marcar solicitud como sincronizada
-        await pool.query(
-            `UPDATE hv_solicitudes SET
-             sincronizado_flota = TRUE,
-             sincronizado_flota_at = NOW(),
-             sincronizado_por = $1,
-             updated_at = NOW()
-             WHERE id = $2`,
-            [user.name || 'Admin', id]
-        );
+            // Marcar solicitud como sincronizada
+            await client.query(
+                `UPDATE hv_solicitudes SET
+                 sincronizado_flota = TRUE,
+                 sincronizado_flota_at = NOW(),
+                 sincronizado_por = $1,
+                 updated_at = NOW()
+                 WHERE id = $2`,
+                [user.name || 'Admin', id]
+            );
+        });
 
         await registrarAuditoria(id, 'sync_flota', 'solicitud', id, user.id, user.name, getIp(req),
             null, { sincronizado_flota: true, tipo: sol.tipo_entidad });

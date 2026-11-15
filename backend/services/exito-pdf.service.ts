@@ -66,94 +66,62 @@ export class ExitoPdfService {
    * cuando se solicita por la API de Grupo Éxito o para imprimir/visualizar en el Frontend,
    * SIN almacenar archivos PDF de rótulos en Google Drive ni en el disco local.
    */
-  static async generateGuideLabelOnDemand(guia: {
-    numero_guia: string;
-    codigo_remision: string;
-    numero_pedido: string;
-    contenedor?: string | null;
-    modalidad_pedido?: string;
-    tipo_operacion: 'SAME_DAY' | 'NEXT_DAY';
-    codigo_dependencia?: string | null;
-    nombre_remitente?: string | null;
-    direccion_remitente?: string | null;
-    ciudad_remitente_nombre?: string | null;
-    nombre_destinatario: string;
-    nit_destinatario?: string | null;
-    direccion_destinatario: string;
-    barrio_destinatario?: string | null;
-    ciudad_destinatario_nombre?: string | null;
-    telefono_destinatario?: string | null;
-    celular_destinatario?: string | null;
-    cant_cajas?: number;
-    peso_kg?: number;
-    alto_cm?: number;
-    ancho_cm?: number;
-    largo_cm?: number;
-    contenido?: string | null;
-    observaciones?: string | null;
-    created_at?: string | Date | null;
-    is_sandbox?: boolean;
-  }): Promise<{
+  static async generateGuideLabelOnDemand(
+    guia: {
+      numero_guia: string;
+      codigo_remision: string;
+      numero_pedido: string;
+      contenedor?: string | null;
+      modalidad_pedido?: string;
+      tipo_operacion: 'SAME_DAY' | 'NEXT_DAY';
+      codigo_dependencia?: string | null;
+      nombre_remitente?: string | null;
+      direccion_remitente?: string | null;
+      ciudad_remitente_nombre?: string | null;
+      nombre_destinatario: string;
+      nit_destinatario?: string | null;
+      direccion_destinatario: string;
+      barrio_destinatario?: string | null;
+      ciudad_destinatario_nombre?: string | null;
+      telefono_destinatario?: string | null;
+      celular_destinatario?: string | null;
+      cant_cajas?: number;
+      peso_kg?: number;
+      alto_cm?: number;
+      ancho_cm?: number;
+      largo_cm?: number;
+      contenido?: string | null;
+      observaciones?: string | null;
+      created_at?: string | Date | null;
+      is_sandbox?: boolean;
+    },
+    paquetes?: Array<{
+      numero_paquete: number;
+      codigo_barra_paquete?: string;
+      descripcion?: string;
+      peso_kg?: number;
+      alto_cm?: number;
+      ancho_cm?: number;
+      largo_cm?: number;
+    }>
+  ): Promise<{
     pdfBuffer: Buffer;
     pdfBase64: string;
     dynamicLabelUrl: string;
   }> {
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([288, 432]); // 4x6 pulgadas
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const fontReg = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
     const black = rgb(0, 0, 0);
 
-    // Marco exterior en blanco y negro puro (0 relleno de color para ahorro total de tinta)
-    page.drawRectangle({
-      x: 8,
-      y: 8,
-      width: 272,
-      height: 416,
-      borderColor: black,
-      borderWidth: 1.5,
-    });
+    // Determinar total de cajas a rotular (1 etiqueta por cada caja)
+    const totalCajas = Math.max(
+      1,
+      parseInt(String(guia.cant_cajas || '1'), 10) || (paquetes && paquetes.length > 0 ? paquetes.length : 1)
+    );
 
-    // Encabezado en blanco y negro (sin fondo sólido de color y sin mención a Go Éxito)
-    page.drawLine({
-      start: { x: 8, y: 382 },
-      end: { x: 280, y: 382 },
-      thickness: 1.5,
-      color: black,
-    });
-
-    page.drawText('MILLA 7 LOGISTICS', {
-      x: 16,
-      y: 406,
-      size: 11.5,
-      font: fontBold,
-      color: black,
-    });
-
-    const opText =
-      guia.tipo_operacion === 'SAME_DAY'
-        ? 'ENTREGA MISMO DIA (SAME DAY) - URBANO'
-        : 'ENTREGA DIA SIGUIENTE (NEXT DAY) - URBANO';
-    page.drawText(opText, {
-      x: 16,
-      y: 390,
-      size: 8,
-      font: fontBold,
-      color: black,
-    });
-
-    if (guia.is_sandbox) {
-      page.drawText('[PRUEBA QA]', {
-        x: 210,
-        y: 406,
-        size: 8,
-        font: fontBold,
-        color: black,
-      });
-    }
-
-    // Código QR con el número de guía limpio para lectura directa con celular o lector 2D
+    // Código QR con el número de guía limpio para lectura directa con celular o lector 2D (embebido una sola vez)
     const qrPayload = cleanPdfText(guia.numero_guia);
     const qrDataUrl = await QRCode.toDataURL(qrPayload, {
       errorCorrectionLevel: 'M',
@@ -163,226 +131,338 @@ export class ExitoPdfService {
     const qrPngBytes = Buffer.from(qrDataUrl.split(',')[1], 'base64');
     const qrImage = await pdfDoc.embedPng(qrPngBytes);
 
-    page.drawImage(qrImage, {
-      x: 196,
-      y: 298,
-      width: 76,
-      height: 76,
-    });
-
-    // Datos principales de Guía y Pedido
-    page.drawText('GUIA DE TRANSPORTE MILLA 7:', {
-      x: 16,
-      y: 366,
-      size: 7.5,
-      font: fontBold,
-      color: black,
-    });
-    page.drawText(cleanPdfText(guia.numero_guia), {
-      x: 16,
-      y: 350,
-      size: 14.5,
-      font: fontBold,
-      color: black,
-    });
-
-    page.drawText(`PEDIDO: ${cleanPdfText(guia.numero_pedido)}`, {
-      x: 16,
-      y: 334,
-      size: 9,
-      font: fontBold,
-      color: black,
-    });
-
-    page.drawText(`CONTENEDOR: ${cleanPdfText(guia.contenedor || 'N/A')}`, {
-      x: 16,
-      y: 321,
-      size: 8,
-      font: fontReg,
-      color: black,
-    });
-
-    page.drawText(
-      `MODALIDAD: ${cleanPdfText(guia.modalidad_pedido || 'FIRME')}  |  REM: ${cleanPdfText(guia.codigo_remision)}`,
-      {
-        x: 16,
-        y: 308,
-        size: 7.5,
-        font: fontReg,
-        color: black,
-      }
-    );
-
-    // Línea divisoria
-    page.drawLine({
-      start: { x: 8, y: 292 },
-      end: { x: 280, y: 292 },
-      thickness: 1,
-      color: black,
-    });
-
-    // Sección Nodo Origen
-    page.drawText('ORIGEN (NODO REMITENTE - MISMA CIUDAD):', {
-      x: 16,
-      y: 278,
-      size: 7.5,
-      font: fontBold,
-      color: black,
-    });
-    page.drawText(
-      cleanPdfText(`NODO ${guia.codigo_dependencia || '0054'} - ${guia.nombre_remitente || 'CENTRO DE DESPACHO'}`).slice(0, 46),
-      {
-        x: 16,
-        y: 266,
-        size: 8.5,
-        font: fontBold,
-        color: black,
-      }
-    );
-    page.drawText(
-      cleanPdfText(`${guia.direccion_remitente || ''} (${guia.ciudad_remitente_nombre || 'LOCAL'})`).slice(0, 52),
-      {
-        x: 16,
-        y: 254,
-        size: 7.5,
-        font: fontReg,
-        color: black,
-      }
-    );
-
-    // Recuadro Destinatario en Blanco y Negro (Sin fondo de color, solo borde negro nítido)
-    page.drawRectangle({
-      x: 12,
-      y: 138,
-      width: 264,
-      height: 104,
-      borderColor: black,
-      borderWidth: 1.2,
-    });
-
-    page.drawText('ENTREGAR A (DESTINATARIO):', {
-      x: 18,
-      y: 228,
-      size: 8,
-      font: fontBold,
-      color: black,
-    });
-
-    page.drawText(cleanPdfText(guia.nombre_destinatario).slice(0, 36), {
-      x: 18,
-      y: 211,
-      size: 11.5,
-      font: fontBold,
-      color: black,
-    });
-
-    page.drawText(`DIRECCION: ${cleanPdfText(guia.direccion_destinatario).slice(0, 38)}`, {
-      x: 18,
-      y: 193,
-      size: 9.5,
-      font: fontBold,
-      color: black,
-    });
-
-    page.drawText(
-      `BARRIO: ${cleanPdfText(guia.barrio_destinatario || 'URBANO').slice(0, 22)} | CIUDAD: ${cleanPdfText(guia.ciudad_destinatario_nombre || 'LOCAL').slice(0, 15)}`,
-      {
-        x: 18,
-        y: 177,
-        size: 8.5,
-        font: fontBold,
-        color: black,
-      }
-    );
-
-    const tel = cleanPdfText(guia.celular_destinatario || guia.telefono_destinatario || 'SIN TELEFONO');
-    page.drawText(`TEL / CELULAR: ${tel}   |   DOC: ${cleanPdfText(guia.nit_destinatario || 'N/A')}`, {
-      x: 18,
-      y: 161,
-      size: 8.5,
-      font: fontBold,
-      color: black,
-    });
-
-    page.drawText(
-      `CAJAS: ${guia.cant_cajas || 1}   |   PESO: ${guia.peso_kg || 1} KG   |   DIM: ${guia.alto_cm || 0}x${guia.ancho_cm || 0}x${guia.largo_cm || 0} cm`,
-      {
-        x: 18,
-        y: 145,
-        size: 7.5,
-        font: fontReg,
-        color: black,
-      }
-    );
-
-    // Contenido y Observaciones
-    page.drawText(`CONTENIDO: ${cleanPdfText(guia.contenido || 'MERCANCIA GENERAL').slice(0, 48)}`, {
-      x: 16,
-      y: 122,
-      size: 7.5,
-      font: fontReg,
-      color: black,
-    });
-
-    if (guia.observaciones) {
-      page.drawText(`OBS: ${cleanPdfText(guia.observaciones).slice(0, 52)}`, {
-        x: 16,
-        y: 109,
-        size: 7,
-        font: fontReg,
-        color: black,
-      });
-    }
-
-    // Código de barras estándar ISO/IEC 15417 CODE-128B real (100% escaneable por cualquier pistola láser o celular)
+    // Código de barras estándar ISO/IEC 15417 CODE-128B real
     const code128Pattern = buildCode128BPattern(guia.numero_guia);
     let totalModules = 0;
     for (let i = 0; i < code128Pattern.length; i++) {
       totalModules += Number(code128Pattern[i]);
     }
-    // Dejar zona silenciosa (Quiet Zone) amplia a ambos lados para lectura óptica inmediata
     const maxBarcodeWidth = 236;
     const moduleWidth = Math.min(1.45, maxBarcodeWidth / Math.max(1, totalModules));
     const actualBarcodeWidth = totalModules * moduleWidth;
-    let cursorX = (288 - actualBarcodeWidth) / 2;
-
-    for (let i = 0; i < code128Pattern.length; i++) {
-      const modCount = Number(code128Pattern[i]);
-      const elemWidth = modCount * moduleWidth;
-      if (i % 2 === 0) {
-        // Índices pares son barras negras sólidas; impares son espacios blancos
-        page.drawRectangle({
-          x: cursorX,
-          y: 42,
-          width: elemWidth,
-          height: 52,
-          color: black,
-        });
-      }
-      cursorX += elemWidth;
-    }
-
-    const guiaLabelText = cleanPdfText(guia.numero_guia);
-    const guiaLabelWidth = fontBold.widthOfTextAtSize(guiaLabelText, 10.5);
-    page.drawText(guiaLabelText, {
-      x: Math.max(16, (288 - guiaLabelWidth) / 2),
-      y: 27,
-      size: 10.5,
-      font: fontBold,
-      color: black,
-    });
+    const cursorXStart = (288 - actualBarcodeWidth) / 2;
 
     const fechaCreacionCol = guia.created_at
       ? nowColombiaDateTimeStr(new Date(guia.created_at))
       : nowColombiaDateTimeStr();
 
-    page.drawText(`Fecha Guia (COL): ${fechaCreacionCol} — MILLA 7 LOGISTICS`, {
-      x: 16,
-      y: 13,
-      size: 6.5,
-      font: fontReg,
-      color: black,
-    });
+    // Generar 1 página de etiqueta térmica por cada caja (Caja 1 de X, Caja 2 de X, ...)
+    for (let boxIndex = 0; boxIndex < totalCajas; boxIndex++) {
+      const boxNum = boxIndex + 1;
+      const pkg = paquetes && paquetes[boxIndex] ? paquetes[boxIndex] : null;
+      const page = pdfDoc.addPage([288, 432]); // 4x6 pulgadas estándar
+
+      // Marco exterior en blanco y negro puro (0 relleno de color para ahorro total de tinta)
+      page.drawRectangle({
+        x: 8,
+        y: 8,
+        width: 272,
+        height: 416,
+        borderColor: black,
+        borderWidth: 1.5,
+      });
+
+      // Encabezado en blanco y negro
+      page.drawLine({
+        start: { x: 8, y: 382 },
+        end: { x: 280, y: 382 },
+        thickness: 1.5,
+        color: black,
+      });
+
+      page.drawText('MILLA 7 LOGISTICS', {
+        x: 16,
+        y: 406,
+        size: 11.5,
+        font: fontBold,
+        color: black,
+      });
+
+      const opText =
+        guia.tipo_operacion === 'SAME_DAY'
+          ? 'ENTREGA MISMO DIA (SAME DAY) - URBANO'
+          : 'ENTREGA DIA SIGUIENTE (NEXT DAY) - URBANO';
+      page.drawText(opText, {
+        x: 16,
+        y: 390,
+        size: 8,
+        font: fontBold,
+        color: black,
+      });
+
+      // Distintivo de Caja (Caja X de Y) y [PRUEBA QA]
+      if (totalCajas > 1) {
+        const boxBadgeText = `CAJA ${boxNum} DE ${totalCajas}`;
+        const badgeWidth = fontBold.widthOfTextAtSize(boxBadgeText, 9) + 10;
+        const badgeX = 274 - badgeWidth;
+        page.drawRectangle({
+          x: badgeX,
+          y: 396,
+          width: badgeWidth,
+          height: 18,
+          borderColor: black,
+          borderWidth: 1.2,
+        });
+        page.drawText(boxBadgeText, {
+          x: badgeX + 5,
+          y: 402,
+          size: 9,
+          font: fontBold,
+          color: black,
+        });
+
+        if (guia.is_sandbox) {
+          page.drawText('[QA]', {
+            x: badgeX - 28,
+            y: 402,
+            size: 7.5,
+            font: fontBold,
+            color: black,
+          });
+        }
+      } else {
+        if (guia.is_sandbox) {
+          page.drawText('[PRUEBA QA]', {
+            x: 210,
+            y: 406,
+            size: 8,
+            font: fontBold,
+            color: black,
+          });
+        }
+      }
+
+      // Dibujar Imagen QR
+      page.drawImage(qrImage, {
+        x: 196,
+        y: 298,
+        width: 76,
+        height: 76,
+      });
+
+      // Datos principales de Guía y Pedido
+      page.drawText('GUIA DE TRANSPORTE MILLA 7:', {
+        x: 16,
+        y: 366,
+        size: 7.5,
+        font: fontBold,
+        color: black,
+      });
+      page.drawText(cleanPdfText(guia.numero_guia), {
+        x: 16,
+        y: 350,
+        size: 14.5,
+        font: fontBold,
+        color: black,
+      });
+
+      page.drawText(`PEDIDO: ${cleanPdfText(guia.numero_pedido)}`, {
+        x: 16,
+        y: 334,
+        size: 9,
+        font: fontBold,
+        color: black,
+      });
+
+      page.drawText(`CONTENEDOR: ${cleanPdfText(guia.contenedor || 'N/A')}`, {
+        x: 16,
+        y: 321,
+        size: 8,
+        font: fontReg,
+        color: black,
+      });
+
+      page.drawText(
+        `MODALIDAD: ${cleanPdfText(guia.modalidad_pedido || 'FIRME')}  |  REM: ${cleanPdfText(guia.codigo_remision)}`,
+        {
+          x: 16,
+          y: 308,
+          size: 7.5,
+          font: fontReg,
+          color: black,
+        }
+      );
+
+      // Línea divisoria
+      page.drawLine({
+        start: { x: 8, y: 292 },
+        end: { x: 280, y: 292 },
+        thickness: 1,
+        color: black,
+      });
+
+      // Sección Nodo Origen
+      page.drawText('ORIGEN (NODO REMITENTE - MISMA CIUDAD):', {
+        x: 16,
+        y: 278,
+        size: 7.5,
+        font: fontBold,
+        color: black,
+      });
+      page.drawText(
+        cleanPdfText(`NODO ${guia.codigo_dependencia || '0054'} - ${guia.nombre_remitente || 'CENTRO DE DESPACHO'}`).slice(0, 46),
+        {
+          x: 16,
+          y: 266,
+          size: 8.5,
+          font: fontBold,
+          color: black,
+        }
+      );
+      page.drawText(
+        cleanPdfText(`${guia.direccion_remitente || ''} (${guia.ciudad_remitente_nombre || 'LOCAL'})`).slice(0, 52),
+        {
+          x: 16,
+          y: 254,
+          size: 7.5,
+          font: fontReg,
+          color: black,
+        }
+      );
+
+      // Recuadro Destinatario en Blanco y Negro
+      page.drawRectangle({
+        x: 12,
+        y: 138,
+        width: 264,
+        height: 104,
+        borderColor: black,
+        borderWidth: 1.2,
+      });
+
+      page.drawText('ENTREGAR A (DESTINATARIO):', {
+        x: 18,
+        y: 228,
+        size: 8,
+        font: fontBold,
+        color: black,
+      });
+
+      page.drawText(cleanPdfText(guia.nombre_destinatario).slice(0, 36), {
+        x: 18,
+        y: 211,
+        size: 11.5,
+        font: fontBold,
+        color: black,
+      });
+
+      page.drawText(`DIRECCION: ${cleanPdfText(guia.direccion_destinatario).slice(0, 38)}`, {
+        x: 18,
+        y: 193,
+        size: 9.5,
+        font: fontBold,
+        color: black,
+      });
+
+      page.drawText(
+        `BARRIO: ${cleanPdfText(guia.barrio_destinatario || 'URBANO').slice(0, 22)} | CIUDAD: ${cleanPdfText(guia.ciudad_destinatario_nombre || 'LOCAL').slice(0, 15)}`,
+        {
+          x: 18,
+          y: 177,
+          size: 8.5,
+          font: fontBold,
+          color: black,
+        }
+      );
+
+      const tel = cleanPdfText(guia.celular_destinatario || guia.telefono_destinatario || 'SIN TELEFONO');
+      page.drawText(`TEL / CELULAR: ${tel}   |   DOC: ${cleanPdfText(guia.nit_destinatario || 'N/A')}`, {
+        x: 18,
+        y: 161,
+        size: 8.5,
+        font: fontBold,
+        color: black,
+      });
+
+      // Cálculo dinámico de peso y dimensiones por paquete/caja
+      const pkgPeso = pkg?.peso_kg != null
+        ? Number(pkg.peso_kg).toFixed(3)
+        : guia.peso_kg != null
+          ? totalCajas > 1
+            ? (Number(guia.peso_kg) / totalCajas).toFixed(3)
+            : Number(guia.peso_kg).toFixed(3)
+          : '1.000';
+      const pkgAlto = pkg?.alto_cm != null ? Number(pkg.alto_cm).toFixed(2) : guia.alto_cm != null ? Number(guia.alto_cm).toFixed(2) : '0';
+      const pkgAncho = pkg?.ancho_cm != null ? Number(pkg.ancho_cm).toFixed(2) : guia.ancho_cm != null ? Number(guia.ancho_cm).toFixed(2) : '0';
+      const pkgLargo = pkg?.largo_cm != null ? Number(pkg.largo_cm).toFixed(2) : guia.largo_cm != null ? Number(guia.largo_cm).toFixed(2) : '0';
+
+      const cajaIndicador = totalCajas > 1
+        ? `CAJA ${boxNum} DE ${totalCajas}`
+        : `CAJAS: 1`;
+
+      page.drawText(
+        `${cajaIndicador}   |   PESO: ${pkgPeso} KG   |   DIM: ${pkgAlto}x${pkgAncho}x${pkgLargo} cm`,
+        {
+          x: 18,
+          y: 145,
+          size: 7.5,
+          font: fontBold,
+          color: black,
+        }
+      );
+
+      // Contenido y Observaciones
+      page.drawText(`CONTENIDO: ${cleanPdfText(guia.contenido || 'MERCANCIA GENERAL').slice(0, 48)}`, {
+        x: 16,
+        y: 122,
+        size: 7.5,
+        font: fontReg,
+        color: black,
+      });
+
+      if (guia.observaciones) {
+        page.drawText(`OBS: ${cleanPdfText(guia.observaciones).slice(0, 52)}`, {
+          x: 16,
+          y: 109,
+          size: 7,
+          font: fontReg,
+          color: black,
+        });
+      }
+
+      // Dibujar Código de Barras CODE-128B
+      let cursorX = cursorXStart;
+      for (let j = 0; j < code128Pattern.length; j++) {
+        const modCount = Number(code128Pattern[j]);
+        const elemWidth = modCount * moduleWidth;
+        if (j % 2 === 0) {
+          page.drawRectangle({
+            x: cursorX,
+            y: 42,
+            width: elemWidth,
+            height: 52,
+            color: black,
+          });
+        }
+        cursorX += elemWidth;
+      }
+
+      // Texto bajo código de barras indicando caja
+      const textUnderBarcode = totalCajas > 1
+        ? `${cleanPdfText(guia.numero_guia)} (CAJA ${boxNum} DE ${totalCajas})`
+        : cleanPdfText(guia.numero_guia);
+      const barcodeLabelWidth = fontBold.widthOfTextAtSize(textUnderBarcode, 9.8);
+      page.drawText(textUnderBarcode, {
+        x: Math.max(12, (288 - barcodeLabelWidth) / 2),
+        y: 27,
+        size: 9.8,
+        font: fontBold,
+        color: black,
+      });
+
+      // Pie de página
+      const footerStr = totalCajas > 1
+        ? `Fecha Guia (COL): ${fechaCreacionCol} — CAJA ${boxNum} DE ${totalCajas} — MILLA 7 LOGISTICS`
+        : `Fecha Guia (COL): ${fechaCreacionCol} — MILLA 7 LOGISTICS`;
+      const footerWidth = fontReg.widthOfTextAtSize(footerStr, 6.2);
+      page.drawText(footerStr, {
+        x: Math.max(10, (288 - footerWidth) / 2),
+        y: 13,
+        size: 6.2,
+        font: fontReg,
+        color: black,
+      });
+    }
 
     const pdfBytes = await pdfDoc.save();
     const pdfBuffer = Buffer.from(pdfBytes);

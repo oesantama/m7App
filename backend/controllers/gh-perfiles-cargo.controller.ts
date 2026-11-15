@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import pool from '../config/database.js';
+import pool, { withTransaction } from '../config/database.js';
 import { parseWorkbook } from '../services/gh-perfiles-cargo-parser.service.js';
 import { generatePerfilCargoPdf, generatePerfilCargoFirmadoPdf } from '../services/gh-perfiles-cargo-pdf.service.js';
 import { uploadDocument, uploadPerfilCargoDocument, deleteFileFromStorage } from '../services/hv-drive.service.js';
@@ -102,13 +102,6 @@ export const mapearCargo = async (req: AuthRequest, res: Response) => {
         if (cargoRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Cargo no encontrado' });
         const cargoNombre = cargoRes.rows[0].nombre;
 
-        const perfilRes = await pool.query(
-            `UPDATE gh_perfiles_cargo SET cargo_id = $1, cargo_nombre = $2 WHERE id = $3 RETURNING *`,
-            [cargo_id, cargoNombre, id]
-        );
-        if (perfilRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Perfil no encontrado' });
-        const perfil = perfilRes.rows[0];
-
         // Búsqueda robusta de personal activo con normalización de acentos/tildes en PostgreSQL
         const personal = await pool.query(
             `SELECT id, nombre, cedula 
@@ -127,31 +120,44 @@ export const mapearCargo = async (req: AuthRequest, res: Response) => {
 
         const matchingIds = personal.rows.map(p => p.id);
 
-        // Limpiar pendientes antiguos de personas que ya no pertenecen al cargo mapeado
-        if (matchingIds.length > 0) {
-            await pool.query(
-                `DELETE FROM gh_perfiles_cargo_firmas 
-                 WHERE perfil_id = $1 AND estado = 'pendiente' AND personal_id NOT IN (SELECT unnest($2::int[]))`,
-                [perfil.id, matchingIds]
+        const { perfil, generados } = await withTransaction(async (client) => {
+            const perfilRes = await client.query(
+                `UPDATE gh_perfiles_cargo SET cargo_id = $1, cargo_nombre = $2 WHERE id = $3 RETURNING *`,
+                [cargo_id, cargoNombre, id]
             );
-        } else {
-            await pool.query(
-                `DELETE FROM gh_perfiles_cargo_firmas 
-                 WHERE perfil_id = $1 AND estado = 'pendiente'`,
-                [perfil.id]
-            );
-        }
+            if (perfilRes.rows.length === 0) {
+                throw new Error('Perfil no encontrado');
+            }
+            const perfilRecord = perfilRes.rows[0];
 
-        let generados = 0;
-        for (const persona of personal.rows) {
-            const r = await pool.query(
-                `INSERT INTO gh_perfiles_cargo_firmas (perfil_id, perfil_version, personal_id, cedula, nombre, estado)
-                 VALUES ($1, $2, $3, $4, $5, 'pendiente')
-                 ON CONFLICT (perfil_id, personal_id) DO NOTHING RETURNING id`,
-                [perfil.id, perfil.version, persona.id, persona.cedula, persona.nombre]
-            );
-            if (r.rows.length > 0) generados++;
-        }
+            // Limpiar pendientes antiguos de personas que ya no pertenecen al cargo mapeado
+            if (matchingIds.length > 0) {
+                await client.query(
+                    `DELETE FROM gh_perfiles_cargo_firmas 
+                     WHERE perfil_id = $1 AND estado = 'pendiente' AND personal_id NOT IN (SELECT unnest($2::int[]))`,
+                    [perfilRecord.id, matchingIds]
+                );
+            } else {
+                await client.query(
+                    `DELETE FROM gh_perfiles_cargo_firmas 
+                     WHERE perfil_id = $1 AND estado = 'pendiente'`,
+                    [perfilRecord.id]
+                );
+            }
+
+            let genCount = 0;
+            for (const persona of personal.rows) {
+                const r = await client.query(
+                    `INSERT INTO gh_perfiles_cargo_firmas (perfil_id, perfil_version, personal_id, cedula, nombre, estado)
+                     VALUES ($1, $2, $3, $4, $5, 'pendiente')
+                     ON CONFLICT (perfil_id, personal_id) DO NOTHING RETURNING id`,
+                    [perfilRecord.id, perfilRecord.version, persona.id, persona.cedula, persona.nombre]
+                );
+                if (r.rows.length > 0) genCount++;
+            }
+
+            return { perfil: perfilRecord, generados: genCount };
+        });
 
         res.json({ success: true, data: { perfil, pendientes_generados: generados, personal_coincidente: personal.rows.length } });
     } catch (error: any) {
