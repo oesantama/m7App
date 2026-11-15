@@ -9,6 +9,7 @@ registerSW({ immediate: true });
 // @ts-ignore
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
+import MaintenanceGate from './components/MaintenanceGate';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) throw new Error("Could not find root element to mount to");
@@ -18,9 +19,11 @@ const root = ReactDOM.createRoot(rootElement!);
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <MaintenanceGate>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </MaintenanceGate>
     </ErrorBoundary>
   </React.StrictMode>
 );
