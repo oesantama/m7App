@@ -22,3 +22,11 @@ export const marcarAsunto = (asunto: string): string => {
   if (!esPruebas()) return asunto;
   return asunto.startsWith(MARCA_CORREO) ? asunto : MARCA_CORREO + asunto;
 };
+
+/**
+ * Nombre de la instancia de WhatsApp (Evolution) de un usuario.
+ * Pruebas y producción comparten el mismo Evolution: pruebas usa el prefijo "qa_" para que
+ * "Obtener nuevo enlace" en pruebas nunca borre ni use la sesión de producción.
+ */
+export const prefijoInstanciaWA = (): string => (esPruebas() ? 'qa_user_' : 'user_');
+export const instanciaWAUsuario = (userId: string): string => `${prefijoInstanciaWA()}${userId}`;

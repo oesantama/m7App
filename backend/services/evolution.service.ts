@@ -3,7 +3,7 @@ import axios from 'axios';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 import pool from '../config/database.js';
-import { marcarWhatsApp } from '../utils/entorno.util.js';
+import { marcarWhatsApp, instanciaWAUsuario, prefijoInstanciaWA } from '../utils/entorno.util.js';
 
 dotenv.config();
 
@@ -157,8 +157,8 @@ export class EvolutionService {
 
         const p = (async () => {
             console.log(`[EVO] Polling QR for ${sessionName}...`);
-            for (let i = 0; i < 25; i++) {
-                await sleep(2000);
+            for (let i = 0; i < 50; i++) {
+                await sleep(1000);
                 try {
                     const state = await this.checkInstanceState(sessionName);
                     if (!state) {
@@ -250,7 +250,7 @@ export class EvolutionService {
             const found = instances.find(i => {
                 const name: string = i.name || '';
                 const state: string = (i.connectionStatus || i.state || '').toLowerCase();
-                return name.startsWith('user_') && state === 'open';
+                return name.startsWith(prefijoInstanciaWA()) && state === 'open';
             });
             return found?.name ?? null;
         } catch {
@@ -375,7 +375,7 @@ export class EvolutionService {
      */
     async sendMessage(userId: string, number: string, text: string) {
         text = marcarWhatsApp(text)!;
-        const sessionName = `user_${userId}`;
+        const sessionName = instanciaWAUsuario(userId);
         const cleanNumber = number.replace(/\D/g, '');
         const finalNumber = cleanNumber.length === 10 ? '57' + cleanNumber : cleanNumber;
 
@@ -398,7 +398,7 @@ export class EvolutionService {
      */
     async sendMedia(userId: string, number: string, base64: string, fileName: string, caption?: string) {
         caption = marcarWhatsApp(caption || fileName);
-        const sessionName = `user_${userId}`;
+        const sessionName = instanciaWAUsuario(userId);
         const cleanNumber = number.replace(/\D/g, '');
         const finalNumber = cleanNumber.length === 10 ? '57' + cleanNumber : cleanNumber;
 
@@ -430,7 +430,7 @@ export class EvolutionService {
 
     async getContacts(userId: string) {
         try {
-            const sessionName = `user_${userId}`;
+            const sessionName = instanciaWAUsuario(userId);
             const res = await axios.get(`${EVO_URL}/contact/findContacts/${sessionName}`, {
                 headers: this.getHeaders(), timeout: 8000
             });
@@ -444,7 +444,7 @@ export class EvolutionService {
      * Obtiene los chats activos combinando Evolution + logs locales
      */
     async getChats(userId: string) {
-        const sessionName = `user_${userId}`;
+        const sessionName = instanciaWAUsuario(userId);
         try {
             const [chatsRes, contactsRes, logsRes] = await Promise.all([
                 axios.get(`${EVO_URL}/chat/findChats/${sessionName}`, {
@@ -520,7 +520,7 @@ export class EvolutionService {
      * Obtiene mensajes de un chat combinando Evolution + logs
      */
     async getMessages(userId: string, remoteJid: string) {
-        const sessionName = `user_${userId}`;
+        const sessionName = instanciaWAUsuario(userId);
         try {
             const res = await axios.get(
                 `${EVO_URL}/chat/findMessages/${sessionName}?remoteJid=${remoteJid}&count=50`,

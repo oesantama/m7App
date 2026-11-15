@@ -2,6 +2,7 @@
 import { Request, Response } from 'express';
 import { evolutionService } from '../services/evolution.service.js';
 import pool from '../config/database.js';
+import { instanciaWAUsuario } from '../utils/entorno.util.js';
 
 /**
  * Obtiene el estado de conexión de WhatsApp incluyendo QR si está disponible
@@ -12,7 +13,7 @@ export const getStatus = async (req: Request, res: Response) => {
   if (!userId) return res.status(400).json({ error: "Falta userId" });
 
   try {
-    const statusInfo = await evolutionService.getQR(`user_${userId}`);
+    const statusInfo = await evolutionService.getQR(instanciaWAUsuario(userId));
     res.json(statusInfo);
   } catch (err: any) {
     console.error('[M7-WHATSAPP-CTRL] Error obteniendo estado:', err);
@@ -31,7 +32,7 @@ export const reconnect = async (req: Request, res: Response) => {
   if (!userId) return res.status(400).json({ error: "Falta userId" });
 
   try {
-    const statusInfo = await evolutionService.forceNewQR(`user_${userId}`);
+    const statusInfo = await evolutionService.forceNewQR(instanciaWAUsuario(userId));
     res.json({ success: true, ...statusInfo });
   } catch (err: any) {
     console.error('[M7-WHATSAPP-CTRL] Error al iniciar sesión:', err);
@@ -48,7 +49,7 @@ export const disconnect = async (req: Request, res: Response) => {
     if (!userId) return res.status(400).json({ error: "Falta userId" });
 
     try {
-      await evolutionService.logout(`user_${userId}`);
+      await evolutionService.logout(instanciaWAUsuario(userId));
       res.json({ success: true, message: 'Sesión cerrada y desvinculada' });
     } catch (err: any) {
       console.error('[M7-WHATSAPP-CTRL] Error al desconectar:', err);
@@ -172,7 +173,7 @@ export const sendNotification = async (req: Request, res: Response) => {
             return res.status(400).json({ error: "Lista de teléfonos inválida o vacía" });
         }
 
-        console.log(`[M7-NOTIFY] Iniciando envío masivo a ${phones.length} destinatarios desde user_${userId}... media? ${!!media}`);
+        console.log(`[M7-NOTIFY] Iniciando envío masivo a ${phones.length} destinatarios desde ${instanciaWAUsuario(userId)}... media? ${!!media}`);
         
         const results = { sent: 0, failed: 0, details: [] as any[] };
         

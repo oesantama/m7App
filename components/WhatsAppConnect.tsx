@@ -205,7 +205,7 @@ const WhatsAppConnect: React.FC<WhatsAppCenterProps> = ({ user }) => {
         fetchStatus();
         fetchQuickReplies();
         // Polling frecuente mientras conecta o espera escaneo, normal cuando conectado
-        const intervalMs = (status === 'CONNECTING' || status === 'SCAN_QR') ? 4000 : 15000;
+        const intervalMs = (status === 'CONNECTING' || status === 'SCAN_QR') ? 1500 : 15000;
         const interval = setInterval(fetchStatus, intervalMs);
         return () => clearInterval(interval);
     }, [user?.id, status]);
