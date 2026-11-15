@@ -49,9 +49,12 @@ No usa Coolify: son tres `docker compose` detrás de un nginx del host, con cert
   - WhatsApp: `wa.m7apps.com`, `evolution.m7apps.com` → 8081 (HTTPS).
 - Firewall (ufw): solo 22, 80 y 443. Ollama, Redis y las BD **no** están expuestas.
 - Archivos persistentes en el host: `/opt/m7-*/storage/{uploads,docs,keys}`.
-- Respaldo diario: `/opt/m7-respaldo-diario.sh` a las 2:30 a. m. (`/etc/cron.d/m7-respaldo`).
-  Guarda BD prod, BD Evolution y storage en `/var/backups/m7`, con retención de 14 días.
-  **Falta una copia fuera del servidor** (rclone a Drive).
+- Respaldo de producción: `/opt/m7-respaldo-diario.sh` a la **1:00 a. m. y 3:00 p. m.** (hora Colombia;
+  el servidor quedó en `America/Bogota`), definido en `/etc/cron.d/m7-respaldo`.
+  - Guarda BD prod, BD Evolution y storage en `/var/backups/m7` (14 días).
+  - Sube cada respaldo a **Google Drive** `gdrive_cumplidos:m7_backups/contabo/<fecha>` (30 días), con las
+    mismas credenciales que usaba DigitalOcean (`/root/.rclone.env`). Log: `/var/log/m7-respaldo.log`.
+  - Histórico de DigitalOcean (16 respaldos, 9,1 GB) copiado en `/var/backups/m7/historico_digitalocean`.
 - Los scripts de migración se ejecutan con el contenedor explícito, por ejemplo
   `PG_CONTAINER=m7-qa-postgres BACKEND_CONTAINER=m7-qa-backend`: hay varios PostgreSQL y no adivinan.
 
@@ -268,3 +271,16 @@ sigue intacto y en mantenimiento; para volver atrás basta con `MAINTENANCE_MODE
   no están en un volumen en `docker-compose.coolify.yml`: lo generado en ejecución no sobrevive a que
   Coolify recree el contenedor. Conviene montarlos como volumen en Contabo (no verificado en el
   servidor: revisar con `docker inspect` antes de la ventana).
+
+---
+
+## Estado final (15-nov-2026)
+
+- Migración completada: 251 tablas verificadas, 0 filas faltantes. DNS `orbitm7` y `apiapps` → Contabo, HTTPS válido.
+- DigitalOcean quedó en `MAINTENANCE_MODE=true` (en `/data/coolify/applications/j00k…/.env`). **No hacer Redeploy allí.**
+- Ramas: `main` = producción (`/opt/deploy-prod.sh`), `develop` = pruebas (`/opt/deploy-qa.sh`). No hay otras.
+- Antes de cancelar DigitalOcean (recomendado 2–3 días después):
+  1. WhatsApp de producción vinculado con el número de soporte 301 182 5161 y la sesión vieja cerrada en el celular.
+  2. Borrar en DigitalOcean la llave `contabo-m7-migracion` de `/root/.ssh/authorized_keys`.
+  3. Borrar `/root/m7_respaldo_*` en ambos servidores (tienen datos reales).
+  4. Cancelar Coolify y el droplet; revisar que no queden snapshots, volúmenes ni IP reservadas.
