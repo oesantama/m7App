@@ -897,6 +897,7 @@ const App: React.FC = () => {
             </div>
           </div>
         );
+      }
       case 'master':
         return (
           <MasterModule
