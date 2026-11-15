@@ -6,6 +6,7 @@ import { Toaster, toast } from 'sonner';
 import { User, PageModule, MasterCategory, MasterRecord } from '../types';
 import { api } from '../services/api';
 import { hasPermission } from '../utils/permissions';
+import { getVersionInfo } from '../utils/env';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -43,6 +44,7 @@ const Layout: React.FC<LayoutProps> = ({
   const [twoFactorVerifyCode, setTwoFactorVerifyCode] = useState('');
 
   const client = INITIAL_CLIENTS.find(c => c.id === user.clientId);
+  const versionInfo = getVersionInfo();
 
   useEffect(() => {
     setProfileData({ name: user.name, email: user.email, phone: user.phone || '', avatar: user.avatar || AVATAR_GALLERY[0] });
@@ -214,13 +216,24 @@ const Layout: React.FC<LayoutProps> = ({
           </div>
           {!isCollapsed && (
             <div className="flex flex-col">
-              <h1 className="font-black text-lg tracking-tighter text-white">ORBITM7</h1>
               <div className="flex items-center gap-2">
-                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em]">GLOBAL v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.9.56'}-ULTRA-SLIM</span>
+                <h1 className="font-black text-lg tracking-tighter text-white">ORBITM7</h1>
+                <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border ${
+                  versionInfo.env === 'DEVELOP'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm shadow-amber-500/20'
+                    : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                }`}>
+                  {versionInfo.env === 'DEVELOP' ? 'QA • DEVELOP' : 'PROD'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.15em]">
+                  v{versionInfo.version} <span className="text-slate-600 font-mono text-[8px]">({versionInfo.build})</span>
+                </span>
                 <button onClick={() => {
                   if ('caches' in window) caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
                   window.location.reload();
-                }} title="Limpiar caché y recargar" className="text-slate-500 hover:text-emerald-400 transition-colors">
+                }} title="Limpiar caché y recargar versión" className="text-slate-500 hover:text-emerald-400 transition-colors">
                   <Icons.RefreshCw className="w-3 h-3" />
                 </button>
               </div>
@@ -275,8 +288,10 @@ const Layout: React.FC<LayoutProps> = ({
             <button onClick={onLogout} title="Cerrar Sesión" className="p-1.5 text-slate-500 hover:text-rose-500 z-20 relative transition-colors"><Icons.LogOut className="w-4 h-4" /></button>
           </div>
           {!isCollapsed && (
-             <div className="flex items-center justify-center gap-2 opacity-40 hover:opacity-100 transition-opacity">
-               <p className="text-[7px] text-slate-600 font-bold uppercase text-center">Milla 7 • Orbit v{typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.9.56'}-ULTRA-SLIM</p>
+             <div className="flex items-center justify-center gap-2 opacity-50 hover:opacity-100 transition-opacity">
+               <p className="text-[7.5px] text-slate-500 font-bold uppercase text-center">
+                 Milla 7 • Orbit v{versionInfo.version} • <span className={versionInfo.env === 'DEVELOP' ? "text-amber-400 font-black" : "text-emerald-400 font-black"}>{versionInfo.env === 'DEVELOP' ? "QA" : "PROD"}</span> • {versionInfo.build}
+               </p>
                <button onClick={() => {
                  if ('caches' in window) caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
                  window.location.reload();

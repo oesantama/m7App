@@ -3,10 +3,25 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import tailwindcss from '@tailwindcss/vite';
+import { execSync } from 'child_process';
 import pkg from './package.json';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+
+    // Generar identificador automático de build y commit para CI/CD
+    const gitCommit = (() => {
+      try {
+        return execSync('git rev-parse --short HEAD').toString().trim();
+      } catch {
+        return 'live';
+      }
+    })();
+
+    const now = new Date();
+    const buildTime = `${now.getFullYear().toString().slice(2)}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}.${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+    const appVersion = pkg.version || '1.9.65';
+
     return {
       server: {
         proxy: {
@@ -20,6 +35,22 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(),
         tailwindcss(),
+        // Plugin personalizado para emitir siempre dist/version.json en cada compilación
+        {
+          name: 'generate-version-json',
+          generateBundle() {
+            this.emitFile({
+              type: 'asset',
+              fileName: 'version.json',
+              source: JSON.stringify({
+                version: appVersion,
+                build: buildTime,
+                git: gitCommit,
+                timestamp: now.toISOString(),
+              }, null, 2)
+            });
+          }
+        },
         VitePWA({
           registerType: 'prompt',
           includeAssets: ['m7_favicon.png'],
@@ -29,7 +60,7 @@ export default defineConfig(({ mode }) => {
             clientsClaim: true,
             skipWaiting: true,
             navigateFallback: 'index.html',
-            navigateFallbackDenylist: [/^\/api/, /^\/publico\//, /^\/documentacion\//, /\.html$/],
+            navigateFallbackDenylist: [/^\/api/, /^\/publico\//, /^\/documentacion\//, /\.html$/, /version\.json$/],
           },
           manifest: {
             name: 'Milla 7 - Sistema de Logística',
@@ -48,7 +79,9 @@ export default defineConfig(({ mode }) => {
         }),
       ],
       define: {
-        '__APP_VERSION__': JSON.stringify(pkg.version),
+        '__APP_VERSION__': JSON.stringify(appVersion),
+        '__APP_BUILD__': JSON.stringify(buildTime),
+        '__APP_GIT__': JSON.stringify(gitCommit),
         'global': 'window',
       },
       resolve: {

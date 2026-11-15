@@ -1,6 +1,6 @@
 {
   "name": "m7-backend",
-  "version": "1.9.65",
+  "version": "1.9.66",
   "private": true,
   "type": "module",
   "scripts": {
