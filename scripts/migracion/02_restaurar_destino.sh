@@ -38,13 +38,14 @@ echo "== 2/5 Restaurando m7_logistica.dump"
 docker exec -i "$PG_CONTAINER" sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-privileges --exit-on-error' < m7_logistica.dump
 docker exec "$PG_CONTAINER" sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ANALYZE;"' >/dev/null
 
-if [ -f evolution.dump ]; then
+# En Contabo Evolution tiene su propia BD (otra versión): solo con RESTAURAR_EVOLUTION_BD=SI.
+if [ -f evolution.dump ] && [ "${RESTAURAR_EVOLUTION_BD:-NO}" = "SI" ]; then
   echo "== 3/5 Restaurando BD Evolution"
   docker exec "$PG_CONTAINER" sh -c 'psql -U "$POSTGRES_USER" -d postgres -tAc "select 1 from pg_database where datname='"'"'evolution'"'"'" | grep -q 1 || createdb -U "$POSTGRES_USER" evolution'
   docker exec -i "$PG_CONTAINER" sh -c 'pg_restore -U "$POSTGRES_USER" -d evolution --clean --if-exists --no-owner --no-privileges' < evolution.dump || \
     echo "   ⚠  pg_restore de evolution reportó avisos; revisar si WhatsApp no conecta."
 else
-  echo "== 3/5 (sin BD evolution en el respaldo)"
+  echo "== 3/5 BD Evolution omitida (RESTAURAR_EVOLUTION_BD=SI para restaurarla)"
 fi
 
 echo "== 4/5 Volúmenes (llaves JWT / sesiones WhatsApp)"
@@ -52,7 +53,7 @@ if [ "${RESTAURAR_VOLUMENES:-NO}" = "SI" ]; then
   for f in vol_*.tar.gz; do
     [ -f "$f" ] || continue
     patron="${f#vol_}"; patron="${patron%.tar.gz}"
-    vol=$(docker volume ls --format '{{.Name}}' | grep -E "(^|_)${patron}$" | head -1 || true)
+    vol=$(docker volume ls --format '{{.Name}}' | grep -E "(^|_)${patron//_/[-_]}$" | head -1 || true)
     if [ -z "$vol" ]; then echo "   ⚠  No existe volumen *${patron} en destino (despliegue primero en Coolify)"; continue; fi
     docker run --rm -i -v "$vol":/v alpine sh -c 'rm -rf /v/* /v/.[!.]* 2>/dev/null; tar xzf - -C /v' < "$f"
     echo "   $f -> $vol"

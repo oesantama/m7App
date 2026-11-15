@@ -63,7 +63,7 @@ echo "   $(wc -l < conteos.tsv) tablas contadas"
 
 echo "== 4/5 Volúmenes Docker (llaves JWT y sesiones WhatsApp)"
 for patron in m7_keys evolution_instances evolution_store; do
-  vol=$(docker volume ls --format '{{.Name}}' | grep -E "(^|_)${patron}$" | head -1 || true)
+  vol=$(docker volume ls --format '{{.Name}}' | grep -E "(^|_)${patron//_/[-_]}$" | head -1 || true)
   if [ -n "$vol" ]; then
     docker run --rm -v "$vol":/v:ro alpine tar czf - -C /v . > "vol_${patron}.tar.gz"
     echo "   $vol -> vol_${patron}.tar.gz"
