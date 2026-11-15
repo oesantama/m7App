@@ -149,8 +149,32 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── MODO MANTENIMIENTO (migración de servidor) ───────────────────────────────
+// Con MAINTENANCE_MODE=true en el entorno, el servidor queda en solo-lectura total:
+// toda la API responde 503 (login incluido, sesiones activas e integraciones externas
+// como Éxito / Grupo Inter, que reciben Retry-After para reintentar contra el servidor
+// nuevo) y no se ejecutan los cron. Así nada se escribe en la BD después del respaldo final.
+// /health y /ready siguen respondiendo para que el proxy no reinicie el contenedor.
+const isMaintenance = () => process.env.MAINTENANCE_MODE === 'true';
+const maintenanceMessage = () =>
+  process.env.MAINTENANCE_MESSAGE ||
+  'OrbitM7 se está migrando a un nuevo servidor. El acceso está suspendido temporalmente para no perder información. Intente de nuevo más tarde.';
+
+app.get('/api/maintenance-status', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ maintenance: isMaintenance(), message: isMaintenance() ? maintenanceMessage() : null });
+});
+
+app.use('/api', (_req, res, next) => {
+  if (!isMaintenance()) return next();
+  res.set('X-M7-Maintenance', '1');
+  res.set('Retry-After', process.env.MAINTENANCE_RETRY_AFTER || '3600');
+  res.set('Cache-Control', 'no-store');
+  return res.status(503).json({ success: false, maintenance: true, error: maintenanceMessage(), code: 503 });
+});
+
 // Montaje de API Modular
-app.use('/api/auth/login', loginLimiter); 
+app.use('/api/auth/login', loginLimiter);
 app.use('/api/public/hv', hvPublicLimiter); 
 
 // REMOVIDO: /health-sec exponía claves API sin autenticación — ver audit Sprint 1
@@ -162,6 +186,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'UP',
     ready: systemReady,
+    maintenance: isMaintenance(),
     version: APP_VERSION,
     build: APP_BUILD,
     env: APP_ENV,
@@ -280,7 +305,9 @@ app.listen(PORT, () => {
     return;
   }
 
-  if (process.env.DISABLE_CRON === 'true') {
+  if (process.env.MAINTENANCE_MODE === 'true') {
+    console.log('[ORBIT-BOOT] MODO MANTENIMIENTO activo: API en 503 y CRONs deshabilitados (migración de servidor).');
+  } else if (process.env.DISABLE_CRON === 'true') {
     console.log('[ORBIT-BOOT] CRONs y Schedulers DESHABILITADOS por configuración (DISABLE_CRON=true). Entorno de pruebas limpio.');
   } else {
     // Inicializar scheduler SÓLO en el leader worker

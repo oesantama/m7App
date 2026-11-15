@@ -94,6 +94,10 @@ export const login = async (req: Request, res: Response) => {
     // La respuesta al cliente incluye permissions para hidratar el store
     const userData = { ...tokenPayload, permissions };
 
+    // Cookie segura HttpOnly para mitigar robo de tokens vía XSS en navegador
+    const isProd = process.env.NODE_ENV === 'production';
+    res.setHeader('Set-Cookie', `m7_session=${accessToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800${isProd ? '; Secure' : ''}`);
+
     res.json({
         success: true,
         token: accessToken,
@@ -106,6 +110,8 @@ export const login = async (req: Request, res: Response) => {
 };
 
 export const logout = (req: Request, res: Response) => {
+  const isProd = process.env.NODE_ENV === 'production';
+  res.setHeader('Set-Cookie', `m7_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${isProd ? '; Secure' : ''}`);
   res.json({ success: true, message: 'Sesión finalizada' });
 };
 

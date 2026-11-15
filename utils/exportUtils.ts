@@ -1,8 +1,9 @@
 
 import * as XLSX from 'xlsx';
+import { sanitizeRowObject } from './security';
 
 /**
- * Export data to an Excel file (.xlsx)
+ * Export data to an Excel file (.xlsx) con sanitización de inyección de fórmulas
  * @param data Array of objects representing the rows
  * @param fileName Name of the file to save (without extension)
  * @param sheetName Name of the sheet inside the workbook
@@ -10,7 +11,10 @@ import * as XLSX from 'xlsx';
 export const exportToExcel = (data: any[], fileName: string, sheetName: string = 'Sheet1') => {
     if (!data || data.length === 0) return;
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
+    // Sanitizar contra Formula Injection (CWE-1236)
+    const sanitizedData = data.map(row => sanitizeRowObject(row));
+
+    const worksheet = XLSX.utils.json_to_sheet(sanitizedData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
     

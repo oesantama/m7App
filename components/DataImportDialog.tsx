@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { MasterCategory } from '../types';
 import { api } from '../services/api';
 import { useAppStore } from '../stores/useAppStore';
+import { validateImportFile, sanitizeRowObject } from '../utils/security';
 
 interface DataImportDialogProps {
   isOpen: boolean;
@@ -290,11 +291,11 @@ export const DataImportDialog: React.FC<DataImportDialogProps> = ({
     const uploadedFile = e.target.files?.[0];
     if (!uploadedFile) return;
 
-    // Validar extensión
-    const ext = uploadedFile.name.split('.').pop()?.toLowerCase();
-    if (ext !== 'xlsx' && ext !== 'xls') {
-        toast.error("Formato no válido", { description: "Por favor use archivos Excel (.xlsx o .xls)" });
-        return;
+    // Validación de seguridad (tipo real, tamaño máximo 25MB, extensión)
+    const fileValidation = validateImportFile(uploadedFile, ['.xlsx', '.xls'], 25 * 1024 * 1024);
+    if (!fileValidation.valid) {
+      toast.error("Archivo no válido", { description: fileValidation.error });
+      return;
     }
 
     setFile(uploadedFile);
@@ -305,19 +306,22 @@ export const DataImportDialog: React.FC<DataImportDialogProps> = ({
         const wb = XLSX.read(bstr, { type: 'binary' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
+        const rawData: any[] = XLSX.utils.sheet_to_json(ws);
         
-        if (data.length === 0) {
+        if (rawData.length === 0) {
           toast.error("El archivo está vacío");
           return;
         }
+
+        // Sanitización contra Inyección de Fórmulas (CWE-1236)
+        const data = rawData.map(row => sanitizeRowObject(row));
 
         // Ejecutar validaciones
         const isValid = await validateData(data);
         
         const dataHeaders = Object.keys(data[0] as object);
         setHeaders(dataHeaders);
-        setPreviewData(data); // Guardamos todo para el preview (que será paginado o limitado)
+        setPreviewData(data);
         
         if (isValid) {
             toast.success("Archivo Leído", { description: "Se detectaron los registros correctamente." });

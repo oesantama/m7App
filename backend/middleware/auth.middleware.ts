@@ -6,9 +6,33 @@ export interface AuthRequest extends Request {
     user?: any;
 }
 
+function parseCookies(cookieHeader?: string): Record<string, string> {
+    const list: Record<string, string> = {};
+    if (!cookieHeader) return list;
+    cookieHeader.split(';').forEach(cookie => {
+        const parts = cookie.split('=');
+        const name = parts[0]?.trim();
+        if (!name) return;
+        const val = parts.slice(1).join('=').trim();
+        try {
+            list[name] = decodeURIComponent(val);
+        } catch {
+            list[name] = val;
+        }
+    });
+    return list;
+}
+
 export const authenticateToken = async (req: AuthRequest, res: Response, next: NextFunction) => {
     const authHeader = req.headers['authorization'];
     let token = authHeader && authHeader.split(' ')[1];
+
+    if (!token && req.headers.cookie) {
+        const cookies = parseCookies(req.headers.cookie);
+        if (cookies['m7_session']) {
+            token = cookies['m7_session'];
+        }
+    }
 
     if (!token && req.query.token) {
         token = req.query.token as string;
