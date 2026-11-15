@@ -36,6 +36,16 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
   });
   const [lockoutUntil, setLockoutUntil] = useState<number | null>(null);
   const [forgotSuccess, setForgotSuccess] = useState(false);
+  // Enlace del correo de recuperación: /?reset=<token de 64 hex>
+  const [resetToken, setResetToken] = useState<string | null>(() => {
+    try {
+      const t = new URLSearchParams(window.location.search).get('reset');
+      return t && /^[a-f0-9]{64}$/.test(t) ? t : null;
+    } catch { return null; }
+  });
+  const [newPass, setNewPass] = useState('');
+  const [newPass2, setNewPass2] = useState('');
+  const [resetDone, setResetDone] = useState(false);
   const [showRepairConfirm, setShowRepairConfirm] = useState(false);
 
   useEffect(() => {
@@ -129,6 +139,40 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     }
   };
 
+  const salirDeReset = () => {
+    setResetToken(null);
+    setResetDone(false);
+    setError(null);
+    try { window.history.replaceState({}, '', window.location.pathname); } catch { /* sin history */ }
+  };
+
+  const handleReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (newPass.length < 8 || !/[A-Za-z]/.test(newPass) || !/\d/.test(newPass)) {
+      setError('La contraseña debe tener al menos 8 caracteres, con letras y números.');
+      return;
+    }
+    if (newPass !== newPass2) { setError('Las contraseñas no coinciden.'); return; }
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: resetToken, password: newPass })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) { setError(data.error || 'No fue posible cambiar la contraseña.'); return; }
+      setResetDone(true);
+      setNewPass(''); setNewPass2('');
+      try { window.history.replaceState({}, '', window.location.pathname); } catch { /* sin history */ }
+    } catch {
+      setError('Error de red: no se pudo contactar al servidor.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -185,7 +229,39 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             </div>
           )}
 
-          {view === 'login' ? (
+          {resetToken ? (
+            resetDone ? (
+              <div className="text-center space-y-6" role="status" aria-live="polite">
+                <div className="w-20 h-20 bg-emerald-500/20 text-emerald-400 rounded-full mx-auto flex items-center justify-center"><Icons.Check /></div>
+                <div>
+                  <h3 className="text-lg font-black text-white uppercase tracking-tight mb-2">Contraseña actualizada</h3>
+                  <p className="text-slate-400 text-xs font-semibold leading-relaxed">Ya puede iniciar sesión con su nueva contraseña.</p>
+                </div>
+                <button type="button" onClick={salirDeReset} className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-4 rounded-2xl uppercase text-xs tracking-widest">
+                  Ir a iniciar sesión
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleReset} className="space-y-5">
+                <h3 className="text-sm font-black text-white uppercase tracking-widest text-center">Nueva contraseña</h3>
+                <div className="space-y-2">
+                  <label htmlFor="new-pass" className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Contraseña nueva</label>
+                  <input id="new-pass" type="password" autoComplete="new-password" required minLength={8} value={newPass} onChange={e => setNewPass(e.target.value)}
+                    className="w-full bg-slate-800/40 border border-white/10 rounded-2xl py-4 px-4 text-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none font-bold" />
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor="new-pass-2" className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Confirmar contraseña</label>
+                  <input id="new-pass-2" type="password" autoComplete="new-password" required minLength={8} value={newPass2} onChange={e => setNewPass2(e.target.value)}
+                    className="w-full bg-slate-800/40 border border-white/10 rounded-2xl py-4 px-4 text-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none font-bold" />
+                </div>
+                <p className="text-xs text-slate-400">Mínimo 8 caracteres, con letras y números.</p>
+                <button type="submit" disabled={isLoading} className="w-full bg-emerald-500 hover:bg-emerald-400 disabled:bg-slate-800 disabled:text-slate-600 text-slate-950 font-black py-5 rounded-2xl transition-all">
+                  {isLoading ? 'GUARDANDO...' : 'GUARDAR CONTRASEÑA'}
+                </button>
+                <button type="button" onClick={salirDeReset} className="w-full text-xs font-black uppercase tracking-widest text-slate-500 hover:text-white py-2">Cancelar</button>
+              </form>
+            )
+          ) : view === 'login' ? (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <label htmlFor="email" className="block text-xs font-black text-slate-400 uppercase tracking-widest ml-1 mb-1">

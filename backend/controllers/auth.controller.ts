@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import pool from '../config/database.js';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 import { signAccessToken } from '../utils/jwt.util.js';
 
 export const login = async (req: Request, res: Response) => {
@@ -210,6 +211,17 @@ export const renewToken = async (req: Request, res: Response) => {
 
 import { sendEmail } from '../services/notification.service.js';
 
+const RESET_TOKEN_MINUTES = 30;
+const hashResetToken = (t: string) => crypto.createHash('sha256').update(t).digest('hex');
+
+// El enlace vuelve al mismo sitio desde donde se pidió (producción o pruebas) si es un dominio propio;
+// si no, APP_URL; si no, producción.
+const resetBaseUrl = (req: Request): string => {
+  const origin = String(req.headers.origin || '');
+  if (/^https:\/\/([a-z0-9-]+\.)*m7apps\.com$/i.test(origin) || /^http:\/\/localhost(:\d+)?$/.test(origin)) return origin;
+  return (process.env.APP_URL || 'https://orbitm7.m7apps.com').replace(/\/$/, '');
+};
+
 export const forgotPassword = async (req: Request, res: Response) => {
   const { email } = req.body;
   
@@ -237,8 +249,18 @@ export const forgotPassword = async (req: Request, res: Response) => {
       });
     }
 
-    // 2. Lógica de Envío de Email
-    const recoveryLink = `https://orbitm7.m7apps.com/#/portal?recover=true&token=PENDING`; // Enlace base para portal
+    // 2. Token de un solo uso (30 min). En BD solo queda su SHA-256.
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    await pool.query(
+      `UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL`,
+      [user.id]
+    );
+    await pool.query(
+      `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at, requested_ip)
+       VALUES ($1, $2, NOW() + INTERVAL '${RESET_TOKEN_MINUTES} minutes', $3)`,
+      [user.id, hashResetToken(rawToken), String(req.ip || '').slice(0, 100)]
+    );
+    const recoveryLink = `${resetBaseUrl(req)}/?reset=${rawToken}`;
     
     const html = `
       <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8fafc; border-radius: 20px;">
@@ -258,6 +280,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
           </div>
           
           <p style="color: #64748b; font-size: 12px;">
+            El enlace vence en ${RESET_TOKEN_MINUTES} minutos y solo se puede usar una vez.
             Si no solicitaste este cambio, puedes ignorar este correo con seguridad. Tu contraseña actual seguirá siendo válida.
           </p>
         </div>
@@ -268,7 +291,15 @@ export const forgotPassword = async (req: Request, res: Response) => {
       </div>
     `;
 
-    await sendEmail(user.email, '🔐 Recuperación de Contraseña - OrbitM7', html);
+    // sendEmail no devuelve nada si EMAIL_ENABLED != 'true' y lanza si fallan Resend y SMTP.
+    const sent = await sendEmail(user.email, '🔐 Recuperación de Contraseña - OrbitM7', html)
+      .catch((e: any) => { console.error('[AUTH-FORGOT-EMAIL]', e?.message); return null; });
+    if (!sent?.success) {
+      return res.status(503).json({
+        success: false,
+        error: 'No fue posible enviar el correo en este momento. Intente más tarde o contacte a soporte.'
+      });
+    }
 
     res.json({ 
       success: true, 
@@ -278,5 +309,43 @@ export const forgotPassword = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[AUTH-FORGOT-ERR]', error.message);
     res.status(500).json({ success: false, error: 'Falla crítica al procesar la recuperación' });
+  }
+};
+
+
+/** POST /api/auth/reset-password { token, password } — fija la contraseña nueva con un token vigente. */
+export const resetPassword = async (req: Request, res: Response) => {
+  const { token, password } = req.body || {};
+  if (!token || typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) {
+    return res.status(400).json({ success: false, error: 'El enlace de recuperación no es válido.' });
+  }
+  if (!password || typeof password !== 'string' || password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+    return res.status(400).json({ success: false, error: 'La contraseña debe tener al menos 8 caracteres, con letras y números.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const tk = await client.query(
+      `SELECT id, user_id FROM password_reset_tokens
+        WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()
+        FOR UPDATE`,
+      [hashResetToken(token)]
+    );
+    if (tk.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ success: false, error: 'El enlace venció o ya fue usado. Solicite uno nuevo desde "¿Olvidó su contraseña?".' });
+    }
+    const hashed = await bcrypt.hash(password, await bcrypt.genSalt(10));
+    await client.query('UPDATE users SET password = $1 WHERE id = $2', [hashed, tk.rows[0].user_id]);
+    await client.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL', [tk.rows[0].user_id]);
+    await client.query('COMMIT');
+    res.json({ success: true, message: 'Contraseña actualizada. Ya puede iniciar sesión.' });
+  } catch (error: any) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[AUTH-RESET-ERR]', error.message);
+    res.status(500).json({ success: false, error: 'No fue posible actualizar la contraseña.' });
+  } finally {
+    client.release();
   }
 };

@@ -73,7 +73,7 @@ const allowedOrigins = [
   'https://www.orbitm7.m7apps.com',
   'https://m7apps.com',
   'https://www.m7apps.com',
-  'https://devsm7.santamariapp.com',
+  'https://devsm7.m7apps.com',
   'http://localhost:3000',
   'http://127.0.0.1:3000',
   'http://localhost:5173',
@@ -95,7 +95,6 @@ app.use(cors({
     // En producción y sandbox, validar contra la whitelist o subdominios autorizados
     if (process.env.NODE_ENV === 'production') {
       const isAllowed = allowedOrigins.includes(origin) ||
-        origin.endsWith('.santamariapp.com') ||
         origin.endsWith('.m7apps.com');
       if (isAllowed) return callback(null, true);
       return callback(new Error(`CORS: Origen no permitido — ${origin}`));
@@ -175,6 +174,8 @@ app.use('/api', (_req, res, next) => {
 
 // Montaje de API Modular
 app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/forgot-password', loginLimiter);
+app.use('/api/auth/reset-password', loginLimiter);
 app.use('/api/public/hv', hvPublicLimiter); 
 
 // REMOVIDO: /health-sec exponía claves API sin autenticación — ver audit Sprint 1
@@ -208,6 +209,7 @@ app.use('/api', (req, res, next) => {
   const publicPaths = [
     '/auth/login', 
     '/auth/forgot-password',
+    '/auth/reset-password',
     '/health', 
     '/', 
     '/geocode', 
