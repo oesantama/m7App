@@ -107,3 +107,8 @@ $RECYCLE.BIN/
 
 # Cola local de evidencias GH (firmas/fotos) antes de subir a Drive — nunca al repo
 backend/docs/gh-cola/
+
+# Capturas generadas por las pruebas e2e (se regeneran en cada corrida)
+qa-report/
+test-results/
+playwright-report/

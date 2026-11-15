@@ -16,15 +16,15 @@ export default defineConfig({
   projects: [
     {
       name: 'desktop-chrome',
-      use: { ...devices['Desktop Chrome'] },
+      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     },
     {
       name: 'mobile-chrome',
-      use: { ...devices['Pixel 5'] },
+      use: { ...devices['Pixel 5'], channel: 'chrome' },
     },
     {
-      name: 'tablet-safari',
-      use: { ...devices['iPad (gen 7) landscape'] },
+      name: 'tablet-chrome',
+      use: { ...devices['iPad (gen 7) landscape'], channel: 'chrome' },
     },
   ],
 });
