@@ -684,64 +684,146 @@ const App: React.FC = () => {
     }
 
     switch (String(activeTab).toLowerCase()) {
-      case 'dashboard':
+      case 'dashboard': {
+        const totalDocs = documents.length;
+        const processedDocs = documents.filter(d => ['ENTREGADO', 'FINALIZADO', 'AUDITADO', 'LEGALIZADO'].includes(String(d.status || d.estado || '').toUpperCase())).length;
+        const hasRealCompliance = totalDocs > 0;
+        const compliancePct = hasRealCompliance ? Math.round((processedDocs / totalDocs) * 100) : null;
+        const complianceDate = hasRealCompliance ? new Date().toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }) : null;
+
+        const totalVehicles = vehicles.length;
+        const availableVehiclesCount = vehicles.filter(v => ['DISPONIBLE', 'AVAILABLE', 'ACTIVO'].includes(String(v.status || '').toUpperCase())).length;
+
+        let flotaSubtitle = "Sin vehículos registrados en el sistema";
+        if (totalVehicles === 0) {
+          flotaSubtitle = "Sin flota cargada en sistema";
+        } else if (availableVehiclesCount === 0) {
+          flotaSubtitle = `0 disponibles de ${totalVehicles} — Toda la flota ocupada en ruta`;
+        } else {
+          flotaSubtitle = `${availableVehiclesCount} de ${totalVehicles} unidades disponibles`;
+        }
+
+        const hasRoutes = routes.length > 0;
+
         return (
           <div className="min-h-full flex flex-col p-6 md:p-10 text-center animate-in fade-in duration-700 bg-slate-50">
-            <h2 className="text-5xl font-black text-slate-900 mb-6 uppercase tracking-tighter">PROCESADOR ORBITM7</h2>
-            <div className="w-32 h-2 bg-emerald-500 mx-auto rounded-full mb-10"></div>
+            <h1 className="text-4xl md:text-5xl font-black text-slate-900 mb-6 uppercase tracking-tighter">
+              PROCESADOR ORBITM7
+            </h1>
+            <div className="w-32 h-2 bg-emerald-500 mx-auto rounded-full mb-8"></div>
 
-            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border ${waStatus === 'CONNECTED' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-200 text-slate-400'} mb-10`}>
-              <div className={`w-2 h-2 rounded-full ${waStatus === 'CONNECTED' ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
-              <span className="text-[10px] font-black uppercase tracking-widest">{waStatus === 'CONNECTED' ? 'ASISTENTE ONLINE' : 'ASISTENTE OFFLINE'}</span>
+            {/* ASISTENTE INTELIGENTE CON TOOLTIP, REINTENTAR Y ARIA-LIVE */}
+            <div 
+              role="status"
+              aria-live="polite"
+              className="flex items-center justify-center gap-3 mb-10"
+            >
+              <div 
+                className={`inline-flex items-center gap-2.5 px-4 py-2 rounded-full border text-xs font-bold transition-all shadow-sm ${
+                  waStatus === 'CONNECTED' 
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+                    : 'bg-slate-100 border-slate-300 text-slate-700'
+                }`}
+                title={
+                  waStatus === 'CONNECTED'
+                    ? 'Canal WhatsApp en línea: listo para notificaciones en tiempo real.'
+                    : 'Canal WhatsApp desconectado: configure o escanee el código QR en el módulo Alertas WhatsApp.'
+                }
+              >
+                <div 
+                  className={`w-2.5 h-2.5 rounded-full ${
+                    waStatus === 'CONNECTED' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                  }`}
+                  aria-hidden="true"
+                />
+                <span className="uppercase tracking-wider">
+                  {waStatus === 'CONNECTED' ? 'ASISTENTE ONLINE' : 'ASISTENTE OFFLINE'}
+                </span>
+                <span className="text-[11px] text-slate-500 font-normal hidden sm:inline">
+                  {waStatus === 'CONNECTED' ? '(Canal activo)' : '(Sin conexión Evolution)'}
+                </span>
+              </div>
+
+              {waStatus !== 'CONNECTED' && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    toast.info("Verificando estado del asistente WhatsApp...");
+                    try {
+                      const res = await api.getWhatsAppStatus(user?.id || 'USR-01');
+                      const st = res?.status === 'CONNECTED' ? 'CONNECTED' : 'DISCONNECTED';
+                      setWaStatus(st);
+                      if (st === 'CONNECTED') {
+                        toast.success("¡Asistente WhatsApp conectado exitosamente!");
+                      } else {
+                        toast.warning("Asistente aún desconectado. Dirígete a Alertas WhatsApp para vincular el QR.");
+                      }
+                    } catch (e: any) {
+                      toast.error("Error al reintentar conexión con WhatsApp", { description: e?.message });
+                    }
+                  }}
+                  className="px-3.5 py-1.5 min-h-[44px] rounded-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs flex items-center gap-1.5 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  aria-label="Reintentar conexión del asistente"
+                  title="Reintentar verificación del asistente"
+                >
+                  <Icons.RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Reintentar</span>
+                </button>
+              )}
             </div>
 
             {/* HERO BANNER PROACTIVO - VISIBILIDAD MÁXIMA AL INICIO */}
-            <div className={`max-w-6xl mx-auto mb-12 p-1 relative overflow-hidden rounded-[3.5rem] group transition-all duration-700 shadow-2xl ${documents.length === 0
-              ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600'
-              : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600'
-              }`}>
+            <div className={`max-w-6xl mx-auto mb-12 p-1 relative overflow-hidden rounded-[3.5rem] group transition-all duration-700 shadow-2xl ${
+              totalDocs === 0
+                ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600'
+                : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600'
+            }`}>
               <div className="bg-slate-950/90 backdrop-blur-3xl p-10 md:p-14 rounded-[3.3rem] relative overflow-hidden flex flex-col md:flex-row items-center gap-10 border border-white/5">
-                {/* Background Brain Animation */}
                 <div className="absolute top-0 right-0 p-10 text-emerald-500/5 group-hover:scale-110 transition-transform duration-1000 hidden md:block">
                   <Icons.Brain style={{ width: '250px', height: '250px' }} />
                 </div>
 
-                <div className={`w-28 h-28 rounded-[2rem] flex items-center justify-center shrink-0 shadow-2xl animate-pulse relative z-10 ${documents.length === 0 ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-amber-500 shadow-amber-500/20'
-                  }`}>
-                  <Icons.Sparkles className="text-slate-950 w-14 h-14" />
+                <div className={`w-28 h-28 rounded-[2rem] flex items-center justify-center shrink-0 shadow-2xl animate-pulse relative z-10 ${
+                  totalDocs === 0 ? 'bg-emerald-500 shadow-emerald-500/20' : 'bg-amber-500 shadow-amber-500/20'
+                }`}>
+                  <Icons.Sparkles className="text-slate-950 w-14 h-14" aria-hidden="true" />
                 </div>
 
                 <div className="text-left flex-1 relative z-10">
-                  <div className={`inline-block px-4 py-1.5 rounded-full mb-6 border ${documents.length === 0 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'
-                    }`}>
-                    <span className="text-[9px] font-black uppercase tracking-[0.2em]">Centro de Mando Inteligente OrbitM7</span>
+                  <div className={`inline-block px-4 py-1.5 rounded-full mb-6 border ${
+                    totalDocs === 0 ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-amber-500/10 border-amber-500/20 text-amber-500'
+                  }`}>
+                    <span className="text-xs font-black uppercase tracking-[0.2em]">Centro de Mando Inteligente OrbitM7</span>
                   </div>
 
-                  <h3 className="text-white font-black text-3xl md:text-5xl uppercase tracking-tighter mb-4 leading-none">
-                    {documents.length === 0
+                  <h2 className="text-white font-black text-3xl md:text-5xl uppercase tracking-tighter mb-4 leading-none">
+                    {totalDocs === 0
                       ? "Listo para procesar tu logística"
                       : "Hay tareas críticas que requieren tu atención"}
-                  </h3>
+                  </h2>
 
-                  <p className="text-slate-400 text-lg md:text-xl font-medium leading-relaxed max-w-3xl">
-                    {documents.length === 0
+                  <p className="text-slate-300 text-base md:text-lg font-medium leading-relaxed max-w-3xl">
+                    {totalDocs === 0
                       ? "Tu panel está limpio. Sube un archivo de preventa para que OrbitM7 IQ pueda generar tus rutas optimizadas ahora."
-                      : `He detectado ${documents.length} documentos detenidos. ¿Quieres que audite la carga para liberar rutas de inmediato?`}
+                      : `He detectado ${totalDocs} documentos detenidos. ¿Quieres que audite la carga para liberar rutas de inmediato?`}
                   </p>
 
-                  <div className="mt-10 flex flex-wrap gap-5">
+                  <div className="mt-8 flex flex-wrap gap-4">
                     <button
+                      type="button"
                       onClick={() => setActiveTab('documentos')}
-                      className={`px-10 py-5 rounded-[1.5rem] font-black text-[11px] uppercase tracking-widest hover:scale-105 transition-all shadow-xl ${documents.length === 0
-                        ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
-                        : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-                        }`}
+                      className={`min-h-[48px] px-8 py-3 rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 transition-all shadow-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 ${
+                        totalDocs === 0
+                          ? 'bg-emerald-500 text-slate-950 hover:bg-emerald-400'
+                          : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                      }`}
                     >
-                      {documents.length === 0 ? "Abrir Gestor de Documentos" : "Iniciar Auditoría IA"}
+                      {totalDocs === 0 ? "Abrir Gestor de Documentos" : "Iniciar Auditoría IA"}
                     </button>
                     <button
-                      onClick={() => toast.success("OrbitM7 IQ: Consultando núcleo de inteligencia...", { description: "Usa el widget inferior para ver mi reporte completo." })}
-                      className="px-8 py-5 border border-white/10 text-white rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest hover:bg-white/5 transition-all"
+                      type="button"
+                      onClick={() => toast.success("OrbitM7 IQ: Consultando núcleo de inteligencia...", { description: "Usa el gestor de documentos o rutas para el reporte completo." })}
+                      className="min-h-[48px] px-6 py-3 border border-white/20 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-white/10 transition-all focus:outline-none focus:ring-2 focus:ring-white"
                     >
                       Informe Narrativo
                     </button>
@@ -750,31 +832,49 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* KPI GRID - Ahora debajo del banner principal */}
+            {/* KPI GRID - Vinculado a datos reales */}
             <div className="max-w-6xl mx-auto mb-12 grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-bottom-10 duration-700">
               <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border border-slate-100 text-left hover:shadow-2xl transition-all">
                 <div className="flex justify-between items-start mb-4">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">CUMPLIMIENTO</p>
-                  <Icons.Check className="text-emerald-500" />
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">CUMPLIMIENTO</p>
+                  <Icons.Check className="text-emerald-500 w-5 h-5" aria-hidden="true" />
                 </div>
-                <h4 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">98%</h4>
-                <p className="text-xs text-slate-500 font-medium">+14% vs semana previa</p>
+                <h3 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">
+                  {hasRealCompliance ? `${compliancePct}%` : '—'}
+                </h3>
+                <p className="text-xs text-slate-600 font-medium">
+                  {hasRealCompliance 
+                    ? `${processedDocs} de ${totalDocs} gestionados • ${complianceDate}`
+                    : 'Sin datos aún (sin órdenes registradas)'}
+                </p>
               </div>
+
               <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border border-slate-100 text-left hover:shadow-2xl transition-all">
                 <div className="flex justify-between items-start mb-4">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">FLOTA DISPONIBLE</p>
-                  <Icons.Truck className="text-blue-500" />
+                  <p className="text-xs font-black text-slate-500 uppercase tracking-widest">FLOTA DISPONIBLE</p>
+                  <Icons.Truck className="text-blue-500 w-5 h-5" aria-hidden="true" />
                 </div>
-                <h4 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">{availableVehiclesCount}</h4>
-                <p className="text-xs text-slate-500 font-medium">{availableVehiclesCount > 0 ? 'Capacidad de respuesta inmediata' : 'Flota totalmente ocupada'}</p>
+                <h3 className="text-4xl font-black text-slate-900 tracking-tighter mb-2">
+                  {availableVehiclesCount}
+                </h3>
+                <p className="text-xs text-slate-600 font-medium">
+                  {flotaSubtitle}
+                </p>
               </div>
+
               <div className="bg-slate-900 p-8 rounded-[2.5rem] shadow-lg text-left hover:bg-slate-800 transition-all group">
                 <div className="flex justify-between items-start mb-4">
-                  <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">IA PROYECCIÓN</p>
-                  <Icons.Route className="text-emerald-500 animate-pulse" />
+                  <p className="text-xs font-black text-emerald-400 uppercase tracking-widest">IA PROYECCIÓN</p>
+                  <Icons.Route className="text-emerald-500 animate-pulse w-5 h-5" aria-hidden="true" />
                 </div>
-                <h4 className="text-2xl font-black text-white tracking-tighter mb-2">Plan de Vuelo OrbitM7 IQ</h4>
-                <p className="text-xs text-slate-400">Ahorro estimado despacho: <span className="text-emerald-500 font-black">12 min</span></p>
+                <h3 className="text-2xl font-black text-white tracking-tighter mb-2">
+                  {hasRoutes ? 'Plan de Vuelo Activo' : '—'}
+                </h3>
+                <p className="text-xs text-slate-300">
+                  {hasRoutes 
+                    ? `${routes.length} ruta(s) planificada(s) • Optimización IA activa`
+                    : 'Sin datos aún (esperando generación de rutas)'}
+                </p>
               </div>
             </div>
 
