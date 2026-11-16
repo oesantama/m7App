@@ -24,22 +24,6 @@ interface LayoutProps {
   pagesData?: MasterRecord[];
 }
 
-const SECTION_ORDER = ['Operación', 'Clientes & Aliados', 'Cumplimiento & Talento', 'Administración & Estrategia'];
-
-const getModuleSection = (moduleName: string): string => {
-  const n = moduleName.toUpperCase();
-  if (n.includes('TRANSPORTE') || n.includes('ÉXITO') || n.includes('EXITO') || n.includes('FULFILLMENT')) {
-    return 'Operación';
-  }
-  if (n.includes('AJOVER') || n.includes('DICORP') || n.includes('INTER') || n.includes('DRIVE') || n.includes('CLIENTE')) {
-    return 'Clientes & Aliados';
-  }
-  if (n.includes('FORMACIÓN') || n.includes('FORMACION') || n.includes('BASC') || n.includes('HUMANA') || n.includes('CALIDAD')) {
-    return 'Cumplimiento & Talento';
-  }
-  return 'Administración & Estrategia';
-};
-
 const Layout: React.FC<LayoutProps> = ({
   children, activeTab, setActiveTab, activeMasterCategory, setActiveMasterCategory,
   activePageId, setActivePageId,
@@ -171,7 +155,7 @@ const Layout: React.FC<LayoutProps> = ({
       const nameB = b.name.toUpperCase();
       if (nameA.includes('ADMINISTRACIÓN')) return 1;
       if (nameB.includes('ADMINISTRACIÓN')) return -1;
-      return nameA.localeCompare(nameB);
+      return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
     })
     .map(mod => {
       const modId = String(mod.id).trim().toUpperCase();
@@ -207,7 +191,6 @@ const Layout: React.FC<LayoutProps> = ({
         id: mod.id,
         label: mod.name,
         icon: getIcon((mod.iconClass || mod.icon_class || 'Settings')),
-        section: getModuleSection(mod.name),
         items: allowedPages
       };
     })
@@ -378,7 +361,7 @@ const Layout: React.FC<LayoutProps> = ({
           </div>
         )}
 
-        {/* NAVEGACIÓN AGRUPADA POR SECCIONES */}
+        {/* NAVEGACIÓN: favoritos, recientes y módulos */}
         <nav
           aria-label="Lista de módulos"
           className="flex-1 space-y-3 overflow-y-auto custom-scrollbar px-2 mt-2"
@@ -444,19 +427,14 @@ const Layout: React.FC<LayoutProps> = ({
             </div>
           )}
 
-          {/* MÓDULOS AGRUPADOS POR SECCIÓN */}
-          {SECTION_ORDER.map(sectionName => {
-            const groupsInSection = menuGroups.filter(g => g.section === sectionName);
-            if (groupsInSection.length === 0) return null;
-
-            return (
-              <div key={sectionName} className="space-y-1">
-                {!isCollapsed && (
-                  <div className="px-3 pt-2 pb-1 text-[11px] font-black uppercase tracking-wider text-slate-400 border-t border-white/5 first:border-0 first:pt-0">
-                    {sectionName}
+          {/* MÓDULOS (orden alfabético, sin agrupar por secciones) */}
+              <div className="space-y-1">
+                {!isCollapsed && (favoritePages.length > 0 || recents.length > 0) && (
+                  <div className="px-3 pt-2 pb-1 text-[11px] font-black uppercase tracking-wider text-slate-400 border-t border-white/5">
+                    Módulos
                   </div>
                 )}
-                {groupsInSection.map(group => (
+                {menuGroups.map(group => (
                   <div key={group.id} className="space-y-0.5">
                     <button
                       onClick={() => toggleGroup(group.id)}
@@ -541,8 +519,6 @@ const Layout: React.FC<LayoutProps> = ({
                   </div>
                 ))}
               </div>
-            );
-          })}
         </nav>
 
         {/* PIE DE BARRA LATERAL CON IDENTIDAD Y SALIDA */}
