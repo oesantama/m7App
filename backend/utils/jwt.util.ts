@@ -85,13 +85,70 @@ export interface TokenPayload {
     permissions?: any[];
 }
 
+// ── Permisos compactos dentro del JWT ─────────────────────────────────────────
+// Un SuperAdmin tiene ~600 permisos; como {"module","actions"} el token pasaba de 8 KB:
+// nginx lo rechazaba (400), no cabía en la cookie de sesión (máx. 4 KB) y pesaba en cada
+// petición. En el token viajan agrupados "vced|PAG-01,PAG-02" (claim `pc`) y verifyToken los expande al
+// formato de siempre, así que el resto del backend no cambia. Acciones desconocidas van
+// completas entre paréntesis: "v(nueva_accion)|PAG-09".
+const ACCION_A_LETRA: Record<string, string> = {
+    view: 'v', create: 'c', edit: 'e', delete: 'd', active: 't',
+    approve: 'a', admin: 'm', execute: 'x', update: 'u',
+};
+const LETRA_A_ACCION: Record<string, string> = Object.fromEntries(
+    Object.entries(ACCION_A_LETRA).map(([accion, letra]) => [letra, accion])
+);
+
+const codificarAcciones = (acciones: string[]): string =>
+    (acciones || []).map(a => ACCION_A_LETRA[a] ?? `(${a})`).join('');
+
+const decodificarAcciones = (codigo: string): string[] => {
+    const actions: string[] = [];
+    for (let k = 0; k < codigo.length; k++) {
+        if (codigo[k] === '(') {
+            const fin = codigo.indexOf(')', k);
+            actions.push(codigo.slice(k + 1, fin));
+            k = fin;
+        } else if (LETRA_A_ACCION[codigo[k]]) {
+            actions.push(LETRA_A_ACCION[codigo[k]]);
+        }
+    }
+    return actions;
+};
+
+/** Agrupa los módulos que tienen el mismo juego de acciones: ["vcedt|PAG-01,PAG-02", "v|PAG-07"]. */
+export const compactarPermisos = (permisos: any[]): string[] => {
+    const grupos = new Map<string, string[]>();
+    for (const p of permisos || []) {
+        if (!p || !p.module) continue;
+        const codigo = codificarAcciones(Array.isArray(p.actions) ? p.actions : []);
+        if (!grupos.has(codigo)) grupos.set(codigo, []);
+        grupos.get(codigo)!.push(String(p.module));
+    }
+    return Array.from(grupos.entries()).map(([codigo, modulos]) => `${codigo}|${modulos.join(',')}`);
+};
+
+export const expandirPermisos = (compactos: string[]): { module: string; actions: string[] }[] => {
+    const salida: { module: string; actions: string[] }[] = [];
+    for (const entrada of compactos || []) {
+        const i = entrada.indexOf('|');
+        const actions = decodificarAcciones(entrada.slice(0, i));
+        for (const module of entrada.slice(i + 1).split(',')) {
+            if (module) salida.push({ module, actions: [...actions] });
+        }
+    }
+    return salida;
+};
+
 export const signAccessToken = (payload: any): string => {
     // Aseguramos que el payload tenga tanto role_id como roleId para compatibilidad total
-    const enrichedPayload = {
-        ...payload,
+    const { permissions, pc: _pcViejo, iat: _iat, exp: _exp, ...resto } = payload || {};
+    const enrichedPayload: any = {
+        ...resto,
         roleId: payload.roleId || payload.role_id,
         role_id: payload.role_id || payload.roleId
     };
+    if (Array.isArray(permissions)) enrichedPayload.pc = compactarPermisos(permissions);
     return sign(enrichedPayload, PRIVATE_KEY, {
         algorithm: 'RS256',
         expiresIn: '30d' // Reducido a 30d por seguridad (tokens robados quedan válidos menos tiempo)
@@ -106,5 +163,11 @@ export const signRefreshToken = (payload: { id: string }): string => {
 };
 
 export const verifyToken = (token: string): TokenPayload => {
-    return verify(token, PUBLIC_KEY, { algorithms: ['RS256'] }) as TokenPayload;
+    const decoded: any = verify(token, PUBLIC_KEY, { algorithms: ['RS256'] });
+    // Tokens nuevos: permisos compactos en `pc`. Tokens anteriores: `permissions` completo (se aceptan igual).
+    if (Array.isArray(decoded?.pc)) {
+        decoded.permissions = expandirPermisos(decoded.pc);
+        delete decoded.pc;
+    }
+    return decoded as TokenPayload;
 };

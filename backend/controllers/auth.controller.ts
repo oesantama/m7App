@@ -95,9 +95,16 @@ export const login = async (req: Request, res: Response) => {
     // La respuesta al cliente incluye permissions para hidratar el store
     const userData = { ...tokenPayload, permissions };
 
-    // Cookie segura HttpOnly para mitigar robo de tokens vía XSS en navegador
+    // Cookie segura HttpOnly para mitigar robo de tokens vía XSS en navegador.
+    // Los navegadores descartan sin aviso cookies > 4096 bytes: si el token no cabe, no se envía
+    // (la sesión sigue funcionando con el encabezado Authorization).
     const isProd = process.env.NODE_ENV === 'production';
-    res.setHeader('Set-Cookie', `m7_session=${accessToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800${isProd ? '; Secure' : ''}`);
+    const cookie = `m7_session=${accessToken}; Path=/; HttpOnly; SameSite=Lax; Max-Age=28800${isProd ? '; Secure' : ''}`;
+    if (cookie.length <= 4000) {
+      res.setHeader('Set-Cookie', cookie);
+    } else {
+      console.warn(`[AUTH] Token de ${user.id} (${accessToken.length} B) no cabe en cookie; solo encabezado Authorization.`);
+    }
 
     res.json({
         success: true,
