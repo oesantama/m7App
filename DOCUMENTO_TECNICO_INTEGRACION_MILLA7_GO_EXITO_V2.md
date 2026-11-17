@@ -1,5 +1,5 @@
 # 📘 DOCUMENTO TÉCNICO DE INTEGRACIÓN Y ACCESOS QA
-**Transportadora / Paquetera:** Milla Siete S.A.S. (Plataforma **OrbitM7 v1.9.65**)  
+**Transportadora / Paquetera:** Milla Siete S.A.S. (Plataforma **OrbitM7 v1.9.66**)  
 **Cliente:** Grupo Éxito — Ecosistema **Go Éxito**  
 **Referencia Normativa:** *Lineamientos Técnicos de Integración para Paqueteras v2.0 (2026)*  
 **Modalidad Operativa:** Operación Urbana Misma Ciudad (*Same-Day* y *Next-Day*)  
@@ -183,23 +183,57 @@ Dado que **Milla Siete** realiza la recogida en los nodos/tiendas del Grupo Éxi
 ---
 
 ### 4.6. Notificación Saliente de Estados hacia Webhook Go Éxito (Sección 7.4 y 9)
-- **Estructura enviada por Milla Siete al Webhook de Grupo Éxito:**
+- **Método y destino:** `POST` al endpoint de tracking de Grupo Éxito, cabeceras `Content-Type: application/json` y `x-api-key` (credencial entregada por Grupo Éxito), además de `x-correlation-id` e `Idempotency-Key`. Se envía en el momento en que ocurre cada cambio de estado.
+- **Endpoint QA (Grupo Éxito):** `https://lzv2oui8p2.execute-api.us-east-1.amazonaws.com/dev/postelddev` — estructura según la colección *Milla7 Tracking.postman_collection*.
+- **Estructura enviada por Milla Siete (ejemplo entrega):**
 ```json
 {
   "header": {
-    "transactionId": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
-    "transactionDate": "2026-11-05T10:15:30-05:00",
-    "source": "PAQUETERA"
+    "transactionId": "2345c322-17a7-4252-aea9-06c0a2e25722",
+    "transactionDate": "2026-11-16T15:57:07-05:00",
+    "source": "MILLA7",
+    "eventType": "TRACKING_UPDATE",
+    "version": "1.0"
   },
   "data": {
-    "guide": "M7E-85012345678",
-    "orderNumber": "1412345678-01",
+    "guide": "SBX-23605099129",
+    "orderNumber": "1675613993173-01",
     "status": "6",
-    "eventDate": "2026-11-05T10:15:30-05:00",
-    "observation": "Entregado satisfactoriamente al destinatario."
+    "statusName": "ENTREGADO",
+    "eventDate": "2026-11-16T15:57:07-05:00",
+    "observation": "Entregado a José Bernardo Ospina Yepes. Foto y firma registradas."
   }
 }
 ```
+- **Ejemplo novedad (intento fallido con causal):**
+```json
+{
+  "header": { "transactionId": "c489a96e-c216-47bd-9f1e-3a0e5b7d2c11", "transactionDate": "2026-11-16T16:10:00-05:00",
+              "source": "MILLA7", "eventType": "TRACKING_UPDATE", "version": "1.0" },
+  "data": {
+    "guide": "SBX-32299297439",
+    "orderNumber": "1675613993169-01",
+    "status": "10",
+    "statusName": "NOVEDAD",
+    "eventDate": "2026-11-16T16:10:00-05:00",
+    "observation": "[FAILED_ATTEMPT_ABSENT] Intento fallido: Cliente no está en casa (Intento #1). Evidencia Drive: https://drive.google.com/..."
+  }
+}
+```
+- **Estados que envía Milla 7** (los estados `3` y `4` de transporte nacional no aplican: operación urbana misma ciudad):
+
+| status | statusName | Momento operativo Milla 7 |
+| :--- | :--- | :--- |
+| `1` | GUIA GENERADA | Creación de la guía (API o Inhouse) |
+| `2` | RECOGIDO EN TIENDA | Conductor recoge el paquete en la tienda |
+| `5` | EN REPARTO | Salida a ruta hacia el cliente |
+| `6` | ENTREGADO | Entrega efectiva con foto y firma |
+| `7` | CANCELADO | Anulación de la guía |
+| `9` | DEVOLUCION | Rechazo del cliente, avería, pérdida o máximo de intentos alcanzado (con `[reason_code]`) |
+| `10` | NOVEDAD | Novedad en el reparto o en la recogida que deja la guía para un nuevo intento: cliente ausente, dirección errada, portería no autoriza, faltante en tienda. Causal `[reason_code]` en `observation` |
+
+- **Causales (`reason_code` dentro de `observation`):** `FAILED_ATTEMPT_ABSENT`, `ADDRESS_ISSUE`, `ACCESS_RESTRICTED`, `CUSTOMER_REJECTED`, `DAMAGED_PACKAGE`, `PICKUP_DIFFERENCE`, `LOST_PACKAGE`, `CUSTOMER_REQUEST`.
+- Fechas en ISO 8601 con hora Colombia (`-05:00`).
 - **Política de Resiliencia Implementada:**
   - Timeout por intento: `5 segundos`.
   - Calendario automático de reintentos: Inmediato (`0s`), `1 min`, `2 min`, `5 min`, `15 min`, `30 min`, y cada `30 min` hasta completar **24 horas** (`DLQ`), más botón de **Reenvío Manual por Contingencia** desde la Torre de Control Inhouse de Milla Siete.
@@ -218,8 +252,8 @@ Dado que **Milla Siete** realiza la recogida en los nodos/tiendas del Grupo Éxi
 | **Header de Ambiente** | `x-exito-env: SANDBOX` *(o `QA`)* |
 | **Header de Trazabilidad** | `x-correlation-id: <UUID-v4>` |
 | **Header de Idempotencia** | `Idempotency-Key: <UUID-v4>` |
-| **Endpoint Crear Guía** | `POST https://orbitm7.m7apps.com/api/v1/guides` |
-| **Endpoint Consultar Rótulo PDF** | `GET https://orbitm7.m7apps.com/api/v1/guides/{guideNumber}/label` |
-| **Endpoint Solicitar Recogida** | `POST https://orbitm7.m7apps.com/api/v1/pickups` |
-| **Endpoint Anular Guía** | `POST https://orbitm7.m7apps.com/api/v1/guides/{guideNumber}/cancel` |
-| **Endpoint Consultar Estado/Trazabilidad** | `GET https://orbitm7.m7apps.com/api/v1/guides/{guideNumber}` |
+| **Endpoint Crear Guía** | `POST https://devsm7.m7apps.com/api/v1/guides` |
+| **Endpoint Consultar Rótulo PDF** | `GET https://devsm7.m7apps.com/api/v1/guides/{guideNumber}/label` |
+| **Endpoint Solicitar Recogida** | `POST https://devsm7.m7apps.com/api/v1/pickups` |
+| **Endpoint Anular Guía** | `POST https://devsm7.m7apps.com/api/v1/guides/{guideNumber}/cancel` |
+| **Endpoint Consultar Estado/Trazabilidad** | `GET https://devsm7.m7apps.com/api/v1/guides/{guideNumber}` |

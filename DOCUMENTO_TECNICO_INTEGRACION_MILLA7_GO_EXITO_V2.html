@@ -832,59 +832,69 @@
 
   <h2>7.5. Notificación Saliente vía Webhook hacia Go Éxito</h2>
   <p>
-    Milla 7 notifica inmediatamente cada avance de estado hacia el Webhook provisto por Go Éxito. La siguiente matriz resume la homologación oficial de estados:
+    Milla 7 envía un <code>POST</code> al endpoint de tracking de Grupo Éxito en el momento en que ocurre cada cambio de estado, con las cabeceras <code>Content-Type: application/json</code> y <code>x-api-key</code> (credencial entregada por Grupo Éxito), según la colección <em>Milla7 Tracking</em>. Endpoint QA: <code>https://lzv2oui8p2.execute-api.us-east-1.amazonaws.com/dev/postelddev</code>.
   </p>
+  <pre style="font-size:9px;">{
+  "header": {
+    "transactionId": "2345c322-17a7-4252-aea9-06c0a2e25722",
+    "transactionDate": "2026-11-16T15:57:07-05:00",
+    "source": "MILLA7",
+    "eventType": "TRACKING_UPDATE",
+    "version": "1.0"
+  },
+  "data": {
+    "guide": "SBX-23605099129",
+    "orderNumber": "1675613993173-01",
+    "status": "6",
+    "statusName": "ENTREGADO",
+    "eventDate": "2026-11-16T15:57:07-05:00",
+    "observation": "Entregado a José Bernardo Ospina Yepes. Foto y firma registradas."
+  }
+}</pre>
+  <p>Estados enviados (3 y 4 no aplican: operación urbana misma ciudad). En novedades (estado 10) y devoluciones (estado 9) la causal va en <code>observation</code> como <code>[reason_code]</code>, por ejemplo <code>[FAILED_ATTEMPT_ABSENT]</code>, <code>[ADDRESS_ISSUE]</code>, <code>[ACCESS_RESTRICTED]</code>, <code>[CUSTOMER_REJECTED]</code>, <code>[DAMAGED_PACKAGE]</code>.</p>
   <table class="data-table">
     <thead>
       <tr>
-        <th style="width: 10%;">Id Guía</th>
-        <th style="width: 22%;">Estado Homologado</th>
-        <th style="width: 22%;">Momento Operativo Milla 7</th>
-        <th>Evidencia Adjunta en Notificación</th>
+        <th style="width: 10%;">status</th>
+        <th style="width: 24%;">statusName</th>
+        <th>Momento operativo Milla 7</th>
       </tr>
     </thead>
     <tbody>
       <tr>
         <td><code>1</code></td>
-        <td>Guía generada</td>
-        <td>Creación vía API o Inhouse</td>
-        <td>Enlace al rótulo térmico PDF on-demand.</td>
+        <td>GUIA GENERADA</td>
+        <td>Creación de la guía (API o Inhouse)</td>
       </tr>
       <tr>
         <td><code>2</code></td>
-        <td>Recogido en punto</td>
-        <td>Conductor recibe en tienda Éxito</td>
-        <td>Foto de paquetes + Firma del encargado de tienda.</td>
+        <td>RECOGIDO EN TIENDA</td>
+        <td>Conductor recoge el paquete en la tienda</td>
       </tr>
       <tr>
         <td><code>5</code></td>
-        <td>En reparto</td>
-        <td>Vehículo sale de bodega en ruta</td>
-        <td>Placa, conductor asignado y remisión de ruta.</td>
+        <td>EN REPARTO</td>
+        <td>Salida a ruta hacia el cliente</td>
       </tr>
       <tr>
         <td><code>6</code></td>
-        <td>Entregado</td>
-        <td>Entrega final al cliente</td>
-        <td>Firma digital del cliente + Foto de fachada/paquete.</td>
+        <td>ENTREGADO</td>
+        <td>Entrega efectiva con foto y firma</td>
       </tr>
       <tr>
         <td><code>7</code></td>
-        <td>Novedad en reparto</td>
-        <td>Intento de entrega no efectivo</td>
-        <td>Foto causal + Causal homologada (motivo / reason_code).</td>
-      </tr>
-      <tr>
-        <td><code>8</code></td>
-        <td>Cancelado</td>
-        <td>Anulación antes de recogida</td>
-        <td>Registro de auditoría del usuario que anuló.</td>
+        <td>CANCELADO</td>
+        <td>Anulación de la guía</td>
       </tr>
       <tr>
         <td><code>9</code></td>
-        <td>Devolución</td>
-        <td>Retorno definitivo a tienda</td>
-        <td>Acta de devolución firmada en el nodo local.</td>
+        <td>DEVOLUCION</td>
+        <td>Rechazo del cliente, avería, pérdida o máximo de intentos alcanzado (con <code>[reason_code]</code>)</td>
+      </tr>
+      <tr>
+        <td><code>10</code></td>
+        <td>NOVEDAD</td>
+        <td>Novedad en el reparto o en la recogida que deja la guía para un nuevo intento: cliente ausente, dirección errada, portería no autoriza, faltante en tienda. Causal <code>[reason_code]</code> en <code>observation</code></td>
       </tr>
     </tbody>
   </table>
@@ -1021,7 +1031,7 @@
       <tr>
         <td><strong>Servidor y Host</strong></td>
         <td>VPS Dedicado Contabo (Alemania / 6 vCPUs, 12 GB RAM)</td>
-        <td>Infraestructura Cloud DigitalOcean Droplet</td>
+        <td>VPS Dedicado Contabo (aislado del ambiente QA)</td>
       </tr>
       <tr>
         <td><strong>Base URL API</strong></td>

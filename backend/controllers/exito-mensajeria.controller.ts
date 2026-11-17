@@ -4062,7 +4062,7 @@ export async function reportDriverNovelty(req: any, res: Response) {
       id: null,
       codigo_novedad: 'NOV-CLI-AUSENTE',
       reason_code_exito: 'FAILED_ATTEMPT_ABSENT',
-      id_guia_webhook: '5',
+      id_guia_webhook: '10',
       nombre_interno: 'Novedad operativa en entrega',
       etiqueta_conductor: 'Novedad en entrega',
       requiere_foto: true,
@@ -4109,7 +4109,8 @@ export async function reportDriverNovelty(req: any, res: Response) {
     const pasaADevolucion = Boolean(cat.es_rechazo_definitivo || numIntento >= 3);
     const nuevoEstado = pasaADevolucion ? 'DEVOLUCION' : 'EN_ALMACEN';
     const nuevoEstadoId = pasaADevolucion ? 'EST-13' : 'EST-33';
-    const idGuiaWebhook = pasaADevolucion ? '9' : String(cat.id_guia_webhook || '5');
+    // Novedad que deja la guía viva → 10 NOVEDAD (pedido de Grupo Éxito); si cierra el proceso → 9 DEVOLUCION.
+    const idGuiaWebhook = pasaADevolucion ? '9' : String(cat.id_guia_webhook || '10');
     const textoNovedad = `${cat.nombre_interno}${descripcion ? `: ${descripcion}` : ''} (Intento #${numIntento})`;
 
     await withTransaction(async (client) => {

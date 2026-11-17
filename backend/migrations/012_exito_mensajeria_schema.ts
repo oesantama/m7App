@@ -142,7 +142,7 @@ export const migration012: Migration = {
         id SERIAL PRIMARY KEY,
         codigo_novedad VARCHAR(40) UNIQUE NOT NULL,
         reason_code_exito VARCHAR(50) NOT NULL,
-        id_guia_webhook VARCHAR(10) NOT NULL DEFAULT '5',
+        id_guia_webhook VARCHAR(10) NOT NULL DEFAULT '10',
         nombre_interno VARCHAR(150) NOT NULL,
         etiqueta_conductor VARCHAR(120) NOT NULL,
         icono VARCHAR(40) DEFAULT 'AlertTriangle',
@@ -163,12 +163,12 @@ export const migration012: Migration = {
         codigo_novedad, reason_code_exito, id_guia_webhook, nombre_interno,
         etiqueta_conductor, icono, etapa, requiere_foto, es_rechazo_definitivo, dispara_alerta
       ) VALUES
-        ('NOV-CLI-AUSENTE',     'FAILED_ATTEMPT_ABSENT', '5', 'Intento fallido: Cliente no está en casa',      '🏠 No hay nadie en la casa',           'Home',          'ENTREGA',   TRUE,  FALSE, TRUE),
-        ('NOV-DIR-ERRADA',      'ADDRESS_ISSUE',         '5', 'Novedad de dirección: No existe o incompleta',  '📍 La dirección no existe o está mal', 'MapPinOff',     'ENTREGA',   TRUE,  FALSE, TRUE),
+        ('NOV-CLI-AUSENTE',     'FAILED_ATTEMPT_ABSENT', '10', 'Intento fallido: Cliente no está en casa',      '🏠 No hay nadie en la casa',           'Home',          'ENTREGA',   TRUE,  FALSE, TRUE),
+        ('NOV-DIR-ERRADA',      'ADDRESS_ISSUE',         '10', 'Novedad de dirección: No existe o incompleta',  '📍 La dirección no existe o está mal', 'MapPinOff',     'ENTREGA',   TRUE,  FALSE, TRUE),
         ('NOV-CLI-RECHAZA',     'CUSTOMER_REJECTED',     '9', 'Rechazo: Cliente no recibe el pedido',          '✋ El cliente no quiso recibir',        'XCircle',       'ENTREGA',   TRUE,  TRUE,  TRUE),
-        ('NOV-PORTERIA-NO',     'ACCESS_RESTRICTED',     '5', 'Portería / Unidad no autoriza ingreso',         '🏢 En portería no dejaron recibir',    'ShieldAlert',   'ENTREGA',   TRUE,  FALSE, TRUE),
+        ('NOV-PORTERIA-NO',     'ACCESS_RESTRICTED',     '10', 'Portería / Unidad no autoriza ingreso',         '🏢 En portería no dejaron recibir',    'ShieldAlert',   'ENTREGA',   TRUE,  FALSE, TRUE),
         ('NOV-AVERIA',          'DAMAGED_PACKAGE',       '9', 'Avería: Paquete o empaque dañado',              '📦 La caja está rota o dañada',        'PackageX',      'TODAS',     TRUE,  TRUE,  TRUE),
-        ('NOV-DIF-RECOGIDA',    'PICKUP_DIFFERENCE',     '2', 'Diferencia en recogida: Paquete faltante nodo', '🔍 Falta este paquete en la tienda',   'SearchX',       'RECOGIDA',  FALSE, FALSE, TRUE),
+        ('NOV-DIF-RECOGIDA',    'PICKUP_DIFFERENCE',     '10', 'Diferencia en recogida: Paquete faltante nodo', '🔍 Falta este paquete en la tienda',   'SearchX',       'RECOGIDA',  FALSE, FALSE, TRUE),
         ('NOV-PERDIDA',         'LOST_PACKAGE',          '9', 'Pérdida o extravío reportado en operación',     '⚠️ Paquete extraviado',                'AlertOctagon',  'ALMACEN',   FALSE, TRUE,  TRUE),
         ('NOV-ANUL-CLIENTE',    'CUSTOMER_REQUEST',      '7', 'Anulación solicitada por el cliente / Éxito',   '🚫 Pedido cancelado por Éxito',        'Ban',           'ANULACION', FALSE, TRUE,  FALSE)
       ON CONFLICT (codigo_novedad) DO UPDATE SET
