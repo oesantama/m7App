@@ -3409,10 +3409,22 @@ export async function getDriverTasks(req: any, res: Response) {
       rawCedula ||
       '';
 
-    // 5. Consultar TODOS los paquetes DISPONIBLES a recoger en los nodos asignados a esta placa
+    // 5. Paquetes a recoger: SOLO de los nodos de una programación de recogida ABIERTA (PROGRAMADO) de esta placa.
+    //    Si la programación ya se completó, no se puede volver a recoger hasta que Inhouse programe otra.
+    const progAbiertasRes = await pool.query(
+      `SELECT * FROM exito_msj_programacion_recogidas
+       WHERE REPLACE(UPPER(placa), '-', '') = $1 AND estado = 'PROGRAMADO'
+       ORDER BY created_at DESC`,
+      [cleanPlaca]
+    );
+    const nodoIdsProgramados = Array.from(
+      new Set<number>(progAbiertasRes.rows.flatMap((p: any) => (p.nodo_ids || []).map((x: any) => Number(x))))
+    );
+    const recogidaSinProgramacionAbierta = nodosAsignados.length > 0 && progAbiertasRes.rows.length === 0;
+
     let recogidasPendientesRows: any[] = [];
-    if (nodosAsignados.length > 0) {
-      const nodoIds = nodosAsignados.map((n: any) => Number(n.id));
+    if (nodoIdsProgramados.length > 0) {
+      const nodoIds = nodoIdsProgramados;
       const recRes = await pool.query(
         `SELECT g.*, n.nombre AS nodo_nombre, n.direccion AS nodo_direccion, n.contacto_telefono AS nodo_telefono
          FROM exito_msj_guias g
@@ -3461,6 +3473,7 @@ export async function getDriverTasks(req: any, res: Response) {
       programacionesPlaca,
       programacionRecogidas: progRecogidasRes.rows,
       recogidasPendientes: recogidasPendientesRows,
+      recogidaSinProgramacionAbierta,
       rutasActivas: rutasActivas.map((r: any) => ({
         ...r,
         planillaPdfUrl: `/api/exito-mensajeria/planillas/${encodeURIComponent(r.codigo_ruta)}/pdf`,
@@ -3553,6 +3566,34 @@ export async function completeDriverStorePickup(req: any, res: Response) {
       req.user?.documentNumber ||
       req.user?.document_number ||
       null;
+
+    // Solo se puede recoger con una programación ABIERTA para esta placa que incluya los nodos de las guías.
+    const placaLimpia = finalPlaca.replace(/[^A-Z0-9]/g, '');
+    const progAbiertaRes = await pool.query(
+      `SELECT nodo_ids FROM exito_msj_programacion_recogidas
+       WHERE REPLACE(UPPER(placa), '-', '') = $1 AND estado = 'PROGRAMADO'`,
+      [placaLimpia]
+    );
+    if (progAbiertaRes.rows.length === 0) {
+      return res.status(409).json({
+        error: `La placa ${finalPlaca} no tiene una programación de recogida abierta. Si la recogida ya se completó, pida a Inhouse una nueva programación.`,
+      });
+    }
+    const nodosPermitidos = new Set<number>(
+      progAbiertaRes.rows.flatMap((p: any) => (p.nodo_ids || []).map((x: any) => Number(x)))
+    );
+    const fueraDeProgramacion = guias.filter((g: any) => !nodosPermitidos.has(Number(g.nodo_id)));
+    if (fueraDeProgramacion.length > 0) {
+      return res.status(409).json({
+        error: `Las guías ${fueraDeProgramacion.map((g: any) => g.numero_guia).join(', ')} son de un nodo que no está en la programación abierta de la placa ${finalPlaca}.`,
+      });
+    }
+    const yaRecogidas = guias.filter((g: any) => !['DISPONIBLE', 'ESPERA_RECOGIDA'].includes(String(g.estado_operativo)));
+    if (yaRecogidas.length > 0) {
+      return res.status(409).json({
+        error: `Las guías ${yaRecogidas.map((g: any) => g.numero_guia).join(', ')} ya fueron recogidas o no están disponibles.`,
+      });
+    }
 
     const codigoRecogida = `REC-EX-${Date.now().toString().slice(-6)}`;
     const remisionOnDemandUrl = `/api/exito-mensajeria/planillas/${encodeURIComponent(codigoRecogida)}/pdf`;

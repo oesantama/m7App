@@ -170,6 +170,8 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
 
   // Datos cargados para la placa validada
   const [recogidasPendientes, setRecogidasPendientes] = useState<any[]>([]);
+  // true cuando la placa tiene tiendas asignadas pero ninguna programación de recogida abierta (ya se completó)
+  const [recogidaCerrada, setRecogidaCerrada] = useState<boolean>(false);
   const [entregasEnRuta, setEntregasEnRuta] = useState<any[]>([]);
   const [catalogoNovedades, setCatalogoNovedades] = useState<any[]>([]);
 
@@ -298,6 +300,7 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
         setProgramacionRecogidas(data.programacionRecogidas || []);
         setRutasActivas(data.rutasActivas || []);
         setRecogidasPendientes(data.recogidasPendientes || []);
+        setRecogidaCerrada(Boolean(data.recogidaSinProgramacionAbierta));
         setEntregasEnRuta(data.entregasEnRuta || []);
         setCatalogoNovedades(data.catalogoNovedades || []);
         setGuiasMarcadasRecogida((data.recogidasPendientes || []).map((g: any) => Number(g.id)));
@@ -946,6 +949,14 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
               </div>
             )}
 
+            {recogidaCerrada ? (
+              <div className="w-full bg-slate-100 border-4 border-slate-300 rounded-3xl p-6 space-y-1">
+                <div className="text-xl font-black text-slate-700">Recogida en tienda completada</div>
+                <div className="text-base font-bold text-slate-600">
+                  La placa {placaValidada} no tiene una programación de recogida abierta. Para volver a recoger, Inhouse debe programar el vehículo de nuevo.
+                </div>
+              </div>
+            ) : (
             <button
               onClick={() => {
                 if (recogidasPendientes.length === 0) {
@@ -971,6 +982,7 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
                 <Building2 className="w-10 h-10 text-white" />
               </div>
             </button>
+            )}
           </div>
         )}
 
