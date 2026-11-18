@@ -74,7 +74,10 @@ const codigoDePdf = (url?: string | null): string | null => {
   return m ? decodeURIComponent(m[1]) : null;
 };
 /** Las fotos guardadas en el servidor se muestran en la app; los enlaces de Drive (carpeta privada) no. */
-const esFotoVisible = (url?: string | null): url is string => !!url && !url.includes('drive.google.com');
+const esFotoVisible = (url?: string | null): url is string =>
+  !!url &&
+  !url.includes('drive.google.com') &&
+  (url.startsWith('/uploads/') || url.startsWith('data:image') || /\.(jpe?g|png|webp|gif)(\?|$)/i.test(url));
 
 /** Une historial de estados, novedades, intentos de entrega y envíos a Éxito en una línea de tiempo (más reciente primero). */
 type EventoGuia = { key: string; fecha: string; tipo: string; titulo: string; detalle?: string; usuario?: string; url?: string; color: string };
@@ -2235,8 +2238,18 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
                             alt="Evidencia"
                             loading="lazy"
                             onClick={() => setFotoAmpliada(ev.url!)}
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
                             className="mt-1 w-20 h-20 object-cover rounded-lg border border-slate-200 cursor-zoom-in"
                           />
+                        )}
+                        {codigoDePdf(ev.url) && (
+                          <button
+                            type="button"
+                            onClick={() => handlePrintOrViewPlanilla(codigoDePdf(ev.url)!)}
+                            className="mt-1 text-[11px] font-bold text-indigo-700 hover:underline inline-flex items-center gap-1"
+                          >
+                            <FileText className="w-3 h-3" /> {codigoDePdf(ev.url)}
+                          </button>
                         )}
                       </div>
                       <div className="text-right text-[11px] text-slate-500 shrink-0">
