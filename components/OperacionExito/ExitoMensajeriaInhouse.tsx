@@ -68,6 +68,14 @@ const ESTADO_LABELS: Record<string, { label: string; idGuia: string; badge: stri
 };
 
 
+/** Código del documento (REC-EX / RUT-EX / lote) a partir del enlace on-demand /planillas/{codigo}/pdf. */
+const codigoDePdf = (url?: string | null): string | null => {
+  const m = String(url || '').match(/planillas\/([^/]+)\/pdf/);
+  return m ? decodeURIComponent(m[1]) : null;
+};
+/** Las fotos guardadas en el servidor se muestran en la app; los enlaces de Drive (carpeta privada) no. */
+const esFotoVisible = (url?: string | null): url is string => !!url && !url.includes('drive.google.com');
+
 /** Une historial de estados, novedades, intentos de entrega y envíos a Éxito en una línea de tiempo (más reciente primero). */
 type EventoGuia = { key: string; fecha: string; tipo: string; titulo: string; detalle?: string; usuario?: string; url?: string; color: string };
 const construirLineaTiempo = (d: any): EventoGuia[] => {
@@ -143,6 +151,7 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
   // Filtros de guías (Inicia mostrando DISPONIBLES para recoger, pero permite ver TODOS)
   const [filtroEstado, setFiltroEstado] = useState('DISPONIBLES_RECOGIDA');
   const [consultaGuia, setConsultaGuia] = useState('');
+  const [fotoAmpliada, setFotoAmpliada] = useState<string | null>(null);
   const [filtroOperacion, setFiltroOperacion] = useState('TODOS');
   const [filtroNodo, setFiltroNodo] = useState('TODOS');
   const [filtroSync, setFiltroSync] = useState('TODOS');
@@ -510,7 +519,7 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
     if (selectedGuiaIds.length === 0) return toast.warning('Seleccione las guías que saldrán a reparto urbano.');
     if (!selVehiculoId || !selConductorId) return toast.warning('Seleccione vehículo y conductor de reparto.');
     try {
-      toast.loading('Generando ruta urbana, PDF en Google Drive y notificando Id guía=5 a Go Éxito...', {
+      toast.loading('Generando ruta y notificando a Éxito...', {
         id: 'route-create',
       });
       const res = await apiFetch('/rutas', {
@@ -553,12 +562,12 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
   const handleCreateManualGuide = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      toast.loading('Creando guía y subiendo rótulo PDF a Google Drive...', { id: 'manual-guide' });
+      toast.loading('Creando guía...', { id: 'manual-guide' });
       await apiFetch('/guias/manual', {
         method: 'POST',
         body: JSON.stringify(newGuiaForm),
       });
-      toast.success('Guía creada exitosamente con rótulo en Google Drive.', { id: 'manual-guide' });
+      toast.success('Guía creada. El rótulo se genera al imprimirlo.', { id: 'manual-guide' });
       setShowCreateManualModal(false);
       loadGuias();
     } catch (err: any) {
@@ -568,7 +577,7 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
 
   const handleSimulateSandbox = async () => {
     try {
-      toast.loading('Generando guías simuladas Go Éxito v2.0 y subiendo rótulos a Google Drive...', {
+      toast.loading('Generando guías de prueba...', {
         id: 'sbx-sim',
       });
       const res = await apiFetch('/sandbox/simular-guias', {
@@ -1427,27 +1436,25 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
                               >
                                 <Eye className="w-3 h-3 text-indigo-600" /> Ver PDF
                               </button>
-                              {g.remision_pdf_url && (
-                                <a
-                                  href={g.remision_pdf_url}
-                                  target="_blank"
-                                  rel="noreferrer"
+                              {codigoDePdf(g.remision_pdf_url) && (
+                                <button
+                                  type="button"
+                                  onClick={() => handlePrintOrViewPlanilla(codigoDePdf(g.remision_pdf_url)!)}
                                   className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold text-[10px] flex items-center gap-1"
-                                  title="Abrir Remisión PDF en Google Drive"
+                                  title="Generar remisión PDF"
                                 >
                                   <FileText className="w-3 h-3" /> Remisión
-                                </a>
+                                </button>
                               )}
-                              {(g.foto_entrega_url || g.foto_recogida_url || g.foto_url) && (
-                                <a
-                                  href={g.foto_entrega_url || g.foto_recogida_url || g.foto_url}
-                                  target="_blank"
-                                  rel="noreferrer"
+                              {esFotoVisible(g.foto_entrega_url || g.foto_recogida_url || g.foto_url) && (
+                                <button
+                                  type="button"
+                                  onClick={() => setFotoAmpliada(g.foto_entrega_url || g.foto_recogida_url || g.foto_url)}
                                   className="px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[10px] flex items-center gap-1"
-                                  title="Ver Foto de Evidencia en Google Drive"
+                                  title="Ver foto de evidencia"
                                 >
-                                  <ExternalLink className="w-3 h-3" /> Foto Drive
-                                </a>
+                                  <Eye className="w-3 h-3" /> Foto
+                                </button>
                               )}
                             </div>
                           </td>
@@ -1657,7 +1664,7 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
                     <th className="p-3">Nodo Destino</th>
                     <th className="p-3">Total Guías</th>
                     <th className="p-3">Estado</th>
-                    <th className="p-3">Acta PDF en Google Drive</th>
+                    <th className="p-3">Acta</th>
                     <th className="p-3">Fecha</th>
                   </tr>
                 </thead>
@@ -1680,16 +1687,13 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
                           </span>
                         </td>
                         <td className="p-3">
-                          {l.remision_pdf_url && (
-                            <a
-                              href={l.remision_pdf_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-indigo-600 font-bold hover:underline"
-                            >
-                              <FileText className="w-3.5 h-3.5" /> Ver Acta en Google Drive
-                            </a>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => handlePrintOrViewPlanilla(l.codigo_lote)}
+                            className="inline-flex items-center gap-1 text-indigo-600 font-bold hover:underline"
+                          >
+                            <FileText className="w-3.5 h-3.5" /> Ver acta
+                          </button>
                         </td>
                         <td className="p-3 text-slate-500">
                           {new Date(l.created_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}
@@ -2047,6 +2051,15 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
       {/* =====================================================================
           MODAL: DETALLE COMPLETO Y TRAZABILIDAD DE GUÍA
          ===================================================================== */}
+      {fotoAmpliada && (
+        <div
+          className="fixed inset-0 z-[60] bg-slate-950/85 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setFotoAmpliada(null)}
+        >
+          <img src={fotoAmpliada} alt="Evidencia" className="max-w-full max-h-[90vh] rounded-2xl shadow-2xl bg-white" />
+        </div>
+      )}
+
       {detailModalGuia && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl">
@@ -2159,24 +2172,44 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
                   </button>
                 </div>
               </div>
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
+                <div className="text-[10px] font-black uppercase text-slate-500">Remisión PDF</div>
+                {codigoDePdf(detailModalGuia.guia.remision_pdf_url) ? (
+                  <button
+                    type="button"
+                    onClick={() => handlePrintOrViewPlanilla(codigoDePdf(detailModalGuia.guia.remision_pdf_url)!)}
+                    className="text-xs font-black text-emerald-700 hover:underline flex items-center gap-1 mt-1"
+                  >
+                    <FileText className="w-3.5 h-3.5" /> Generar PDF
+                  </button>
+                ) : (
+                  <span className="text-xs text-slate-400">Pendiente</span>
+                )}
+              </div>
+            </div>
+
+            {/* Fotos y firmas: se ven aquí mismo (no se envía al usuario a Drive) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: 'Remisión PDF (Drive)', url: detailModalGuia.guia.remision_pdf_url },
-                { label: 'Foto Recogida (Drive)', url: detailModalGuia.guia.foto_recogida_url },
-                { label: 'Foto Entrega (Drive)', url: detailModalGuia.guia.foto_entrega_url || detailModalGuia.guia.foto_url },
-              ].map((doc) => (
-                <div key={doc.label} className="p-3 rounded-2xl bg-slate-50 border border-slate-200">
-                  <div className="text-[10px] font-black uppercase text-slate-500">{doc.label}</div>
-                  {doc.url ? (
-                    <a
-                      href={doc.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs font-black text-emerald-700 hover:underline flex items-center gap-1 mt-1"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" /> Abrir en Drive
-                    </a>
+                { label: 'Foto recogida', url: detailModalGuia.guia.foto_recogida_url },
+                { label: 'Foto entrega', url: detailModalGuia.guia.foto_entrega_url || detailModalGuia.guia.foto_url },
+                { label: 'Rótulo en entrega', url: detailModalGuia.guia.foto_rotulo_entrega_url },
+                { label: 'Firma entrega', url: detailModalGuia.guia.firma_entrega_url },
+              ].map((f) => (
+                <div key={f.label} className="rounded-2xl bg-slate-50 border border-slate-200 p-2">
+                  <div className="text-[10px] font-black uppercase text-slate-500 mb-1">{f.label}</div>
+                  {esFotoVisible(f.url) ? (
+                    <img
+                      src={f.url}
+                      alt={f.label}
+                      loading="lazy"
+                      onClick={() => setFotoAmpliada(f.url!)}
+                      className="w-full h-28 object-cover rounded-xl cursor-zoom-in bg-white"
+                    />
                   ) : (
-                    <span className="text-xs text-slate-400">Pendiente</span>
+                    <div className="h-28 flex items-center justify-center text-[11px] text-slate-400">
+                      {f.url ? 'Solo en respaldo' : 'Pendiente'}
+                    </div>
                   )}
                 </div>
               ))}
@@ -2196,10 +2229,14 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
                           {ev.titulo}
                         </div>
                         {ev.detalle && <p className="text-[11px] text-slate-600 break-words">{ev.detalle}</p>}
-                        {ev.url && (
-                          <a href={ev.url} target="_blank" rel="noreferrer" className="text-[11px] font-bold text-emerald-700 hover:underline inline-flex items-center gap-1">
-                            <ExternalLink className="w-3 h-3" /> Evidencia
-                          </a>
+                        {esFotoVisible(ev.url) && (
+                          <img
+                            src={ev.url}
+                            alt="Evidencia"
+                            loading="lazy"
+                            onClick={() => setFotoAmpliada(ev.url!)}
+                            className="mt-1 w-20 h-20 object-cover rounded-lg border border-slate-200 cursor-zoom-in"
+                          />
                         )}
                       </div>
                       <div className="text-right text-[11px] text-slate-500 shrink-0">

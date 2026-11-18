@@ -95,8 +95,10 @@ function prepareDriveEvidenceAsync(
           ...options,
           buffer,
         });
+        // Drive es solo respaldo (carpeta privada): se guarda el ID real pero el enlace visible
+        // sigue siendo la copia del servidor, que la app puede mostrar.
         if (onComplete && realRes?.driveFileId && realRes.driveFileId !== mockFileId) {
-          await onComplete(realRes);
+          await onComplete({ driveFileId: realRes.driveFileId, driveUrl: localUrl });
         }
       } catch (err: any) {
         console.warn(`[DRIVE-BACKGROUND] Subida de ${options.tipoEvidencia} procesada con respaldo:`, err?.message);
@@ -3034,7 +3036,7 @@ export async function manualStateChangeInhouse(req: any, res: Response) {
     let driveUrl: string | null = null;
     let driveFileId: string | null = null;
     if (evidenciaBase64) {
-      const up = await ExitoDriveService.uploadBase64ToDrive(evidenciaBase64, {
+      const up = prepareDriveEvidenceAsync(evidenciaBase64, {
         numeroGuia: guia.numero_guia,
         tipoOperacion: guia.tipo_operacion,
         etapa: nuevoEstado === 'DEVOLUCION' ? 'Devoluciones' : 'Entregas',
@@ -4297,7 +4299,7 @@ export async function createReturnBatch(req: any, res: Response) {
     let firmaDriveId: string | null = null;
 
     if (fotoDevolucionBase64) {
-      const f = await ExitoDriveService.uploadBase64ToDrive(fotoDevolucionBase64, {
+      const f = prepareDriveEvidenceAsync(fotoDevolucionBase64, {
         numeroGuia: primera.numero_guia,
         tipoOperacion: primera.tipo_operacion,
         etapa: 'Devoluciones',
@@ -4310,7 +4312,7 @@ export async function createReturnBatch(req: any, res: Response) {
     }
 
     if (firmaExitoBase64) {
-      const s = await ExitoDriveService.uploadBase64ToDrive(firmaExitoBase64, {
+      const s = prepareDriveEvidenceAsync(firmaExitoBase64, {
         numeroGuia: primera.numero_guia,
         tipoOperacion: primera.tipo_operacion,
         etapa: 'Devoluciones',
@@ -4322,21 +4324,11 @@ export async function createReturnBatch(req: any, res: Response) {
       firmaDriveId = s.driveFileId;
     }
 
-    const remisionDrive = await ExitoPdfService.generateAndUploadRemissionPdf({
-      codigoDocumento: codigoLote,
-      titulo: 'ACTA / REMISION DE DEVOLUCION A NODO EXITO',
-      subtitulo: 'Devolucion Semanal de Paqueteria - Milla 7 Logistics',
-      tipoOperacion: primera.tipo_operacion,
-      etapaDrive: 'Devoluciones',
-      tipoEvidencia: 'remision_devolucion',
-      nodoNombre: primera.nodo_nombre || 'NODO EXITO',
-      placaVehiculo: vehiculoId || 'FLOTA-M7',
-      nombreConductor: conductorId || userName,
-      responsableTienda: nombreReceptorExito || 'Receptor Devoluciones Éxito',
-      observaciones,
-      guias,
-      isSandbox,
-    });
+    // El acta no se guarda: se genera en memoria cada vez que se consulta (mismo endpoint que REC-EX / RUT-EX).
+    const remisionDrive = {
+      driveUrl: `/api/exito-mensajeria/planillas/${encodeURIComponent(codigoLote)}/pdf`,
+      driveFileId: null as string | null,
+    };
 
     const lote = await withTransaction(async (client) => {
       const loteIns = await client.query(
@@ -4405,7 +4397,7 @@ export async function createReturnBatch(req: any, res: Response) {
         numeroPedido: g.numero_pedido,
         codigoInterno: 'DEVOLUCION',
         idGuiaStatus: '9',
-        observation: `En lote de devolución ${codigoLote}. Acta Drive: ${remisionDrive.driveUrl}`,
+        observation: `En lote de devolución ${codigoLote}.`,
         ambiente: g.ambiente,
         isSandbox: Boolean(g.is_sandbox),
       });

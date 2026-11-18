@@ -197,6 +197,19 @@ export class EvolutionService {
         this.qrCache.delete(sessionName);
         this.refreshLocks.get(sessionName); // no cancelamos, pero...
 
+        // Camino rápido (~2 s): si la instancia existe y no está abierta, pedir el QR sin borrarla.
+        try {
+            const actual = await this.checkInstanceState(sessionName);
+            if (actual && actual.state !== 'open') {
+                const qrRapido = await this.fetchQRFromConnect(sessionName);
+                if (qrRapido) {
+                    this.qrCache.set(sessionName, { status: 'SCAN_QR', qr: qrRapido, ownerJid: null, ts: Date.now() });
+                    this.registerWebhook(sessionName);
+                    return { status: 'SCAN_QR', qr: qrRapido };
+                }
+            }
+        } catch { /* sigue con borrar y recrear */ }
+
         // Intentar borrar instancia existente
         try {
             await axios.delete(`${EVO_URL}/instance/delete/${sessionName}`, {

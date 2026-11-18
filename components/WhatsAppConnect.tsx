@@ -82,7 +82,8 @@ const WhatsAppConnect: React.FC<WhatsAppCenterProps> = ({ user }) => {
 
     const handleConnect = async () => {
         try {
-            toast.info("Iniciando motor de WhatsApp...");
+            setQr(null);
+            setStatus('CONNECTING');
             const data = await api.connectWhatsApp(user.id);
             if (data.qr) {
                 setQr(data.qr);
@@ -306,10 +307,16 @@ const WhatsAppConnect: React.FC<WhatsAppCenterProps> = ({ user }) => {
                                             </div>
                                         ) : (
                                             <div className="w-64 h-64 bg-slate-50 rounded-[2.5rem] flex flex-col items-center justify-center mx-auto border-4 border-dashed border-slate-100">
-                                                <Icons.Loader className="w-10 h-10 text-emerald-500 animate-spin mb-4" />
-                                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">
-                                                    {status === 'CONNECTING' ? 'Generando código QR...' : 'En espera...'}
-                                                </p>
+                                                {status === 'CONNECTING' ? (
+                                                    <>
+                                                        <Icons.Loader className="w-10 h-10 text-emerald-500 animate-spin mb-4" />
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Generando código QR...</p>
+                                                    </>
+                                                ) : (
+                                                    <p className="px-6 text-center text-xs font-bold text-slate-400">
+                                                        Sin conexión.<br />Pulse <span className="text-emerald-600">Obtener nuevo enlace</span> para ver el QR.
+                                                    </p>
+                                                )}
                                                 {status === 'CONNECTING' && (
                                                     <p className="text-[9px] text-slate-300 mt-2 text-center max-w-[12rem]">Puede tomar hasta 30 segundos la primera vez</p>
                                                 )}
