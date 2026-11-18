@@ -38,6 +38,7 @@ const PAGE_DESCRIPTIONS: Record<string, string> = {
   'prov-clientes': 'Relación entre proveedores y los clientes que atienden.',
   'masterTipoDocumento': 'Tipos de documento de identidad disponibles (CC, NIT, etc.).',
   'masterTipoNotificacion': 'Grupos de alerta que agrupan a los destinatarios de notificaciones.',
+  'masterBancos': 'Bancos a los que se consigna o transfiere al conciliar facturas.',
   'masterTiposVehiculo': 'Tipos de vehículo disponibles para la flota.',
   'masterUnidadMedida': 'Unidades de medida usadas en artículos e inventario (UND, KG, etc.).',
   // Gerencia
@@ -308,6 +309,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     masterNotificaciones: 'NOT',
     masterNotificacionesWhatsapp: 'WAP',
     masterTipoNotificacion: 'TGN',
+    masterBancos: 'BANCO',
     masterUnidadMedida: 'UOM',
     masterArticulo: 'ART',
     masterClientes: 'CLI',
@@ -330,6 +332,7 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
     masterNotificaciones: 'ALERTAS & NOTIFICACIONES',
     masterNotificacionesWhatsapp: 'ALERTAS WHATSAPP',
     masterTipoNotificacion: 'GRUPOS DE ALERTA',
+    masterBancos: 'BANCOS',
     masterUnidadMedida: 'UNIDADES DE MEDIDA',
     masterArticulo: 'MAESTRO DE ARTÍCULOS',
     masterClientes: 'CLIENTES CORPORATIVOS',
@@ -1067,6 +1070,15 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
           updatedBy: user.name
         };
         saveResponse = await api.saveTipoNotificacion(cleanData);
+      } else if (activeMaster === 'masterBancos') {
+        saveResponse = await api.saveMaster('bancos', {
+          id: newRecord.id,
+          name: String(newRecord.name || '').toUpperCase().trim(),
+          description: newRecord.description || '',
+          statusId: newRecord.statusId,
+          createdBy: newRecord.createdBy || user.name,
+          updatedBy: user.name,
+        });
       } else {
         // Guardado Genérico para el resto de tablas maestras (masterTipoDocumento, etc.)
         saveResponse = await api.saveMaster(activeMaster, newRecord);
@@ -1114,6 +1126,12 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
             case 'masterNotificacionesWhatsapp': rawData = await api.getNotificacionesWhatsapp(); break;
             case 'masterTiposVehiculo': rawData = await api.getTiposVehiculo(); break;
             case 'masterTipoNotificacion': rawData = await api.getTiposNotificacion(); break;
+            case 'masterBancos': {
+              // Maestra genérica master_records (category = 'bancos'), compartida con conciliación y Dicorp
+              const todos = await api.getGenericMasters();
+              rawData = (Array.isArray(todos) ? todos : []).filter((r: any) => r.category === 'bancos');
+              break;
+            }
             default:
               const allGenerics = await api.getGenericMasters();
               rawData = (allGenerics as any)[cat] || [];
@@ -1230,6 +1248,8 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
         await api.deleteTipoVehiculo(recordToDelete.id, user.name);
       } else if (activeMaster === 'masterTipoNotificacion') {
         await api.deleteTipoNotificacion(recordToDelete.id, user.name);
+      } else if (activeMaster === 'masterBancos') {
+        await api.deleteMaster('bancos', recordToDelete.id, user.name);
       } else {
         await api.deleteMaster(activeMaster, recordToDelete.id, user.name);
       }
@@ -2258,6 +2278,16 @@ const MasterModule: React.FC<MasterModuleProps> = ({ activeMaster, user, onAudit
             </div>
             <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Descripción</label>
               <textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} className={`${commonInputStyle} h-24 resize-none`} placeholder="Detalles del tipo de documento..." />
+            </div>
+            {renderStatusField()}
+          </div>
+        );
+
+      case 'masterBancos':
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in">
+            <div className="md:col-span-2 space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase ml-2">Nombre del Banco</label>
+              <input type="text" value={formData.name || ''} onChange={e => setFormData({ ...formData, name: e.target.value.toUpperCase() })} className={commonInputStyle} required />
             </div>
             {renderStatusField()}
           </div>

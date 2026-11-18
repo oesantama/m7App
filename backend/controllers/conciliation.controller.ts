@@ -308,7 +308,8 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
                 di.address,
                 SUM(COALESCE(di.expected_qty, 0))           AS total_qty,
                 ic.id                                       AS conciliation_id,
-                ic.banco,
+                ic.banco                                    AS banco_id,
+                COALESCE((SELECT mb.name FROM master_records mb WHERE mb.category = 'bancos' AND mb.id = ic.banco), ic.banco)      AS banco,
                 ic.valor,
                 ic.comprobante,
                 ic.fecha_pago,
@@ -531,7 +532,10 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
             [documentId, idNum]
         );
         const paymentsRes = await pool.query(
-            `SELECT * FROM route_group_payments WHERE document_id = $1 OR document_id = $2::text ORDER BY created_at ASC`,
+            `SELECT rgp.*, mb.name AS banco_nombre
+               FROM route_group_payments rgp
+               LEFT JOIN master_records mb ON mb.category = 'bancos' AND mb.id = rgp.banco_id
+              WHERE rgp.document_id = $1 OR rgp.document_id = $2::text ORDER BY rgp.created_at ASC`,
             [documentId, idNum]
         );
 
@@ -556,7 +560,7 @@ export const getConciliationByDocument = async (req: Request, res: Response) => 
 export const saveConciliation = async (req: Request, res: Response) => {
         const {
             documentId, invoiceNumber,
-            banco, valor, comprobante, fechaPago, formaPago, numeroCheque,
+            banco: bancoTexto, bancoId, valor, comprobante, fechaPago, formaPago, numeroCheque,
             esDevolucion, conciliadoPor,
             vehiclePlate, conductorId, conductorName,
             estadoEntrega,
@@ -566,6 +570,8 @@ export const saveConciliation = async (req: Request, res: Response) => {
             itemsReturned,
             targetRouteId,
         } = req.body;
+        // La columna invoice_conciliations.banco guarda el ID del banco (master_records category='bancos')
+        const banco: string | null = bancoId || bancoTexto || null;
 
         if (!documentId || !invoiceNumber) {
             return res.status(400).json({ success: false, error: 'documentId e invoiceNumber son requeridos' });
@@ -799,7 +805,7 @@ export const saveConciliation = async (req: Request, res: Response) => {
             facturaNum > 0 ? facturaNum : null,
             valorEntregado > 0 ? valorEntregado : null,
             valorDevuelto  > 0 ? valorDevuelto  : null,
-            banco || 'Bancolombia',
+            banco || null,
             comprobante || null,
             conciliadoPor  || null,
             usuarioNombre  || null,
@@ -940,7 +946,8 @@ export const getConciliationHistory = async (req: Request, res: Response) => {
                 ic.conductor_name,
                 ic.forma_pago,
                 ic.valor,
-                ic.banco,
+                ic.banco AS banco_id,
+                COALESCE((SELECT mb.name FROM master_records mb WHERE mb.category = 'bancos' AND mb.id = ic.banco), ic.banco) AS banco,
                 ic.comprobante,
                 ic.numero_cheque,
                 ic.fecha_pago,
@@ -1155,7 +1162,7 @@ export const downloadPlanilla = async (req: Request, res: Response) => {
                 MAX(p.vmetodo)                                                     AS "Valor Factura",
                 est_item.name                                                      AS "Estado Entrega",
                 ic.forma_pago                                                      AS "Forma de Pago",
-                ic.banco                                                           AS "Banco",
+                COALESCE((SELECT mb.name FROM master_records mb WHERE mb.category = 'bancos' AND mb.id = ic.banco), ic.banco) AS "Banco",
                 ic.valor                                                           AS "Valor Recaudado",
                 ic.comprobante                                                     AS "Comprobante",
                 ic.fecha_pago                                                      AS "Fecha Pago",
@@ -1343,15 +1350,16 @@ export const saveRouteGroupPayments = async (req: Request, res: Response) => {
                 // lo que evita errores de casteo o formatos.
                 await client.query(`
                     UPDATE route_group_payments
-                    SET valor = $1, referencia = $2, fecha = $3, metodo_pago = $4, observacion = $5, user_id = $6
+                    SET valor = $1, referencia = $2, fecha = $3, metodo_pago = $4, observacion = $5, user_id = $6,
+                        banco_id = $8
                     WHERE id::text = $7::text
-                `, [valNum, pay.referencia, pay.fecha, pay.metodo, pay.observacion, userId, pay.id]);
+                `, [valNum, pay.referencia, pay.fecha, pay.metodo, pay.observacion, userId, pay.id, pay.bancoId || null]);
             } else {
                 // Es un registro nuevo -> INSERT
                 await client.query(`
-                    INSERT INTO route_group_payments (document_id, plate, valor, referencia, fecha, metodo_pago, observacion, user_id)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                `, [documentId, plate, valNum, pay.referencia, pay.fecha, pay.metodo, pay.observacion, userId]);
+                    INSERT INTO route_group_payments (document_id, plate, valor, referencia, fecha, metodo_pago, observacion, user_id, banco_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                `, [documentId, plate, valNum, pay.referencia, pay.fecha, pay.metodo, pay.observacion, userId, pay.bancoId || null]);
             }
         }
 
@@ -1482,7 +1490,7 @@ export const generateAndSendReport = async (req: Request, res: Response) => {
                 di.address          AS "Dirección",
                 SUM(COALESCE(di.expected_qty, 0)) AS "Cantidad",
                 ic.forma_pago       AS "Forma de Pago",
-                ic.banco            AS "Banco",
+                COALESCE((SELECT mb.name FROM master_records mb WHERE mb.category = 'bancos' AND mb.id = ic.banco), ic.banco) AS "Banco",
                 ic.valor            AS "Valor Recaudado",
                 ic.comprobante      AS "No. Comprobante",
                 ic.fecha_pago       AS "Fecha de Pago",
@@ -1667,7 +1675,8 @@ export const getPlateMovementHistory = async (req: Request, res: Response) => {
                 ic.conductor_name,
                 ic.forma_pago,
                 ic.valor,
-                ic.banco,
+                ic.banco AS banco_id,
+                COALESCE((SELECT mb.name FROM master_records mb WHERE mb.category = 'bancos' AND mb.id = ic.banco), ic.banco) AS banco,
                 ic.comprobante,
                 ic.created_at          AS action_at,
                 'CONCILIADO'           AS status,
@@ -1697,7 +1706,8 @@ export const getPlateMovementHistory = async (req: Request, res: Response) => {
                 rl.conductor_name,
                 rl.forma_pago,
                 rl.valor,
-                rl.banco,
+                rl.banco AS banco_id,
+                COALESCE((SELECT mb.name FROM master_records mb WHERE mb.category = 'bancos' AND mb.id = rl.banco), rl.banco) AS banco,
                 rl.comprobante,
                 rl.reversed_at         AS action_at,
                 'REVERSADO'            AS status,

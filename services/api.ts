@@ -144,7 +144,7 @@ export const api = {
     fetchJson(`${API_URL}/conciliation/${encodeURIComponent(documentId)}`),
   saveConciliation: (data: {
     documentId: string; invoiceNumber: string;
-    banco?: string; valor?: number; comprobante?: string; fechaPago?: string;
+    banco?: string; bancoId?: string; valor?: number; comprobante?: string; fechaPago?: string;
     formaPago?: string; numeroCheque?: string; esDevolucion?: boolean;
     conciliadoPor?: string; vehiclePlate?: string; conductorId?: string; conductorName?: string;
     estadoEntrega?: string; valorFactura?: number; usuarioNombre?: string;
@@ -1094,7 +1094,7 @@ export const api = {
   }),
   deleteDriver: (id: string, deletedBy?: string) => fetchJson(`${API_URL}/drivers/${id}?deletedBy=${encodeURIComponent(deletedBy || '')}`, { method: 'DELETE' }),
 
-  getDocuments: (clientId?: string, statuses?: string[], docL?: string, plate?: string, planType?: string, options?: { limit?: number; days?: number; history?: boolean }) => {
+  getDocuments: (clientId?: string, statuses?: string[], docL?: string, plate?: string, planType?: string, options?: { limit?: number; days?: number; history?: boolean; invoice?: string; clientRef?: string }) => {
     const params = new URLSearchParams();
     if (clientId) params.set('clientId', clientId);
     if (statuses?.length) params.set('statuses', statuses.join(','));
@@ -1104,6 +1104,8 @@ export const api = {
     if (options?.limit) params.set('limit', String(options.limit));
     if (options?.days) params.set('days', String(options.days));
     if (options?.history) params.set('history', 'true');
+    if (options?.invoice) params.set('invoice', options.invoice);
+    if (options?.clientRef) params.set('clientRef', options.clientRef);
     const qs = params.toString();
     return fetchJson(`${API_URL}/documents${qs ? `?${qs}` : ''}`);
   },

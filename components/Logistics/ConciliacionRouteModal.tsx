@@ -4,6 +4,7 @@ import { api } from '../../services/api';
 import { useAppData } from '../../hooks/useAppData';
 
 import { toast } from 'sonner';
+import { useBancos, BANCO_DEFAULT_ID } from '../../hooks/useBancos';
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 
@@ -72,6 +73,7 @@ interface InvoiceFormState {
     valor: string;
     numConsignacion: string;
     metodo: MetodoPago;
+    bancoId: string;
     fecha: string;
     saving: boolean;
     items: InvoiceItem[];
@@ -87,6 +89,7 @@ interface ConsignacionRow {
     fecha: string;
     observacion?: string;
     metodo?: MetodoPago;
+    bancoId?: string;
     plate?: string;
 }
 
@@ -173,6 +176,7 @@ function initForm(inv: InvoiceRow): InvoiceFormState {
                           : String(inv.invoice_value ?? ''),
         numConsignacion:  inv.comprobante || '',
         metodo:           (inv.forma_pago as MetodoPago) || 'TRANSFERENCIA',
+        bancoId:          (inv as any).banco_id || BANCO_DEFAULT_ID,
         fecha:            inv.fecha_pago
                             ? inv.fecha_pago.slice(0, 10)
                             : getYesterday(),
@@ -436,6 +440,7 @@ const LegalizationDialog: React.FC<{
     currentUserId: string;
     onConfirmReturnAndSave: (returnId: number, returnType: 'COMPLETA' | 'PARCIAL', consignar: number, comprobante: string, metodo: string, fecha: string, devuelto: number, itemsReturned: any[]) => Promise<void>;
 }> = ({ inv, form, onClose, onUpdate, onUpdateItem, onSave, allRoutes, onCheckReference, currentUserId, onConfirmReturnAndSave }) => {
+    const bancos = useBancos();
     const isLegalized   = !!inv.forma_pago;
     const isRepice      = (inv.item_status || '').toUpperCase() === 'EST-15' || (inv.item_status || '').toUpperCase() === 'REPICE';
     const invoiceVal    = Number(inv.invoice_value) || 0;
@@ -975,6 +980,16 @@ const LegalizationDialog: React.FC<{
                                                 </div>
                                             </div>
 
+                                            <div className="space-y-1.5">
+                                                <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">Banco</label>
+                                                <select value={form.bancoId || BANCO_DEFAULT_ID}
+                                                    onChange={e => onUpdate({ bancoId: e.target.value })}
+                                                    className="w-full px-4 py-3 bg-white border border-slate-200 focus:border-emerald-500 rounded-2xl text-sm font-black outline-none transition-all">
+                                                    {bancos.length === 0 && <option value={BANCO_DEFAULT_ID}>BANCOLOMBIA</option>}
+                                                    {bancos.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                                </select>
+                                            </div>
+
                                             <div className="grid grid-cols-1 gap-4">
                                                 <div className="space-y-1.5">
                                                     <label className="text-[9px] font-black text-slate-500 uppercase tracking-widest ml-1">No. Comprobante / Ref.</label>
@@ -1049,6 +1064,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
     isOpen, onClose, route, invoices, documentId, currentUserId, onSaved,
     initialSurcharges, initialGroupPayments, allRoutes
 }) => {
+    const bancos = useBancos();
     useAppData();
     const canDelete = false; // permiso gestionado a nivel de padre
     const [tab, setTab]         = useState<ModalTab>('individual');
@@ -1057,7 +1073,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
 
 
     // Estado consignación grupal
-    const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), observacion: '', metodo: 'CONSIGNACION' }]);
+    const [consignaciones, setConsignaciones] = useState<ConsignacionRow[]>([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), observacion: '', metodo: 'CONSIGNACION', bancoId: BANCO_DEFAULT_ID }]);
     const [isGrupalUnlocked, setIsGrupalUnlocked] = useState(false);
     const [savingGrupal, setSavingGrupal] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -1219,10 +1235,11 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 // M7 FIX: Usar slice(0,10) pero asegurar que si no hay fecha, use getYesterday
                 fecha: p.fecha ? (typeof p.fecha === 'string' ? p.fecha.slice(0, 10) : new Date(p.fecha).toISOString().slice(0, 10)) : getYesterday(),
                 observacion: p.observacion || '',
-                metodo: p.metodo as MetodoPago || 'CONSIGNACION'
+                metodo: p.metodo as MetodoPago || 'CONSIGNACION',
+                bancoId: p.bancoId || BANCO_DEFAULT_ID
             })));
         } else {
-            setConsignaciones([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), observacion: '', metodo: 'CONSIGNACION' }]);
+            setConsignaciones([{ id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), observacion: '', metodo: 'CONSIGNACION', bancoId: BANCO_DEFAULT_ID }]);
         }
 
         // Cargar sobrecostos previos si existen
@@ -1327,6 +1344,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                     referencia: c.nroAprobacion,
                     fecha: c.fecha,
                     metodo: c.metodo || 'CONSIGNACION',
+                    bancoId: c.bancoId || BANCO_DEFAULT_ID,
                     observacion: c.observacion
                 }));
 
@@ -1618,7 +1636,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 documentId,
                 invoiceNumber:  inv.invoice_number,
                 valor:          esDevolucion ? 0 : valorNum,
-                banco:          'Bancolombia',
+                bancoId:        esDevolucion ? undefined : (form.bancoId || BANCO_DEFAULT_ID),
                 comprobante:    form.numConsignacion || undefined,
                 fechaPago:      form.fecha    || undefined,
                 formaPago:      esDevolucion ? 'DEVOLUCION' : form.metodo,
@@ -1678,7 +1696,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                 // Para PARCIAL: valor = total_a_consignar; backend calcula valor_devuelto = factura - consignar
                 // Para COMPLETA: valor = 0 (sin cobro)
                 valor:          esCompleta ? 0 : consignar,
-                banco:          'Bancolombia',
+                bancoId:        esCompleta ? undefined : (forms.get(inv.invoice_number)?.bancoId || BANCO_DEFAULT_ID),
                 comprobante:    comprobante || `DEV-BOD-${returnId}`,
                 fechaPago:      fecha || new Date().toISOString().slice(0, 10),
                 formaPago:      (esCompleta ? 'DEVOLUCION' : metodo) as any,
@@ -2032,7 +2050,20 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                                         }}
                                                         className="w-full bg-white px-2 py-2 rounded-xl text-[10px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent disabled:bg-transparent" />
                                                 </div>
-                                                <div className="col-span-4">
+                                                <div className="col-span-2">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Banco</p>
+                                                    <select value={c.bancoId || BANCO_DEFAULT_ID} disabled={!String(c.id).startsWith('temp-') && !isGrupalUnlocked}
+                                                        onChange={e => {
+                                                            const next = [...consignaciones];
+                                                            next[idx].bancoId = e.target.value;
+                                                            setConsignaciones(next);
+                                                        }}
+                                                        className="w-full bg-white px-1 py-2 rounded-xl text-[9px] font-black text-slate-700 outline-none focus:border-violet-300 border border-transparent appearance-none text-center disabled:bg-transparent">
+                                                        {bancos.length === 0 && <option value={BANCO_DEFAULT_ID}>BANCOLOMBIA</option>}
+                                                        {bancos.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div className="col-span-2">
                                                     <p className="text-[8px] font-black text-slate-400 uppercase mb-1">Observación</p>
                                                     <input type="text" value={c.observacion || ''} disabled={!String(c.id).startsWith('temp-') && !isGrupalUnlocked}
                                                         onChange={e => {
@@ -2052,7 +2083,7 @@ const ConciliacionRouteModal: React.FC<Props> = ({
                                     ))}
                                 </div>
 
-                                <button onClick={() => setConsignaciones([...consignaciones, { id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), observacion: '', metodo: 'CONSIGNACION' }])}
+                                <button onClick={() => setConsignaciones([...consignaciones, { id: `temp-${Date.now()}`, valor: '', nroAprobacion: '', fecha: getYesterday(), observacion: '', metodo: 'CONSIGNACION', bancoId: BANCO_DEFAULT_ID }])}
                                     className="mt-4 w-full py-2.5 border-2 border-dashed border-slate-300 rounded-2xl text-[9px] font-black text-slate-500 uppercase tracking-widest hover:border-violet-400 hover:text-violet-600 transition-all">
                                     + Agregar otra consignación
                                 </button>

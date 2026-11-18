@@ -83,7 +83,7 @@ export const getDocuments = async (req: Request, res: Response) => {
     `;
 
     const queryParams: any[] = [];
-    const { clientId, docL, statuses, plate, planType, history, limit, days } = req.query;
+    const { clientId, docL, statuses, plate, planType, history, limit, days, invoice, clientRef } = req.query;
     const user = (req as any).user;
     const isSuper = user?.role_id === 'ROL-01' || user?.email === 'directorti@millasiete.com';
 
@@ -124,6 +124,19 @@ export const getDocuments = async (req: Request, res: Response) => {
         query += ` AND d.plan_type = $${queryParams.length}`;
     }
 
+    // Factura / referencia de cliente: el documento contiene al menos un ítem con ese valor (acepta lista separada por comas)
+    const listaUpper = (v: any) => String(v || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
+    const facturas = listaUpper(invoice);
+    if (facturas.length > 0) {
+        queryParams.push(facturas);
+        query += ` AND EXISTS (SELECT 1 FROM document_items fi WHERE fi.document_id = d.id AND UPPER(TRIM(fi.invoice)) = ANY($${queryParams.length}::text[]))`;
+    }
+    const refsCliente = listaUpper(clientRef);
+    if (refsCliente.length > 0) {
+        queryParams.push(refsCliente);
+        query += ` AND EXISTS (SELECT 1 FROM document_items ri WHERE ri.document_id = d.id AND UPPER(TRIM(ri.client_ref)) = ANY($${queryParams.length}::text[]))`;
+    }
+
     if (!isSuper) {
       const allowedIds = user?.client_ids || [];
       if (allowedIds.length > 0) {
@@ -132,13 +145,13 @@ export const getDocuments = async (req: Request, res: Response) => {
       }
     }
 
-    const isSpecificSearch = !!(docL || plate || statuses || planType);
+    const isSpecificSearch = !!(docL || plate || statuses || planType || facturas.length || refsCliente.length);
     if (!isSpecificSearch && history !== 'true') {
       // Optimización M7: Carga operativa inicial / login no debe arrastrar años de histórico cerrado para evitar saturación OOM/502
       query += ` AND (d.status NOT IN ('EST-07', 'EST-12', 'EST-16', 'EST-17', 'EST-18', 'EST-19', 'COMPLETADO', 'ENTREGADO', 'ELIMINADO', 'CONCILIADO', 'LEGALIZADO') OR d.created_at >= NOW() - INTERVAL '30 days')`;
       query += ` ORDER BY d.created_at DESC LIMIT 150`;
     } else {
-      if (!docL && !plate && history !== 'true' && !days) {
+      if (!docL && !plate && !facturas.length && !refsCliente.length && history !== 'true' && !days) {
         query += ` AND (d.status NOT IN ('EST-08', 'INVENTORED') OR d.created_at >= NOW() - INTERVAL '30 days')`;
       }
       query += ` ORDER BY d.created_at DESC`;
@@ -1277,6 +1290,8 @@ export const getInvoiceTraceability = async (req: Request, res: Response) => {
     const concRes = await pool.query(`
       SELECT
         ic.*,
+        ic.banco AS banco_id,
+        COALESCE((SELECT mb.name FROM master_records mb WHERE mb.category = 'bancos' AND mb.id = ic.banco), ic.banco) AS banco_nombre,
         u.name AS conciliado_por_nombre
       FROM invoice_conciliations ic
       LEFT JOIN users u ON u.id = ic.conciliado_por

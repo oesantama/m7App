@@ -23,6 +23,7 @@ export const ROUTE_TO_MASTER_CATEGORY: Record<string, MasterCategory> = {
   'masterUnidadMedida': 'masterUnidadMedida',
   'masterTipoDocumento': 'masterTipoDocumento',
   'masterTipoNotificacion': 'masterTipoNotificacion',
+  'masterBancos': 'masterBancos',
   'modules': 'modules',
   'pages': 'pages',
   'masterPaginas': 'pages',

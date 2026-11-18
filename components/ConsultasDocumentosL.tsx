@@ -23,6 +23,8 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const [filters, setFilters] = useState({
     plate: '',
     docL: '',
+    invoice: '',
+    clientRef: '',
     remesaTDM: '',
     status: '',
     planType: '',
@@ -33,6 +35,8 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
   const [appliedFilters, setAppliedFilters] = useState({
     plate: '',
     docL: '',
+    invoice: '',
+    clientRef: '',
     remesaTDM: '',
     status: '',
     planType: '',
@@ -414,11 +418,11 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
 
   const clearFilters = () => {
     setFilters({
-      plate: '', docL: '', remesaTDM: '', status: '',
+      plate: '', docL: '', invoice: '', clientRef: '', remesaTDM: '', status: '',
       planType: '', deliveryDate: '', cargueDate: '', inventoryDate: ''
     });
     setAppliedFilters({
-      plate: '', docL: '', remesaTDM: '', status: '',
+      plate: '', docL: '', invoice: '', clientRef: '', remesaTDM: '', status: '',
       planType: '', deliveryDate: '', cargueDate: '', inventoryDate: ''
     });
     setHasSearched(false);
@@ -439,7 +443,11 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
         filters.status ? [filters.status] : ['ALL'],
         filters.docL || undefined,
         filters.plate || undefined,
-        filters.planType || undefined
+        filters.planType || undefined,
+        {
+          invoice: filters.invoice.trim() || undefined,
+          clientRef: filters.clientRef.trim() || undefined,
+        }
       );
       setSearchResults(Array.isArray(data) ? data : []);
     } catch {
@@ -651,7 +659,7 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
         </div>
       )}
       <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-xl border border-slate-100 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="space-y-1">
             <label className={labelClass}>Placa</label>
             <input type="text" placeholder="PLACA..." value={filters.plate} onChange={e => setFilters({ ...filters, plate: e.target.value })} className={inputClass} />
@@ -659,6 +667,14 @@ const ConsultasDocumentosL: React.FC<ConsultasDocumentosLProps> = ({ documents, 
           <div className="space-y-1">
             <label className={labelClass}>Documento L</label>
             <input type="text" placeholder="DOCUMENTO L..." value={filters.docL} onChange={e => setFilters({ ...filters, docL: e.target.value })} className={inputClass} />
+          </div>
+          <div className="space-y-1">
+            <label className={labelClass}>Factura</label>
+            <input type="text" placeholder="FACTURA..." value={filters.invoice} onChange={e => setFilters({ ...filters, invoice: e.target.value.toUpperCase() })} onKeyDown={e => e.key === 'Enter' && handleSearch()} className={inputClass} />
+          </div>
+          <div className="space-y-1">
+            <label className={labelClass}>Ref. Cliente</label>
+            <input type="text" placeholder="REFERENCIA CLIENTE..." value={filters.clientRef} onChange={e => setFilters({ ...filters, clientRef: e.target.value.toUpperCase() })} onKeyDown={e => e.key === 'Enter' && handleSearch()} className={inputClass} />
           </div>
           <div className="space-y-1">
             <label className={labelClass}>Tipo Plan</label>

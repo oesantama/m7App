@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Icons } from '../../constants';
 import { api } from '../../services/api';
 import { toast } from 'sonner';
+import { useBancos, BANCO_DEFAULT_ID } from '../../hooks/useBancos';
 import ReturnApprovalInline from '../Devoluciones/ReturnApprovalInline';
 
 type FormaPago = 'TRANSFERENCIA' | 'CONSIGNACION';
@@ -68,6 +69,8 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
     const [comprobante, setComprobante] = useState('');
     const [fechaPago, setFechaPago]     = useState('');
     const [numeroCheque, setNumeroCheque] = useState('');
+    const [bancoId, setBancoId]         = useState<string>(BANCO_DEFAULT_ID);
+    const bancos = useBancos();
     const [saving, setSaving]           = useState(false);
 
     // Precargar datos: si ya está conciliado usa esos valores,
@@ -81,6 +84,7 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                 setComprobante(invoice.comprobante || '');
                 setFechaPago(invoice.fecha_pago ? invoice.fecha_pago.slice(0, 10) : new Date().toISOString().slice(0, 10));
                 setNumeroCheque(invoice.numero_cheque || '');
+                setBancoId((invoice as any).banco_id || BANCO_DEFAULT_ID);
             } else {
                 // Nueva conciliación — pre-cargar desde datos de pago de la factura
                 setFormaPago('TRANSFERENCIA');
@@ -88,6 +92,7 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                 setComprobante('');
                 setFechaPago(new Date().toISOString().slice(0, 10));
                 setNumeroCheque('');
+                setBancoId(BANCO_DEFAULT_ID);
             }
         }
     }, [isOpen, invoice]);
@@ -105,7 +110,7 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                 documentId,
                 invoiceNumber:  invoice.invoice_number,
                 valor:          Number(valor),
-                banco:          'Bancolombia',
+                bancoId:        bancoId || BANCO_DEFAULT_ID,
                 comprobante:    comprobante || undefined,
                 fechaPago:      fechaPago || undefined,
                 formaPago:      formaPago as FormaPago,
@@ -230,6 +235,21 @@ const ConciliacionModal: React.FC<ConciliacionModalProps> = ({
                         </div>
                     </div>
 
+
+                    {/* Banco */}
+                    <div>
+                        <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Banco</label>
+                        <select
+                            value={bancoId}
+                            onChange={e => setBancoId(e.target.value)}
+                            disabled={isReadOnly}
+                            className={`w-full px-4 py-3 border focus:border-slate-500 focus:bg-white rounded-2xl text-sm outline-none transition-all
+                                ${isReadOnly ? 'bg-slate-100 border-slate-200 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900'}`}
+                        >
+                            {bancos.length === 0 && <option value={BANCO_DEFAULT_ID}>BANCOLOMBIA</option>}
+                            {bancos.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                    </div>
 
                     {/* Comprobante */}
                     <div>

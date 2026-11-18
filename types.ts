@@ -298,6 +298,7 @@ export type MasterCategory =
   | 'masterMarcas'
   | 'masterNotificaciones'
   | 'masterTipoNotificacion'
+  | 'masterBancos'
   | 'masterNotificacionesWhatsapp'
   | 'masterUnidadMedida'
   | 'masterTipoDocumento'

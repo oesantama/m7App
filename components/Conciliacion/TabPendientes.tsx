@@ -2470,7 +2470,8 @@ const TabPendientes: React.FC<Props> = ({ docs, loadingDocs, onRefresh, user }) 
                             nroAprobacion: p.referencia || '',
                             fecha: p.fecha ? String(p.fecha).slice(0, 10) : '',
                             observacion: p.observacion || '',
-                            metodo: p.metodo_pago || 'CONSIGNACION'
+                            metodo: p.metodo_pago || 'CONSIGNACION',
+                            bancoId: p.banco_id || undefined
                         }))}
                     allRoutes={routes}
                 />

@@ -1285,7 +1285,7 @@ const ConsultaFacturaTab: React.FC<{ user: any }> = ({ user }) => {
                   <InfoRow label="Fecha Pago"    value={fmtDate(data.conciliation.fecha_pago) || fmtDateTime(data.conciliation.conciliado_at)} />
                   <InfoRow label="Forma de Pago" value={data.conciliation.es_devolucion ? 'Devolución' : data.conciliation.forma_pago} />
                   <InfoRow label="Valor"         value={fmtCOP(data.conciliation.valor) || fmtCOP(data.payment?.vmetodo)} />
-                  <InfoRow label="Banco"         value={data.conciliation.banco} />
+                  <InfoRow label="Banco"         value={(data.conciliation as any).banco_nombre || data.conciliation.banco} />
                   {data.conciliation.comprobante && <InfoRow label="Comprobante" value={data.conciliation.comprobante} />}
                   {data.conciliation.numero_cheque && <InfoRow label="N° Cheque" value={data.conciliation.numero_cheque} />}
                   <InfoRow label="Conciliado por"  value={data.conciliation.conciliado_por_nombre} />
