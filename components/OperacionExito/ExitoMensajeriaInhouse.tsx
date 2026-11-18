@@ -79,6 +79,32 @@ const esFotoVisible = (url?: string | null): url is string =>
   !url.includes('drive.google.com') &&
   (url.startsWith('/uploads/') || url.startsWith('data:image') || /\.(jpe?g|png|webp|gif)(\?|$)/i.test(url));
 
+const NOMBRES_ESTADO: Record<string, string> = {
+  ESPERA_RECOGIDA: 'Espera recogida',
+  DISPONIBLE: 'Disponible en nodo',
+  RECOGIDA_TIENDA: 'Recogida en tienda',
+  EN_ALMACEN: 'En almacén',
+  EN_RUTA: 'En reparto',
+  ENTREGADO: 'Entregado',
+  DEVOLUCION: 'Devolución',
+  ANULADO: 'Cancelado',
+  NOVEDAD: 'Novedad',
+};
+const nombreEstado = (codigo?: string | null): string =>
+  codigo ? NOMBRES_ESTADO[codigo] || codigo.replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase()) : '';
+const COLOR_ESTADO: Record<string, string> = {
+  ENTREGADO: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+  DEVOLUCION: 'bg-orange-100 text-orange-800 border-orange-300',
+  ANULADO: 'bg-rose-100 text-rose-800 border-rose-300',
+  EN_RUTA: 'bg-cyan-100 text-cyan-800 border-cyan-300',
+  EN_ALMACEN: 'bg-purple-100 text-purple-800 border-purple-300',
+  RECOGIDA_TIENDA: 'bg-indigo-100 text-indigo-800 border-indigo-300',
+};
+
+/** Primer enlace que se puede mostrar como imagen. */
+const primeraVisible = (...urls: Array<string | null | undefined>): string | null =>
+  urls.find((u) => esFotoVisible(u)) || urls.find(Boolean) || null;
+
 /** Une historial de estados, novedades, intentos de entrega y envíos a Éxito en una línea de tiempo (más reciente primero). */
 type EventoGuia = { key: string; fecha: string; tipo: string; titulo: string; detalle?: string; usuario?: string; url?: string; color: string };
 const construirLineaTiempo = (d: any): EventoGuia[] => {
@@ -87,7 +113,7 @@ const construirLineaTiempo = (d: any): EventoGuia[] => {
   for (const h of d.historial || []) {
     ev.push({
       key: `h${h.id}`, fecha: h.created_at, tipo: 'Estado', color: 'bg-indigo-500',
-      titulo: `${h.estado_anterior || 'INICIO'} → ${h.estado_nuevo}${h.id_guia_exito ? ` (Id ${h.id_guia_exito})` : ''}`,
+      titulo: `${nombreEstado(h.estado_anterior) || 'Inicio'} → ${nombreEstado(h.estado_nuevo)}`,
       detalle: h.observacion, usuario: h.usuario_nombre, url: h.evidencia_drive_url || undefined,
     });
   }
@@ -100,9 +126,9 @@ const construirLineaTiempo = (d: any): EventoGuia[] => {
   }
   for (const i of d.intentos || []) {
     ev.push({
-      key: `i${i.id}`, fecha: i.created_at, tipo: 'Intento', color: i.resultado === 'ENTREGADO' ? 'bg-emerald-500' : 'bg-rose-500',
+      key: `i${i.id}`, fecha: i.created_at, tipo: 'Intento', color: ['ENTREGADO', 'EXITOSO'].includes(String(i.resultado || '').toUpperCase()) ? 'bg-emerald-500' : 'bg-rose-500',
       titulo: `Intento #${i.numero_intento}: ${i.resultado || '—'}${i.receptor_nombre ? ` · Recibe ${i.receptor_nombre}` : ''}`,
-      detalle: i.observaciones, usuario: i.created_by, url: i.foto_url || i.firma_url || undefined,
+      detalle: i.observaciones, usuario: i.created_by, url: primeraVisible(i.foto_url, i.foto_rotulo_url, i.firma_url) || undefined,
     });
   }
   for (const q of d.syncQueue || []) {
@@ -114,7 +140,7 @@ const construirLineaTiempo = (d: any): EventoGuia[] => {
     ev.push({
       key: `q${q.id}`, fecha: q.created_at, tipo: 'Envío Éxito',
       color: q.estado_cola === 'ENVIADO' ? 'bg-cyan-500' : q.estado_cola === 'DLQ' ? 'bg-rose-600' : 'bg-slate-400',
-      titulo: `status ${q.id_guia_status}${statusName ? ` ${statusName}` : ''} · ${q.estado_cola}${q.http_status ? ` (HTTP ${q.http_status})` : ''}`,
+      titulo: `${statusName || 'Actualización'} · ${q.estado_cola === 'ENVIADO' ? 'recibido por Éxito' : q.estado_cola}`,
       detalle: q.intentos > 1 ? `${q.intentos} intentos` : undefined,
       usuario: q.disparado_por,
     });
@@ -773,9 +799,6 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
                 }}
                 className={`p-4 rounded-2xl border-l-4 ${k.color} bg-white shadow-sm cursor-pointer hover:shadow-md transition`}
               >
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase text-slate-500">{k.idGuia}</span>
-                </div>
                 <div className="text-2xl font-black text-slate-900 mt-1">{getCount(k.code)}</div>
                 <div className="text-xs font-bold text-slate-700 mt-0.5">{k.title}</div>
               </div>
@@ -1413,7 +1436,7 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
                           </td>
                           <td className="p-3">
                             <span className={`px-2.5 py-1 rounded-full text-[10px] font-black border ${estInfo.badge}`}>
-                              {estInfo.label} (Id guía={estInfo.idGuia})
+                              {estInfo.label}
                             </span>
                             {g.tiene_novedad_activa && (
                               <div className="text-[10px] text-rose-600 font-bold mt-1 flex items-center gap-1">
@@ -2068,10 +2091,14 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
           <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-5 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <div>
-                <span className="text-xs font-black uppercase text-indigo-600">
-                  Historial de la guía
-                </span>
-                <h3 className="text-xl font-black text-slate-900">
+                <div
+                  className={`inline-block px-4 py-1.5 rounded-2xl border text-2xl md:text-3xl font-black uppercase tracking-tight mb-2 ${
+                    COLOR_ESTADO[detailModalGuia.guia.estado_operativo] || 'bg-slate-100 text-slate-800 border-slate-300'
+                  }`}
+                >
+                  {nombreEstado(detailModalGuia.guia.estado_operativo)}
+                </div>
+                <h3 className="text-lg font-black text-slate-900">
                   Guía {detailModalGuia.guia.numero_guia} · Pedido {detailModalGuia.guia.numero_pedido}
                 </h3>
               </div>
@@ -2194,10 +2221,29 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
             {/* Fotos y firmas: se ven aquí mismo (no se envía al usuario a Drive) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[
-                { label: 'Foto recogida', url: detailModalGuia.guia.foto_recogida_url },
-                { label: 'Foto entrega', url: detailModalGuia.guia.foto_entrega_url || detailModalGuia.guia.foto_url },
-                { label: 'Rótulo en entrega', url: detailModalGuia.guia.foto_rotulo_entrega_url },
-                { label: 'Firma entrega', url: detailModalGuia.guia.firma_entrega_url },
+                { label: 'Foto recogida', url: primeraVisible(detailModalGuia.guia.foto_recogida_url) },
+                {
+                  label: 'Foto entrega',
+                  url: primeraVisible(
+                    detailModalGuia.guia.foto_entrega_url,
+                    detailModalGuia.guia.foto_url,
+                    ...(detailModalGuia.intentos || []).map((i: any) => i.foto_url)
+                  ),
+                },
+                {
+                  label: 'Rótulo en entrega',
+                  url: primeraVisible(
+                    detailModalGuia.guia.foto_rotulo_entrega_url,
+                    ...(detailModalGuia.intentos || []).map((i: any) => i.foto_rotulo_url)
+                  ),
+                },
+                {
+                  label: 'Firma entrega',
+                  url: primeraVisible(
+                    detailModalGuia.guia.firma_entrega_url,
+                    ...(detailModalGuia.intentos || []).map((i: any) => i.firma_url)
+                  ),
+                },
               ].map((f) => (
                 <div key={f.label} className="rounded-2xl bg-slate-50 border border-slate-200 p-2">
                   <div className="text-[10px] font-black uppercase text-slate-500 mb-1">{f.label}</div>
