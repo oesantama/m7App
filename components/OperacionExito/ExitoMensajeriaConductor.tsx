@@ -176,6 +176,9 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
   // Flujo Recogida en Tienda (3 pasos simples)
   const [pasoRecogida, setPasoRecogida] = useState<1 | 2 | 3>(1);
   const [guiasMarcadasRecogida, setGuiasMarcadasRecogida] = useState<number[]>([]);
+  // Guías que el conductor reporta explícitamente como faltantes en tienda (novedad 10).
+  // Las no marcadas y no reportadas quedan pendientes para otra recogida, sin novedad.
+  const [guiasFaltantesRecogida, setGuiasFaltantesRecogida] = useState<number[]>([]);
   const [fotoRecogidaB64, setFotoRecogidaB64] = useState<string>('');
   const [nombreEncargadoTienda, setNombreEncargadoTienda] = useState<string>('');
 
@@ -298,6 +301,7 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
         setEntregasEnRuta(data.entregasEnRuta || []);
         setCatalogoNovedades(data.catalogoNovedades || []);
         setGuiasMarcadasRecogida((data.recogidasPendientes || []).map((g: any) => Number(g.id)));
+        setGuiasFaltantesRecogida([]);
 
         // Auto-seleccionar rol según lo que tenga asignado esta placa o lanzar alerta si no tiene nada programado
         const tieneRutas = (data.rutasActivas || []).length > 0 || (data.entregasEnRuta || []).length > 0;
@@ -414,8 +418,7 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
 
     try {
       const firmaB64 = exportSignatureBase64();
-      const todasIds = recogidasPendientes.map((g) => Number(g.id));
-      const faltantesIds = todasIds.filter((id) => !guiasMarcadasRecogida.includes(id));
+      const faltantesIds = guiasFaltantesRecogida.filter((id) => !guiasMarcadasRecogida.includes(id));
 
       const res = await fetch(`${API_URL}/exito-mensajeria/conductor/recogida-tienda`, {
         method: 'POST',
@@ -1146,22 +1149,27 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
         {pasoRecogida === 1 && (
           <div className="space-y-4">
             <p className="text-base font-bold text-slate-700">
-              Toque cada paquete que le entregaron en la tienda (si falta alguno, desmárquelo):
+              Toque cada paquete que le entregaron. Si la tienda no tiene alguno, desmárquelo y toque "Falta en tienda".
             </p>
             {recogidasPendientes.map((g) => {
-              const marcado = guiasMarcadasRecogida.includes(Number(g.id));
+              const idNum = Number(g.id);
+              const marcado = guiasMarcadasRecogida.includes(idNum);
+              const faltante = !marcado && guiasFaltantesRecogida.includes(idNum);
               return (
+                <div key={g.id} className="space-y-2">
                 <div
-                  key={g.id}
-                  onClick={() =>
+                  onClick={() => {
                     setGuiasMarcadasRecogida((prev) =>
-                      marcado ? prev.filter((id) => id !== Number(g.id)) : [...prev, Number(g.id)]
-                    )
-                  }
+                      marcado ? prev.filter((id) => id !== idNum) : [...prev, idNum]
+                    );
+                    if (!marcado) setGuiasFaltantesRecogida((prev) => prev.filter((id) => id !== idNum));
+                  }}
                   className={`p-5 rounded-3xl border-4 cursor-pointer transition flex items-center justify-between gap-3 ${
                     marcado
                       ? 'bg-emerald-50 border-emerald-500'
-                      : 'bg-white border-slate-300 opacity-75'
+                      : faltante
+                        ? 'bg-red-50 border-red-500'
+                        : 'bg-white border-slate-300 opacity-75'
                   }`}
                 >
                   <div>
@@ -1182,6 +1190,29 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
                   >
                     {marcado ? '✓' : ''}
                   </div>
+                </div>
+                {!marcado && (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setGuiasFaltantesRecogida((prev) => prev.filter((id) => id !== idNum))}
+                      className={`flex-1 min-h-[52px] rounded-2xl border-2 font-black text-sm ${
+                        !faltante ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-300'
+                      }`}
+                    >
+                      Queda para otra recogida
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGuiasFaltantesRecogida((prev) => (prev.includes(idNum) ? prev : [...prev, idNum]))}
+                      className={`flex-1 min-h-[52px] rounded-2xl border-2 font-black text-sm ${
+                        faltante ? 'bg-red-600 text-white border-red-600' : 'bg-white text-red-600 border-red-300'
+                      }`}
+                    >
+                      🔍 Falta en tienda (novedad)
+                    </button>
+                  </div>
+                )}
                 </div>
               );
             })}

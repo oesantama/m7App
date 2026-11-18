@@ -3655,6 +3655,8 @@ export async function completeDriverStorePickup(req: any, res: Response) {
                foto_recogida_url = $5,
                foto_recogida_drive_id = $6,
                foto_url = COALESCE(foto_url, $5),
+               tiene_novedad_activa = FALSE,
+               ultima_novedad_texto = NULL,
                firma_drive_id = $7,
                remision_pdf_url = $8,
                unidades_recogidas = cant_cajas,
@@ -3678,6 +3680,15 @@ export async function completeDriverStorePickup(req: any, res: Response) {
         await client.query(
           `UPDATE exito_msj_guia_paquetes SET verificado_recogida = TRUE WHERE guia_id = $1`,
           [g.id]
+        );
+
+        // Si tenía una diferencia de recogida pendiente y ahora sí se recogió, se cierra.
+        await client.query(
+          `UPDATE exito_msj_novedades
+           SET resuelta = TRUE, resuelta_at = NOW(), resuelta_por = $2,
+               resolucion_comentario = $3
+           WHERE guia_id = $1 AND codigo_novedad = 'NOV-DIF-RECOGIDA' AND COALESCE(resuelta, FALSE) = FALSE`,
+          [g.id, finalConductorNombre, `Recogida posteriormente en ${codigoRecogida}`]
         );
 
         await client.query(
@@ -3711,29 +3722,47 @@ export async function completeDriverStorePickup(req: any, res: Response) {
         });
       }
 
-      // 4. Si quedaron guías faltantes en tienda, registrar novedad automática
+      // 4. Guías que el conductor reportó explícitamente como FALTANTES en tienda → novedad 10 NOVEDAD.
+      //    (Las que solo no se marcaron quedan pendientes para otra recogida, sin novedad.)
       if (Array.isArray(guiaIdsFaltantes) && guiaIdsFaltantes.length > 0) {
-        for (const fid of guiaIdsFaltantes) {
+        const faltRes = await client.query(
+          `SELECT id, numero_guia, numero_pedido, estado_operativo, ambiente, is_sandbox
+           FROM exito_msj_guias WHERE id = ANY($1::int[])`,
+          [guiaIdsFaltantes.map((x: any) => Number(x)).filter((x: number) => Number.isFinite(x))]
+        );
+        for (const fg of faltRes.rows) {
+          const desc = `Paquete faltante en tienda al recoger (${codigoRecogida}, placa ${finalPlaca}).`;
           await client.query(
             `UPDATE exito_msj_guias
              SET tiene_novedad_activa = TRUE,
-                 ultima_novedad_texto = 'Diferencia en recogida: Paquete no entregado por la tienda en Checkout',
+                 ultima_novedad_texto = 'Diferencia en recogida: paquete faltante en tienda',
                  updated_at = NOW()
              WHERE id = $1`,
-            [fid]
+            [fg.id]
           );
           await client.query(
             `INSERT INTO exito_msj_novedades (
-              guia_id, codigo_novedad, reason_code_exito, etapa, descripcion, foto_url, foto_drive_id, created_by
-            ) VALUES ($1,'NOV-DIF-RECOGIDA','PICKUP_DIFFERENCE','RECOGIDA',$2,$3,$4,$5)`,
-            [
-              fid,
-              `Paquete no entregado por el nodo en el Checkout ${codigoRecogida} (Placa ${finalPlaca}).`,
-              fotoDrive.driveUrl,
-              fotoDrive.driveFileId,
-              finalConductorNombre,
-            ]
+              guia_id, codigo_novedad, reason_code_exito, etapa, descripcion, created_by
+            ) VALUES ($1,'NOV-DIF-RECOGIDA','PICKUP_DIFFERENCE','RECOGIDA',$2,$3)`,
+            [fg.id, desc, finalConductorNombre]
           );
+          await client.query(
+            `INSERT INTO exito_msj_guia_historial (
+              guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+              origen_cambio, observacion, latitud, longitud, usuario_nombre
+            ) VALUES ($1,$2,$3,$3,'10','NOVEDAD_RECOGIDA',$4,$5,$6,$7)`,
+            [fg.id, fg.numero_guia, fg.estado_operativo, desc, latitud || null, longitud || null, finalConductorNombre]
+          );
+          trackingEventsToDispatch.push({
+            guiaId: Number(fg.id),
+            numeroGuia: fg.numero_guia,
+            numeroPedido: fg.numero_pedido,
+            codigoInterno: 'NOVEDAD',
+            idGuiaStatus: '10',
+            observation: `[PICKUP_DIFFERENCE] ${desc}`,
+            ambiente: fg.ambiente,
+            isSandbox: Boolean(fg.is_sandbox),
+          });
         }
       }
 

@@ -1736,7 +1736,7 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
                 <div className="text-slate-900 text-xs italic bg-white p-2 rounded-xl border border-slate-200 min-h-[42px]">
                   {detalleGuiaModal.guia.observaciones ||
                     detalleGuiaModal.intentos?.[0]?.observaciones ||
-                    detalleGuiaModal.novedades?.[0]?.descripcion ||
+                    (detalleGuiaModal.novedades || []).find((n: any) => !n.resuelta)?.descripcion ||
                     'Sin observaciones adicionales'}
                 </div>
                 {(detalleGuiaModal.guia.persona_recibe || detalleGuiaModal.intentos?.[0]?.persona_recibe) && (
@@ -1765,7 +1765,7 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
               const fotoRotulo =
                 detalleGuiaModal.guia.foto_rotulo_entrega_url ||
                 detalleGuiaModal.intentos?.[0]?.foto_rotulo_url;
-              const fotoNovedad = detalleGuiaModal.novedades?.[0]?.foto_url;
+              const fotoNovedad = (detalleGuiaModal.novedades || []).find((n: any) => !n.resuelta)?.foto_url;
               const fotoRecogida = detalleGuiaModal.guia.foto_recogida_url;
 
               const hayEvidencias =
