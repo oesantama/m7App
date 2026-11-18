@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useConfirmDialog, FilaConfirm } from './useConfirmDialog';
 import { toast } from 'sonner';
 import { User } from '../../types';
 import { API_URL, getStoredToken } from '../../services/api/client';
@@ -149,6 +150,7 @@ const construirLineaTiempo = (d: any): EventoGuia[] => {
 };
 
 const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
+  const { confirmar, confirmDialog } = useConfirmDialog();
   const [activeSubTab, setActiveSubTab] = useState<
     'dashboard' | 'guias' | 'cola_dlq' | 'devoluciones' | 'maestras' | 'sandbox'
   >('guias');
@@ -492,19 +494,30 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
     const drvObj = maestras.drivers.find((d: any) => String(d.id) === String(selConductorId));
     const placaNombre = vehObj?.plate || selVehiculoId;
     const condNombre = drvObj?.name || 'Conductor';
-    const nodosNombres = maestras.nodos
-      .filter((n: any) => selNodosRecogidaIds.includes(Number(n.id)))
-      .map((n: any) => `• Nodo ${n.codigo_dependencia} - ${n.nombre}`)
-      .join('\n');
 
-    const ok = window.confirm(
-      `⚠️ CONFIRMACIÓN DE PROGRAMACIÓN DE RECOGIDA\n\n` +
-      `¿Está completamente seguro de programar este vehículo para ir a recoger a las tiendas?\n\n` +
-      `🚚 Placa del Vehículo: ${placaNombre}\n` +
-      `👤 Conductor Asignado: ${condNombre} (${drvObj?.document_number || 'CC N/A'})\n\n` +
-      `Nodos seleccionados para recoger (${selNodosRecogidaIds.length}):\n${nodosNombres}\n\n` +
-      `Cuando el conductor ingrese con la placa "${placaNombre}" verá únicamente estos nodos para hacer el checkout.`
-    );
+    const nodosSel = maestras.nodos.filter((n: any) => selNodosRecogidaIds.includes(Number(n.id)));
+    const ok = await confirmar({
+      title: 'Programar recogida',
+      badge: { text: `Placa ${placaNombre}`, variant: 'amber' },
+      message: (
+        <div>
+          <FilaConfirm label="Conductor" value={`${condNombre.trim()}${drvObj?.document_number ? ` · CC ${drvObj.document_number}` : ''}`} />
+          <FilaConfirm
+            label={`Nodos (${nodosSel.length})`}
+            value={
+              <div className="space-y-0.5">
+                {nodosSel.map((n: any) => (
+                  <div key={n.id}>{`${n.codigo_dependencia} · ${n.nombre}`}</div>
+                ))}
+              </div>
+            }
+          />
+        </div>
+      ),
+      confirmText: 'Programar',
+      variant: 'emerald',
+      icon: 'send',
+    });
     if (!ok) return;
 
     try {
@@ -661,7 +674,16 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
   };
 
   const handleResetSandbox = async () => {
-    if (!window.confirm('¿Está seguro de limpiar únicamente las guías de prueba del entorno SANDBOX?')) return;
+    if (
+      !(await confirmar({
+        title: 'Limpiar Sandbox',
+        message: 'Se borran solo las guías de prueba del entorno Sandbox.',
+        confirmText: 'Limpiar',
+        variant: 'danger',
+        icon: 'trash',
+      }))
+    )
+      return;
     try {
       const res = await apiFetch('/sandbox/reset', { method: 'POST' });
       toast.success(res.message);
@@ -700,6 +722,8 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
     maestras.config.find((c: any) => c.clave === 'SANDBOX_SIMULATE_WEBHOOK_503')?.valor === 'true';
 
   return (
+    <>
+      {confirmDialog}
     <div className="p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto">
       {/* PESTAÑAS + ACCIONES */}
       <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 flex flex-col xl:flex-row xl:items-center justify-between gap-2">
@@ -2477,6 +2501,7 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
         </div>
       )}
     </div>
+    </>
   );
 };
 

@@ -23,6 +23,7 @@ import {
   assignPickupVehicle,
   getWarehouseReceptionData,
   confirmWarehouseReception,
+  reportWarehouseMissing,
   getSmartDispatchSuggestions,
   createUrbanDeliveryRoute,
   manageUrbanDeliveryRoute,
@@ -95,6 +96,7 @@ exitoInternalRouter.post('/guias/asignar-recogida', assignPickupVehicle);
 // Recepción de Almacén (PAG-85 — Selección de Placa/Remisión y Pistoleo/Selección de Paquetes)
 exitoInternalRouter.get('/almacen/remisiones-recogida', getWarehouseReceptionData);
 exitoInternalRouter.post('/guias/recepcion-bodega', confirmWarehouseReception);
+exitoInternalRouter.post('/guias/no-llego-almacen', reportWarehouseMissing);
 
 exitoInternalRouter.post('/guias/:id/estado-manual', manualStateChangeInhouse);
 exitoInternalRouter.post('/guias/:id/reenviar-exito', manualResendGuideToExito);

@@ -18,6 +18,7 @@ import {
   Printer,
   ShieldCheck,
   LogOut,
+  Search,
 } from 'lucide-react';
 
 interface Props {
@@ -143,20 +144,20 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
   const userCedula = String(user.documentNumber || '').trim();
   const misPlacasRecogida = useMemo(() => {
     if (!isConductor) return [];
-    if (!userCedula) return placasProgramadasRecogida;
-    const filtradas = placasProgramadasRecogida.filter(
-      (p: any) => String(p.conductor_cedula || '').trim() === userCedula
+    // Solo las placas asignadas a la cédula del usuario en sesión (nunca las de otro conductor)
+    if (!userCedula) return [];
+    return placasProgramadasRecogida.filter(
+      (p: any) => String(p.conductor_cedula || '').replace(/\D/g, '') === userCedula.replace(/\D/g, '')
     );
-    return filtradas.length > 0 ? filtradas : placasProgramadasRecogida;
   }, [isConductor, userCedula, placasProgramadasRecogida]);
 
   const misPlacasReparto = useMemo(() => {
     if (!isConductor) return [];
-    if (!userCedula) return placasEnReparto;
-    const filtradas = placasEnReparto.filter(
-      (p: any) => String(p.conductor_cedula || '').trim() === userCedula
+    // Solo las placas asignadas a la cédula del usuario en sesión (nunca las de otro conductor)
+    if (!userCedula) return [];
+    return placasEnReparto.filter(
+      (p: any) => String(p.conductor_cedula || '').replace(/\D/g, '') === userCedula.replace(/\D/g, '')
     );
-    return filtradas.length > 0 ? filtradas : placasEnReparto;
   }, [isConductor, userCedula, placasEnReparto]);
 
   const miHistoricoRecogidas = useMemo(() => {
@@ -173,6 +174,7 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
   // true cuando la placa tiene tiendas asignadas pero ninguna programación de recogida abierta (ya se completó)
   const [recogidaCerrada, setRecogidaCerrada] = useState<boolean>(false);
   const [entregasEnRuta, setEntregasEnRuta] = useState<any[]>([]);
+  const [busquedaEntrega, setBusquedaEntrega] = useState<string>('');
   const [catalogoNovedades, setCatalogoNovedades] = useState<any[]>([]);
 
   // Flujo Recogida en Tienda (3 pasos simples)
@@ -268,6 +270,9 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
       if (!p) {
         return toast.warning('Por favor digite la PLACA del vehículo para continuar.');
       }
+      if (!c) {
+        return toast.warning('Por favor digite la CÉDULA del conductor para continuar.');
+      }
       setLoading(true);
       try {
         const qs = new URLSearchParams({
@@ -308,7 +313,9 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
 
         // Auto-seleccionar rol según lo que tenga asignado esta placa o lanzar alerta si no tiene nada programado
         const tieneRutas = (data.rutasActivas || []).length > 0 || (data.entregasEnRuta || []).length > 0;
-        const tieneNodos = (data.nodosAsignados || []).length > 0 || (data.recogidasPendientes || []).length > 0;
+        const tieneNodos =
+          !data.recogidaSinProgramacionAbierta &&
+          ((data.nodosAsignados || []).length > 0 || (data.recogidasPendientes || []).length > 0);
         if (!tieneNodos && !tieneRutas) {
           toast.warning(
             `⚠️ La placa ${pVal} NO tiene recogidas en tienda ni rutas de reparto programadas en este momento.`
@@ -593,7 +600,7 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
 
           <div>
             <label className="block text-xs font-black uppercase text-slate-600 mb-2">
-              2. CÉDULA DEL CONDUCTOR {isConductor ? 'EN SESIÓN' : '(OPCIONAL EN CONSULTA)'}
+              2. CÉDULA DEL CONDUCTOR (OBLIGATORIA)
             </label>
             <input
               type="text"
@@ -603,9 +610,7 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
               className="w-full h-14 px-4 rounded-2xl border-2 border-slate-300 bg-slate-50 text-slate-900 text-xl font-black text-center"
             />
             <p className="text-xs text-slate-500 mt-1 text-center font-semibold">
-              {isConductor
-                ? `Se valida tu usuario (${user.name}) más la placa asignada por Inhouse.`
-                : `Usuario (${user.name}) en modo consulta. Pulse el botón para ver la información de la placa.`}
+              Solo verá las recogidas y rutas de la placa asignadas a esta cédula.
             </p>
           </div>
 
@@ -631,8 +636,7 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
                     type="button"
                     onClick={() => {
                       setPlacaInput(p.placa);
-                      if (p.conductor_cedula) setCedulaInput(p.conductor_cedula);
-                      validarPlacaYCargarTareas(p.placa, p.conductor_cedula || cedulaInput);
+                      validarPlacaYCargarTareas(p.placa, cedulaInput);
                     }}
                     className="p-3.5 rounded-2xl bg-blue-50 hover:bg-blue-100 border-2 border-blue-400 text-blue-950 text-left transition space-y-1 shadow-xs"
                   >
@@ -659,8 +663,7 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
                     type="button"
                     onClick={() => {
                       setPlacaInput(p.placa);
-                      if (p.conductor_cedula) setCedulaInput(p.conductor_cedula);
-                      validarPlacaYCargarTareas(p.placa, p.conductor_cedula || cedulaInput);
+                      validarPlacaYCargarTareas(p.placa, cedulaInput);
                     }}
                     className="p-3.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 border-2 border-emerald-400 text-emerald-950 text-left transition space-y-1 shadow-xs"
                   >
@@ -727,7 +730,10 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
   // PANTALLA DE INICIO (UNA VEZ VALIDADA LA PLACA Y CÉDULA)
   // ===========================================================================
   if (modoPrincipal === 'inicio') {
-    const tieneProgramacionTienda = nodosAsignados.length > 0 || recogidasPendientes.length > 0;
+    // Sin programación de recogida abierta no hay nada que elegir en tienda (salvo que no tenga ruta: se muestra el aviso)
+    const tieneProgramacionTienda =
+      (nodosAsignados.length > 0 || recogidasPendientes.length > 0) &&
+      (!recogidaCerrada || (rutasActivas.length === 0 && entregasEnRuta.length === 0));
     const tieneRutaAsignada = rutasActivas.length > 0 || entregasEnRuta.length > 0;
     const sinNadaProgramado = !tieneProgramacionTienda && !tieneRutaAsignada;
 
@@ -1033,7 +1039,41 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
                 </h2>
               </div>
 
+              {entregasEnRuta.length > 0 && (
+                <div className="relative">
+                  <Search className="w-6 h-6 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="search"
+                    value={busquedaEntrega}
+                    onChange={(e) => setBusquedaEntrega(e.target.value)}
+                    placeholder="Buscar cliente, dirección o guía"
+                    className="w-full h-14 pl-12 pr-4 rounded-2xl border-2 border-slate-300 bg-white text-slate-900 text-lg font-bold"
+                  />
+                </div>
+              )}
+
+              {(() => {
+                const q = busquedaEntrega.trim().toLowerCase();
+                if (!q) return null;
+                const n = entregasEnRuta.filter((g) =>
+                  [g.nombre_destinatario, g.direccion_destinatario, g.barrio_destinatario, g.numero_guia, g.numero_pedido]
+                    .some((v) => String(v || '').toLowerCase().includes(q))
+                ).length;
+                return n === 0 ? (
+                  <div className="p-5 rounded-3xl bg-slate-100 text-slate-600 font-bold text-center">
+                    Sin resultados para "{busquedaEntrega}"
+                  </div>
+                ) : null;
+              })()}
+
               {entregasEnRuta.map((g, index) => {
+                const q = busquedaEntrega.trim().toLowerCase();
+                if (
+                  q &&
+                  ![g.nombre_destinatario, g.direccion_destinatario, g.barrio_destinatario, g.numero_guia, g.numero_pedido]
+                    .some((v) => String(v || '').toLowerCase().includes(q))
+                )
+                  return null;
                 const telCliente = g.celular_destinatario || g.telefono_destinatario || '';
                 const mapQuery = encodeURIComponent(
                   `${g.direccion_destinatario}, ${g.ciudad_destinatario_nombre || 'Medellin'}, Colombia`

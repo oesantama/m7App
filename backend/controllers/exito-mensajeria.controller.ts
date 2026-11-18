@@ -1958,6 +1958,11 @@ export async function getWarehouseReceptionData(req: Request, res: Response) {
          g.estado_operativo, g.cant_cajas, g.peso_kg, g.nombre_destinatario,
          g.direccion_destinatario, g.barrio_destinatario, g.ciudad_destinatario_nombre,
          g.recogida_id, g.fecha_recogida_tienda, g.fecha_ingreso_almacen,
+         g.tiene_novedad_activa, g.ultima_novedad_texto,
+         EXISTS (
+           SELECT 1 FROM exito_msj_novedades nv
+           WHERE nv.guia_id = g.id AND nv.codigo_novedad = 'NOV-NO-LLEGO-ALMACEN' AND COALESCE(nv.resuelta, FALSE) = FALSE
+         ) AS no_llego_almacen,
          n.codigo_dependencia, n.nombre AS nodo_nombre,
          r.codigo_recogida,
          COALESCE(r.placa_vehiculo, v.plate, n.placa_recogida, 'SIN-PLACA') AS placa_recogida,
@@ -2012,6 +2017,81 @@ export async function getWarehouseReceptionData(req: Request, res: Response) {
 /**
  * Recepción en Almacén Urbano Milla 7 (Punteo / Pistoleo local sin disparar estados nacionales 3 ni 4)
  */
+/**
+ * Almacén reporta que guías recogidas en tienda NO llegaron a la bodega M7.
+ * Envía 10 NOVEDAD [PICKUP_DIFFERENCE] a Éxito, retira la guía de su ruta y la bloquea para despacho.
+ * Si luego aparece, se recibe normal y la novedad se cierra sola.
+ */
+export async function reportWarehouseMissing(req: any, res: Response) {
+  try {
+    const { guiaIds, observacion } = req.body || {};
+    if (!Array.isArray(guiaIds) || guiaIds.length === 0) {
+      return res.status(400).json({ error: 'Seleccione al menos una guía que no llegó al almacén.' });
+    }
+    const userName = req.user?.name || req.user?.email || 'BODEGA_M7';
+    const gRes = await pool.query(
+      `SELECT g.*, r.codigo_recogida, COALESCE(r.placa_vehiculo, g.vehiculo_recogida_id) AS placa_recogida
+       FROM exito_msj_guias g
+       LEFT JOIN exito_msj_recogidas r ON r.id = g.recogida_id
+       WHERE g.id = ANY($1::bigint[]) AND g.deleted_at IS NULL`,
+      [guiaIds]
+    );
+    const validas = gRes.rows.filter((g: any) => g.estado_operativo === 'RECOGIDA_TIENDA');
+    if (validas.length === 0) {
+      return res.status(409).json({ error: 'Solo se puede reportar una guía recogida en tienda que aún no se ha recibido.' });
+    }
+    const eventos: any[] = [];
+    await withTransaction(async (client) => {
+      for (const g of validas) {
+        const ya = await client.query(
+          `SELECT 1 FROM exito_msj_novedades WHERE guia_id = $1 AND codigo_novedad = 'NOV-NO-LLEGO-ALMACEN' AND COALESCE(resuelta, FALSE) = FALSE`,
+          [g.id]
+        );
+        if (ya.rows.length > 0) continue;
+        const desc = `Paquete recogido en tienda (${g.codigo_recogida || 'sin remisión'}, placa ${g.placa_recogida || 'N/D'}) no llegó al almacén M7.${observacion ? ` ${observacion}` : ''}`;
+        await client.query(
+          `INSERT INTO exito_msj_novedades (guia_id, codigo_novedad, reason_code_exito, etapa, descripcion, is_sandbox, created_by)
+           VALUES ($1,'NOV-NO-LLEGO-ALMACEN','PICKUP_DIFFERENCE','ALMACEN',$2,$3,$4)`,
+          [g.id, desc, Boolean(g.is_sandbox), userName]
+        );
+        await client.query(
+          `UPDATE exito_msj_guias
+           SET tiene_novedad_activa = TRUE, ultima_novedad_texto = 'No llegó al almacén', updated_by = $2, updated_at = NOW()
+           WHERE id = $1`,
+          [g.id, userName]
+        );
+        await client.query(
+          `INSERT INTO exito_msj_guia_historial (
+            guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito, origen_cambio, observacion, usuario_nombre
+          ) VALUES ($1,$2,$3,$3,'10','NOVEDAD_RECEPCION_ALMACEN',$4,$5)`,
+          [g.id, g.numero_guia, g.estado_operativo, desc, userName]
+        );
+        await retirarGuiaDeRutaActual(client, Number(g.id), g.ruta_actual_id ? Number(g.ruta_actual_id) : null, 'NO_LLEGO_ALMACEN');
+        eventos.push({
+          guiaId: Number(g.id),
+          numeroGuia: g.numero_guia,
+          numeroPedido: g.numero_pedido,
+          codigoInterno: 'NOVEDAD',
+          idGuiaStatus: '10',
+          observation: `[PICKUP_DIFFERENCE] ${desc}`,
+          ambiente: g.ambiente,
+          isSandbox: Boolean(g.is_sandbox),
+        });
+      }
+    });
+    for (const evt of eventos) {
+      await ExitoSyncService.enqueueAndDispatchTrackingEvent(evt).catch(() => {});
+    }
+    return res.json({
+      success: true,
+      reportadas: eventos.length,
+      message: `${eventos.length} guía(s) reportada(s) como no llegadas al almacén. Se notificó a Éxito (10 NOVEDAD).`,
+    });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+}
+
 export async function confirmWarehouseReception(req: any, res: Response) {
   try {
     const { guiaIds, recogidaId, observacion } = req.body || {};
@@ -2020,7 +2100,19 @@ export async function confirmWarehouseReception(req: any, res: Response) {
     }
     const userName = req.user?.name || req.user?.email || 'BODEGA_M7';
 
+    const salidasAReparto: any[] = [];
     await withTransaction(async (client) => {
+      // Guías que estaban pendientes de recepción dentro de una ruta que YA tiene placa → salen a reparto (5).
+      const enRutaConPlaca = await client.query(
+        `SELECT g.id, g.numero_guia, g.numero_pedido, g.estado_operativo, g.ambiente, g.is_sandbox,
+                r.id AS ruta_id, r.codigo_ruta, r.vehiculo_id, r.conductor_id, r.placa_vehiculo
+         FROM exito_msj_guias g
+         JOIN exito_msj_rutas r ON r.id = g.ruta_actual_id
+         WHERE g.id = ANY($1::bigint[]) AND g.estado_operativo = 'RECOGIDA_TIENDA'
+           AND r.estado IN ('EN_REPARTO', 'EN_CURSO') AND COALESCE(r.placa_vehiculo, '') <> ''`,
+        [guiaIds]
+      );
+
       await client.query(
         `UPDATE exito_msj_guias
          SET estado_operativo = 'EN_ALMACEN',
@@ -2028,9 +2120,11 @@ export async function confirmWarehouseReception(req: any, res: Response) {
              fecha_ingreso_almacen = NOW(),
              updated_by = $2,
              updated_at = NOW()
-         WHERE id = ANY($1::bigint[])`,
+         WHERE id = ANY($1::bigint[])
+           AND estado_operativo NOT IN ('EN_RUTA', 'ENTREGADO', 'DEVOLUCION', 'ANULADO')`,
         [guiaIds, userName]
       );
+
 
       await client.query(
         `UPDATE exito_msj_guia_paquetes
@@ -2039,6 +2133,22 @@ export async function confirmWarehouseReception(req: any, res: Response) {
         [guiaIds]
       );
 
+      // Si se había reportado que no llegó y ahora sí se recibe, la novedad se cierra.
+      const resueltas = await client.query(
+        `UPDATE exito_msj_novedades
+         SET resuelta = TRUE, resuelta_at = NOW(), resuelta_por = $2, resolucion_comentario = 'Llegó y se recibió en almacén'
+         WHERE guia_id = ANY($1::bigint[]) AND codigo_novedad = 'NOV-NO-LLEGO-ALMACEN' AND COALESCE(resuelta, FALSE) = FALSE
+         RETURNING guia_id`,
+        [guiaIds, userName]
+      );
+      if (resueltas.rows.length > 0) {
+        await client.query(
+          `UPDATE exito_msj_guias SET tiene_novedad_activa = FALSE, ultima_novedad_texto = NULL
+           WHERE id = ANY($1::bigint[])`,
+          [resueltas.rows.map((x: any) => Number(x.guia_id))]
+        );
+      }
+
       await client.query(
         `INSERT INTO exito_msj_guia_historial (
           guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
@@ -2046,13 +2156,42 @@ export async function confirmWarehouseReception(req: any, res: Response) {
         )
         SELECT id, numero_guia, estado_operativo, 'EN_ALMACEN', '2',
                'RECEPCION_BODEGA_LOCAL', $2, $3
-        FROM exito_msj_guias WHERE id = ANY($1::bigint[])`,
+        FROM exito_msj_guias WHERE id = ANY($1::bigint[]) AND estado_operativo = 'EN_ALMACEN'`,
         [
           guiaIds,
           observacion || 'Recibido y pistoleado en almacén urbano Milla 7 (control local misma ciudad).',
           userName,
         ]
       );
+
+      for (const x of enRutaConPlaca.rows) {
+        const planilla = `/api/exito-mensajeria/planillas/${encodeURIComponent(x.codigo_ruta)}/pdf`;
+        await client.query(
+          `UPDATE exito_msj_guias
+           SET estado_operativo = 'EN_RUTA', estado_id = 'EST-35', id_guia_exito = '5',
+               vehiculo_entrega_id = $2, conductor_entrega_id = $3, remision_pdf_url = $4,
+               fecha_salida_ruta = COALESCE(fecha_salida_ruta, NOW()), updated_by = $5, updated_at = NOW()
+           WHERE id = $1`,
+          [x.id, x.vehiculo_id, x.conductor_id, planilla, userName]
+        );
+        await client.query(
+          `INSERT INTO exito_msj_guia_historial (
+            guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+            origen_cambio, observacion, evidencia_drive_url, usuario_nombre
+          ) VALUES ($1,$2,'EN_ALMACEN','EN_RUTA','5','RECEPCION_CON_RUTA_ASIGNADA',$3,$4,$5)`,
+          [x.id, x.numero_guia, `Recibida en almacén y sale en la ruta ${x.codigo_ruta} - Placa ${x.placa_vehiculo}.`, planilla, userName]
+        );
+        salidasAReparto.push({
+          guiaId: Number(x.id),
+          numeroGuia: x.numero_guia,
+          numeroPedido: x.numero_pedido,
+          codigoInterno: 'EN_RUTA',
+          idGuiaStatus: '5',
+          observation: `En reparto urbano (${x.codigo_ruta}) - Placa ${x.placa_vehiculo}.`,
+          ambiente: x.ambiente,
+          isSandbox: Boolean(x.is_sandbox),
+        });
+      }
 
       if (recogidaId) {
         const pendRes = await client.query(
@@ -2069,6 +2208,10 @@ export async function confirmWarehouseReception(req: any, res: Response) {
         }
       }
     });
+
+    for (const evt of salidasAReparto) {
+      await ExitoSyncService.enqueueAndDispatchTrackingEvent(evt).catch(() => {});
+    }
 
     // Disparar Notificación Formal por Correo de Recepción en Almacén M7
     let emailResult: { sent: boolean; emails: string[]; warning?: string } = {
@@ -2155,6 +2298,8 @@ export async function getSmartDispatchSuggestions(req: Request, res: Response) {
       `g.deleted_at IS NULL`,
       `g.estado_operativo IN ('EN_ALMACEN', 'RECOGIDA_TIENDA')`,
       `g.ruta_actual_id IS NULL`,
+      `NOT EXISTS (SELECT 1 FROM exito_msj_novedades nv WHERE nv.guia_id = g.id
+         AND nv.codigo_novedad = 'NOV-NO-LLEGO-ALMACEN' AND COALESCE(nv.resuelta, FALSE) = FALSE)`,
     ];
 
     if (includeSandbox !== 'true') {
@@ -2361,6 +2506,31 @@ export async function getSmartDispatchSuggestions(req: Request, res: Response) {
 /**
  * Crear o Adicionar a Ruta Urbana de Reparto (Pasa guías a EN_RUTA, genera Remisión/Planilla PDF On-Demand para el conductor y notifica Id guía = 5 a Go Éxito)
  */
+/**
+ * Saca una guía de su ruta actual (p. ej. al registrar una novedad estando en ruta).
+ * La parada queda marcada con el motivo en exito_msj_ruta_guias para trazabilidad.
+ */
+async function retirarGuiaDeRutaActual(client: any, guiaId: number, rutaId: number | null, motivoParada: string) {
+  if (!rutaId) return;
+  await client.query(
+    `UPDATE exito_msj_ruta_guias SET estado_parada = $3 WHERE ruta_id = $1 AND guia_id = $2`,
+    [rutaId, guiaId, motivoParada]
+  );
+  await client.query(
+    `UPDATE exito_msj_guias
+     SET ruta_actual_id = NULL, vehiculo_entrega_id = NULL, conductor_entrega_id = NULL, updated_at = NOW()
+     WHERE id = $1`,
+    [guiaId]
+  );
+  await client.query(
+    `UPDATE exito_msj_rutas
+     SET total_guias = (SELECT COUNT(*)::int FROM exito_msj_guias WHERE ruta_actual_id = $1 AND deleted_at IS NULL),
+         updated_at = NOW()
+     WHERE id = $1`,
+    [rutaId]
+  );
+}
+
 export async function createUrbanDeliveryRoute(req: any, res: Response) {
   try {
     const {
@@ -2507,16 +2677,21 @@ export async function createUrbanDeliveryRoute(req: any, res: Response) {
         await client.query(
           `INSERT INTO exito_msj_ruta_guias (ruta_id, guia_id, orden_parada, estado_parada)
            VALUES ($1,$2,$3,'PENDIENTE')
-           ON CONFLICT (ruta_id, guia_id) DO NOTHING`,
+           ON CONFLICT (ruta_id, guia_id) DO UPDATE SET estado_parada = 'PENDIENTE', orden_parada = EXCLUDED.orden_parada`,
           [r.id, g.id, i + 1]
         );
 
-        if (tienePlacaAsignada) {
+        // Guía aún no recibida en almacén: queda en la ruta como PENDIENTE DE RECEPCIÓN; no sale a reparto
+        // ni se envía el 5 a Éxito hasta que el almacén la reciba (o se quite si no llega).
+        const pendienteRecepcion = g.estado_operativo === 'RECOGIDA_TIENDA';
+
+        if (tienePlacaAsignada && !pendienteRecepcion) {
           await client.query(
             `UPDATE exito_msj_guias
              SET estado_operativo = 'EN_RUTA',
                  estado_id = 'EST-35',
                  id_guia_exito = '5',
+                 tiene_novedad_activa = FALSE,
                  ruta_actual_id = $2,
                  vehiculo_entrega_id = $3,
                  conductor_entrega_id = $4,
@@ -2574,7 +2749,9 @@ export async function createUrbanDeliveryRoute(req: any, res: Response) {
               g.numero_guia,
               g.estado_operativo,
               g.id_guia_exito || '2',
-              `Agrupada en ruta ${r.codigo_ruta} (${r.nombre}) en espera de asignación de placa de reparto.`,
+              pendienteRecepcion
+                ? `Agrupada en ruta ${r.codigo_ruta} pendiente de recepción en almacén; sale a reparto al recibirse.`
+                : `Agrupada en ruta ${r.codigo_ruta} (${r.nombre}) en espera de asignación de placa de reparto.`,
               dynamicPlanillaUrl,
               userName,
             ]
@@ -2689,6 +2866,14 @@ export async function manageUrbanDeliveryRoute(req: any, res: Response) {
         updatedGuidesCount = guiasRutaRes.rows.length;
 
         for (const g of guiasRutaRes.rows) {
+          // Pendiente de recepción en almacén: se le asigna la placa pero no sale a reparto hasta recibirse.
+          if (g.estado_operativo === 'RECOGIDA_TIENDA') {
+            await client.query(
+              `UPDATE exito_msj_guias SET vehiculo_entrega_id = $2, conductor_entrega_id = $3, updated_at = NOW() WHERE id = $1`,
+              [g.id, vehIdReal, drvIdReal]
+            );
+            continue;
+          }
           const estabaEnAlmacen = g.estado_operativo !== 'EN_RUTA';
           await client.query(
             `UPDATE exito_msj_guias
@@ -2769,6 +2954,24 @@ export async function manageUrbanDeliveryRoute(req: any, res: Response) {
         );
 
         for (const g of guiasAQuitar.rows) {
+          if (g.estado_operativo === 'RECOGIDA_TIENDA') {
+            // Nunca llegó al almacén: solo sale de la ruta, conserva su estado de recogida.
+            await client.query(
+              `UPDATE exito_msj_guias
+               SET ruta_actual_id = NULL, vehiculo_entrega_id = NULL, conductor_entrega_id = NULL,
+                   updated_by = $2, updated_at = NOW()
+               WHERE id = $1`,
+              [g.id, userName]
+            );
+            await client.query(
+              `INSERT INTO exito_msj_guia_historial (
+                guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
+                origen_cambio, observacion, usuario_nombre
+              ) VALUES ($1,$2,$3,$3,'2','RETIRO_DE_RUTA_INHOUSE',$4,$5)`,
+              [g.id, g.numero_guia, g.estado_operativo, `Retirada de la ruta ${ruta.codigo_ruta}: no llegó al almacén.`, userName]
+            );
+            continue;
+          }
           await client.query(
             `UPDATE exito_msj_guias
              SET estado_operativo = 'EN_ALMACEN',
@@ -3072,6 +3275,11 @@ export async function manualStateChangeInhouse(req: any, res: Response) {
         ]
       );
 
+      // Si sale de reparto por contingencia (novedad, devolución, anulación, almacén), deja la ruta.
+      if (guia.ruta_actual_id && !['EN_RUTA', 'ENTREGADO'].includes(String(nuevoEstado))) {
+        await retirarGuiaDeRutaActual(client, Number(guiaId), Number(guia.ruta_actual_id), `CAMBIO_MANUAL_${nuevoEstado}`);
+      }
+
       await client.query(
         `INSERT INTO exito_msj_guia_historial (
           guia_id, numero_guia, estado_anterior, estado_nuevo, id_guia_exito,
@@ -3362,36 +3570,26 @@ export async function getDriverTasks(req: any, res: Response) {
       });
     }
 
-    // 4. Validar cédula del usuario que inició sesión (o digitada) contra la asignación de la placa
-    const userRole = String(req.user?.roleId || req.user?.role_id || '');
-    const isAdminOrInhouse =
-      userRole === 'ROL-01' ||
-      userRole === 'ROL-02' ||
-      String(req.user?.role || '').toUpperCase().includes('ADMIN') ||
-      String(req.user?.name || '').toUpperCase().includes('ADMIN');
-
-    const cedulasAutorizadas = new Set<string>();
-    for (const n of nodosAsignados) {
-      if (n.cedula_conductor_recogida) {
-        cedulasAutorizadas.add(String(n.cedula_conductor_recogida).replace(/\D/g, ''));
-      }
-    }
-    for (const r of rutasActivas) {
-      if (r.cedula_mostrar) {
-        cedulasAutorizadas.add(String(r.cedula_mostrar).replace(/\D/g, ''));
-      }
-    }
-
-    const cleanUserCedula = rawCedula.replace(/\D/g, '');
-    if (
-      cedulasAutorizadas.size > 0 &&
-      !isAdminOrInhouse &&
-      (!cleanUserCedula || !cedulasAutorizadas.has(cleanUserCedula))
-    ) {
-      return res.status(403).json({
-        error: `Validación de seguridad: La placa ${placaOficial} está asignada al conductor con CC ${Array.from(cedulasAutorizadas).join(', ')}. Verifique la cédula digitada (${rawCedula || 'sin documento'}) o solicite actualización en Inhouse.`,
+    // 4. Validar la cédula digitada contra la asignación de la placa — obligatoria para TODOS los usuarios
+    //    (sin excepción de rol). Solo se muestran las recogidas y rutas asignadas a esa cédula exacta.
+    const soloDigitos = (v: any) => String(v || '').replace(/\D/g, '');
+    const cleanUserCedula = soloDigitos(rawCedula);
+    if (!cleanUserCedula) {
+      return res.status(400).json({
+        error: 'Digite la cédula del conductor para ingresar con la placa.',
       });
     }
+    const nodosDelConductor = nodosAsignados.filter(
+      (n: any) => soloDigitos(n.cedula_conductor_recogida) === cleanUserCedula
+    );
+    const rutasDelConductor = rutasActivas.filter((r: any) => soloDigitos(r.cedula_mostrar) === cleanUserCedula);
+    if (nodosDelConductor.length === 0 && rutasDelConductor.length === 0) {
+      return res.status(403).json({
+        error: `La placa ${placaOficial} no tiene recogidas ni rutas asignadas a la cédula ${rawCedula}. Verifique la cédula o pida a Inhouse/Despacho que asigne el conductor.`,
+      });
+    }
+    nodosAsignados.splice(0, nodosAsignados.length, ...nodosDelConductor);
+    rutasActivas.splice(0, rutasActivas.length, ...rutasDelConductor);
 
     // Datos del conductor validado
     const conductorId =
@@ -3403,11 +3601,7 @@ export async function getDriverTasks(req: any, res: Response) {
       rutasActivas[0]?.conductor_mostrar ||
       req.user?.name ||
       'CONDUCTOR MILLA 7';
-    const conductorCedula =
-      nodosAsignados[0]?.cedula_conductor_recogida ||
-      rutasActivas[0]?.cedula_mostrar ||
-      rawCedula ||
-      '';
+    const conductorCedula = cleanUserCedula;
 
     // 5. Paquetes a recoger: SOLO de los nodos de una programación de recogida ABIERTA (PROGRAMADO) de esta placa.
     //    Si la programación ya se completó, no se puede volver a recoger hasta que Inhouse programe otra.
@@ -3447,13 +3641,10 @@ export async function getDriverTasks(req: any, res: Response) {
        LEFT JOIN exito_msj_rutas r ON r.id = g.ruta_actual_id
        WHERE g.deleted_at IS NULL
          AND g.estado_operativo = 'EN_RUTA'
-         AND (
-           UPPER(COALESCE(g.vehiculo_entrega_id, '')) = UPPER($1)
-           OR REPLACE(UPPER(COALESCE(r.placa_vehiculo, '')), '-', '') = $2
-         )
+         AND g.ruta_actual_id = ANY($1::bigint[])
          ${sandboxClause}
        ORDER BY g.barrio_destinatario ASC NULLS LAST, g.direccion_destinatario ASC, g.id ASC`,
-      [String(vehiculoId), cleanPlaca]
+      [rutasActivas.map((r: any) => Number(r.id))]
     );
 
     // 7. Histórico de recogidas y programaciones de esta placa
@@ -4243,6 +4434,9 @@ export async function reportDriverNovelty(req: any, res: Response) {
          WHERE id = $1`,
         [guia.id, nuevoEstado, nuevoEstadoId, idGuiaWebhook, numIntento, textoNovedad, fotoDriveUrl, userName]
       );
+
+      // Con novedad la guía ya no sigue en esa ruta: el sistema la retira (vuelve a almacén o a devolución).
+      await retirarGuiaDeRutaActual(client, Number(guia.id), guia.ruta_actual_id ? Number(guia.ruta_actual_id) : null, 'NOVEDAD');
 
       await client.query(
         `INSERT INTO exito_msj_guia_historial (

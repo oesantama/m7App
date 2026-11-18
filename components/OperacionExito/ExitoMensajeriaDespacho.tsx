@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useConfirmDialog, FilaConfirm } from './useConfirmDialog';
 import { toast } from 'sonner';
 import { User } from '../../types';
 import { API_URL, getStoredToken } from '../../services/api/client';
@@ -234,6 +235,7 @@ const SearchableDropdown: React.FC<SearchableDropdownProps> = ({
 };
 
 const ExitoMensajeriaDespacho: React.FC<Props> = () => {
+  const { confirmar, confirmDialog } = useConfirmDialog();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [includeSandbox, setIncludeSandbox] = useState(true);
@@ -475,19 +477,55 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
     const drvObj = conductores.find((d) => String(d.id) === String(conductorIdSeleccionado));
     const placaNombre = vehObj?.plate || (vehiculoIdSeleccionado ? String(vehiculoIdSeleccionado) : '');
 
-    let confirmMsg = '';
-    if (rutaExistenteId !== 'NUEVA') {
-      const rObj = rutasActivas.find((r) => String(r.id) === String(rutaExistenteId));
-      confirmMsg = `¿Confirmar adición de ${guiaIds.length} guía(s) a la ruta ${rObj?.codigo_ruta || 'existente'}?`;
-    } else if (placaNombre) {
-      confirmMsg = `¿Confirmar despacho de ${guiaIds.length} guía(s) con la Placa "${placaNombre}"${
-        drvObj?.name ? ` (Conductor: ${drvObj.name})` : ''
-      }?`;
-    } else {
-      confirmMsg = `¿Guardar esta agrupación de ${guiaIds.length} guía(s) como ruta SIN PLACA aún?\n\nPodrá destinarle la placa en cualquier momento desde el panel de gestión cuando el vehículo esté disponible.`;
-    }
-
-    if (!window.confirm(confirmMsg)) return;
+    const rObjExistente =
+      rutaExistenteId !== 'NUEVA' ? rutasActivas.find((r) => String(r.id) === String(rutaExistenteId)) : null;
+    const pendientesRecepcion = guiasEnAlmacen.filter(
+      (g: any) => grupoDespachoIds.has(Number(g.id)) && g.estado_operativo === 'RECOGIDA_TIENDA'
+    ).length;
+    const avisoPendientes = pendientesRecepcion
+      ? {
+          icon: 'alert' as const,
+          title: `${pendientesRecepcion} guía(s) sin recibir en almacén`,
+          text: 'Quedan en la ruta como pendientes. Salen a reparto cuando el almacén las reciba; si no llegan, quítelas de la ruta.',
+          variant: 'amber' as const,
+        }
+      : undefined;
+    const ok = await confirmar(
+      rutaExistenteId !== 'NUEVA'
+        ? {
+            title: 'Agregar a ruta',
+            badge: { text: rObjExistente?.codigo_ruta || 'Ruta existente', variant: 'blue' },
+            message: <FilaConfirm label="Guías a agregar" value={guiaIds.length} />,
+            infoBox: avisoPendientes,
+            confirmText: 'Agregar',
+            variant: 'info',
+            icon: 'send',
+          }
+        : placaNombre
+          ? {
+              title: 'Confirmar despacho',
+              badge: { text: `Placa ${placaNombre}`, variant: 'amber' },
+              message: (
+                <div>
+                  <FilaConfirm label="Guías" value={guiaIds.length} />
+                  <FilaConfirm label="Conductor" value={drvObj?.name?.trim() || 'Sin conductor'} />
+                </div>
+              ),
+              infoBox: avisoPendientes,
+              confirmText: 'Despachar',
+              variant: 'emerald',
+              icon: 'send',
+            }
+          : {
+              title: 'Guardar ruta sin placa',
+              message: <FilaConfirm label="Guías" value={guiaIds.length} />,
+              infoBox: avisoPendientes || { icon: 'info', text: 'Puede asignarle la placa después desde el panel de gestión.', variant: 'blue' },
+              confirmText: 'Guardar',
+              variant: 'info',
+              icon: 'send',
+            }
+    );
+    if (!ok) return;
 
     setSubmitting(true);
     try {
@@ -544,10 +582,20 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
     const condObj = conductores.find((c) => String(c.id) === String(conductorCambioRuta));
     const condNombre = condObj?.name ? ` y conductor "${condObj.name}"` : '';
 
-    const ok = window.confirm(
-      `¿Confirmar asignación de la Placa "${placaNombre}"${condNombre} a la ruta ${rutaObj?.codigo_ruta || ''}?\n\n` +
-      `Todas las guías activas de esta ruta (${rutaObj?.total_guias || 0} guías) quedarán vinculadas a esta placa.`
-    );
+    const ok = await confirmar({
+      title: 'Asignar placa a la ruta',
+      badge: { text: rutaObj?.codigo_ruta || 'Ruta', variant: 'blue' },
+      message: (
+        <div>
+          <FilaConfirm label="Placa" value={placaNombre} />
+          <FilaConfirm label="Conductor" value={condObj?.name?.trim() || 'Sin cambio'} />
+          <FilaConfirm label="Guías de la ruta" value={rutaObj?.total_guias || 0} />
+        </div>
+      ),
+      confirmText: 'Asignar',
+      variant: 'emerald',
+      icon: 'send',
+    });
     if (!ok) return;
 
     setSubmitting(true);
@@ -576,9 +624,15 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
   const handleQuitarGuiaDeRutaExistente = async (rutaId: number, guiaId: number, numeroGuia: string) => {
     const rutaObj = rutasActivas.find((r) => Number(r.id) === Number(rutaId));
     const nomRuta = rutaObj?.codigo_ruta || `Ruta #${rutaId}`;
-    const ok = window.confirm(
-      `¿Desea retirar la guía "${numeroGuia}" de la ruta ${nomRuta}?\n\nLa guía volverá a estar disponible en el Almacén M7 para asignarse a otro vehículo o ruta.`
-    );
+    const ok = await confirmar({
+      title: 'Retirar guía de la ruta',
+      badge: { text: numeroGuia, variant: 'slate' },
+      message: <FilaConfirm label="Ruta" value={nomRuta} />,
+      infoBox: { icon: 'info', text: 'La guía vuelve a quedar disponible en el almacén.', variant: 'amber' },
+      confirmText: 'Retirar',
+      variant: 'warning',
+      icon: 'alert',
+    });
     if (!ok) return;
 
     setSubmitting(true);
@@ -604,9 +658,14 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
 
   // Eliminar una ruta cuando tiene 0 guías (o todas fueron quitadas)
   const handleEliminarRutaVacia = async (rutaId: number, codigoRuta: string) => {
-    const ok = window.confirm(
-      `⚠️ ¿Está completamente seguro de ELIMINAR la ruta ${codigoRuta}?\n\nEsta ruta no tiene guías asociadas y será borrada definitivamente del sistema.`
-    );
+    const ok = await confirmar({
+      title: 'Eliminar ruta',
+      badge: { text: codigoRuta, variant: 'rose' },
+      message: 'La ruta no tiene guías y se borrará definitivamente.',
+      confirmText: 'Eliminar',
+      variant: 'danger',
+      icon: 'trash',
+    });
     if (!ok) return;
 
     setSubmitting(true);
@@ -740,6 +799,8 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
   );
 
   return (
+    <>
+      {confirmDialog}
     <div className="p-3 md:p-6 space-y-5 max-w-[1600px] mx-auto">
       {/* ENCABEZADO RESPONSIVE DE DESPACHO INTELIGENTE (PAG-86) */}
       <div className="bg-slate-900 text-white rounded-3xl p-5 md:p-7 shadow-xl flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -1167,6 +1228,11 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
                         <div className="text-[10px] text-slate-500 font-semibold mt-0.5">
                           {g.codigo_recogida ? `${g.codigo_recogida} · ` : ''}Nodo {g.codigo_dependencia}
                         </div>
+                        {g.estado_operativo === 'RECOGIDA_TIENDA' && (
+                          <div className="mt-1 inline-flex px-2 py-0.5 rounded-md bg-amber-100 border border-amber-300 text-amber-900 font-black text-[10px]">
+                            ⏳ Sin recibir en almacén
+                          </div>
+                        )}
                       </td>
                       <td className="p-2.5">
                         <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-900 font-black text-[11px] inline-flex items-center gap-1">
@@ -1528,8 +1594,9 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
                         const entregada = g.estado_operativo === 'ENTREGADO';
                         const enRuta = g.estado_operativo === 'EN_RUTA';
                         const conNov = Boolean(g.tiene_novedad_activa || g.estado_operativo === 'NOVEDAD');
+                        const sinRecibir = g.estado_operativo === 'RECOGIDA_TIENDA';
                         return (
-                          <tr key={g.id} className="hover:bg-slate-50">
+                          <tr key={g.id} className={sinRecibir ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-slate-50'}>
                             <td className="p-3">
                               <div className="font-black text-slate-950">{g.numero_guia}</div>
                               <div className="text-[10px] text-slate-500 font-bold">
@@ -1573,12 +1640,14 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
                                 <span>&rarr;</span>
                                 <span
                                   className={`px-2 py-0.5 rounded-md border ${
-                                    g.fecha_ingreso_almacen || g.estado_operativo === 'EN_ALMACEN' || enRuta || entregada
+                                    sinRecibir
+                                      ? 'bg-amber-100 border-amber-400 text-amber-900'
+                                      : g.fecha_ingreso_almacen || g.estado_operativo === 'EN_ALMACEN' || enRuta || entregada
                                       ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
                                       : 'bg-slate-100 border-slate-200 text-slate-500'
                                   }`}
                                 >
-                                  2. Bodega M7 ✓
+                                  2. Bodega M7 {sinRecibir ? '⏳ sin recibir' : '✓'}
                                 </span>
                                 <span>&rarr;</span>
                                 <span
@@ -1588,7 +1657,7 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
                                       : 'bg-amber-50 border-amber-300 text-amber-900'
                                   }`}
                                 >
-                                  3. {enRuta || entregada ? 'En Reparto ✓' : 'En Almacén (Esp. Placa)'}
+                                  3. {enRuta || entregada ? 'En Reparto ✓' : sinRecibir ? 'Sale al recibirse' : 'En Almacén (Esp. Placa)'}
                                 </span>
                                 <span>&rarr;</span>
                                 <span
@@ -2127,6 +2196,7 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
         </div>
       )}
     </div>
+    </>
   );
 };
 
