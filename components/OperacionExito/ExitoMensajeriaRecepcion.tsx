@@ -298,7 +298,7 @@ const ExitoMensajeriaRecepcion: React.FC<Props> = ({ onNavigate }) => {
 
   // Confirmar ingreso en Bodega Milla 7 (EST-33 / EN_ALMACEN)
   const handleConfirmarRecepcionAlmacen = async (forcedIds?: number[]) => {
-    let idsArray = forcedIds || Array.from(verificadasIds);
+    let idsArray = Array.isArray(forcedIds) ? forcedIds : Array.from(verificadasIds);
     if (idsArray.length === 0) {
       if (guiasFiltradas.length > 0) {
         const confirmarTodos = window.confirm(
@@ -705,7 +705,7 @@ const ExitoMensajeriaRecepcion: React.FC<Props> = ({ onNavigate }) => {
 
           <button
             type="button"
-            onClick={handleConfirmarRecepcionAlmacen}
+            onClick={() => handleConfirmarRecepcionAlmacen()}
             disabled={submitting || verificadasIds.size === 0}
             className="w-full h-14 rounded-2xl bg-purple-700 hover:bg-purple-600 active:scale-[0.99] text-white font-black text-sm md:text-base flex items-center justify-center gap-2.5 shadow-lg disabled:opacity-40 transition"
           >
