@@ -67,6 +67,50 @@ const ESTADO_LABELS: Record<string, { label: string; idGuia: string; badge: stri
   DEVOLUCION: { label: 'En Devolución', idGuia: '9', badge: 'bg-orange-100 text-orange-800 border-orange-300' },
 };
 
+
+/** Une historial de estados, novedades, intentos de entrega y envíos a Éxito en una línea de tiempo (más reciente primero). */
+type EventoGuia = { key: string; fecha: string; tipo: string; titulo: string; detalle?: string; usuario?: string; url?: string; color: string };
+const construirLineaTiempo = (d: any): EventoGuia[] => {
+  if (!d) return [];
+  const ev: EventoGuia[] = [];
+  for (const h of d.historial || []) {
+    ev.push({
+      key: `h${h.id}`, fecha: h.created_at, tipo: 'Estado', color: 'bg-indigo-500',
+      titulo: `${h.estado_anterior || 'INICIO'} → ${h.estado_nuevo}${h.id_guia_exito ? ` (Id ${h.id_guia_exito})` : ''}`,
+      detalle: h.observacion, usuario: h.usuario_nombre, url: h.evidencia_drive_url || undefined,
+    });
+  }
+  for (const n of d.novedades || []) {
+    ev.push({
+      key: `n${n.id}`, fecha: n.created_at, tipo: 'Novedad', color: 'bg-amber-500',
+      titulo: `${n.codigo_novedad}${n.reason_code_exito ? ` · ${n.reason_code_exito}` : ''}${n.resuelta ? ' (resuelta)' : ''}`,
+      detalle: n.descripcion, usuario: n.created_by, url: n.foto_url || undefined,
+    });
+  }
+  for (const i of d.intentos || []) {
+    ev.push({
+      key: `i${i.id}`, fecha: i.created_at, tipo: 'Intento', color: i.resultado === 'ENTREGADO' ? 'bg-emerald-500' : 'bg-rose-500',
+      titulo: `Intento #${i.numero_intento}: ${i.resultado || '—'}${i.receptor_nombre ? ` · Recibe ${i.receptor_nombre}` : ''}`,
+      detalle: i.observaciones, usuario: i.created_by, url: i.foto_url || i.firma_url || undefined,
+    });
+  }
+  for (const q of d.syncQueue || []) {
+    let statusName = '';
+    try {
+      const pl = typeof q.payload_json === 'string' ? JSON.parse(q.payload_json) : q.payload_json;
+      statusName = pl?.data?.statusName || '';
+    } catch { /* payload no parseable */ }
+    ev.push({
+      key: `q${q.id}`, fecha: q.created_at, tipo: 'Envío Éxito',
+      color: q.estado_cola === 'ENVIADO' ? 'bg-cyan-500' : q.estado_cola === 'DLQ' ? 'bg-rose-600' : 'bg-slate-400',
+      titulo: `status ${q.id_guia_status}${statusName ? ` ${statusName}` : ''} · ${q.estado_cola}${q.http_status ? ` (HTTP ${q.http_status})` : ''}`,
+      detalle: q.intentos > 1 ? `${q.intentos} intentos` : undefined,
+      usuario: q.disparado_por,
+    });
+  }
+  return ev.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+};
+
 const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
   const [activeSubTab, setActiveSubTab] = useState<
     'dashboard' | 'guias' | 'cola_dlq' | 'devoluciones' | 'maestras' | 'sandbox'
@@ -98,6 +142,7 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
 
   // Filtros de guías (Inicia mostrando DISPONIBLES para recoger, pero permite ver TODOS)
   const [filtroEstado, setFiltroEstado] = useState('DISPONIBLES_RECOGIDA');
+  const [consultaGuia, setConsultaGuia] = useState('');
   const [filtroOperacion, setFiltroOperacion] = useState('TODOS');
   const [filtroNodo, setFiltroNodo] = useState('TODOS');
   const [filtroSync, setFiltroSync] = useState('TODOS');
@@ -277,6 +322,29 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
     try {
       const data = await apiFetch(`/guias/${id}`);
       setDetailModalGuia(data);
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  /** Busca una guía por número de guía o pedido (en cualquier estado, incluidas sandbox) y abre su historial. */
+  const handleConsultarGuia = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const termino = consultaGuia.trim();
+    if (!termino) return;
+    try {
+      const qs = new URLSearchParams({
+        estado: 'TODOS', tipoOperacion: 'TODOS', nodoId: 'TODOS', syncStatus: 'TODOS',
+        search: termino, page: '1', limit: '10',
+      });
+      const data = await apiFetch(`/guias?${qs.toString()}`);
+      const lista: any[] = data.guias || [];
+      const t = termino.toLowerCase();
+      const guia =
+        lista.find((g) => String(g.numero_guia).toLowerCase() === t || String(g.numero_pedido).toLowerCase() === t) ||
+        lista[0];
+      if (!guia) return toast.warning(`No se encontró la guía o pedido "${termino}".`);
+      await handleOpenDetail(Number(guia.id));
     } catch (err: any) {
       toast.error(err.message);
     }
@@ -595,43 +663,64 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-[1600px] mx-auto">
-      {/* HEADER PRINCIPAL */}
-      <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl border border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-xs font-black uppercase tracking-wider">
-              MOD-11 · PAG-83
-            </span>
-            <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
-              Go Éxito v2.0 (100% Homologado)
-            </span>
-            <span className="px-3 py-1 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold">
-              Operación Urbana Misma Ciudad (Sin Tránsito Nacional 3/4)
-            </span>
-          </div>
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight">
-            ÉXITO MENSAJERÍA — TORRE DE CONTROL INHOUSE
-          </h1>
-          <p className="text-slate-400 text-xs md:text-sm">
-            Gestión Same-Day y Next-Day · Almacenamiento 100% Google Drive (<code className="text-emerald-300">exito_fulfillment</code>) · Cola Durable 24h + DLQ y Contingencia Manual
-          </p>
+      {/* PESTAÑAS + ACCIONES */}
+      <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 flex flex-col xl:flex-row xl:items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-1">
+          {[
+            { id: 'dashboard', label: 'Resumen', icon: Activity },
+            { id: 'guias', label: 'Guías', icon: Package },
+            { id: 'cola_dlq', label: 'Envíos a Éxito', icon: Send },
+            { id: 'devoluciones', label: 'Devoluciones', icon: RotateCcw },
+            { id: 'maestras', label: 'Configuración', icon: Building2 },
+            { id: 'sandbox', label: 'Pruebas', icon: FlaskConical },
+          ].map((t) => {
+            const Icon = t.icon;
+            const active = activeSubTab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setActiveSubTab(t.id as any)}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                  active ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 bg-slate-800 px-3.5 py-2 rounded-2xl text-xs font-bold cursor-pointer border border-slate-700">
+          <form onSubmit={handleConsultarGuia} className="flex items-center gap-1">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+              <input
+                value={consultaGuia}
+                onChange={(e) => setConsultaGuia(e.target.value)}
+                placeholder="Historial de guía o pedido"
+                className="pl-8 pr-2 py-2 w-56 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+              />
+            </div>
+            <button type="submit" className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold">
+              Consultar
+            </button>
+          </form>
+          <label className="flex items-center gap-1.5 px-2 text-xs font-semibold text-slate-600 cursor-pointer">
             <input
               type="checkbox"
               checked={includeSandbox}
               onChange={(e) => setIncludeSandbox(e.target.checked)}
-              className="rounded text-emerald-500"
+              className="rounded"
             />
-            <span>Ver Guías Sandbox</span>
+            Sandbox
           </label>
           <button
             onClick={() => setShowCreateManualModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase tracking-wider transition"
+            className="flex items-center gap-1 px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs"
+            title="Crear guía por contingencia"
           >
-            <Plus className="w-4 h-4" /> Guía Contingencia
+            <Plus className="w-4 h-4" /> Guía
           </button>
           <button
             onClick={() => {
@@ -639,40 +728,12 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
               loadGuias();
               loadQueue();
             }}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs uppercase transition border border-slate-700"
+            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700"
+            title="Actualizar"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Actualizar
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
-      </div>
-
-      {/* NAVEGACIÓN DE PESTAÑAS */}
-      <div className="flex flex-wrap gap-2 bg-white p-2 rounded-2xl shadow-sm border border-slate-200">
-        {[
-          { id: 'dashboard', label: '1. Dashboard & Observabilidad', icon: Activity },
-          { id: 'guias', label: '2. Guías, Bodega, Rutas y Contingencia', icon: Package },
-          { id: 'cola_dlq', label: '3. Cola Webhook & DLQ (24h)', icon: Send },
-          { id: 'devoluciones', label: '4. Devoluciones Semanales', icon: RotateCcw },
-          { id: 'maestras', label: '5. Nodos y Homologación Sección 16', icon: Building2 },
-          { id: 'sandbox', label: '6. Entorno Pruebas (Sandbox) & OpenAPI', icon: FlaskConical },
-        ].map((t) => {
-          const Icon = t.icon;
-          const active = activeSubTab === t.id;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setActiveSubTab(t.id as any)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition ${
-                active
-                  ? 'bg-slate-900 text-white shadow-md'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {t.label}
-            </button>
-          );
-        })}
       </div>
 
       {/* =====================================================================
@@ -751,7 +812,7 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-5 h-5 text-indigo-600" />
                   <h3 className="font-black text-sm uppercase text-slate-800">
-                    Circuit Breaker & Resiliencia (Sección 9.1)
+                    Conexión con Éxito
                   </h3>
                 </div>
                 <span
@@ -805,16 +866,10 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
                 <div className="flex items-center gap-2">
                   <Clock className="w-5 h-5 text-amber-600" />
                   <h3 className="font-black text-sm uppercase text-slate-800">
-                    Cola de Tracking 24h & DLQ (Sección 9.2)
+                    Envíos a Éxito (24h)
                   </h3>
                 </div>
-                <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 text-[11px] font-black">
-                  RPO = 0
-                </span>
               </div>
-              <p className="text-xs text-slate-600">
-                Reintentos automáticos: <strong>0s, 1m, 2m, 5m, 15m, 30m... hasta 24h</strong>. Luego pasa a <strong>DLQ</strong> con reproceso manual.
-              </p>
               <div className="grid grid-cols-3 gap-2 text-center bg-slate-50 p-3 rounded-xl border border-slate-200">
                 {['ENVIADO', 'REINTENTANDO', 'DLQ'].map((st) => {
                   const found = dashboard?.queueSummary?.find((q: any) => q.estado_cola === st);
@@ -849,10 +904,10 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
           <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="font-black text-sm uppercase text-slate-800">
-                Métricas de Latencia y Nivel de Servicio (SLO Go Éxito v2.0 — Últimas 24h)
+                Tiempos de respuesta (24h)
               </h3>
               <span className="text-xs font-bold text-slate-500">
-                Meta SLO: p95 &le; 2000 ms · p99 &le; 4000 ms · Disponibilidad &ge; 99.5%
+                Meta: p95 ≤ 2 s · p99 ≤ 4 s
               </span>
             </div>
             <div className="overflow-x-auto">
@@ -983,11 +1038,8 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
               <div className="space-y-1">
                 <div className="text-xs font-black uppercase text-amber-400 flex items-center gap-2">
                   <Truck className="w-4 h-4" />
-                  Asignación Global de Placa para Recogida por Nodos (No guía por guía)
+                  Placa de recogida por nodo
                 </div>
-                <p className="text-[11px] text-slate-300">
-                  Seleccione la <strong>Placa + Conductor</strong> y marque los <strong>Nodos Éxito</strong> donde recogerá. Cuando el conductor ingrese con su placa, verá todos los disponibles en esos nodos y estampará su placa al recoger.
-                </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -998,14 +1050,14 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
                       onClick={() => onNavigate('exito-mensajeria-recepcion')}
                       className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-black uppercase transition shadow"
                     >
-                      <Warehouse className="w-4 h-4" /> 2. Página Recepción Almacén (Pistoleo)
+                      <Warehouse className="w-4 h-4" /> Recepción
                     </button>
                     <button
                       type="button"
                       onClick={() => onNavigate('exito-mensajeria-despacho')}
                       className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black uppercase transition shadow"
                     >
-                      <Navigation className="w-4 h-4" /> 3. Página Despacho Inteligente (Rutas)
+                      <Navigation className="w-4 h-4" /> Despacho
                     </button>
                   </>
                 )}
@@ -1459,11 +1511,8 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="font-black text-base uppercase text-slate-900">
-                Cola Durable de Notificaciones Webhook hacia Go Éxito & DLQ (Sección 9.2)
+                Envíos a Éxito
               </h3>
-              <p className="text-xs text-slate-500">
-                Política: Reintento inmediato, 1m, 2m, 5m, 15m, 30m y cada 30m hasta 24h. Permite reproceso manual en cualquier momento.
-              </p>
             </div>
             <div className="flex items-center gap-2">
               <select
@@ -1571,11 +1620,8 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="font-black text-base uppercase text-slate-900">
-                  Generar Lote de Devolución Semanal al Nodo Éxito Local (Id guía = 9)
+                  Lote de devolución semanal
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Agrupa guías con 3 intentos fallidos o rechazo definitivo, genera el Acta PDF en Google Drive (<code className="text-slate-800">Devoluciones/</code>) y notifica a Go Éxito.
-                </p>
               </div>
               <button
                 onClick={async () => {
@@ -1666,11 +1712,8 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
           {/* Matriz Oficial de Homologación Sección 16 Go Éxito v2.0 (Filtrada para Misma Ciudad) */}
           <div className="bg-white rounded-3xl p-5 border border-slate-200 shadow-sm space-y-3">
             <h3 className="font-black text-base uppercase text-slate-900">
-              Matriz Oficial de Homologación de Estados — Sección 16 Go Éxito v2.0 (Operación Misma Ciudad Milla 7)
+              Homologación de estados
             </h3>
-            <p className="text-xs text-slate-600">
-              Como Milla 7 recoge y entrega dentro de los nodos de la <strong>misma ciudad</strong>, los estados nacionales <strong>Id guía 3 (En transporte)</strong> e <strong>Id guía 4 (En ciudad destino)</strong> están desactivados para no enviar pasos nacionales innecesarios.
-            </p>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase">
@@ -1839,7 +1882,7 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
                 <div className="flex items-center gap-2">
                   <FlaskConical className="w-6 h-6 text-amber-600" />
                   <h3 className="font-black text-base uppercase text-slate-900">
-                    Simulador de Integración Go Éxito v2.0 (SANDBOX)
+                    Simulador (Sandbox)
                   </h3>
                 </div>
                 <span className="px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-black">
@@ -1847,9 +1890,6 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
                 </span>
               </div>
 
-              <p className="text-xs text-slate-600">
-                Simula el envío de órdenes desde Grupo Éxito (<code className="text-slate-900">CREATE_GUIDE_REQUEST</code> + <code className="text-slate-900">COLLECT_GUIDE</code>), generando rótulos PDF reales en <code className="text-emerald-700">exito_fulfillment/Sandbox/</code> para que puedas probar todo el flujo Inhouse y la App de Conductor Adulto Mayor (<code className="text-slate-900">PAG-84</code>).
-              </p>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -1930,11 +1970,8 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
                 <div>
                   <div className="font-black text-xs uppercase text-slate-800 flex items-center gap-1.5">
                     <ServerCrash className="w-4 h-4 text-rose-600" />
-                    Simular Caída 503 del Webhook de Go Éxito (Prueba de Contingencia)
+                    Simular caída 503 de Éxito
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Actívelo para comprobar cómo los estados quedan en Cola/Reintento y probar el botón manual <strong>"Reenviar a Éxito"</strong>.
-                  </p>
                 </div>
                 <button
                   onClick={() => handleToggleSandbox503(simulate503Active)}
@@ -1953,7 +1990,7 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
             <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-black text-base uppercase text-emerald-400">
-                  Endpoints Exclusivos para Grupo Éxito & OpenAPI 3.0.3
+                  Endpoints y OpenAPI
                 </h3>
                 <button
                   onClick={handleDownloadOpenApi}
@@ -2016,7 +2053,7 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
             <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <div>
                 <span className="text-xs font-black uppercase text-indigo-600">
-                  Trazabilidad y Evidencias en Google Drive
+                  Historial de la guía
                 </span>
                 <h3 className="text-xl font-black text-slate-900">
                   Guía {detailModalGuia.guia.numero_guia} · Pedido {detailModalGuia.guia.numero_pedido}
@@ -2145,29 +2182,36 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
               ))}
             </div>
 
-            {/* Historial de Eventos */}
+            {/* Historial completo: estados, novedades, intentos y envíos a Éxito */}
             <div>
-              <h4 className="font-black text-xs uppercase text-slate-700 mb-2">
-                Historial Inmutable de Estados
-              </h4>
-              <div className="space-y-2">
-                {(detailModalGuia.historial || []).map((h: any) => (
-                  <div
-                    key={h.id}
-                    className="p-3 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs"
-                  >
-                    <div>
-                      <span className="font-black text-slate-900">
-                        {h.estado_anterior || 'INICIO'} &rarr; {h.estado_nuevo} (Id guía={h.id_guia_exito})
-                      </span>
-                      <p className="text-slate-600 text-[11px]">{h.observacion}</p>
-                    </div>
-                    <div className="text-right text-[11px] text-slate-500">
-                      <div>{h.usuario_nombre}</div>
-                      <div>{new Date(h.created_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}</div>
+              <h4 className="font-black text-xs uppercase text-slate-700 mb-2">Historial completo</h4>
+              <div className="relative border-l-2 border-slate-200 ml-2 space-y-3">
+                {construirLineaTiempo(detailModalGuia).map((ev) => (
+                  <div key={ev.key} className="relative pl-5">
+                    <span className={`absolute -left-[7px] top-1.5 w-3 h-3 rounded-full ${ev.color}`} />
+                    <div className="flex flex-wrap items-start justify-between gap-2 text-xs">
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-900">
+                          <span className="text-[10px] uppercase font-black text-slate-400 mr-1.5">{ev.tipo}</span>
+                          {ev.titulo}
+                        </div>
+                        {ev.detalle && <p className="text-[11px] text-slate-600 break-words">{ev.detalle}</p>}
+                        {ev.url && (
+                          <a href={ev.url} target="_blank" rel="noreferrer" className="text-[11px] font-bold text-emerald-700 hover:underline inline-flex items-center gap-1">
+                            <ExternalLink className="w-3 h-3" /> Evidencia
+                          </a>
+                        )}
+                      </div>
+                      <div className="text-right text-[11px] text-slate-500 shrink-0">
+                        <div>{new Date(ev.fecha).toLocaleString('es-CO', { timeZone: 'America/Bogota' })}</div>
+                        {ev.usuario && <div>{ev.usuario}</div>}
+                      </div>
                     </div>
                   </div>
                 ))}
+                {construirLineaTiempo(detailModalGuia).length === 0 && (
+                  <p className="pl-5 text-xs text-slate-400">Sin eventos registrados.</p>
+                )}
               </div>
             </div>
           </div>
@@ -2184,11 +2228,8 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
             className="bg-white rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl"
           >
             <h3 className="text-lg font-black text-slate-900">
-              Contingencia Manual: Guía {manualModalGuia.numero_guia}
+              Cambiar estado · {manualModalGuia.numero_guia}
             </h3>
-            <p className="text-xs text-slate-600">
-              Actualiza manualmente el estado urbano de la guía y despacha inmediatamente la notificación homologada al Webhook de Go Éxito.
-            </p>
             <div>
               <label className="text-xs font-black uppercase text-slate-600">
                 Nuevo Estado Urbano (Misma Ciudad)
@@ -2249,7 +2290,7 @@ const ExitoMensajeriaInhouse: React.FC<Props> = ({ user, onNavigate }) => {
             className="bg-white rounded-3xl max-w-lg w-full p-6 space-y-3 shadow-2xl max-h-[90vh] overflow-y-auto"
           >
             <h3 className="text-lg font-black text-slate-900">
-              Crear Guía por Contingencia Manual (Genera Rótulo en Google Drive)
+              Nueva guía (contingencia)
             </h3>
             <div className="grid grid-cols-2 gap-2">
               <select
