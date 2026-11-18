@@ -1591,12 +1591,21 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
                       </tr>
                     ) : (
                       (rutaActivaSeleccionada.guias_ruta || []).map((g: any) => {
-                        const entregada = g.estado_operativo === 'ENTREGADO';
-                        const enRuta = g.estado_operativo === 'EN_RUTA';
-                        const conNov = Boolean(g.tiene_novedad_activa || g.estado_operativo === 'NOVEDAD');
-                        const sinRecibir = g.estado_operativo === 'RECOGIDA_TIENDA';
+                        // Parada histórica: la guía salió de esta ruta por novedad (puede estar despachada en otra)
+                        const historica = g.activa_en_ruta === false;
+                        const entregada = historica ? g.estado_parada === 'ENTREGADA' : g.estado_operativo === 'ENTREGADO';
+                        const enRuta = !historica && g.estado_operativo === 'EN_RUTA';
+                        const conNov = historica
+                          ? !entregada
+                          : Boolean(g.tiene_novedad_activa || g.estado_operativo === 'NOVEDAD');
+                        const sinRecibir = !historica && g.estado_operativo === 'RECOGIDA_TIENDA';
                         return (
-                          <tr key={g.id} className={sinRecibir ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-slate-50'}>
+                          <tr
+                            key={g.id}
+                            className={
+                              historica ? 'bg-slate-50 opacity-70' : sinRecibir ? 'bg-amber-50/60 hover:bg-amber-50' : 'hover:bg-slate-50'
+                            }
+                          >
                             <td className="p-3">
                               <div className="font-black text-slate-950">{g.numero_guia}</div>
                               <div className="text-[10px] text-slate-500 font-bold">
@@ -1672,7 +1681,12 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
                                   4. {entregada ? '✅ ENTREGADO' : conNov ? '⚠️ NOVEDAD' : 'Pend. Entrega'}
                                 </span>
                               </div>
-                              {conNov && g.ultima_novedad_texto && (
+                              {historica && !entregada && (
+                                <div className="text-[10px] font-black text-slate-600 mt-1">
+                                  Salió de esta ruta por novedad · hoy: {String(g.estado_operativo || '').replace(/_/g, ' ')}
+                                </div>
+                              )}
+                              {!historica && conNov && g.ultima_novedad_texto && (
                                 <div className="text-[10px] font-bold text-rose-700 mt-1">
                                   ⚠️ {g.ultima_novedad_texto}
                                 </div>
@@ -1695,7 +1709,7 @@ const ExitoMensajeriaDespacho: React.FC<Props> = () => {
                                 >
                                   Historial / Fotos
                                 </button>
-                                {!entregada && (
+                                {!entregada && !historica && (
                                   <button
                                     type="button"
                                     disabled={submitting}

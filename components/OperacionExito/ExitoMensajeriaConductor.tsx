@@ -84,6 +84,8 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
   // Paso 0: Digitación de Placa + Validación de Cédula del Conductor (Siempre pide la placa al entrar para evitar confusión si cambió de vehículo)
   const [placaInput, setPlacaInput] = useState<string>('');
   const [cedulaInput, setCedulaInput] = useState<string>(() => user.documentNumber || '');
+  // Error de acceso mostrado dentro del formulario (placa/cédula no válidas)
+  const [errorAcceso, setErrorAcceso] = useState<{ titulo: string; detalle: string } | null>(null);
   const [placaValidada, setPlacaValidada] = useState<string>('');
   const [vehiculoIdValidado, setVehiculoIdValidado] = useState<string>('');
   const [conductorIdValidado, setConductorIdValidado] = useState<string>('');
@@ -285,8 +287,17 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
         });
         const data = await res.json();
         if (!res.ok) {
+          if (res.status === 403 || res.status === 400) {
+            setErrorAcceso({
+              titulo: data.code === 'CEDULA_NO_ASIGNADA' ? 'Cédula no asignada a esta placa' : 'No se pudo ingresar',
+              detalle: data.error || 'Verifique la placa y la cédula.',
+            });
+            setPlacaValidada('');
+            return;
+          }
           throw new Error(data.error || 'No se pudo validar la placa asignada.');
         }
+        setErrorAcceso(null);
 
         if (data.requiresPlate) {
           setPlacaValidada('');
@@ -588,7 +599,7 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
             <input
               type="text"
               value={placaInput}
-              onChange={(e) => setPlacaInput(e.target.value.toUpperCase())}
+              onChange={(e) => { setPlacaInput(e.target.value.toUpperCase()); setErrorAcceso(null); }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') validarPlacaYCargarTareas();
               }}
@@ -605,7 +616,10 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
             <input
               type="text"
               value={cedulaInput}
-              onChange={(e) => setCedulaInput(e.target.value)}
+              onChange={(e) => {
+                setCedulaInput(e.target.value);
+                setErrorAcceso(null);
+              }}
               placeholder="Número de Cédula del Conductor"
               className="w-full h-14 px-4 rounded-2xl border-2 border-slate-300 bg-slate-50 text-slate-900 text-xl font-black text-center"
             />
@@ -613,6 +627,21 @@ const ExitoMensajeriaConductor: React.FC<Props> = ({ user }) => {
               Solo verá las recogidas y rutas de la placa asignadas a esta cédula.
             </p>
           </div>
+
+          {errorAcceso && (
+            <div className="rounded-2xl border-2 border-rose-300 bg-rose-50 p-4 flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 font-black text-xl">
+                !
+              </div>
+              <div className="space-y-1">
+                <div className="text-base font-black text-rose-900">{errorAcceso.titulo}</div>
+                <div className="text-sm font-bold text-rose-800">{errorAcceso.detalle}</div>
+                <div className="text-xs text-rose-700">
+                  Revise la cédula o pida a Inhouse / Despacho que le asigne la placa.
+                </div>
+              </div>
+            </div>
+          )}
 
           <button
             onClick={() => validarPlacaYCargarTareas()}

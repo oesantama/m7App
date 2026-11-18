@@ -2432,15 +2432,18 @@ export async function getSmartDispatchSuggestions(req: Request, res: Response) {
                 'tiene_novedad_activa', g2.tiene_novedad_activa,
                 'ultima_novedad_texto', g2.ultima_novedad_texto,
                 'foto_entrega_url', COALESCE(g2.foto_entrega_url, g2.foto_url),
-                'firma_entrega_url', g2.firma_entrega_url
+                'firma_entrega_url', g2.firma_entrega_url,
+                'estado_parada', rg2.estado_parada,
+                'activa_en_ruta', (g2.ruta_actual_id = rt.id)
               )
-              ORDER BY g2.barrio_destinatario ASC, g2.direccion_destinatario ASC
+              ORDER BY rg2.orden_parada ASC NULLS LAST, g2.barrio_destinatario ASC, g2.direccion_destinatario ASC
             )
-            FROM exito_msj_guias g2
+            FROM exito_msj_ruta_guias rg2
+            JOIN exito_msj_guias g2 ON g2.id = rg2.guia_id
             LEFT JOIN exito_msj_nodos n2 ON n2.id = g2.nodo_id
             LEFT JOIN exito_msj_recogidas rec2 ON rec2.id = g2.recogida_id
             LEFT JOIN vehicles vr2 ON vr2.id = g2.vehiculo_recogida_id
-            WHERE g2.ruta_actual_id = rt.id AND g2.deleted_at IS NULL
+            WHERE rg2.ruta_id = rt.id AND g2.deleted_at IS NULL
           ),
           '[]'::json
         ) AS guias_ruta
@@ -2454,12 +2457,18 @@ export async function getSmartDispatchSuggestions(req: Request, res: Response) {
 
     const rutasActivasEnriquecidas = rutasActivasRes.rows.map((r: any) => {
       const lista = Array.isArray(r.guias_ruta) ? r.guias_ruta : [];
-      const entregadas = lista.filter((x: any) => x.estado_operativo === 'ENTREGADO').length;
-      const conNovedad = lista.filter(
-        (x: any) => x.tiene_novedad_activa || x.estado_operativo === 'NOVEDAD'
+      // Histórico por parada: una guía que salió por novedad sigue contando en ESTA ruta como novedad,
+      // aunque ya esté despachada en otra.
+      const esNovedadParada = (x: any) =>
+        !x.activa_en_ruta && x.estado_parada && x.estado_parada !== 'PENDIENTE' && x.estado_parada !== 'ENTREGADA';
+      const entregadas = lista.filter(
+        (x: any) => x.estado_parada === 'ENTREGADA' || (x.activa_en_ruta && x.estado_operativo === 'ENTREGADO')
       ).length;
-      const enReparto = lista.filter((x: any) => x.estado_operativo === 'EN_RUTA').length;
-      const enAlmacen = lista.filter((x: any) => x.estado_operativo === 'EN_ALMACEN').length;
+      const conNovedad = lista.filter(
+        (x: any) => esNovedadParada(x) || (x.activa_en_ruta && x.tiene_novedad_activa && x.estado_operativo !== 'EN_RUTA')
+      ).length;
+      const enReparto = lista.filter((x: any) => x.activa_en_ruta && x.estado_operativo === 'EN_RUTA').length;
+      const enAlmacen = lista.filter((x: any) => x.activa_en_ruta && x.estado_operativo === 'EN_ALMACEN').length;
       const totalUnidades = lista.reduce((acc: number, x: any) => acc + Number(x.cant_cajas || 1), 0);
       const totalPesoKg = Number(
         lista.reduce((acc: number, x: any) => acc + Number(x.peso_kg || 1), 0).toFixed(1)
@@ -2524,7 +2533,7 @@ async function retirarGuiaDeRutaActual(client: any, guiaId: number, rutaId: numb
   );
   await client.query(
     `UPDATE exito_msj_rutas
-     SET total_guias = (SELECT COUNT(*)::int FROM exito_msj_guias WHERE ruta_actual_id = $1 AND deleted_at IS NULL),
+     SET total_guias = (SELECT COUNT(*)::int FROM exito_msj_ruta_guias WHERE ruta_id = $1),
          updated_at = NOW()
      WHERE id = $1`,
     [rutaId]
@@ -2761,7 +2770,7 @@ export async function createUrbanDeliveryRoute(req: any, res: Response) {
 
       await client.query(
         `UPDATE exito_msj_rutas
-         SET total_guias = (SELECT COUNT(*)::int FROM exito_msj_guias WHERE ruta_actual_id = $1 AND deleted_at IS NULL),
+         SET total_guias = (SELECT COUNT(*)::int FROM exito_msj_ruta_guias WHERE ruta_id = $1),
              updated_at = NOW()
          WHERE id = $1`,
         [r.id]
@@ -3004,7 +3013,7 @@ export async function manageUrbanDeliveryRoute(req: any, res: Response) {
 
         await client.query(
           `UPDATE exito_msj_rutas
-           SET total_guias = (SELECT COUNT(*)::int FROM exito_msj_guias WHERE ruta_actual_id = $1 AND deleted_at IS NULL),
+           SET total_guias = (SELECT COUNT(*)::int FROM exito_msj_ruta_guias WHERE ruta_id = $1),
                updated_at = NOW()
            WHERE id = $1`,
           [rutaId]
@@ -3585,7 +3594,8 @@ export async function getDriverTasks(req: any, res: Response) {
     const rutasDelConductor = rutasActivas.filter((r: any) => soloDigitos(r.cedula_mostrar) === cleanUserCedula);
     if (nodosDelConductor.length === 0 && rutasDelConductor.length === 0) {
       return res.status(403).json({
-        error: `La placa ${placaOficial} no tiene recogidas ni rutas asignadas a la cédula ${rawCedula}. Verifique la cédula o pida a Inhouse/Despacho que asigne el conductor.`,
+        code: 'CEDULA_NO_ASIGNADA',
+        error: `La cédula ${rawCedula} no tiene recogidas ni rutas asignadas en la placa ${placaOficial}.`,
       });
     }
     nodosAsignados.splice(0, nodosAsignados.length, ...nodosDelConductor);
