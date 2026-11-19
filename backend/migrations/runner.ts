@@ -16,6 +16,7 @@ import { migration013 } from './013_gh_asignaciones_reposicion.js';
 import { migration014 } from './014_password_reset_tokens.js';
 import { migration015 } from './015_exito_estado_novedad.js';
 import { migration016 } from './016_maestra_bancos_conciliacion.js';
+import { migration017 } from './017_master_records_updated_by.js';
 
 export const MIGRATIONS_REGISTRY: Migration[] = [
   migration001,
@@ -33,7 +34,8 @@ export const MIGRATIONS_REGISTRY: Migration[] = [
   migration013,
   migration014,
   migration015,
-  migration016
+  migration016,
+  migration017
 ];
 
 const ADVISORY_LOCK_ID = 742910385;

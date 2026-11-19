@@ -34,7 +34,26 @@ export const saveMasterRecord = async (req: Request, res: Response) => {
   const createdBy = r.createdBy || r.updatedBy || 'System';
   const updatedBy = r.updatedBy || r.createdBy || 'System';
 
+  if (!name || String(name).trim() === '') {
+    return res.status(400).json({ success: false, error: 'El nombre es obligatorio.' });
+  }
+
   try {
+    // No permitir dos registros con el mismo nombre en la misma categoría (ignora mayúsculas, espacios y puntos)
+    const duplicado = await pool.query(
+      `SELECT id, name FROM master_records
+        WHERE category = $1 AND id <> $2
+          AND regexp_replace(UPPER(TRIM(name)), '[\\s\\.]+', '', 'g') = regexp_replace(UPPER(TRIM($3)), '[\\s\\.]+', '', 'g')
+        LIMIT 1`,
+      [category, id, name]
+    );
+    if (duplicado.rows.length > 0) {
+      return res.status(409).json({
+        success: false,
+        error: `Ya existe "${duplicado.rows[0].name}" (${duplicado.rows[0].id}) en esta maestra.`,
+      });
+    }
+
     const result = await pool.query(`
       INSERT INTO master_records (id, category, name, description, parent_id, notification_email, icon_class, status_id, tipo_notificacion_id, created_by, updated_by, created_at, updated_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
