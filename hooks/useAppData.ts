@@ -52,6 +52,8 @@ export const useAppData = () => {
               if (!grouped[m.category]) grouped[m.category] = [];
               grouped[m.category].push(m);
             });
+            // La pantalla de la maestra de bancos lee la categoría 'masterBancos' (en BD: category = 'bancos')
+            grouped.masterBancos = normalizeData(grouped.bancos || []);
             useAppStore.getState().updateMasterData(grouped);
           }
       }).catch(() => []);
