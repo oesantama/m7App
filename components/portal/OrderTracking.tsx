@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import ExitoTrackingView from './ExitoTrackingView';
 
 const OrderTracking: React.FC = () => {
     const [trackingInput, setTrackingInput] = useState('');
@@ -218,8 +219,11 @@ const OrderTracking: React.FC = () => {
                 </form>
              </div>
 
-             {/* Result Card */}
-             {order && (
+             {/* Guías Éxito: vista con etapas, intentos y evidencias */}
+             {order && order.is_exito && Array.isArray(order.etapas) && <ExitoTrackingView order={order} />}
+
+             {/* Result Card (documentos / pedidos) */}
+             {order && !(order.is_exito && Array.isArray(order.etapas)) && (
                  <div className="bg-white text-slate-900 rounded-[2.5rem] p-6 md:p-10 shadow-2xl animate-in slide-in-from-bottom-5 duration-500 border border-slate-100">
                     <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-8 border-b border-slate-100 pb-6">
                         <div>
