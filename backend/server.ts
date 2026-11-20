@@ -237,6 +237,7 @@ app.use('/api', (req, res, next) => {
     '/it-activos/script/dl/',
     '/gh-perfiles-cargo-publico',
     '/whatsapp/webhook',
+    '/portal',
     '/v1',
     '/exito-mensajeria/openapi.json',
     '/exito-mensajeria/guias/por-numero',

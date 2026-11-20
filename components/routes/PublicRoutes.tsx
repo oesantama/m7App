@@ -87,8 +87,48 @@ export const PublicRoutes: React.FC = () => {
             </>
           }
         />
+        {/* CONSULTA PÚBLICA DE GUÍAS Y PEDIDOS (CLIENTE FINAL Y EMPRESAS) */}
+        <Route
+          path="/tracking"
+          element={
+            <>
+              <Toaster position="top-left" richColors theme="dark" />
+              <PWABanner />
+              <AutoUpdate />
+              <PortalLayout>
+                <OrderTracking />
+              </PortalLayout>
+            </>
+          }
+        />
+        <Route
+          path="/tracking/:trackingId"
+          element={
+            <>
+              <Toaster position="top-left" richColors theme="dark" />
+              <PWABanner />
+              <AutoUpdate />
+              <PortalLayout>
+                <OrderTracking />
+              </PortalLayout>
+            </>
+          }
+        />
         <Route
           path="/portal/tracking"
+          element={
+            <>
+              <Toaster position="top-left" richColors theme="dark" />
+              <PWABanner />
+              <AutoUpdate />
+              <PortalLayout>
+                <OrderTracking />
+              </PortalLayout>
+            </>
+          }
+        />
+        <Route
+          path="/portal/tracking/:trackingId"
           element={
             <>
               <Toaster position="top-left" richColors theme="dark" />
@@ -128,7 +168,9 @@ export const isPublicRoute = (pathname: string, hash: string): boolean => {
     pathname.startsWith('/documentacion/') ||
     pathname.startsWith('/attendance/') ||
     pathname.startsWith('/portal') ||
+    pathname.startsWith('/tracking') ||
     hash.startsWith('#/portal') ||
+    hash.startsWith('#/tracking') ||
     hash.startsWith('#/publico/')
   ) {
     return true;

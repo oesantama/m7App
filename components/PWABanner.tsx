@@ -3,6 +3,12 @@ import { useRegisterSW } from 'virtual:pwa-register/react';
 
 declare const __APP_VERSION__: string;
 
+declare global {
+  interface Window {
+    __orbitTriggerSWUpdate?: () => Promise<void>;
+  }
+}
+
 const PWABanner: React.FC = () => {
   const {
     offlineReady: [offlineReady, setOfflineReady],
@@ -11,77 +17,42 @@ const PWABanner: React.FC = () => {
   } = useRegisterSW({
     onRegistered(r) {
       if (r) {
-        // Check for updates in the background every 5 minutes
+        // Verificar periódicamente si hay nuevo service worker
         setInterval(() => {
           r.update().catch(() => {});
-        }, 5 * 60 * 1000);
+        }, 60 * 1000);
       }
     },
     onRegisterError() {},
   });
 
-  // 1. Version check on mount: If the version compiled in __APP_VERSION__ is different
-  // from the version stored in localStorage, we clear all caches and reload immediately.
-  useEffect(() => {
-    try {
-      const currentVersion = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0';
-      const lastVersion = localStorage.getItem('m7_app_version');
-
-      if (lastVersion && lastVersion !== currentVersion) {
-        console.log(`[PWA] Version upgrade detected: ${lastVersion} -> ${currentVersion}. Purging caches...`);
-        localStorage.setItem('m7_app_version', currentVersion);
-        
-        if ('caches' in window) {
-          caches.keys().then((cacheNames) => {
-            Promise.all(cacheNames.map((name) => caches.delete(name)))
-              .then(() => {
-                console.log('[PWA] Caches cleared on version upgrade. Reloading...');
-                window.location.reload();
-              })
-              .catch(() => window.location.reload());
-          }).catch(() => window.location.reload());
-        } else {
-          window.location.reload();
-        }
-      } else if (!lastVersion) {
-        localStorage.setItem('m7_app_version', currentVersion);
-      }
-    } catch (e) {
-      console.error('[PWA] Error checking version in localStorage:', e);
-    }
-  }, []);
-
-  // 2. SW update check: If the service worker detects a pending update,
-  // we clear the cache, trigger update, and reload.
+  // Cuando el Service Worker detecta una versión en espera (needRefresh),
+  // se almacena la función de actualización y se emite la alerta interactiva
+  // para que el usuario sea quien dé clic en Aceptar.
   useEffect(() => {
     if (needRefresh) {
-      console.log('[PWA] New service worker version detected. Clearing cache and updating...');
-      
-      const performAutoUpdate = async () => {
-        if ('caches' in window) {
-          try {
+      window.__orbitTriggerSWUpdate = async () => {
+        try {
+          if ('caches' in window) {
             const cacheNames = await caches.keys();
-            await Promise.all(
-              cacheNames.map((cacheName) => caches.delete(cacheName))
-            );
-            console.log('[PWA] CacheStorage cleared successfully.');
-          } catch (error) {
-            console.error('[PWA] Error clearing CacheStorage:', error);
+            await Promise.all(cacheNames.map((name) => caches.delete(name)));
           }
+          await updateServiceWorker(true);
+          setNeedRefresh(false);
+        } catch (error) {
+          console.warn('[PWA] Error activando nuevo service worker:', error);
         }
-        updateServiceWorker(true);
-        setNeedRefresh(false);
-        
-        setTimeout(() => {
-          window.location.reload();
-        }, 500);
       };
 
-      performAutoUpdate();
+      // Notificar al componente AutoUpdate para mostrar el modal con botón Aceptar
+      window.dispatchEvent(
+        new CustomEvent('orbit-new-version-available', {
+          detail: { reason: 'sw-need-refresh' },
+        })
+      );
     }
 
     if (offlineReady) {
-      console.log('[PWA] App is ready for offline usage');
       setOfflineReady(false);
     }
   }, [needRefresh, offlineReady, updateServiceWorker, setOfflineReady, setNeedRefresh]);
