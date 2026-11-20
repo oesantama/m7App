@@ -64,29 +64,39 @@ const AutoUpdate: React.FC = () => {
   }, [localInfo.build, localInfo.version]);
 
   useEffect(() => {
-    // 1. Chequeo inicial a los 5 segundos de arrancar
-    const initTimer = setTimeout(() => {
-      checkServerVersion();
-    }, 5000);
+    // 1. Chequeo inicial inmediato y a los 3 segundos
+    checkServerVersion();
+    const initTimer = setTimeout(checkServerVersion, 3000);
 
-    // 2. Intervalo periódico cada 45 segundos para detección rápida
-    const interval = setInterval(checkServerVersion, 45 * 1000);
+    // 2. Intervalo periódico cada 30 segundos
+    const interval = setInterval(checkServerVersion, 30 * 1000);
 
-    // 3. Verificación inmediata cuando el usuario regresa a la pestaña (Visibility Change)
+    // 3. Verificación cuando el usuario regresa a la pestaña (Visibility Change)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         checkServerVersion();
       }
     };
 
+    // 4. Escuchar evento de actualización del Service Worker
+    const handleSWUpdateEvent = (e: any) => {
+      console.log('[ORBIT-UPDATE] Evento de actualización SW recibido:', e?.detail);
+      setUpdateAvailable(true);
+      if (e?.detail?.meta) {
+        setNewMeta(e.detail.meta);
+      }
+    };
+
     window.addEventListener('focus', checkServerVersion);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('orbit-new-version-available', handleSWUpdateEvent);
 
     return () => {
       clearTimeout(initTimer);
       clearInterval(interval);
       window.removeEventListener('focus', checkServerVersion);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('orbit-new-version-available', handleSWUpdateEvent);
     };
   }, [checkServerVersion]);
 
@@ -107,12 +117,17 @@ const AutoUpdate: React.FC = () => {
   const handleAcceptUpdate = async () => {
     setIsUpdating(true);
     try {
+      // Si el Service Worker tiene actualización pendiente, activarla
+      if (window.__orbitTriggerSWUpdate) {
+        await window.__orbitTriggerSWUpdate();
+      }
+
       // Limpiar todas las cachés del navegador / Service Worker
       if ('caches' in window) {
         const keys = await caches.keys();
         await Promise.all(keys.map(k => caches.delete(k)));
       }
-      // Si hay service worker activo, pedirle que tome control
+      
       if ('serviceWorker' in navigator) {
         const registrations = await navigator.serviceWorker.getRegistrations();
         for (const registration of registrations) {
@@ -126,7 +141,7 @@ const AutoUpdate: React.FC = () => {
     // Pequeño retardo visual y recarga dura forzada
     setTimeout(() => {
       window.location.reload();
-    }, 400);
+    }, 300);
   };
 
   if (!updateAvailable || isDismissed) {
