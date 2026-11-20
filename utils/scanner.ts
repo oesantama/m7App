@@ -56,11 +56,18 @@ export const extractUnitFromBarcode = (raw: string): string | null => {
   return null;
 };
 
+/**
+ * Corrige lecturas de pistolas en tablets con teclado en español: la tecla del guion '-' (distribución US)
+ * llega como apóstrofo/tilde (' ´ ` ‘ ’). Ej: P14C14'350'1500 → P14C14-350-1500.
+ */
+export const normalizeScannerLayout = (raw: string): string =>
+  (raw || '').replace(/['´`‘’]/g, '-');
+
 export const cleanSkuM7 = (raw: string): string => {
   if (!raw) return '';
 
   // Normalizar: trim, mayusculas, quitar \r (Windows line endings de algunos scanners)
-  let code = raw.trim().toUpperCase().replace(/\r/g, '');
+  let code = normalizeScannerLayout(raw).trim().toUpperCase().replace(/\r/g, '');
 
   // 1. Eliminar prefijos de hardware conocidos al inicio
   const knownPrefixes = ['S4:', 'ID:', 'SKU:'];

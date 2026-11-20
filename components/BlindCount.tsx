@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { Icons } from '../constants';
 import { toast } from 'sonner';
 import { Article, DocumentL, DocumentLItem, MasterRecord, DocStatus, User } from '../types';
-import { cleanSkuM7, extractUnitFromBarcode } from '../utils/scanner';
+import { cleanSkuM7, extractUnitFromBarcode, normalizeScannerLayout } from '../utils/scanner';
 import { api } from '../services/api';
 import { markPendingCount, clearPendingCount } from '../utils/pendingCounts';
 
@@ -465,6 +465,8 @@ const BlindCount: React.FC<BlindCountProps> = ({
 
   const enqueueScan = (rawString: string) => {
       if (!rawString || rawString.trim().length < 2) return;
+      // Teclado en español: el guion del lector llega como apóstrofo → se corrige antes de partir ráfagas
+      rawString = normalizeScannerLayout(rawString).toUpperCase();
       // M7 V18: Encolar siempre — processBarcode se encarga de limpiar y clasificar.
       // Ya no descartamos códigos sin ':' aquí; eso causaba pérdida silenciosa de lecturas 1D largas.
       scanQueue.current.push(rawString);
